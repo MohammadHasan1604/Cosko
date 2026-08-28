@@ -1,0 +1,23 @@
+# COSKO Search Engine Directives
+User-agent: *
+Allow: /
+Allow: /sign-up-login
+
+# Protect Private Enterprise Application Routes
+Disallow: /dashboard
+Disallow: /sales
+Disallow: /inventory-management
+Disallow: /purchases
+Disallow: /customers
+Disallow: /vendors
+Disallow: /expenses
+Disallow: /accounting
+Disallow: /reports
+Disallow: /employees
+Disallow: /stores
+Disallow: /users
+Disallow: /integrations
+Disallow: /audit-logs
+Disallow: /settings
+
+Sitemap: http://localhost:4028/sitemap.xml

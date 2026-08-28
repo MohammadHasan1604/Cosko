@@ -1,0 +1,40 @@
+# Node modules
+node_modules/
+package-lock.json
+
+# Next.js build output
+.next/
+out/
+
+# Production build
+build/
+
+# Environment Variables & Secrets
+.env
+.env*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Vercel deployment
+.vercel/
+
+# TypeScript & Testing
+*.tsbuildinfo
+coverage/
+jest-test-results.json
+
+# IDEs
+.vscode/
+.idea/
+
+# TurboRepo or monorepo
+turbo/

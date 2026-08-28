@@ -1,0 +1,601 @@
+'use client';
+import React, { useState, useMemo } from 'react';
+import Icon from '@/components/ui/AppIcon';
+import StatusBadge from '@/components/ui/StatusBadge';
+import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import EmptyState from '@/components/ui/EmptyState';
+import StockAdjustmentForm from './StockAdjustmentForm';
+import AddItemModal from './AddItemModal';
+import ProductDetailModal from './ProductDetailModal';
+import { useApp, InventoryItem } from '@/context/AppContext';
+import { toast } from 'sonner';
+
+type SortKey = keyof InventoryItem;
+
+const ALL_COLUMNS = [
+  { key: 'sku', label: 'SKU', visible: true },
+  { key: 'name', label: 'Item Name', visible: true },
+  { key: 'brand', label: 'Brand', visible: true },
+  { key: 'category', label: 'Category', visible: true },
+  { key: 'store', label: 'Store', visible: true },
+  { key: 'qtyOnHand', label: 'Qty on Hand', visible: true },
+  { key: 'reorderPt', label: 'Reorder Pt', visible: true },
+  { key: 'costPrice', label: 'Cost Price', visible: true },
+  { key: 'sellingPrice', label: 'Sell Price', visible: true },
+  { key: 'mrp', label: 'MRP', visible: true },
+  { key: 'hsn', label: 'HSN', visible: false },
+  { key: 'taxRate', label: 'Tax %', visible: true },
+  { key: 'fifoLots', label: 'FIFO Lots', visible: false },
+  { key: 'status', label: 'Status', visible: true },
+  { key: 'lastMovement', label: 'Last Movement', visible: false },
+];
+
+const STORES = ['All Stores', 'BLR', 'HYD', 'DEL'];
+const CATEGORIES = ['All Categories', 'Electricals', 'Lighting', 'Wiring', 'Power Tools', 'Hand Tools', 'Circuit Protection', 'Power Conditioning'];
+const STATUSES = ['All Status', 'Active', 'Inactive', 'Low Stock', 'Out of Stock'];
+
+function getStockStatus(item: InventoryItem) {
+  if (item.qtyOnHand === 0) return { variant: 'out-of-stock' as const, label: 'Out of Stock' };
+  if (item.qtyOnHand <= item.reorderPt) return { variant: 'low-stock' as const, label: 'Low Stock' };
+  if (item.status === 'inactive') return { variant: 'inactive' as const, label: 'Inactive' };
+  return { variant: 'active' as const, label: 'Active' };
+}
+
+export default function InventoryTable() {
+  const { inventory, deleteItem: removeInventoryItem, updateItem, selectedStore } = useApp();
+
+  const [search, setSearch] = useState('');
+  const [storeFilter, setStoreFilter] = useState(selectedStore);
+  const [categoryFilter, setCategoryFilter] = useState('All Categories');
+  const [statusFilter, setStatusFilter] = useState('All Status');
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [columnConfig, setColumnConfig] = useState(ALL_COLUMNS);
+  const [colVisOpen, setColVisOpen] = useState(false);
+
+  const [adjustItem, setAdjustItem] = useState<InventoryItem | null>(null);
+  const [editItem, setEditItem] = useState<InventoryItem | null>(null);
+  const [viewItem, setViewItem] = useState<InventoryItem | null>(null);
+  const [deleteItemModal, setDeleteItemModal] = useState<InventoryItem | null>(null);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [statusDropdownId, setStatusDropdownId] = useState<string | null>(null);
+
+  const visibleColumns = columnConfig.filter((c) => c.visible);
+
+  const filtered = useMemo(() => {
+    return inventory.filter((item) => {
+      const matchSearch =
+        search === '' ||
+        item.name.toLowerCase().includes(search.toLowerCase()) ||
+        item.sku.toLowerCase().includes(search.toLowerCase()) ||
+        item.barcode.includes(search) ||
+        item.brand.toLowerCase().includes(search.toLowerCase());
+
+      const matchStore = storeFilter === 'All Stores' || item.store === storeFilter;
+      const matchCategory = categoryFilter === 'All Categories' || item.category === categoryFilter;
+
+      const stockSt = getStockStatus(item);
+      const matchStatus =
+        statusFilter === 'All Status' ||
+        (statusFilter === 'Active' && stockSt.variant === 'active') ||
+        (statusFilter === 'Inactive' && item.status === 'inactive') ||
+        (statusFilter === 'Low Stock' && stockSt.variant === 'low-stock') ||
+        (statusFilter === 'Out of Stock' && stockSt.variant === 'out-of-stock');
+
+      return matchSearch && matchStore && matchCategory && matchStatus;
+    });
+  }, [inventory, search, storeFilter, categoryFilter, statusFilter]);
+
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      if (typeof av === 'number' && typeof bv === 'number') {
+        return sortDir === 'asc' ? av - bv : bv - av;
+      }
+      return sortDir === 'asc'
+        ? String(av).localeCompare(String(bv))
+        : String(bv).localeCompare(String(av));
+    });
+  }, [filtered, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / perPage));
+  const paginated = sorted.slice((page - 1) * perPage, page * perPage);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === paginated.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginated.map((i) => i.id)));
+    }
+  };
+
+  const handleSelectRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = () => {
+    selectedIds.forEach((id) => removeInventoryItem(id));
+    setSelectedIds(new Set());
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteItemModal) return;
+    setDeleteLoading(true);
+    await new Promise((r) => setTimeout(r, 400));
+    removeInventoryItem(deleteItemModal.id);
+    setDeleteLoading(false);
+    setDeleteItemModal(null);
+  };
+
+  const handleStatusChange = (itemId: string, newStatus: 'active' | 'inactive' | 'discontinued') => {
+    setStatusDropdownId(null);
+    updateItem(itemId, { status: newStatus });
+  };
+
+  const toggleColumn = (key: string) => {
+    setColumnConfig((prev) =>
+      prev.map((c) => (c.key === key ? { ...c, visible: !c.visible } : c))
+    );
+  };
+
+  const SortIcon = ({ colKey }: { colKey: string }) => {
+    if (sortKey !== colKey) return <Icon name="ChevronUpDownIcon" size={12} className="text-muted-foreground opacity-50" />;
+    return sortDir === 'asc'
+      ? <Icon name="ChevronUpIcon" size={12} className="text-primary" />
+      : <Icon name="ChevronDownIcon" size={12} className="text-primary" />;
+  };
+
+  return (
+    <>
+      <div className="card overflow-hidden">
+        {/* Toolbar */}
+        <div className="px-4 py-3.5 border-b border-border flex items-center gap-3 flex-wrap">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Icon name="MagnifyingGlassIcon" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by name, SKU, barcode..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              className="input-field pl-9 py-2 text-sm"
+            />
+          </div>
+
+          {/* Store filter */}
+          <select
+            value={storeFilter}
+            onChange={(e) => { setStoreFilter(e.target.value); setPage(1); }}
+            className="input-field py-2 text-sm w-auto min-w-[130px]"
+          >
+            {STORES.map((s) => <option key={`store-opt-${s}`} value={s}>{s}</option>)}
+          </select>
+
+          {/* Category filter */}
+          <select
+            value={categoryFilter}
+            onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
+            className="input-field py-2 text-sm w-auto min-w-[160px]"
+          >
+            {CATEGORIES.map((c) => <option key={`cat-opt-${c}`} value={c}>{c}</option>)}
+          </select>
+
+          {/* Status filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            className="input-field py-2 text-sm w-auto min-w-[140px]"
+          >
+            {STATUSES.map((s) => <option key={`status-opt-${s}`} value={s}>{s}</option>)}
+          </select>
+
+          <div className="flex-1" />
+
+          {/* Column visibility */}
+          <div className="relative">
+            <button
+              onClick={() => setColVisOpen((v) => !v)}
+              className="btn-ghost text-sm gap-1.5"
+            >
+              <Icon name="ViewColumnsIcon" size={15} />
+              Columns
+            </button>
+            {colVisOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-52 bg-card border border-border rounded-xl shadow-modal z-30 py-2 fade-in">
+                <p className="px-4 py-1.5 text-2xs font-semibold uppercase tracking-widest text-muted-foreground">Toggle Columns</p>
+                {ALL_COLUMNS.map((col) => (
+                  <label
+                    key={`col-toggle-${col.key}`}
+                    className="flex items-center gap-2.5 px-4 py-2 cursor-pointer hover:bg-muted transition-colors duration-100"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={columnConfig.find((c) => c.key === col.key)?.visible ?? false}
+                      onChange={() => toggleColumn(col.key)}
+                      className="w-3.5 h-3.5 accent-primary rounded"
+                    />
+                    <span className="text-sm text-foreground">{col.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div className="px-4 py-2.5 bg-primary/5 border-b border-primary/20 flex items-center gap-3 slide-up">
+            <span className="text-sm font-semibold text-primary">
+              {selectedIds.size} item{selectedIds.size > 1 ? 's' : ''} selected
+            </span>
+            <div className="flex-1" />
+            <button
+              className="btn-ghost text-sm gap-1.5"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              <Icon name="XMarkIcon" size={14} />
+              Deselect
+            </button>
+            <button
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-danger hover:bg-danger/10 transition-all duration-150 active:scale-95"
+              onClick={handleBulkDelete}
+            >
+              <Icon name="TrashIcon" size={14} />
+              Delete Selected
+            </button>
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="w-full min-w-[900px]">
+            <thead>
+              <tr className="bg-muted">
+                {/* Checkbox */}
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={paginated.length > 0 && selectedIds.size === paginated.length}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 accent-primary rounded"
+                    aria-label="Select all rows"
+                  />
+                </th>
+
+                {visibleColumns.map((col) => (
+                  <th
+                    key={`th-${col.key}`}
+                    className="table-header"
+                    onClick={() => handleSort(col.key as SortKey)}
+                  >
+                    <span className="flex items-center gap-1.5 cursor-pointer select-none">
+                      {col.label}
+                      <SortIcon colKey={col.key} />
+                    </span>
+                  </th>
+                ))}
+
+                {/* Actions col */}
+                <th className="table-header w-28 text-right pr-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={visibleColumns.length + 2}>
+                    <EmptyState
+                      icon="CubeIcon"
+                      title="No inventory items found"
+                      description="No items match your current filters. Try adjusting the search or filter criteria, or add a new item to get started."
+                      actionLabel="Add Item"
+                      onAction={() => setAddModalOpen(true)}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((item) => {
+                  const stockStatus = getStockStatus(item);
+                  const isSelected = selectedIds.has(item.id);
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className={`table-row group ${isSelected ? 'bg-primary/5' : ''}`}
+                    >
+                      {/* Checkbox */}
+                      <td className="px-4 py-3.5">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleSelectRow(item.id)}
+                          className="w-4 h-4 accent-primary rounded"
+                          aria-label={`Select ${item.name}`}
+                        />
+                      </td>
+
+                      {/* Dynamic columns */}
+                      {visibleColumns.map((col) => {
+                        const val = item[col.key as keyof InventoryItem];
+
+                        if (col.key === 'sku') return (
+                          <td key={`cell-${item.id}-sku`} className="table-cell">
+                            <div>
+                              <span className="font-mono text-xs font-semibold text-foreground">{item.sku}</span>
+                              <p className="text-2xs text-muted-foreground mt-0.5">{item.barcode}</p>
+                            </div>
+                          </td>
+                        );
+
+                        if (col.key === 'name') return (
+                          <td key={`cell-${item.id}-name`} className="table-cell max-w-[240px]">
+                            <div className="flex items-center gap-2.5">
+                              {item.primaryImage || (item.images && item.images[0]) ? (
+                                <img src={item.primaryImage || item.images![0]} alt={item.name} className="w-8 h-8 rounded-lg object-cover border border-border flex-shrink-0" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground font-bold text-xs flex-shrink-0">
+                                  {item.name.charAt(0)}
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p
+                                  onClick={() => setViewItem(item)}
+                                  className="text-sm font-medium text-foreground hover:text-primary cursor-pointer truncate"
+                                  title={item.name}
+                                >
+                                  {item.name}
+                                </p>
+                                <p className="text-2xs text-muted-foreground mt-0.5">{item.subcategory}</p>
+                              </div>
+                            </div>
+                          </td>
+                        );
+
+                        if (col.key === 'qtyOnHand') return (
+                          <td key={`cell-${item.id}-qty`} className="table-cell">
+                            <div className="flex items-center gap-2">
+                              <span className={`font-tabular font-semibold text-sm ${item.qtyOnHand === 0 ? 'text-danger' : item.qtyOnHand <= item.reorderPt ? 'text-warning' : 'text-foreground'}`}>
+                                {item.qtyOnHand}
+                              </span>
+                              {item.qtyOnHand <= item.reorderPt && item.qtyOnHand > 0 && (
+                                <Icon name="ExclamationTriangleIcon" size={12} className="text-warning" />
+                              )}
+                              {item.qtyOnHand === 0 && (
+                                <Icon name="XCircleIcon" size={12} className="text-danger" />
+                              )}
+                            </div>
+                          </td>
+                        );
+
+                        if (col.key === 'costPrice') return (
+                          <td key={`cell-${item.id}-cost`} className="table-cell">
+                            <span className="font-tabular text-sm">₹{item.costPrice.toLocaleString('en-IN')}</span>
+                          </td>
+                        );
+
+                        if (col.key === 'sellingPrice') return (
+                          <td key={`cell-${item.id}-sell`} className="table-cell">
+                            <span className="font-tabular text-sm font-medium">₹{item.sellingPrice.toLocaleString('en-IN')}</span>
+                          </td>
+                        );
+
+                        if (col.key === 'mrp') return (
+                          <td key={`cell-${item.id}-mrp`} className="table-cell">
+                            <span className="font-tabular text-sm text-muted-foreground">₹{item.mrp.toLocaleString('en-IN')}</span>
+                          </td>
+                        );
+
+                        if (col.key === 'taxRate') return (
+                          <td key={`cell-${item.id}-tax`} className="table-cell">
+                            <span className="font-tabular text-sm">{item.taxRate}%</span>
+                          </td>
+                        );
+
+                        if (col.key === 'fifoLots') return (
+                          <td key={`cell-${item.id}-fifo`} className="table-cell">
+                            <span className={`font-tabular text-sm ${item.fifoLots === 0 ? 'text-muted-foreground' : 'text-foreground'}`}>
+                              {item.fifoLots} lot{item.fifoLots !== 1 ? 's' : ''}
+                            </span>
+                          </td>
+                        );
+
+                        if (col.key === 'store') return (
+                          <td key={`cell-${item.id}-store`} className="table-cell">
+                            <span className="badge-info text-2xs">{item.store}</span>
+                          </td>
+                        );
+
+                        if (col.key === 'status') return (
+                          <td key={`cell-${item.id}-status`} className="table-cell relative">
+                            <button
+                              onClick={() => setStatusDropdownId(statusDropdownId === item.id ? null : item.id)}
+                              className="flex items-center gap-1 group"
+                              aria-label={`Change status for ${item.name}`}
+                            >
+                              <StatusBadge variant={stockStatus.variant} label={stockStatus.label} dot />
+                              <Icon name="ChevronDownIcon" size={10} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                            {statusDropdownId === item.id && (
+                              <div className="absolute left-0 top-full mt-1 w-40 bg-card border border-border rounded-xl shadow-modal z-30 py-1 fade-in">
+                                {(['active', 'inactive', 'discontinued'] as const).map((s) => (
+                                  <button
+                                    key={`status-change-${item.id}-${s}`}
+                                    onClick={() => handleStatusChange(item.id, s)}
+                                    className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted capitalize transition-colors duration-100"
+                                  >
+                                    {s}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        );
+
+                        return (
+                          <td key={`cell-${item.id}-${col.key}`} className="table-cell">
+                            <span className="text-sm text-foreground">{String(val)}</span>
+                          </td>
+                        );
+                      })}
+
+                      {/* Actions */}
+                      <td className="table-cell text-right pr-4">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                          <button
+                            onClick={() => setAdjustItem(item)}
+                            className="p-1.5 rounded-lg hover:bg-warning/10 text-muted-foreground hover:text-warning transition-all duration-150"
+                            title={`Adjust stock for ${item.name}`}
+                          >
+                            <Icon name="AdjustmentsHorizontalIcon" size={15} />
+                          </button>
+                          <button
+                            onClick={() => setEditItem(item)}
+                            className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all duration-150"
+                            title={`Edit ${item.name}`}
+                          >
+                            <Icon name="PencilSquareIcon" size={15} />
+                          </button>
+                          <button
+                            onClick={() => setViewItem(item)}
+                            className="p-1.5 rounded-lg hover:bg-info/10 text-muted-foreground hover:text-info transition-all duration-150"
+                            title={`View details for ${item.name}`}
+                          >
+                            <Icon name="EyeIcon" size={15} />
+                          </button>
+                          <button
+                            onClick={() => setDeleteItemModal(item)}
+                            className="p-1.5 rounded-lg hover:bg-danger/10 text-muted-foreground hover:text-danger transition-all duration-150"
+                            title={`Delete ${item.name}`}
+                          >
+                            <Icon name="TrashIcon" size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {sorted.length > 0 && (
+          <div className="px-4 py-3.5 border-t border-border flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">
+                Showing <span className="font-semibold text-foreground font-tabular">{(page - 1) * perPage + 1}–{Math.min(page * perPage, sorted.length)}</span> of <span className="font-semibold text-foreground font-tabular">{sorted.length}</span> items
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Per page:</span>
+                <select
+                  value={perPage}
+                  onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}
+                  className="input-field py-1 text-sm w-16"
+                >
+                  {[10, 20, 50].map((n) => (
+                    <option key={`perpage-${n}`} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+                className="btn-ghost p-2 disabled:opacity-40"
+              >
+                <Icon name="ChevronDoubleLeftIcon" size={14} />
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="btn-ghost p-2 disabled:opacity-40"
+              >
+                <Icon name="ChevronLeftIcon" size={14} />
+              </button>
+
+              <span className="px-3 text-sm font-semibold text-foreground">Page {page} of {totalPages}</span>
+
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="btn-ghost p-2 disabled:opacity-40"
+              >
+                <Icon name="ChevronRightIcon" size={14} />
+              </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={page === totalPages}
+                className="btn-ghost p-2 disabled:opacity-40"
+              >
+                <Icon name="ChevronDoubleRightIcon" size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Stock Adjustment Modal */}
+      {adjustItem && (
+        <Modal
+          open={!!adjustItem}
+          onClose={() => setAdjustItem(null)}
+          title="Stock Adjustment"
+          subtitle={`${adjustItem.sku} · ${adjustItem.name}`}
+          size="md"
+        >
+          <StockAdjustmentForm
+            item={adjustItem}
+            onClose={() => setAdjustItem(null)}
+          />
+        </Modal>
+      )}
+
+      {/* Add / Edit Modal */}
+      <AddItemModal
+        open={addModalOpen || !!editItem}
+        onClose={() => { setAddModalOpen(false); setEditItem(null); }}
+        editItem={editItem}
+      />
+
+      {/* Product Detail Record Modal */}
+      <ProductDetailModal
+        item={viewItem}
+        onClose={() => setViewItem(null)}
+      />
+
+      {/* Delete Confirm Modal */}
+      <ConfirmModal
+        open={!!deleteItemModal}
+        onClose={() => setDeleteItemModal(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete inventory item?"
+        message={`This will permanently remove "${deleteItemModal?.name}" (${deleteItemModal?.sku}) from the system.`}
+        confirmLabel="Delete Item"
+        variant="danger"
+        loading={deleteLoading}
+      />
+    </>
+  );
+}
