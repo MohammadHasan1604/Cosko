@@ -1,12 +1,39 @@
-import { createClient } from '@supabase/supabase-js';
+/**
+ * COSKO — Server-side Supabase Client
+ * Uses @supabase/ssr for proper cookie-based session management in Next.js App Router.
+ * Import this in Server Components, Route Handlers, and Server Actions only.
+ */
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xsujcrphkmtprvgncsdw.supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzdWpjcnBoa210cHJ2Z25jc2R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MzIzMTIsImV4cCI6MjEwMzUwODMxMn0.H7lW8Bhs3gN6vHPNTs_RbEZ2vmMoD0QJSuFvJs7aPcs';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
-export const createServerClient = () => {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: false,
+export async function createSupabaseServerClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    throw new Error(
+      'Missing Supabase environment variables. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env file.'
+    );
+  }
+
+  const cookieStore = await cookies();
+
+  return createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // setAll can fail when called from Server Components (read-only context).
+          // This is expected — the middleware handles session refresh.
+        }
+      },
     },
   });
-};
+}

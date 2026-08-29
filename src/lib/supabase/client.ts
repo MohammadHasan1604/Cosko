@@ -1,15 +1,37 @@
-import { createClient } from '@supabase/supabase-js';
+/**
+ * COSKO — Browser-side Supabase Client
+ * Uses @supabase/ssr for proper cookie-based session management in Next.js
+ */
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xsujcrphkmtprvgncsdw.supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzdWpjcnBoa210cHJ2Z25jc2R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MzIzMTIsImV4cCI6MjEwMzUwODMxMn0.H7lW8Bhs3gN6vHPNTs_RbEZ2vmMoD0QJSuFvJs7aPcs';
+import { createBrowserClient } from '@supabase/ssr';
 
-export const createBrowserClient = () => {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-    },
-  });
-};
+let browserClient: ReturnType<typeof createBrowserClient> | null = null;
 
-export const supabaseBrowser = createBrowserClient();
+export function createSupabaseBrowserClient() {
+  if (browserClient) return browserClient;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    throw new Error(
+      'Missing Supabase environment variables. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env file.'
+    );
+  }
+
+  browserClient = createBrowserClient(url, anonKey);
+  return browserClient;
+}
+
+/**
+ * Convenience singleton for browser-side usage.
+ * Safe to import in 'use client' components.
+ */
+export const supabaseBrowser = (() => {
+  // Only create in browser environment
+  if (typeof window !== 'undefined') {
+    return createSupabaseBrowserClient();
+  }
+  // Return a proxy that creates on first access during SSR hydration
+  return null as unknown as ReturnType<typeof createBrowserClient>;
+})();

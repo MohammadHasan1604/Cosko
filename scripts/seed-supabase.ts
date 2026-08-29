@@ -58,14 +58,18 @@ async function seedSupabase() {
 
   // 2. Seed Users & Auth Accounts
   console.log('\n--- 2. Seeding Auth Users & Profiles ---');
+  const adminEmail = process.env.SEED_SUPER_ADMIN_EMAIL || 'cosko@gmail.com';
+  const adminPassword = process.env.SEED_SUPER_ADMIN_PASSWORD || 'Cosko2026@';
+  const staffPassword = process.env.SEED_STAFF_PASSWORD || 'Password2026@';
+
   const usersToSeed = [
-    { email: 'cosko@gmail.com', password: 'Cosko2026@', name: 'Super Admin', role: 'Super Admin', security_level: 100, store_scope: 'All Stores' },
-    { email: 'sneha@cosko.com', password: 'Password2026@', name: 'Sneha Patel', role: 'Store Manager', security_level: 80, store_scope: 'BLR' },
-    { email: 'priya@cosko.com', password: 'Password2026@', name: 'Priya Sharma', role: 'Store Manager', security_level: 80, store_scope: 'HYD' },
-    { email: 'rohan@cosko.com', password: 'Password2026@', name: 'Rohan Sharma', role: 'Inventory Auditor', security_level: 60, store_scope: 'DEL' },
-    { email: 'karan@cosko.com', password: 'Password2026@', name: 'Karan Verma', role: 'POS Cashier', security_level: 20, store_scope: 'HYD' },
-    { email: 'pooja@cosko.com', password: 'Password2026@', name: 'Pooja Deshmukh', role: 'Sales Executive', security_level: 40, store_scope: 'BLR' },
-    { email: 'rakesh@cosko.com', password: 'Password2026@', name: 'Rakesh Verma', role: 'Store Manager', security_level: 80, store_scope: 'MUM' },
+    { email: adminEmail, password: adminPassword, name: 'Super Admin', role: 'Super Admin', security_level: 100, store_scope: 'All Stores' },
+    { email: 'sneha@cosko.com', password: staffPassword, name: 'Sneha Patel', role: 'Store Manager', security_level: 80, store_scope: 'BLR' },
+    { email: 'priya@cosko.com', password: staffPassword, name: 'Priya Sharma', role: 'Store Manager', security_level: 80, store_scope: 'HYD' },
+    { email: 'rohan@cosko.com', password: staffPassword, name: 'Rohan Sharma', role: 'Inventory Auditor', security_level: 60, store_scope: 'DEL' },
+    { email: 'karan@cosko.com', password: staffPassword, name: 'Karan Verma', role: 'POS Cashier', security_level: 20, store_scope: 'HYD' },
+    { email: 'pooja@cosko.com', password: staffPassword, name: 'Pooja Deshmukh', role: 'Sales Executive', security_level: 40, store_scope: 'BLR' },
+    { email: 'rakesh@cosko.com', password: staffPassword, name: 'Rakesh Verma', role: 'Store Manager', security_level: 80, store_scope: 'MUM' },
   ];
 
   for (const u of usersToSeed) {
@@ -78,7 +82,7 @@ async function seedSupabase() {
         email: u.email,
         password: u.password,
         email_confirm: true,
-        user_metadata: { name: u.name, role: u.role, store: u.store_scope },
+        user_metadata: { name: u.name, role: u.role, store_code: u.store_scope },
       });
       if (createErr) {
         console.error(`⚠️ Auth User Creation Error (${u.email}):`, createErr.message);

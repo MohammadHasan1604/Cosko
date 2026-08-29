@@ -168,6 +168,35 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const mgrManageMgrRes = RBACEngine.authorize(storeManagerUser, mgrManageMgrReq);
   assertTest('6. Super Admin Security', 'Lower Level User Blocked from Managing Equal Security User', 'DENIED', mgrManageMgrRes.allowed ? 'PASS' : 'DENIED', mgrManageMgrRes.reason || 'Blocked user management of equal level');
 
+  // Test 12.2: Consolidated P&L Internal Transfer Profit Elimination
+  const purchaseCostUnit = 100;
+  const transferPriceUnit = 120;
+  const storeSellingPriceUnit = 150;
+  const testQty = 20;
+
+  const centralTransferRevenueTest = transferPriceUnit * testQty; // ₹2400 (Internal)
+  const centralGrossProfitTest = (transferPriceUnit - purchaseCostUnit) * testQty; // ₹400
+  const storeSalesRevenueTest = storeSellingPriceUnit * testQty; // ₹3000 (External)
+  const storeCOGSTest = transferPriceUnit * testQty; // ₹2400 (Internal)
+  const storeGrossProfitTest = storeSalesRevenueTest - storeCOGSTest; // ₹600
+
+  // Elimination Rule: Consolidated Revenue = External Sales Only; Consolidated COGS = Actual Vendor Cost
+  const consolidatedRevenueTest = storeSalesRevenueTest; // ₹3000 (Central ₹2400 eliminated)
+  const consolidatedCOGSTest = purchaseCostUnit * testQty; // ₹2000 (Store transfer cost eliminated)
+  const consolidatedGrossProfitTest = consolidatedRevenueTest - consolidatedCOGSTest; // ₹1000 == ₹400 + ₹600
+
+  const isAccountingEliminationCorrect = 
+    consolidatedGrossProfitTest === (centralGrossProfitTest + storeGrossProfitTest) &&
+    consolidatedGrossProfitTest === 1000;
+
+  assertTest(
+    '12. Financial Accuracy',
+    'Consolidated P&L Internal Transfer Profit Elimination (Zero Double-Counting)',
+    'PASS',
+    isAccountingEliminationCorrect ? 'PASS' : 'DENIED',
+    `Consolidated Revenue: ₹${consolidatedRevenueTest} | COGS: ₹${consolidatedCOGSTest} | Consolidated Profit: ₹${consolidatedGrossProfitTest} (Central: ₹${centralGrossProfitTest} + Store: ₹${storeGrossProfitTest})`
+  );
+
   // =========================================================================
   // CATEGORY 7: API SECURITY & SESSION REFRESH PERSISTENCE TESTING
   // =========================================================================

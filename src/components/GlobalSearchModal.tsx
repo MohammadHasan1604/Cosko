@@ -29,7 +29,7 @@ export default function GlobalSearchModal() {
         (i) =>
           i.name.toLowerCase().includes(query.toLowerCase()) ||
           i.sku.toLowerCase().includes(query.toLowerCase()) ||
-          i.barcode.includes(query)
+          (i.barcode && i.barcode.includes(query))
       ).slice(0, 4)
     : [];
 

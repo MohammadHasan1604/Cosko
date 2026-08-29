@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
 import { useApp } from '@/context/AppContext';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 interface LoginFormValues {
   email: string;
@@ -33,38 +35,78 @@ export default function LoginForm() {
     setIsLoading(true);
     clearErrors();
 
-    await new Promise((r) => setTimeout(r, 600));
+    try {
+      // 1. Production Supabase Auth Authentication
+      if (isSupabaseConfigured()) {
+        const supabase = createSupabaseBrowserClient();
+        const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
 
-    // Authenticate against provisioned user accounts (exact email + password match only)
-    const match = usersList.find(
-      (u) => u.email.toLowerCase() === data.email.toLowerCase() && u.password === data.password
-    ) || (data.email.toLowerCase() === 'cosko@gmail.com' && data.password === 'Cosko2026@' ? {
-      id: 'usr-1',
-      name: 'Super Admin',
-      email: 'cosko@gmail.com',
-      role: 'Super Admin' as const,
-      store: 'All Stores',
-      status: 'Active' as const,
-      shiftStatus: 'On Shift' as const,
-    } : null);
+        if (authErr) {
+          setError('root', {
+            message: authErr.message || 'Invalid email or password. Please verify your login credentials.',
+          });
+          setIsLoading(false);
+          return;
+        }
 
-    if (match) {
-      setCurrentUser({
-        id: match.id,
-        name: match.name,
-        email: match.email,
-        role: match.role,
-        store: match.store,
-        avatar: match.name.substring(0, 2).toUpperCase(),
-        shiftStatus: match.shiftStatus || 'On Shift',
-        avatarUrl: (match as any).avatarUrl,
-      });
-      addAuditLog('Authentication', 'User Login', `Signed in as ${match.role} (${match.email})`);
-      toast.success(`Welcome back, ${match.name}! Signed in as ${match.role}`);
-      router.push('/dashboard');
-    } else {
+        if (authData.user) {
+          // Fetch user profile record
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authData.user.id)
+            .single();
+
+          const userObj = {
+            id: authData.user.id,
+            name: profile?.name || authData.user.user_metadata?.name || data.email.split('@')[0],
+            email: authData.user.email || data.email,
+            role: (profile?.role || authData.user.user_metadata?.role || 'Store Manager') as any,
+            store: profile?.store_scope || authData.user.user_metadata?.store_code || 'BLR',
+            avatar: (profile?.name || data.email).substring(0, 2).toUpperCase(),
+            shiftStatus: (profile?.shift_status || 'On Shift') as any,
+            avatarUrl: profile?.avatar_url || undefined,
+          };
+
+          setCurrentUser(userObj);
+          addAuditLog('Authentication', 'User Login', `Signed in as ${userObj.role} (${userObj.email})`);
+          toast.success(`Welcome back, ${userObj.name}! Signed in as ${userObj.role}`);
+          router.push('/dashboard');
+          return;
+        }
+      }
+
+      // 2. Demo / Standalone Mode Authentication (against provisioned user accounts list)
+      const match = usersList.find(
+        (u) => u.email.toLowerCase() === data.email.toLowerCase() && u.password === data.password
+      );
+
+      if (match) {
+        setCurrentUser({
+          id: match.id,
+          name: match.name,
+          email: match.email,
+          role: match.role,
+          store: match.store,
+          avatar: match.name.substring(0, 2).toUpperCase(),
+          shiftStatus: match.shiftStatus || 'On Shift',
+          avatarUrl: (match as any).avatarUrl,
+        });
+        addAuditLog('Authentication', 'User Login', `Signed in as ${match.role} (${match.email})`);
+        toast.success(`Welcome back, ${match.name}! Signed in as ${match.role}`);
+        router.push('/dashboard');
+      } else {
+        setError('root', {
+          message: 'Invalid email or password. Please verify your login credentials.',
+        });
+        setIsLoading(false);
+      }
+    } catch (err: any) {
       setError('root', {
-        message: 'Invalid email or password. Please verify your login credentials.',
+        message: err.message || 'An unexpected authentication error occurred.',
       });
       setIsLoading(false);
     }

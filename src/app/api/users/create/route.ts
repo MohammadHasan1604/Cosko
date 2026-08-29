@@ -1,18 +1,35 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xsujcrphkmtprvgncsdw.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-});
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   try {
+    // 1. Authorization check: Requester must be authenticated and have user creation privileges
+    let callerIsAuthorized = false;
+    try {
+      const serverClient = await createSupabaseServerClient();
+      const { data: { user: caller } } = await serverClient.auth.getUser();
+      if (caller) {
+        const { data: profile } = await serverClient.from('profiles').select('role, security_level').eq('id', caller.id).single();
+        if (profile && (profile.security_level >= 80 || profile.role === 'Super Admin' || profile.role === 'Store Manager')) {
+          callerIsAuthorized = true;
+        }
+      }
+    } catch {
+      // In development or automated seeding without active cookies, check custom auth header if present
+      const authHeader = request.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        callerIsAuthorized = true;
+      }
+    }
+
+    if (!callerIsAuthorized) {
+      return NextResponse.json(
+        { success: false, error: '403 Forbidden: Authorized Super Admin or Store Manager session required to provision accounts' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { name, email, password, role, store, phone, status, securityLevel } = body;
 
@@ -20,16 +37,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Name and email are required' }, { status: 400 });
     }
 
-    const userPassword = password || 'CoskoPass@2026';
+    if (!password) {
+      return NextResponse.json({ success: false, error: 'Password is required to provision a new account' }, { status: 400 });
+    }
+
     const level = securityLevel || (role === 'Super Admin' ? 100 : role === 'Store Manager' ? 80 : role === 'Inventory Auditor' ? 60 : role === 'Sales Executive' ? 40 : 20);
 
-    // 1. Create User in Supabase Auth (auth.users)
+    const supabaseAdmin = createAdminClient();
+
+    // 2. Create User in Supabase Auth (auth.users)
     let userId: string;
     let authError: string | null = null;
 
     const { data: authData, error: createAuthErr } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: userPassword,
+      password,
       email_confirm: true,
       user_metadata: {
         name,
@@ -41,19 +63,19 @@ export async function POST(request: Request) {
     if (createAuthErr) {
       authError = createAuthErr.message;
       console.warn('Supabase auth.admin.createUser warning:', createAuthErr.message);
-      // Fallback: check if user already exists in auth.users by listing users
+      // Check if user already exists in auth.users by listing users
       const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
       const existingUser = usersData?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
       if (existingUser) {
         userId = existingUser.id;
       } else {
-        userId = `usr-${Date.now()}`;
+        return NextResponse.json({ success: false, error: `Failed to create auth user: ${createAuthErr.message}` }, { status: 400 });
       }
     } else {
       userId = authData.user.id;
     }
 
-    // 2. Insert/Upsert into public.profiles
+    // 3. Insert/Upsert into public.profiles
     const profileData = {
       id: userId,
       name,
@@ -72,13 +94,15 @@ export async function POST(request: Request) {
       console.warn('Supabase public.profiles upsert warning:', profileErr.message);
     }
 
-    // 3. Insert into public.user_store_assignments
+    // 4. Insert into public.user_store_assignments
     if (store) {
-      await supabaseAdmin.from('user_store_assignments').upsert({
-        user_id: userId,
-        store_code: store,
-        is_primary: true,
-      }, { onConflict: 'user_id,store_code' });
+      await supabaseAdmin.from('user_store_assignments').upsert(
+        {
+          profile_id: userId,
+          store_code: store,
+        },
+        { onConflict: 'profile_id,store_code' }
+      );
     }
 
     return NextResponse.json({

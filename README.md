@@ -1,91 +1,106 @@
-# Next.js
+# COSKO — Multi-Store Enterprise Retail & POS System
 
-A modern Next.js 15 application built with TypeScript and Tailwind CSS.
+A high-performance, responsive multi-store retail management application built with **Next.js 15**, **TypeScript**, **Tailwind CSS**, and **Supabase** (PostgreSQL, Supabase Auth, Storage, & RLS).
 
-## 🚀 Features
+---
 
-- **Next.js 15** - Latest version with improved performance and features
-- **React 19** - Latest React version with enhanced capabilities
-- **Tailwind CSS** - Utility-first CSS framework for rapid UI development
+## ⚡ Quick Start & Development
 
-## 🛠️ Installation
-
-1. Install dependencies:
-  ```bash
-  npm install
-  # or
-  yarn install
-  ```
-
-2. Start the development server:
-  ```bash
-  npm run dev
-  # or
-  yarn dev
-  ```
-3. Open [http://localhost:4028](http://localhost:4028) with your browser to see the result.
-
-## 📁 Project Structure
-
-```
-nextjs/
-├── public/             # Static assets
-├── src/
-│   ├── app/            # App router components
-│   │   ├── layout.tsx  # Root layout component
-│   │   └── page.tsx    # Main page component
-│   ├── components/     # Reusable UI components
-│   ├── styles/         # Global styles and Tailwind configuration
-├── next.config.mjs     # Next.js configuration
-├── package.json        # Project dependencies and scripts
-├── postcss.config.js   # PostCSS configuration
-└── tailwind.config.js  # Tailwind CSS configuration
-
+### 1. Installation
+```bash
+npm install
 ```
 
-## 🧩 Page Editing
+### 2. Environment Setup
+Copy `.env.example` to `.env` and fill in your Supabase project credentials:
+```bash
+cp .env.example .env
+```
 
-You can start editing the page by modifying `src/app/page.tsx`. The page auto-updates as you edit the file.
+Define the following in `.env`:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 
-## 🎨 Styling
+SEED_SUPER_ADMIN_EMAIL=cosko@gmail.com
+SEED_SUPER_ADMIN_PASSWORD=<your-secure-admin-password>
+```
 
-This project uses Tailwind CSS for styling with the following features:
-- Utility-first approach for rapid development
-- Custom theme configuration
-- Responsive design utilities
-- PostCSS and Autoprefixer integration
+### 3. Run Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:4028](http://localhost:4028) in your browser.
+
+---
+
+## 🗄️ Supabase Setup & Reproducible Migrations
+
+COSKO includes automated PostgreSQL migrations under `supabase/migrations/`.
+
+### Apply Migrations to a New Supabase Instance
+
+1. **Install Supabase CLI** (if not already installed):
+   ```bash
+   npm install -g supabase
+   ```
+
+2. **Link to your Supabase Project**:
+   ```bash
+   npx supabase link --project-ref <your-project-ref>
+   ```
+
+3. **Push Database Migrations**:
+   ```bash
+   npx supabase db push
+   ```
+   This executes all migrations in order:
+   - `001_extensions_enums.sql` - Enables `pgcrypto` and `uuid-ossp`
+   - `002_core_schema.sql` - Creates all 11 core application tables
+   - `003_indexes.sql` - Creates performance indexes
+   - `004_functions_triggers.sql` - `handle_new_user` trigger & RLS helper functions
+   - `005_rls_policies.sql` - Strict Row Level Security policies
+   - `006_storage.sql` - Media storage buckets (`product-images`, `sale-attachments`, `branding`)
+
+4. **Seed Initial Production Data**:
+   ```bash
+   npm run seed
+   ```
+
+---
+
+## 🔐 Security Architecture
+
+- **Supabase Auth Integration**: User accounts use `@supabase/ssr` with cookie-based session handling.
+- **Row Level Security (RLS)**: Access controlled at the database level via security levels (Level 100 Super Admin down to Level 20 Cashier).
+- **Strict Server/Client Separation**:
+  - `src/lib/supabase/client.ts`: Safe browser-side client.
+  - `src/lib/supabase/server.ts`: Server Component & Route Handler client with cookies.
+  - `src/lib/supabase/admin.ts`: Privileged server-only client using `SUPABASE_SERVICE_ROLE_KEY`.
+
+---
+
+## 🧪 Verification & Security Testing
+
+Run the TypeScript type check and security verification suite:
+```bash
+# Type Check
+npm run type-check
+
+# Security Verification Suite
+npm run test:security
+
+# Production Build
+npm run build
+```
+
+---
 
 ## 📦 Available Scripts
 
 - `npm run dev` - Start development server on port 4028
-- `npm run build` - Build the application for production
-- `npm run start` - Start the development server
-- `npm run serve` - Start the production server
-- `npm run lint` - Run ESLint to check code quality
-- `npm run lint:fix` - Fix ESLint issues automatically
-- `npm run format` - Format code with Prettier
-
-## 📱 Deployment
-
-Build the application for production:
-
-  ```bash
-  npm run build
-  ```
-
-## 📚 Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial
-
-You can check out the [Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## 🙏 Acknowledgments
-
-- Built with [Rocket.new](https://rocket.new)
-- Powered by Next.js and React
-- Styled with Tailwind CSS
-
-Built with ❤️ on Rocket.new
+- `npm run build` - Create Next.js production build
+- `npm run type-check` - Run TypeScript compiler check
+- `npm run seed` - Seed Supabase database with initial stores, users, & products
+- `npm run test:security` - Run automated RBAC & security verification suite

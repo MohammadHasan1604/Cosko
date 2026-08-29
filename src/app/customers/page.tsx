@@ -6,11 +6,12 @@ import Modal from '@/components/ui/Modal';
 import { useApp, Customer } from '@/context/AppContext';
 
 export default function CustomersPage() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer } = useApp();
+  const { customers, sales, repairsEnquiries, addCustomer, updateCustomer, deleteCustomer } = useApp();
 
   const [registerModal, setRegisterModal] = useState(false);
   const [editCustomerModal, setEditCustomerModal] = useState<Customer | null>(null);
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<Customer | null>(null);
+  const [crmViewCustomer, setCrmViewCustomer] = useState<Customer | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -74,9 +75,9 @@ export default function CustomersPage() {
       <div className="space-y-6 fade-in">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Customer Directory & Credits</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">COSKO CRM & Customer Intelligence</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Customer relationship management, credit limits, purchase histories, and VIP tier tracking.
+              Unified customer profile linking repair enquiries, store visits, purchase histories, and credit ledgers.
             </p>
           </div>
           <button onClick={() => { resetForm(); setRegisterModal(true); }} className="btn-primary gap-2 self-start sm:self-auto text-xs sm:text-sm">
@@ -87,175 +88,204 @@ export default function CustomersPage() {
 
         {/* Customer Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {customers.map((c) => (
-            <div key={`cust-${c.id}`} className="card p-5 space-y-4 hover:shadow-md transition-all duration-150 relative group">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
-                    {c.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground">{c.name}</h3>
-                    <p className="text-2xs text-muted-foreground">{c.city}</p>
-                  </div>
-                </div>
+          {customers.map((c) => {
+            const customerSales = sales.filter((s) => s.customerPhone === c.phone || s.customerName === c.name);
+            const customerRepairs = repairsEnquiries.filter((r) => r.customerPhone === c.phone || r.customerName === c.name);
+            const storesVisited = Array.from(new Set(customerSales.map((s) => s.store)));
 
-                <div className="flex items-center gap-2">
-                  <span className={`badge ${c.tier === 'VIP' ? 'badge-warning' : 'badge-neutral'} text-2xs`}>
+            return (
+              <div key={`cust-${c.id}`} className="card p-5 space-y-4 hover:shadow-md transition-all duration-150 relative group">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
+                      {c.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-foreground">{c.name}</h3>
+                      <p className="text-2xs text-muted-foreground">{c.city} · {c.phone}</p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
+                    c.tier === 'VIP' ? 'bg-amber-500/15 text-amber-600 border border-amber-500/20' : 'bg-muted text-muted-foreground'
+                  }`}>
                     {c.tier}
                   </span>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => openEdit(c)} className="p-1 text-muted-foreground hover:text-primary">
-                      <Icon name="PencilSquareIcon" size={15} />
-                    </button>
-                    <button onClick={() => setDeleteConfirmModal(c)} className="p-1 text-muted-foreground hover:text-danger">
-                      <Icon name="TrashIcon" size={15} />
-                    </button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border text-center">
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block">Total Spend</span>
+                    <span className="text-xs font-bold text-foreground font-tabular">₹{c.totalSpend.toLocaleString('en-IN')}</span>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block">Orders</span>
+                    <span className="text-xs font-bold text-foreground font-tabular">{customerSales.length}</span>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block">Repairs</span>
+                    <span className="text-xs font-bold text-primary font-tabular">{customerRepairs.length}</span>
                   </div>
                 </div>
-              </div>
 
-              <div className="text-xs space-y-1 text-muted-foreground border-y border-border py-2.5">
-                <p><strong className="text-foreground">Email:</strong> {c.email}</p>
-                <p><strong className="text-foreground">Phone:</strong> {c.phone}</p>
-                <p><strong className="text-foreground">Last Activity:</strong> {c.lastPurchase}</p>
-              </div>
+                <div className="flex items-center justify-between text-2xs text-muted-foreground pt-1">
+                  <span>Stores: {storesVisited.length > 0 ? storesVisited.join(', ') : 'BLR'}</span>
+                  <span>Last: {c.lastPurchase}</span>
+                </div>
 
-              <div className="flex items-center justify-between text-xs pt-1 font-tabular">
-                <div>
-                  <span className="text-2xs text-muted-foreground uppercase block font-semibold">Total Lifetime Spend</span>
-                  <span className="font-extrabold text-foreground text-sm">₹{c.totalSpend.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xs text-muted-foreground uppercase block font-semibold">Credit Balance</span>
-                  <span className={`font-extrabold text-sm ${c.creditBalance > 0 ? 'text-danger' : 'text-foreground'}`}>
-                    ₹{c.creditBalance.toLocaleString('en-IN')}
-                  </span>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                  <button onClick={() => setCrmViewCustomer(c)} className="btn-secondary text-2xs py-1 px-2.5 gap-1">
+                    <Icon name="UserIcon" size={13} />
+                    View CRM Profile
+                  </button>
+                  <button onClick={() => openEdit(c)} className="btn-ghost text-2xs py-1 px-2">
+                    <Icon name="PencilSquareIcon" size={13} />
+                  </button>
+                  <button onClick={() => setDeleteConfirmModal(c)} className="btn-ghost text-2xs py-1 px-2 text-danger">
+                    <Icon name="TrashIcon" size={13} />
+                  </button>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      {/* Add New Customer Modal */}
-      <Modal
-        open={registerModal}
-        onClose={() => setRegisterModal(false)}
-        title="Register Customer Profile"
-        subtitle="Add a new customer to CRM directory with credit limits"
-        size="md"
-      >
-        <form onSubmit={handleCreateCustomer} className="space-y-4 py-2">
-          <div>
-            <label className="text-xs font-bold text-foreground block mb-1">Full Name / Business Name *</label>
-            <input type="text" required placeholder="e.g. Acme Constructions" value={name} onChange={(e) => setName(e.target.value)} className="input-field text-xs" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Phone Number *</label>
-              <input type="text" required placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} className="input-field text-xs" />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Email Address</label>
-              <input type="email" placeholder="contact@acme.com" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field text-xs" />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">City</label>
-              <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className="input-field text-xs" />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Tier Level</label>
-              <select value={tier} onChange={(e) => setTier(e.target.value as any)} className="input-field text-xs font-medium">
-                <option value="VIP">VIP</option>
-                <option value="Regular">Regular</option>
-                <option value="New">New</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Initial Credit Limit (₹)</label>
-              <input type="number" min="0" value={creditBalance} onChange={(e) => setCreditBalance(Number(e.target.value))} className="input-field text-xs" />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-3 border-t border-border">
-            <button type="button" onClick={() => setRegisterModal(false)} className="btn-secondary text-xs">Cancel</button>
-            <button type="submit" className="btn-primary text-xs">Register Customer</button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Edit Customer Modal */}
-      {editCustomerModal && (
+      {/* Unified Customer CRM Modal */}
+      {crmViewCustomer && (
         <Modal
-          open={!!editCustomerModal}
-          onClose={() => setEditCustomerModal(null)}
-          title="Edit Customer Profile"
-          subtitle={`Update details for ${editCustomerModal.name}`}
-          size="md"
+          open={!!crmViewCustomer}
+          onClose={() => setCrmViewCustomer(null)}
+          title={`CRM Profile — ${crmViewCustomer.name}`}
+          subtitle={`Unified History · Phone: ${crmViewCustomer.phone} · Tier: ${crmViewCustomer.tier}`}
+          size="lg"
         >
-          <form onSubmit={handleUpdateCustomerSubmit} className="space-y-4 py-2">
+          <div className="space-y-4 py-2 text-xs">
+            {/* Customer Header Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+                <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Spend</p>
+                <p className="text-base font-bold text-foreground font-tabular">₹{crmViewCustomer.totalSpend.toLocaleString('en-IN')}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+                <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Credit Balance</p>
+                <p className="text-base font-bold text-warning font-tabular">₹{crmViewCustomer.creditBalance.toLocaleString('en-IN')}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+                <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Invoices</p>
+                <p className="text-base font-bold text-foreground font-tabular">
+                  {sales.filter((s) => s.customerPhone === crmViewCustomer.phone || s.customerName === crmViewCustomer.name).length} Orders
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+                <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Repair Enquiries</p>
+                <p className="text-base font-bold text-primary font-tabular">
+                  {repairsEnquiries.filter((r) => r.customerPhone === crmViewCustomer.phone || r.customerName === crmViewCustomer.name).length} Enquiries
+                </p>
+              </div>
+            </div>
+
+            {/* Repair Enquiry Linkage Section */}
+            <div className="space-y-2 pt-2 border-t border-border">
+              <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Linked Repair & Service Records</h4>
+              {repairsEnquiries.filter((r) => r.customerPhone === crmViewCustomer.phone || r.customerName === crmViewCustomer.name).length === 0 ? (
+                <p className="text-2xs text-muted-foreground italic">No repair enquiry records found for this customer phone number.</p>
+              ) : (
+                <div className="space-y-2">
+                  {repairsEnquiries.filter((r) => r.customerPhone === crmViewCustomer.phone || r.customerName === crmViewCustomer.name).map((r) => (
+                    <div key={`crm-rep-${r.id}`} className="p-3 rounded-xl border border-primary/20 bg-primary/5 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-foreground">{r.repairRequested}</span>
+                        <span className="badge-info text-3xs">{r.repairStatus}</span>
+                      </div>
+                      <p className="text-3xs text-muted-foreground">Enquiry Date: {r.enquiryDate}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Purchase History */}
+            <div className="space-y-2 pt-2 border-t border-border">
+              <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Historical Orders & Receipts</h4>
+              <div className="overflow-x-auto max-h-48">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30 text-2xs uppercase text-muted-foreground">
+                      <th className="px-3 py-2">Invoice #</th>
+                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2">Store</th>
+                      <th className="px-3 py-2 font-tabular text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border font-tabular">
+                    {sales.filter((s) => s.customerPhone === crmViewCustomer.phone || s.customerName === crmViewCustomer.name).map((s) => (
+                      <tr key={`crm-sale-${s.id}`}>
+                        <td className="px-3 py-2 font-mono font-bold text-primary">{s.orderNo}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{s.createdAt}</td>
+                        <td className="px-3 py-2 font-bold">{s.store}</td>
+                        <td className="px-3 py-2 text-right font-extrabold">₹{s.total.toLocaleString('en-IN')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-border">
+              <button onClick={() => setCrmViewCustomer(null)} className="btn-primary text-xs py-1.5 px-4">
+                Close Profile
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Add / Edit Customer Modal */}
+      {(registerModal || editCustomerModal) && (
+        <Modal
+          open={registerModal || !!editCustomerModal}
+          onClose={() => { setRegisterModal(false); setEditCustomerModal(null); }}
+          title={editCustomerModal ? 'Edit Customer Profile' : 'Register New Customer'}
+          size="sm"
+        >
+          <form onSubmit={editCustomerModal ? handleUpdateCustomerSubmit : handleCreateCustomer} className="space-y-3 py-2">
             <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Full Name / Business Name *</label>
+              <label className="text-xs font-bold text-foreground block mb-1">Customer Name *</label>
               <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="input-field text-xs" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Phone Number *</label>
-                <input type="text" required value={phone} onChange={(e) => setPhone(e.target.value)} className="input-field text-xs" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Email Address</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field text-xs" />
-              </div>
+
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">Phone Number *</label>
+              <input type="text" required value={phone} onChange={(e) => setPhone(e.target.value)} className="input-field text-xs" />
             </div>
-            <div className="grid grid-cols-3 gap-3">
+
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field text-xs" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">City</label>
                 <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className="input-field text-xs" />
               </div>
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Tier Level</label>
-                <select value={tier} onChange={(e) => setTier(e.target.value as any)} className="input-field text-xs font-medium">
-                  <option value="VIP">VIP</option>
+                <label className="text-xs font-bold text-foreground block mb-1">Tier</label>
+                <select value={tier} onChange={(e: any) => setTier(e.target.value)} className="input-field text-xs">
                   <option value="Regular">Regular</option>
+                  <option value="VIP">VIP</option>
                   <option value="New">New</option>
                 </select>
               </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Credit Limit (₹)</label>
-                <input type="number" min="0" value={creditBalance} onChange={(e) => setCreditBalance(Number(e.target.value))} className="input-field text-xs" />
-              </div>
             </div>
+
             <div className="flex justify-end gap-2 pt-3 border-t border-border">
-              <button type="button" onClick={() => setEditCustomerModal(null)} className="btn-secondary text-xs">Cancel</button>
-              <button type="submit" className="btn-primary text-xs">Save Changes</button>
+              <button type="button" onClick={() => { setRegisterModal(false); setEditCustomerModal(null); }} className="btn-secondary text-xs">Cancel</button>
+              <button type="submit" className="btn-primary text-xs font-bold">Save Record</button>
             </div>
           </form>
-        </Modal>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteConfirmModal && (
-        <Modal
-          open={!!deleteConfirmModal}
-          onClose={() => setDeleteConfirmModal(null)}
-          title="Delete Customer Profile"
-          subtitle={`Are you sure you want to delete ${deleteConfirmModal.name}?`}
-          size="sm"
-        >
-          <div className="space-y-4 py-2">
-            <p className="text-xs text-muted-foreground">
-              This action will permanently remove the customer record and credit history from the system.
-            </p>
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <button onClick={() => setDeleteConfirmModal(null)} className="btn-secondary text-xs">Cancel</button>
-              <button onClick={() => { deleteCustomer(deleteConfirmModal.id); setDeleteConfirmModal(null); }} className="btn-danger text-xs">
-                Delete Customer
-              </button>
-            </div>
-          </div>
         </Modal>
       )}
     </AppLayout>

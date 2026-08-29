@@ -14,24 +14,75 @@ export interface AppBranding {
 export interface InventoryItem {
   id: string;
   sku: string;
-  barcode: string;
+  barcode?: string;
   name: string;
   brand: string;
+  model?: string;
   category: string;
   subcategory: string;
-  store: string;
+  store: string; // 'CENTRAL' | 'BLR' | 'HYD' | 'DEL' | 'MUM'
   qtyOnHand: number;
   reorderPt: number;
   costPrice: number;
+  transferPrice: number;
   sellingPrice: number;
   mrp: number;
-  hsn: string;
+  hsn?: string;
   taxRate: number;
+  warrantyMonths: number;
+  minStock: number;
   status: 'active' | 'inactive' | 'discontinued';
   fifoLots: number;
   lastMovement: string;
   images?: string[];
   primaryImage?: string;
+  imageUrl?: string;
+}
+
+export interface StockTransferRecord {
+  id: string;
+  transferNo: string;
+  sourceStore: string;
+  destStore: string;
+  productId: string;
+  sku: string;
+  productName: string;
+  qty: number;
+  purchaseCost: number;
+  transferPrice: number;
+  transferProfit: number;
+  status: 'Completed' | 'In Transit' | 'Cancelled';
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface InventoryLedgerEntry {
+  id: string;
+  productId: string;
+  sku: string;
+  productName: string;
+  storeCode: string;
+  movementType: 'PURCHASE' | 'TRANSFER_IN' | 'TRANSFER_OUT' | 'SALE' | 'ADJUSTMENT' | 'RETURN';
+  quantity: number;
+  unitCost: number;
+  totalValue: number;
+  fromLocation?: string;
+  toLocation?: string;
+  referenceNo: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface RepairEnquiry {
+  id: string;
+  customerPhone: string;
+  customerName: string;
+  enquiryDate: string;
+  repairStatus: 'Received' | 'Diagnosing' | 'In Progress' | 'Ready for Delivery' | 'Delivered' | 'Cancelled';
+  repairRequested: string;
+  technicianNotes?: string;
+  internalCost?: number;
+  createdAt: string;
 }
 
 export interface SalePhoto {
@@ -48,16 +99,18 @@ export interface SalesOrder {
   customerName: string;
   customerPhone: string;
   store: string;
-  items: { itemId: string; name: string; qty: number; unitPrice: number; taxRate: number }[];
+  items: { itemId: string; name: string; qty: number; unitPrice: number; taxRate: number; warrantyMonths?: number; warrantyExpiryDate?: string }[];
   subtotal: number;
   taxTotal: number;
   discount: number;
   total: number;
+  taxEnabled: boolean;
   paymentMethod: 'Cash' | 'UPI' | 'Card' | 'Credit';
   status: 'Completed' | 'Refunded' | 'Pending';
   createdAt: string;
   period: 'Today' | 'Yesterday' | 'Last 7 Days' | 'This Month' | 'Last Month' | 'This Quarter' | 'This Year';
   salePhotos?: SalePhoto[];
+  warrantyExpiryDate?: string;
 }
 
 export interface PurchaseOrder {
@@ -65,7 +118,7 @@ export interface PurchaseOrder {
   poNo: string;
   vendorName: string;
   store: string;
-  items: { name: string; qty: number; unitCost: number }[];
+  items: { name: string; qty: number; unitCost: number; sku?: string }[];
   totalAmount: number;
   status: 'Draft' | 'Sent' | 'Received' | 'Cancelled';
   paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
@@ -175,36 +228,57 @@ const defaultBranding: AppBranding = {
   supportEmail: 'support@cosko.com',
 };
 
+const initialStoreHubs: StoreHub[] = [
+  { id: 'st-central', code: 'CENTRAL', name: 'COSKO Central Warehouse & Owner Stock', city: 'Bengaluru', address: 'Central Hub, Bengaluru', manager: 'Enterprise Owner', phone: '+91 80 2555 0000', registers: 0, skusCount: 2500, monthlyRevenue: 0, status: 'Active' },
+  { id: 'st-blr', code: 'BLR', name: 'Bengaluru Central Hub', city: 'Bengaluru', address: 'Indiranagar 100ft Rd, Bengaluru', manager: 'Sneha Patel', phone: '+91 80 2555 1234', registers: 4, skusCount: 1420, monthlyRevenue: 1450000, status: 'Active' },
+  { id: 'st-hyd', code: 'HYD', name: 'Hyderabad Warehouse & Outlet', city: 'Hyderabad', address: 'Hitech City Phase 2, Hyderabad', manager: 'Priya Sharma', phone: '+91 40 6677 8899', registers: 3, skusCount: 980, monthlyRevenue: 1120000, status: 'Active' },
+  { id: 'st-del', code: 'DEL', name: 'Delhi NCR Fulfillment Center', city: 'Delhi', address: 'Okhla Industrial Area Ph-III, New Delhi', manager: 'Rohan Sharma', phone: '+91 11 4100 9988', registers: 5, skusCount: 2100, monthlyRevenue: 980000, status: 'Active' },
+  { id: 'st-mum', code: 'MUM', name: 'Mumbai Commercial Hub', city: 'Mumbai', address: 'Bandra Kurla Complex, Mumbai', manager: 'Rakesh Verma', phone: '+91 22 6688 9900', registers: 4, skusCount: 1200, monthlyRevenue: 1350000, status: 'Active' },
+];
+
 const initialInventory: InventoryItem[] = [
-  { id: 'item-001', sku: 'SKU-0091', barcode: '8901234567890', name: 'Crompton Fan Regulator 5-Speed', brand: 'Crompton', category: 'Electricals', subcategory: 'Fans', store: 'DEL', qtyOnHand: 0, reorderPt: 8, costPrice: 320, sellingPrice: 485, mrp: 550, hsn: '84145990', taxRate: 18, status: 'active', fifoLots: 0, lastMovement: '09 Aug 2026' },
-  { id: 'item-002', sku: 'SKU-0218', barcode: '8901234567891', name: 'Philips LED 9W Warm White (Pack of 6)', brand: 'Philips', category: 'Lighting', subcategory: 'LED Bulbs', store: 'HYD', qtyOnHand: 5, reorderPt: 20, costPrice: 480, sellingPrice: 680, mrp: 750, hsn: '85395000', taxRate: 12, status: 'active', fifoLots: 2, lastMovement: '11 Aug 2026' },
-  { id: 'item-003', sku: 'SKU-0312', barcode: '8901234567892', name: 'Anchor Roma 3-Pin 6A Plug Top', brand: 'Anchor', category: 'Electricals', subcategory: 'Plugs & Sockets', store: 'BLR', qtyOnHand: 142, reorderPt: 50, costPrice: 28, sellingPrice: 45, mrp: 55, hsn: '85364900', taxRate: 18, status: 'active', fifoLots: 4, lastMovement: '12 Aug 2026' },
-  { id: 'item-004', sku: 'SKU-0562', barcode: '8901234567893', name: 'Polycab 1.5 Sq mm FR Wire 90m Coil', brand: 'Polycab', category: 'Wiring', subcategory: 'FR Wires', store: 'HYD', qtyOnHand: 3, reorderPt: 12, costPrice: 1850, sellingPrice: 2400, mrp: 2650, hsn: '85444900', taxRate: 18, status: 'active', fifoLots: 1, lastMovement: '10 Aug 2026' },
-  { id: 'item-005', sku: 'SKU-0834', barcode: '8901234567894', name: 'Havells Crabtree 6A Switch 1-Way', brand: 'Havells', category: 'Electricals', subcategory: 'Switches', store: 'BLR', qtyOnHand: 0, reorderPt: 15, costPrice: 65, sellingPrice: 95, mrp: 115, hsn: '85365000', taxRate: 18, status: 'active', fifoLots: 0, lastMovement: '07 Aug 2026' },
-  { id: 'item-006', sku: 'SKU-1042', barcode: '8901234567895', name: 'Bosch GSR 12V-15 Cordless Drill', brand: 'Bosch', category: 'Power Tools', subcategory: 'Drills', store: 'BLR', qtyOnHand: 2, reorderPt: 10, costPrice: 4800, sellingPrice: 6800, mrp: 7500, hsn: '84672900', taxRate: 18, status: 'active', fifoLots: 1, lastMovement: '08 Aug 2026' },
-  { id: 'item-007', sku: 'SKU-1198', barcode: '8901234567896', name: 'Anchor Roma 3-Pin 16A Socket', brand: 'Anchor', category: 'Electricals', subcategory: 'Plugs & Sockets', store: 'DEL', qtyOnHand: 8, reorderPt: 25, costPrice: 42, sellingPrice: 68, mrp: 80, hsn: '85364900', taxRate: 18, status: 'active', fifoLots: 2, lastMovement: '11 Aug 2026' },
-  { id: 'item-008', sku: 'SKU-1341', barcode: '8901234567897', name: 'Syska LED Strip Light 5m RGB', brand: 'Syska', category: 'Lighting', subcategory: 'Strip Lights', store: 'HYD', qtyOnHand: 24, reorderPt: 15, costPrice: 680, sellingPrice: 950, mrp: 1100, hsn: '85395000', taxRate: 12, status: 'active', fifoLots: 3, lastMovement: '12 Aug 2026' },
-  { id: 'item-009', sku: 'SKU-1512', barcode: '8901234567898', name: 'Legrand MCB 32A Single Pole', brand: 'Legrand', category: 'Circuit Protection', subcategory: 'MCBs', store: 'DEL', qtyOnHand: 56, reorderPt: 30, costPrice: 185, sellingPrice: 270, mrp: 320, hsn: '85362000', taxRate: 18, status: 'active', fifoLots: 5, lastMovement: '09 Aug 2026' },
-  { id: 'item-010', sku: 'SKU-1688', barcode: '8901234567899', name: 'V-Guard Voltage Stabilizer 4kVA', brand: 'V-Guard', category: 'Power Conditioning', subcategory: 'Stabilizers', store: 'BLR', qtyOnHand: 11, reorderPt: 8, costPrice: 3200, sellingPrice: 4500, mrp: 5200, hsn: '85044000', taxRate: 18, status: 'active', fifoLots: 2, lastMovement: '10 Aug 2026' },
-  { id: 'item-011', sku: 'SKU-1834', barcode: '8901234567900', name: 'Finolex 2.5 Sq mm FR PVC Wire 90m', brand: 'Finolex', category: 'Wiring', subcategory: 'FR Wires', store: 'HYD', qtyOnHand: 19, reorderPt: 20, costPrice: 2100, sellingPrice: 2800, mrp: 3100, hsn: '85444900', taxRate: 18, status: 'active', fifoLots: 3, lastMovement: '11 Aug 2026' },
-  { id: 'item-012', sku: 'SKU-2001', barcode: '8901234567901', name: 'Stanley 10-Piece Screwdriver Set', brand: 'Stanley', category: 'Hand Tools', subcategory: 'Screwdrivers', store: 'DEL', qtyOnHand: 34, reorderPt: 15, costPrice: 420, sellingPrice: 620, mrp: 720, hsn: '82059900', taxRate: 12, status: 'active', fifoLots: 2, lastMovement: '08 Aug 2026' },
-  { id: 'item-013', sku: 'SKU-2189', barcode: '8901234567902', name: 'Halonix 18W LED Batten Light 2FT', brand: 'Halonix', category: 'Lighting', subcategory: 'Batten Lights', store: 'BLR', qtyOnHand: 67, reorderPt: 30, costPrice: 240, sellingPrice: 360, mrp: 420, hsn: '94054090', taxRate: 12, status: 'active', fifoLots: 4, lastMovement: '12 Aug 2026' },
-  { id: 'item-014', sku: 'SKU-2341', barcode: '8901234567903', name: 'Schneider 32A 3-Phase MCB', brand: 'Schneider', category: 'Circuit Protection', subcategory: 'MCBs', store: 'HYD', qtyOnHand: 18, reorderPt: 10, costPrice: 680, sellingPrice: 980, mrp: 1150, hsn: '85362000', taxRate: 18, status: 'inactive', fifoLots: 2, lastMovement: '03 Aug 2026' },
-  { id: 'item-015', sku: 'SKU-2498', barcode: '8901234567904', name: 'Makita 750W Angle Grinder 4.5"', brand: 'Makita', category: 'Power Tools', subcategory: 'Grinders', store: 'BLR', qtyOnHand: 7, reorderPt: 5, costPrice: 3400, sellingPrice: 4800, mrp: 5500, hsn: '84672900', taxRate: 18, status: 'active', fifoLots: 1, lastMovement: '07 Aug 2026' },
-  { id: 'item-016', sku: 'SKU-2138', barcode: '8901234567905', name: 'Havells Gold Fan 1200mm', brand: 'Havells', category: 'Electricals', subcategory: 'Fans', store: 'BLR', qtyOnHand: 9, reorderPt: 3, costPrice: 1800, sellingPrice: 2499, mrp: 2800, hsn: '84145990', taxRate: 18, status: 'active', fifoLots: 2, lastMovement: 'Today' },
+  { id: 'item-001', sku: 'SKU-0091', barcode: '8901234567890', name: 'Crompton Fan Regulator 5-Speed', brand: 'Crompton', model: 'REG-5S', category: 'Electricals', subcategory: 'Fans', store: 'CENTRAL', qtyOnHand: 150, reorderPt: 8, costPrice: 320, transferPrice: 380, sellingPrice: 485, mrp: 550, hsn: '84145990', taxRate: 18, warrantyMonths: 12, minStock: 10, status: 'active', fifoLots: 5, lastMovement: '09 Aug 2026' },
+  { id: 'item-002', sku: 'SKU-0218', barcode: '8901234567891', name: 'Philips LED 9W Warm White (Pack of 6)', brand: 'Philips', model: 'LED-9W-PK6', category: 'Lighting', subcategory: 'LED Bulbs', store: 'HYD', qtyOnHand: 25, reorderPt: 20, costPrice: 480, transferPrice: 560, sellingPrice: 680, mrp: 750, hsn: '85395000', taxRate: 12, warrantyMonths: 24, minStock: 15, status: 'active', fifoLots: 2, lastMovement: '11 Aug 2026' },
+  { id: 'item-003', sku: 'SKU-0312', barcode: '8901234567892', name: 'Anchor Roma 3-Pin 6A Plug Top', brand: 'Anchor', model: 'ROMA-6A', category: 'Electricals', subcategory: 'Plugs & Sockets', store: 'BLR', qtyOnHand: 142, reorderPt: 50, costPrice: 28, transferPrice: 35, sellingPrice: 45, mrp: 55, hsn: '85364900', taxRate: 18, warrantyMonths: 6, minStock: 20, status: 'active', fifoLots: 4, lastMovement: '12 Aug 2026' },
+  { id: 'item-004', sku: 'SKU-0562', barcode: '8901234567893', name: 'Polycab 1.5 Sq mm FR Wire 90m Coil', brand: 'Polycab', model: 'FR-1.5-90M', category: 'Wiring', subcategory: 'FR Wires', store: 'HYD', qtyOnHand: 18, reorderPt: 12, costPrice: 1850, transferPrice: 2100, sellingPrice: 2400, mrp: 2650, hsn: '85444900', taxRate: 18, warrantyMonths: 60, minStock: 10, status: 'active', fifoLots: 1, lastMovement: '10 Aug 2026' },
+  { id: 'item-005', sku: 'SKU-0834', barcode: '8901234567894', name: 'Havells Crabtree 6A Switch 1-Way', brand: 'Havells', model: 'CT-6A-1W', category: 'Electricals', subcategory: 'Switches', store: 'BLR', qtyOnHand: 85, reorderPt: 15, costPrice: 65, transferPrice: 78, sellingPrice: 95, mrp: 115, hsn: '85365000', taxRate: 18, warrantyMonths: 12, minStock: 15, status: 'active', fifoLots: 3, lastMovement: '07 Aug 2026' },
+  { id: 'item-006', sku: 'SKU-1042', barcode: '8901234567895', name: 'Bosch GSR 12V-15 Cordless Drill', brand: 'Bosch', model: 'GSR-12V-15', category: 'Power Tools', subcategory: 'Drills', store: 'BLR', qtyOnHand: 12, reorderPt: 10, costPrice: 4800, transferPrice: 5600, sellingPrice: 6800, mrp: 7500, hsn: '84672900', taxRate: 18, warrantyMonths: 12, minStock: 5, status: 'active', fifoLots: 1, lastMovement: '08 Aug 2026' },
+  { id: 'item-007', sku: 'SKU-1198', barcode: '8901234567896', name: 'Anchor Roma 3-Pin 16A Socket', brand: 'Anchor', model: 'ROMA-16A', category: 'Electricals', subcategory: 'Plugs & Sockets', store: 'DEL', qtyOnHand: 48, reorderPt: 25, costPrice: 42, transferPrice: 52, sellingPrice: 68, mrp: 80, hsn: '85364900', taxRate: 18, warrantyMonths: 6, minStock: 15, status: 'active', fifoLots: 2, lastMovement: '11 Aug 2026' },
+  { id: 'item-008', sku: 'SKU-1341', barcode: '8901234567897', name: 'Syska LED Strip Light 5m RGB', brand: 'Syska', model: 'STRIP-5M-RGB', category: 'Lighting', subcategory: 'Strip Lights', store: 'HYD', qtyOnHand: 34, reorderPt: 15, costPrice: 680, transferPrice: 790, sellingPrice: 950, mrp: 1100, hsn: '85395000', taxRate: 12, warrantyMonths: 12, minStock: 10, status: 'active', fifoLots: 3, lastMovement: '12 Aug 2026' },
+  { id: 'item-009', sku: 'SKU-1512', barcode: '8901234567898', name: 'Legrand MCB 32A Single Pole', brand: 'Legrand', model: 'MCB-32A-1P', category: 'Circuit Protection', subcategory: 'MCBs', store: 'DEL', qtyOnHand: 96, reorderPt: 30, costPrice: 185, transferPrice: 220, sellingPrice: 270, mrp: 320, hsn: '85362000', taxRate: 18, warrantyMonths: 24, minStock: 20, status: 'active', fifoLots: 5, lastMovement: '09 Aug 2026' },
+  { id: 'item-010', sku: 'SKU-1688', barcode: '8901234567899', name: 'V-Guard Voltage Stabilizer 4kVA', brand: 'V-Guard', model: 'STAB-4KVA', category: 'Power Conditioning', subcategory: 'Stabilizers', store: 'BLR', qtyOnHand: 18, reorderPt: 8, costPrice: 3200, transferPrice: 3800, sellingPrice: 4500, mrp: 5200, hsn: '85044000', taxRate: 18, warrantyMonths: 36, minStock: 5, status: 'active', fifoLots: 2, lastMovement: '10 Aug 2026' },
+  { id: 'item-011', sku: 'SKU-1834', barcode: '8901234567900', name: 'Finolex 2.5 Sq mm FR PVC Wire 90m', brand: 'Finolex', model: 'FR-2.5-90M', category: 'Wiring', subcategory: 'FR Wires', store: 'HYD', qtyOnHand: 29, reorderPt: 20, costPrice: 2100, transferPrice: 2450, sellingPrice: 2800, mrp: 3100, hsn: '85444900', taxRate: 18, warrantyMonths: 60, minStock: 10, status: 'active', fifoLots: 3, lastMovement: '11 Aug 2026' },
+  { id: 'item-012', sku: 'SKU-2001', barcode: '8901234567901', name: 'Stanley 10-Piece Screwdriver Set', brand: 'Stanley', model: 'SD-SET-10P', category: 'Hand Tools', subcategory: 'Screwdrivers', store: 'DEL', qtyOnHand: 42, reorderPt: 15, costPrice: 420, transferPrice: 510, sellingPrice: 620, mrp: 720, hsn: '82059900', taxRate: 12, warrantyMonths: 12, minStock: 10, status: 'active', fifoLots: 2, lastMovement: '08 Aug 2026' },
+  { id: 'item-013', sku: 'SKU-2189', barcode: '8901234567902', name: 'Halonix 18W LED Batten Light 2FT', brand: 'Halonix', model: 'BAT-18W-2FT', category: 'Lighting', subcategory: 'Batten Lights', store: 'BLR', qtyOnHand: 74, reorderPt: 30, costPrice: 240, transferPrice: 290, sellingPrice: 360, mrp: 420, hsn: '94054090', taxRate: 12, warrantyMonths: 12, minStock: 15, status: 'active', fifoLots: 4, lastMovement: '12 Aug 2026' },
+  { id: 'item-014', sku: 'SKU-2341', barcode: '8901234567903', name: 'Schneider 32A 3-Phase MCB', brand: 'Schneider', model: 'MCB-32A-3P', category: 'Circuit Protection', subcategory: 'MCBs', store: 'HYD', qtyOnHand: 18, reorderPt: 10, costPrice: 680, transferPrice: 810, sellingPrice: 980, mrp: 1150, hsn: '85362000', taxRate: 18, warrantyMonths: 24, minStock: 5, status: 'inactive', fifoLots: 2, lastMovement: '03 Aug 2026' },
+  { id: 'item-015', sku: 'SKU-2498', barcode: '8901234567904', name: 'Makita 750W Angle Grinder 4.5"', brand: 'Makita', model: 'AG-750W', category: 'Power Tools', subcategory: 'Grinders', store: 'BLR', qtyOnHand: 14, reorderPt: 5, costPrice: 3400, transferPrice: 4000, sellingPrice: 4800, mrp: 5500, hsn: '84672900', taxRate: 18, warrantyMonths: 12, minStock: 5, status: 'active', fifoLots: 1, lastMovement: '07 Aug 2026' },
+  { id: 'item-016', sku: 'SKU-2138', barcode: '8901234567905', name: 'Havells Gold Fan 1200mm', brand: 'Havells', model: 'GF-1200MM', category: 'Electricals', subcategory: 'Fans', store: 'BLR', qtyOnHand: 22, reorderPt: 3, costPrice: 1800, transferPrice: 2100, sellingPrice: 2499, mrp: 2800, hsn: '84145990', taxRate: 18, warrantyMonths: 24, minStock: 5, status: 'active', fifoLots: 2, lastMovement: 'Today' },
+];
+
+const initialStockTransfers: StockTransferRecord[] = [
+  { id: 'tr-101', transferNo: 'TR-2026-001', sourceStore: 'CENTRAL', destStore: 'BLR', productId: 'item-003', sku: 'SKU-0312', productName: 'Anchor Roma 3-Pin 6A Plug Top', qty: 50, purchaseCost: 28, transferPrice: 35, transferProfit: 350, status: 'Completed', createdBy: 'Super Admin', createdAt: '20 Aug 2026' },
+  { id: 'tr-102', transferNo: 'TR-2026-002', sourceStore: 'CENTRAL', destStore: 'HYD', productId: 'item-004', sku: 'SKU-0562', productName: 'Polycab 1.5 Sq mm FR Wire 90m Coil', qty: 20, purchaseCost: 1850, transferPrice: 2100, transferProfit: 5000, status: 'Completed', createdBy: 'Super Admin', createdAt: '22 Aug 2026' },
+];
+
+const initialInventoryLedger: InventoryLedgerEntry[] = [
+  { id: 'led-1', productId: 'item-003', sku: 'SKU-0312', productName: 'Anchor Roma 3-Pin 6A Plug Top', storeCode: 'CENTRAL', movementType: 'PURCHASE', quantity: 200, unitCost: 28, totalValue: 5600, fromLocation: 'Vendor: Anchor', toLocation: 'CENTRAL', referenceNo: 'PO-2026-0010', createdBy: 'Super Admin', createdAt: '15 Aug 2026' },
+  { id: 'led-2', productId: 'item-003', sku: 'SKU-0312', productName: 'Anchor Roma 3-Pin 6A Plug Top', storeCode: 'BLR', movementType: 'TRANSFER_IN', quantity: 50, unitCost: 35, totalValue: 1750, fromLocation: 'CENTRAL', toLocation: 'BLR', referenceNo: 'TR-2026-001', createdBy: 'Super Admin', createdAt: '20 Aug 2026' },
+];
+
+const initialRepairsEnquiries: RepairEnquiry[] = [
+  { id: 'rep-1', customerPhone: '+91 98765 43210', customerName: 'Rajesh Kumar Electronics', enquiryDate: '24 Aug 2026 11:00 AM', repairStatus: 'Ready for Delivery', repairRequested: 'Bosch Cordless Drill motor brush replacement & battery check', technicianNotes: 'Replaced carbon brushes, recalibrated motor head.', internalCost: 450, createdAt: '24 Aug 2026' },
+  { id: 'rep-2', customerPhone: '+91 97432 50071', customerName: 'Mohammad Yunus', enquiryDate: '26 Aug 2026 03:30 PM', repairStatus: 'In Progress', repairRequested: 'V-Guard Stabilizer voltage trip indicator blinking continuously', technicianNotes: 'Testing relay board and primary coil capacitor.', internalCost: 320, createdAt: '26 Aug 2026' },
 ];
 
 const initialSales: SalesOrder[] = [
-  { id: 'sale-101', orderNo: 'ORD-2026-8821', customerName: 'Rajesh Kumar Electronics', customerPhone: '+91 98765 43210', store: 'BLR', items: [{ itemId: 'item-003', name: 'Anchor Roma 3-Pin 6A Plug Top', qty: 20, unitPrice: 45, taxRate: 18 }], subtotal: 900, taxTotal: 162, discount: 0, total: 1062, paymentMethod: 'UPI', status: 'Completed', createdAt: '28 Aug 2026 10:15 AM', period: 'Today' },
-  { id: 'sale-102', orderNo: 'ORD-2026-8822', customerName: 'Priya Sharma Buildcon', customerPhone: '+91 98111 22334', store: 'HYD', items: [{ itemId: 'item-004', name: 'Polycab 1.5 Sq mm FR Wire 90m Coil', qty: 5, unitPrice: 2400, taxRate: 18 }], subtotal: 12000, taxTotal: 2160, discount: 500, total: 13660, paymentMethod: 'Card', status: 'Completed', createdAt: '28 Aug 2026 11:30 AM', period: 'Today' },
-  { id: 'sale-103', orderNo: 'ORD-2026-8823', customerName: 'Apex Electrical Solutions', customerPhone: '+91 97222 33445', store: 'DEL', items: [{ itemId: 'item-009', name: 'Legrand MCB 32A Single Pole', qty: 12, unitPrice: 270, taxRate: 18 }], subtotal: 3240, taxTotal: 583.2, discount: 0, total: 3823.2, paymentMethod: 'Cash', status: 'Completed', createdAt: '28 Aug 2026 01:05 PM', period: 'Today' },
-  { id: 'sale-104', orderNo: 'ORD-2026-8819', customerName: 'Mohammad Yunus', customerPhone: '+91 97432 50071', store: 'BLR', items: [{ itemId: 'item-016', name: 'Havells Gold Fan 1200mm', qty: 2, unitPrice: 2499, taxRate: 18 }], subtotal: 4998, taxTotal: 899.64, discount: 100, total: 5797.64, paymentMethod: 'UPI', status: 'Completed', createdAt: '27 Aug 2026 04:20 PM', period: 'Yesterday' },
-  { id: 'sale-105', orderNo: 'ORD-2026-8800', customerName: 'Southern Infra Tech', customerPhone: '+91 94444 11223', store: 'HYD', items: [{ itemId: 'item-010', name: 'V-Guard Voltage Stabilizer 4kVA', qty: 4, unitPrice: 4500, taxRate: 18 }], subtotal: 18000, taxTotal: 3240, discount: 0, total: 21240, paymentMethod: 'Credit', status: 'Completed', createdAt: '22 Aug 2026 02:10 PM', period: 'This Month' },
+  { id: 'sale-101', orderNo: 'CS260011', customerName: 'Rajesh Kumar Electronics', customerPhone: '+91 98765 43210', store: 'BLR', items: [{ itemId: 'item-003', name: 'Anchor Roma 3-Pin 6A Plug Top', qty: 20, unitPrice: 45, taxRate: 18, warrantyMonths: 6, warrantyExpiryDate: '28 Feb 2027' }], subtotal: 900, taxTotal: 162, discount: 0, total: 1062, taxEnabled: true, paymentMethod: 'UPI', status: 'Completed', createdAt: '28 Aug 2026 10:15 AM', period: 'Today', warrantyExpiryDate: '28 Feb 2027' },
+  { id: 'sale-102', orderNo: 'CS260021', customerName: 'Priya Sharma Buildcon', customerPhone: '+91 98111 22334', store: 'HYD', items: [{ itemId: 'item-004', name: 'Polycab 1.5 Sq mm FR Wire 90m Coil', qty: 5, unitPrice: 2400, taxRate: 18, warrantyMonths: 60, warrantyExpiryDate: '28 Aug 2031' }], subtotal: 12000, taxTotal: 2160, discount: 500, total: 13660, taxEnabled: true, paymentMethod: 'Card', status: 'Completed', createdAt: '28 Aug 2026 11:30 AM', period: 'Today', warrantyExpiryDate: '28 Aug 2031' },
+  { id: 'sale-103', orderNo: 'CS260031', customerName: 'Apex Electrical Solutions', customerPhone: '+91 97222 33445', store: 'DEL', items: [{ itemId: 'item-009', name: 'Legrand MCB 32A Single Pole', qty: 12, unitPrice: 270, taxRate: 18, warrantyMonths: 24, warrantyExpiryDate: '28 Aug 2028' }], subtotal: 3240, taxTotal: 583.2, discount: 0, total: 3823.2, taxEnabled: true, paymentMethod: 'Cash', status: 'Completed', createdAt: '28 Aug 2026 01:05 PM', period: 'Today', warrantyExpiryDate: '28 Aug 2028' },
 ];
 
 const initialPurchases: PurchaseOrder[] = [
-  { id: 'po-301', poNo: 'PO-2026-0041', vendorName: 'Polycab India Ltd', store: 'HYD', items: [{ name: 'Polycab 1.5 Sq mm FR Wire 90m Coil', qty: 25, unitCost: 1850 }], totalAmount: 46250, status: 'Received', paymentStatus: 'Paid', expectedDate: '25 Aug 2026', createdAt: '20 Aug 2026' },
-  { id: 'po-302', poNo: 'PO-2026-0042', vendorName: 'Havells India Limited', store: 'BLR', items: [{ name: 'Havells Crabtree 6A Switch 1-Way', qty: 100, unitCost: 65 }], totalAmount: 6500, status: 'Sent', paymentStatus: 'Unpaid', expectedDate: '30 Aug 2026', createdAt: '26 Aug 2026' },
+  { id: 'po-301', poNo: 'PO-2026-0041', vendorName: 'Polycab India Ltd', store: 'CENTRAL', items: [{ name: 'Polycab 1.5 Sq mm FR Wire 90m Coil', qty: 25, unitCost: 1850, sku: 'SKU-0562' }], totalAmount: 46250, status: 'Received', paymentStatus: 'Paid', expectedDate: '25 Aug 2026', createdAt: '20 Aug 2026' },
+  { id: 'po-302', poNo: 'PO-2026-0042', vendorName: 'Havells India Limited', store: 'CENTRAL', items: [{ name: 'Havells Crabtree 6A Switch 1-Way', qty: 100, unitCost: 65, sku: 'SKU-0834' }], totalAmount: 6500, status: 'Sent', paymentStatus: 'Unpaid', expectedDate: '30 Aug 2026', createdAt: '26 Aug 2026' },
 ];
 
 const initialCustomers: Customer[] = [
@@ -227,7 +301,7 @@ const initialExpenses: Expense[] = [
 ];
 
 const initialUsers: UserAccount[] = [
-  { id: 'usr-1', name: 'Super Admin', email: 'cosko@gmail.com', password: 'Cosko2026@', phone: '+91 98765 00000', role: 'Super Admin', securityLevel: 100, store: 'All Stores', allowedStores: ['BLR', 'HYD', 'DEL'], status: 'Active', shiftStatus: 'On Shift', lastLogin: 'Just now', permissions: ['ALL_PERMISSIONS', 'super_admin.manage', 'roles.manage', 'permissions.manage', 'security.manage', 'audit_logs.enterprise_view', 'settings.global_manage'] },
+  { id: 'usr-1', name: 'Super Admin', email: 'cosko@gmail.com', password: 'Cosko2026@', phone: '+91 98765 00000', role: 'Super Admin', securityLevel: 100, store: 'All Stores', allowedStores: ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'], status: 'Active', shiftStatus: 'On Shift', lastLogin: 'Just now', permissions: ['ALL_PERMISSIONS', 'super_admin.manage', 'roles.manage', 'permissions.manage', 'security.manage', 'audit_logs.enterprise_view', 'settings.global_manage'] },
   { id: 'usr-2', name: 'Sneha Patel', email: 'sneha@cosko.com', password: 'Password2026@', phone: '+91 80 2555 1234', role: 'Store Manager', securityLevel: 80, store: 'BLR', allowedStores: ['BLR'], status: 'Active', shiftStatus: 'On Shift', lastLogin: '1 hour ago', permissions: ['dashboard.view', 'sales.view', 'sales.create', 'sales.discount', 'sales.refund', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'inventory.transfer', 'purchases.view', 'purchases.create', 'customers.view', 'customers.edit', 'vendors.view', 'expenses.view', 'accounting.view', 'reports.view', 'employees.view', 'stores.view'] },
   { id: 'usr-3', name: 'Rohan Sharma', email: 'rohan@cosko.com', password: 'Password2026@', phone: '+91 11 4100 9988', role: 'Inventory Auditor', securityLevel: 60, store: 'DEL', allowedStores: ['DEL'], status: 'Active', shiftStatus: 'On Shift', lastLogin: '3 hours ago', permissions: ['dashboard.view', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'purchases.view', 'purchases.receive_grn', 'vendors.view', 'reports.view'] },
   { id: 'usr-4', name: 'Karan Verma', email: 'karan@cosko.com', password: 'Password2026@', phone: '+91 40 6677 8899', role: 'POS Cashier', securityLevel: 20, store: 'HYD', allowedStores: ['HYD'], status: 'Active', shiftStatus: 'On Shift', lastLogin: 'Yesterday', permissions: ['sales.view', 'sales.create', 'customers.view'] },
@@ -238,20 +312,12 @@ const initialUsers: UserAccount[] = [
 
 const initialAuditLogs: AuditLog[] = [
   { id: 'log-1', timestamp: '28 Aug 2026 14:10:02', userName: 'Super Admin', userRole: 'Super Admin', module: 'Inventory', action: 'Stock Adjustment', details: 'Adjusted SKU-0312 qty from +20 to +142 (Physical Audit)', ipAddress: '192.168.1.14' },
-  { id: 'log-2', timestamp: '28 Aug 2026 11:30:15', userName: 'Super Admin', userRole: 'Super Admin', module: 'Sales', action: 'POS Sale Checkout', details: 'Completed Order ORD-2026-8822 (₹13,660)', ipAddress: '192.168.1.42' },
-  { id: 'log-3', timestamp: '28 Aug 2026 09:15:00', userName: 'Super Admin', userRole: 'Super Admin', module: 'Authentication', action: 'User Login', details: 'Super Admin login session initialized for cosko@gmail.com', ipAddress: '192.168.1.14' },
+  { id: 'log-2', timestamp: '28 Aug 2026 11:30:15', userName: 'Super Admin', userRole: 'Super Admin', module: 'Sales', action: 'POS Sale Checkout', details: 'Completed Order CS260021 (₹13,660)', ipAddress: '192.168.1.42' },
 ];
 
 const initialNotifications: NotificationItem[] = [
   { id: 'notif-1', title: 'Low Stock Alert', message: '38 items across stores are below reorder threshold.', time: '10 min ago', type: 'warning', read: false },
-  { id: 'notif-2', title: 'New PO Received', message: 'PO-2026-0041 marked received at Hyderabad store.', time: '2 hours ago', type: 'success', read: false },
-];
-
-const initialStoreHubs: StoreHub[] = [
-  { id: 'st-blr', code: 'BLR', name: 'Bengaluru Central Hub', city: 'Bengaluru', address: 'Indiranagar 100ft Rd, Bengaluru', manager: 'Sneha Patel', phone: '+91 80 2555 1234', registers: 4, skusCount: 1420, monthlyRevenue: 1450000, status: 'Active' },
-  { id: 'st-hyd', code: 'HYD', name: 'Hyderabad Warehouse & Outlet', city: 'Hyderabad', address: 'Hitech City Phase 2, Hyderabad', manager: 'Karan Verma', phone: '+91 40 6677 8899', registers: 3, skusCount: 980, monthlyRevenue: 1120000, status: 'Active' },
-  { id: 'st-del', code: 'DEL', name: 'Delhi NCR Fulfillment Center', city: 'Delhi', address: 'Okhla Industrial Area Ph-III, New Delhi', manager: 'Rohan Sharma', phone: '+91 11 4100 9988', registers: 5, skusCount: 2100, monthlyRevenue: 980000, status: 'Active' },
-  { id: 'st-mum', code: 'MUM', name: 'Mumbai Commercial Hub', city: 'Mumbai', address: 'Bandra Kurla Complex, Mumbai', manager: 'Rakesh Verma', phone: '+91 22 6688 9900', registers: 4, skusCount: 1200, monthlyRevenue: 1350000, status: 'Active' },
+  { id: 'notif-2', title: 'New PO Received', message: 'PO-2026-0041 marked received at Central Warehouse.', time: '2 hours ago', type: 'success', read: false },
 ];
 
 interface AppContextType {
@@ -286,6 +352,9 @@ interface AppContextType {
   deleteItem: (id: string) => void;
   adjustStock: (id: string, qtyChange: number, reason: string) => void;
   transferStock: (fromStore: string, toStore: string, itemId: string, qty: number) => void;
+  stockTransfers: StockTransferRecord[];
+  inventoryLedger: InventoryLedgerEntry[];
+  repairsEnquiries: RepairEnquiry[];
   sales: SalesOrder[];
   addSale: (sale: Omit<SalesOrder, 'id' | 'orderNo' | 'createdAt' | 'period'>) => SalesOrder;
   purchases: PurchaseOrder[];
@@ -325,36 +394,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [datePeriod, setDatePeriod] = useState<string>('This Month');
   const [usersList, setUsersList] = useState<UserAccount[]>(initialUsers);
   const [storesList, setStoresList] = useState<StoreHub[]>(initialStoreHubs);
+  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
+  const [stockTransfers, setStockTransfers] = useState<StockTransferRecord[]>(initialStockTransfers);
+  const [inventoryLedger, setInventoryLedger] = useState<InventoryLedgerEntry[]>(initialInventoryLedger);
+  const [repairsEnquiries, setRepairsEnquiries] = useState<RepairEnquiry[]>(initialRepairsEnquiries);
+  const [sales, setSales] = useState<SalesOrder[]>(initialSales);
+  const [purchases, setPurchases] = useState<PurchaseOrder[]>(initialPurchases);
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [vendors, setVendors] = useState<Vendor[]>(initialVendors);
+  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialAuditLogs);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
 
-  // Load persistent branding, stores, and users from localStorage on client side
-  useEffect(() => {
-    try {
-      const savedBranding = localStorage.getItem('cosko_branding');
-      if (savedBranding) setBranding(JSON.parse(savedBranding));
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [storeSelectorOpen, setStoreSelectorOpen] = useState(false);
+  const [userProfileOpen, setUserProfileOpen] = useState(false);
 
-      const savedStores = localStorage.getItem('cosko_stores_list');
-      if (savedStores) setStoresList(JSON.parse(savedStores));
-
-      const savedUsers = localStorage.getItem('cosko_users_list');
-      if (savedUsers) setUsersList(JSON.parse(savedUsers));
-    } catch {
-      // Fallback to defaults
-    }
-  }, []);
-
-  const saveStoresToStorage = (updatedStores: StoreHub[]) => {
-    setStoresList(updatedStores);
-    try {
-      localStorage.setItem('cosko_stores_list', JSON.stringify(updatedStores));
-    } catch {}
-  };
-
-  const saveUsersToStorage = (updatedUsers: UserAccount[]) => {
-    setUsersList(updatedUsers);
-    try {
-      localStorage.setItem('cosko_users_list', JSON.stringify(updatedUsers));
-    } catch {}
-  };
+  // Invoice Sequence Counter per Store
+  const [invoiceCounters, setInvoiceCounters] = useState<Record<string, number>>({
+    BLR: 12,
+    HYD: 22,
+    DEL: 32,
+    MUM: 5,
+    CENTRAL: 1,
+  });
 
   const unauthenticatedUser = {
     id: '',
@@ -369,13 +433,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [authStatus, setAuthStatus] = useState<'AUTH_LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED'>('AUTH_LOADING');
   const [currentUser, setCurrentUserState] = useState<{ id: string; name: string; email: string; role: UserAccount['role']; store: string; avatar: string; shiftStatus: 'On Shift' | 'On Leave'; avatarUrl?: string }>(unauthenticatedUser);
 
-  // Restore authenticated user session from secure client storage on startup & sync assigned store scope
+  // Restore active user session & enforce store scope lock
   useEffect(() => {
     try {
       const savedSession = localStorage.getItem('cosko_active_session');
       if (savedSession) {
         const parsed = JSON.parse(savedSession);
-        // Find matching active user account in provisioned user accounts list
         const match = usersList.find((u) => (u.id === parsed.userId || u.email.toLowerCase() === (parsed.email || '').toLowerCase()) && u.status === 'Active');
         if (match) {
           const userObj = {
@@ -391,7 +454,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setCurrentUserState(userObj);
           setAuthStatus('AUTHENTICATED');
 
-          // Auto-sync selectedStore to user's assigned store scope for non-Super Admin users
           if (match.role !== 'Super Admin') {
             const effectiveStore = (match.store && match.store !== 'All Stores') ? match.store : (match.allowedStores?.[0] || 'BLR');
             userObj.store = effectiveStore;
@@ -400,7 +462,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return;
         }
       }
-      // If no valid active session found, set status to UNAUTHENTICATED (DO NOT FALL BACK TO SUPER ADMIN)
       localStorage.removeItem('cosko_active_session');
       setCurrentUserState(unauthenticatedUser);
       setAuthStatus('UNAUTHENTICATED');
@@ -411,7 +472,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [usersList]);
 
-  // Enforce store scope lock continuously for authenticated non-Super Admin users
+  // Enforce store scope lock continuously for non-Super Admin users
   useEffect(() => {
     if (authStatus === 'AUTHENTICATED' && currentUser.role !== 'Super Admin') {
       const assignedStore = (currentUser.store && currentUser.store !== 'All Stores') ? currentUser.store : 'BLR';
@@ -438,17 +499,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try {
       localStorage.setItem('cosko_active_session', JSON.stringify({ userId: user.id, email: user.email, role: user.role, store: user.store, timestamp: Date.now() }));
-    } catch {
-      // Storage fallback
-    }
+    } catch {}
   };
 
-  const logoutUser = () => {
+  const logoutUser = async () => {
     try {
       localStorage.removeItem('cosko_active_session');
-    } catch {
-      // Storage fallback
-    }
+      if (typeof window !== 'undefined') {
+        const { createSupabaseBrowserClient } = await import('@/lib/supabase/client');
+        const supabase = createSupabaseBrowserClient();
+        await supabase.auth.signOut();
+      }
+    } catch {}
     setCurrentUserState(unauthenticatedUser);
     setAuthStatus('UNAUTHENTICATED');
     setSelectedStoreState('All Stores');
@@ -459,9 +521,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const updated = { ...prev, ...updatedPartial };
       try {
         localStorage.setItem('cosko_branding', JSON.stringify(updated));
-      } catch {
-        // Storage fallback
-      }
+      } catch {}
       return updated;
     });
 
@@ -473,281 +533,170 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBranding(defaultBranding);
     try {
       localStorage.removeItem('cosko_branding');
-    } catch {
-      // ignore
-    }
-    addAuditLog('Settings', 'Reset White-Label Branding', 'Reset branding back to default COSKO theme');
-    toast.success('Branding reset to default COSKO settings');
-  };
-
-  const setSelectedStore = (storeCode: string) => {
-    if (currentUser.role !== 'Super Admin') {
-      if (storeCode === 'All Stores') {
-        toast.error('Deny Access: Enterprise "All Stores" scope is restricted to Super Admin accounts only.');
-        return;
-      }
-      const assignedStore = (currentUser.store && currentUser.store !== 'All Stores') ? currentUser.store : 'BLR';
-      if (storeCode !== assignedStore) {
-        toast.error(`Deny Access: Store Scope Lock prevents access to ${storeCode}. You are assigned to ${assignedStore}.`);
-        return;
-      }
-    }
-    setSelectedStoreState(storeCode);
-  };
-
-  const addStoreHub = (storeData: Omit<StoreHub, 'id'>) => {
-    const newStore: StoreHub = {
-      ...storeData,
-      id: `st-${Date.now()}`,
-    };
-    const updated = [...storesList, newStore];
-    saveStoresToStorage(updated);
-    SupabaseClientService.syncStore(newStore);
-    addAuditLog('Organization', 'Add Store Hub', `Created new store outlet "${newStore.name}" (${newStore.code})`);
-    toast.success(`Store hub "${newStore.name}" (${newStore.code}) created successfully!`);
-  };
-
-  const updateStoreHub = (id: string, updated: Partial<StoreHub>) => {
-    const updatedStores = storesList.map((s) => (s.id === id || s.code === id ? { ...s, ...updated } : s));
-    saveStoresToStorage(updatedStores);
-    const target = updatedStores.find((s) => s.id === id || s.code === id);
-    if (target) SupabaseClientService.syncStore(target);
-    addAuditLog('Organization', 'Edit Store Hub', `Updated details for store hub #${id}`);
-    toast.success('Store hub details updated.');
-  };
-
-  const deleteStoreHub = (id: string) => {
-    const s = storesList.find((st) => st.id === id || st.code === id);
-    const updatedStores = storesList.filter((st) => st.id !== id && st.code !== id);
-    saveStoresToStorage(updatedStores);
-    if (s) {
-      SupabaseClientService.deleteStore(id);
-      addAuditLog('Organization', 'Delete Store Hub', `Removed store hub ${s.name} (${s.code})`);
-      toast.success(`Removed store hub "${s.name}" (${s.code})`);
-    }
-  };
-
-  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
-  const [sales, setSales] = useState<SalesOrder[]>(initialSales);
-  const [purchases, setPurchases] = useState<PurchaseOrder[]>(initialPurchases);
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
-  const [vendors, setVendors] = useState<Vendor[]>(initialVendors);
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialAuditLogs);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
-
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [storeSelectorOpen, setStoreSelectorOpen] = useState(false);
-  const [userProfileOpen, setUserProfileOpen] = useState(false);
-
-  const addAuditLog = (module: string, action: string, details: string) => {
-    const newLog: AuditLog = {
-      id: `log-${Date.now()}`,
-      timestamp: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      userName: currentUser.name,
-      userRole: currentUser.role,
-      module,
-      action,
-      details,
-      ipAddress: '192.168.1.14',
-    };
-    setAuditLogs((prev) => [newLog, ...prev]);
-    SupabaseClientService.syncAuditLog(newLog);
+    } catch {}
+    addAuditLog('Settings', 'Reset Branding', 'Reset white-label branding to system default');
+    toast.info('Application branding reset to defaults');
   };
 
   const toggleCurrentUserShift = () => {
-    const nextStatus: 'On Shift' | 'On Leave' = currentUser.shiftStatus === 'On Shift' ? 'On Leave' : 'On Shift';
-    setCurrentUser((prev: typeof currentUser) => ({ ...prev, shiftStatus: nextStatus }));
-    const updatedUsers = usersList.map((u) => (u.id === currentUser.id ? { ...u, shiftStatus: nextStatus } : u));
-    saveUsersToStorage(updatedUsers);
-    addAuditLog('User Shift', 'Toggle Shift Status', `${currentUser.name} marked shift as ${nextStatus}`);
-    toast.success(`Your shift status is now "${nextStatus}"`);
+    if (authStatus !== 'AUTHENTICATED') return;
+    const nextStatus = currentUser.shiftStatus === 'On Shift' ? 'On Leave' : 'On Shift';
+    setCurrentUserState((prev) => ({ ...prev, shiftStatus: nextStatus }));
+    setUsersList((prev) => prev.map((u) => (u.id === currentUser.id ? { ...u, shiftStatus: nextStatus } : u)));
+    addAuditLog('Employees', 'Toggle Shift Status', `Changed shift status to ${nextStatus}`);
+    toast.success(`You are now ${nextStatus}`);
   };
 
   const updateProfileAvatar = (avatarUrl: string | null) => {
-    setCurrentUser((prev: typeof currentUser) => ({ ...prev, avatarUrl: avatarUrl || undefined }));
-    const updatedUsers = usersList.map((u) => (u.id === currentUser.id ? { ...u, avatarUrl: avatarUrl || undefined } : u));
-    saveUsersToStorage(updatedUsers);
-    addAuditLog('User Profile', 'Update Avatar Photo', `Updated profile picture for ${currentUser.name}`);
-    if (avatarUrl) {
-      toast.success('Profile picture updated successfully!');
-    } else {
-      toast.info('Profile picture removed');
+    if (authStatus !== 'AUTHENTICATED') return;
+    setCurrentUserState((prev) => ({ ...prev, avatarUrl: avatarUrl || undefined }));
+    setUsersList((prev) => prev.map((u) => (u.id === currentUser.id ? { ...u, avatarUrl: avatarUrl || undefined } : u)));
+    toast.success('Profile avatar updated');
+  };
+
+  const setSelectedStore = (store: string) => {
+    if (currentUser.role !== 'Super Admin' && authStatus === 'AUTHENTICATED') {
+      const assignedStore = (currentUser.store && currentUser.store !== 'All Stores') ? currentUser.store : 'BLR';
+      if (store !== assignedStore) {
+        toast.warning(`Store Access Locked: You are restricted to ${assignedStore}`);
+        setSelectedStoreState(assignedStore);
+        return;
+      }
     }
+    setSelectedStoreState(store);
+  };
+
+  const addStoreHub = (storeData: Omit<StoreHub, 'id'>) => {
+    const newStore: StoreHub = { ...storeData, id: `st-${Date.now()}` };
+    setStoresList((prev) => [newStore, ...prev]);
+    SupabaseClientService.syncStore(newStore);
+    addAuditLog('Stores', 'Create Store Hub', `Created store hub "${newStore.name}" (${newStore.code})`);
+    toast.success(`Store Hub "${newStore.name}" created!`);
+  };
+
+  const updateStoreHub = (id: string, updated: Partial<StoreHub>) => {
+    setStoresList((prev) => prev.map((s) => (s.id === id ? { ...s, ...updated } : s)));
+    const target = storesList.find((s) => s.id === id);
+    if (target) SupabaseClientService.syncStore({ ...target, ...updated });
+    addAuditLog('Stores', 'Edit Store Hub', `Updated store #${id}`);
+    toast.success('Store details updated');
+  };
+
+  const deleteStoreHub = (id: string) => {
+    const s = storesList.find((st) => st.id === id);
+    setStoresList((prev) => prev.filter((st) => st.id !== id));
+    if (s) {
+      SupabaseClientService.deleteStore(id);
+      addAuditLog('Stores', 'Delete Store Hub', `Removed store hub "${s.name}" (${s.code})`);
+      toast.success(`Removed store "${s.name}"`);
+    }
+  };
+
+  const addUserAccount = (userData: Omit<UserAccount, 'id' | 'lastLogin' | 'permissions'>) => {
+    const newUser: UserAccount = {
+      ...userData,
+      id: `usr-${Date.now()}`,
+      lastLogin: 'Never',
+      permissions: [],
+    };
+    setUsersList((prev) => [newUser, ...prev]);
+    SupabaseClientService.syncProfile(newUser);
+    addAuditLog('Users & Roles', 'Provision User', `Provisioned account for ${newUser.name} (${newUser.role})`);
+    toast.success(`User "${newUser.name}" provisioned`);
+  };
+
+  const updateUserAccount = (id: string, updated: Partial<UserAccount>) => {
+    setUsersList((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
+    const updatedUser = usersList.find((u) => u.id === id);
+    if (updatedUser) SupabaseClientService.syncProfile({ ...updatedUser, ...updated });
+    addAuditLog('Users & Roles', 'Edit User Profile', `Updated user profile #${id}`);
+    toast.success('User record updated');
   };
 
   const toggleUserShiftStatus = (id: string) => {
-    const updatedUsers = usersList.map((u) => {
-      if (u.id === id) {
-        const nextStatus: 'On Shift' | 'On Leave' = u.shiftStatus === 'On Shift' ? 'On Leave' : 'On Shift';
-        if (u.id === currentUser.id) {
-          setCurrentUser((curr: typeof currentUser) => ({ ...curr, shiftStatus: nextStatus }));
+    setUsersList((prev) =>
+      prev.map((u) => {
+        if (u.id === id) {
+          const nextShift = u.shiftStatus === 'On Shift' ? 'On Leave' : 'On Shift';
+          const updatedUser = { ...u, shiftStatus: nextShift as any };
+          SupabaseClientService.syncProfile(updatedUser);
+          return updatedUser;
         }
-        addAuditLog('User Shift', 'Toggle User Shift', `Toggled shift status for ${u.name} to ${nextStatus}`);
-        toast.success(`${u.name} shift status set to "${nextStatus}"`);
-        return { ...u, shiftStatus: nextStatus };
-      }
-      return u;
-    });
-    saveUsersToStorage(updatedUsers);
-  };
-
-  const deleteUserAccount = async (id: string) => {
-    const u = usersList.find((usr) => usr.id === id);
-    if (u) {
-      if (u.role === 'Super Admin' && currentUser.role !== 'Super Admin') {
-        toast.error('Deny Access: Lower-level roles cannot delete Super Admin accounts.');
-        return;
-      }
-      const updatedUsers = usersList.filter((usr) => usr.id !== id);
-      saveUsersToStorage(updatedUsers);
-      try {
-        await fetch('/api/users/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id }),
-        });
-      } catch {
-        SupabaseClientService.deleteProfile(id);
-      }
-      addAuditLog('Security RBAC', 'Delete User Account', `Deleted user ${u.name} (${u.email})`);
-      toast.success(`User account "${u.name}" deleted successfully.`);
-    }
-  };
-
-  const addUserAccount = async (userData: Omit<UserAccount, 'id' | 'lastLogin' | 'permissions'> & { password?: string }) => {
-    if (userData.role === 'Super Admin' && currentUser.role !== 'Super Admin') {
-      toast.error('Deny Access: Only existing Level 100 Super Admin accounts can create new Super Admin accounts.');
-      return;
-    }
-
-    const securityLevel =
-      userData.role === 'Super Admin' ? 100 : userData.role === 'Store Manager' ? 80 : userData.role === 'Inventory Auditor' ? 60 : userData.role === 'Sales Executive' ? 40 : 20;
-
-    const tempId = `usr-${Date.now()}`;
-    const newUser: UserAccount = {
-      ...userData,
-      id: tempId,
-      securityLevel,
-      lastLogin: 'Never',
-      permissions: userData.role === 'Super Admin' ? ['ALL_PERMISSIONS'] : ['STANDARD_ACCESS'],
-    };
-
-    const updatedUsers = [...usersList, newUser];
-    saveUsersToStorage(updatedUsers);
-
-    try {
-      const res = await fetch('/api/users/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...userData, securityLevel }),
-      });
-      const data = await res.json();
-      if (data.success && data.userId) {
-        const finalUser = { ...newUser, id: data.userId };
-        const currentList = JSON.parse(localStorage.getItem('cosko_users_list') || '[]');
-        const updatedList = currentList.map((u: any) => (u.id === tempId ? finalUser : u));
-        saveUsersToStorage(updatedList);
-      }
-    } catch {
-      SupabaseClientService.syncProfile(newUser);
-    }
-
-    addAuditLog('Security RBAC', 'Add User Account', `Created user account for ${newUser.name} (${newUser.role} [Level ${securityLevel}] - ${newUser.email})`);
-    toast.success(`User account created for ${newUser.name} (${newUser.role} - Level ${securityLevel})`);
+        return u;
+      })
+    );
+    toast.success('Shift status toggled');
   };
 
   const toggleUserStatus = (id: string, nextStatus: 'Active' | 'Inactive' | 'Suspended') => {
-    const target = usersList.find((u) => u.id === id);
-    if (!target) return;
-    if (target.role === 'Super Admin' && currentUser.role !== 'Super Admin') {
-      toast.error('Deny Access: Protected Boundary. Lower roles cannot modify Super Admin accounts.');
-      return;
-    }
-    const updatedUsers = usersList.map((u) => (u.id === id ? { ...u, status: nextStatus } : u));
-    saveUsersToStorage(updatedUsers);
-    const updatedUser = updatedUsers.find((u) => u.id === id);
-    if (updatedUser) {
-      fetch('/api/users/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: nextStatus }),
-      }).catch(() => SupabaseClientService.syncProfile(updatedUser));
-    }
-    addAuditLog('Security RBAC', 'Change Account Status', `Set user status for ${target.name} to ${nextStatus}`);
-    toast.success(`Account status for ${target.name} updated to "${nextStatus}"`);
+    setUsersList((prev) =>
+      prev.map((u) => {
+        if (u.id === id) {
+          const updatedUser = { ...u, status: nextStatus };
+          SupabaseClientService.syncProfile(updatedUser);
+          return updatedUser;
+        }
+        return u;
+      })
+    );
+    addAuditLog('Users & Roles', 'Change Account Status', `Set account #${id} status to ${nextStatus}`);
+    toast.success(`Account status changed to ${nextStatus}`);
   };
 
   const setUserPermissionOverride = (userId: string, permissionCode: string, overrideType: 'ALLOW' | 'DENY' | 'RESET') => {
-    const target = usersList.find((u) => u.id === userId);
-    if (!target) return;
-    if (target.role === 'Super Admin' && currentUser.role !== 'Super Admin') {
-      toast.error('Deny Access: Protected Boundary. Cannot alter Super Admin permission overrides.');
-      return;
-    }
-
-    const updatedUsers = usersList.map((u) => {
-      if (u.id === userId) {
-        const currentOverrides = u.overrides || [];
-        let updatedOverrides = currentOverrides.filter((o) => o.permissionCode !== permissionCode);
-        if (overrideType !== 'RESET') {
-          updatedOverrides.push({ permissionCode, overrideType });
+    setUsersList((prev) =>
+      prev.map((u) => {
+        if (u.id === userId) {
+          const currentOverrides = u.overrides || [];
+          let updatedOverrides: UserPermissionOverride[];
+          if (overrideType === 'RESET') {
+            updatedOverrides = currentOverrides.filter((o) => o.permissionCode !== permissionCode);
+          } else {
+            updatedOverrides = [
+              ...currentOverrides.filter((o) => o.permissionCode !== permissionCode),
+              { permissionCode, overrideType },
+            ];
+          }
+          return { ...u, overrides: updatedOverrides };
         }
-        return { ...u, overrides: updatedOverrides };
-      }
-      return u;
-    });
-    saveUsersToStorage(updatedUsers);
-    addAuditLog('Security RBAC', 'Permission Override', `Configured ${overrideType} override for ${permissionCode} on ${target.name}`);
-    toast.success(`Permission override (${overrideType}) updated for ${permissionCode}`);
+        return u;
+      })
+    );
+    toast.success(`Permission ${permissionCode} override updated`);
   };
 
   const toggleUserStoreAccess = (userId: string, storeCode: string) => {
-    const target = usersList.find((u) => u.id === userId);
-    if (!target) return;
-    if (target.role === 'Super Admin' && currentUser.role !== 'Super Admin') {
-      toast.error('Deny Access: Protected Boundary. Cannot alter Super Admin store access.');
-      return;
-    }
-
-    const updatedUsers = usersList.map((u) => {
-      if (u.id === userId) {
-        const stores = u.allowedStores || [u.store];
-        const hasStore = stores.includes(storeCode);
-        const updatedStores = hasStore ? stores.filter((s) => s !== storeCode) : [...stores, storeCode];
-        const finalStores = updatedStores.length === 0 ? [storeCode] : updatedStores;
-        return { ...u, allowedStores: finalStores };
-      }
-      return u;
-    });
-    saveUsersToStorage(updatedUsers);
-    addAuditLog('Security RBAC', 'Store Access Assignment', `Toggled store access ${storeCode} for ${target.name}`);
-    toast.success(`Toggled store access ${storeCode} for ${target.name}`);
+    setUsersList((prev) =>
+      prev.map((u) => {
+        if (u.id === userId) {
+          const allowed = u.allowedStores || [u.store];
+          const hasAccess = allowed.includes(storeCode);
+          const nextAllowed = hasAccess ? allowed.filter((s) => s !== storeCode) : [...allowed, storeCode];
+          return { ...u, allowedStores: nextAllowed.length > 0 ? nextAllowed : [u.store] };
+        }
+        return u;
+      })
+    );
+    toast.success(`Updated store scope access for ${storeCode}`);
   };
 
-  const updateUserAccount = async (id: string, updated: Partial<UserAccount>) => {
-    const updatedUsers = usersList.map((u) => (u.id === id ? { ...u, ...updated } : u));
-    saveUsersToStorage(updatedUsers);
-    const updatedUser = updatedUsers.find((u) => u.id === id);
-    if (updatedUser) {
-      try {
-        await fetch('/api/users/update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, ...updated }),
-        });
-      } catch {
-        SupabaseClientService.syncProfile(updatedUser);
-      }
+  const deleteUserAccount = (id: string) => {
+    const u = usersList.find((usr) => usr.id === id);
+    setUsersList((prev) => prev.filter((usr) => usr.id !== id));
+    if (u) {
+      SupabaseClientService.deleteProfile(id);
+      addAuditLog('Users & Roles', 'Delete User Account', `Deleted account "${u.name}" (${u.email})`);
+      toast.success(`Removed account "${u.name}"`);
     }
-    toast.success('User role and account details updated.');
   };
 
   const addItem = (itemData: Omit<InventoryItem, 'id'>) => {
     const newItem: InventoryItem = {
       ...itemData,
       id: `item-${Date.now()}`,
+      transferPrice: itemData.transferPrice || Math.round(itemData.costPrice * 1.18),
+      warrantyMonths: itemData.warrantyMonths || 12,
+      minStock: itemData.minStock || 10,
     };
     setInventory((prev) => [newItem, ...prev]);
     SupabaseClientService.syncProduct(newItem);
@@ -781,78 +730,268 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const adjustStock = (id: string, qtyChange: number, reason: string) => {
+    const itemToAdjust = inventory.find((i) => i.id === id);
+    if (!itemToAdjust) return;
+
     setInventory((prev) =>
       prev.map((item) => {
         if (item.id === id) {
           const newQty = Math.max(0, item.qtyOnHand + qtyChange);
           const newItem = { ...item, qtyOnHand: newQty, lastMovement: 'Today' };
           SupabaseClientService.syncProduct(newItem);
-          addAuditLog('Inventory', 'Stock Adjustment', `Adjusted stock for "${item.name}" by ${qtyChange > 0 ? '+' : ''}${qtyChange} units. Reason: ${reason}`);
           return newItem;
         }
         return item;
       })
     );
+
+    // Record in movement ledger
+    const ledgerEntry: InventoryLedgerEntry = {
+      id: `led-${Date.now()}`,
+      productId: itemToAdjust.id,
+      sku: itemToAdjust.sku,
+      productName: itemToAdjust.name,
+      storeCode: itemToAdjust.store,
+      movementType: 'ADJUSTMENT',
+      quantity: qtyChange,
+      unitCost: itemToAdjust.costPrice,
+      totalValue: Math.abs(qtyChange) * itemToAdjust.costPrice,
+      fromLocation: itemToAdjust.store,
+      toLocation: itemToAdjust.store,
+      referenceNo: `ADJ-${Date.now().toString().slice(-6)}`,
+      createdBy: currentUser.name || 'Admin',
+      createdAt: new Date().toISOString(),
+    };
+    setInventoryLedger((prev) => [ledgerEntry, ...prev]);
+
+    addAuditLog('Inventory', 'Stock Adjustment', `Adjusted stock for "${itemToAdjust.name}" by ${qtyChange > 0 ? '+' : ''}${qtyChange} units. Reason: ${reason}`);
     toast.success(`Stock adjusted successfully`);
   };
 
+  /**
+   * CENTRAL -> STORE TRANSFER WITH CENTRAL TRANSFER PROFIT CALCULATION
+   */
   const transferStock = (fromStore: string, toStore: string, itemId: string, qty: number) => {
+    const sourceItem = inventory.find((i) => i.id === itemId || i.sku === itemId);
+    if (!sourceItem) {
+      toast.error('Source item not found for transfer!');
+      return;
+    }
+
+    if (sourceItem.qtyOnHand < qty) {
+      toast.error(`Insufficient stock in ${fromStore} (${sourceItem.qtyOnHand} units available)`);
+      return;
+    }
+
+    const transferPrice = sourceItem.transferPrice || Math.round(sourceItem.costPrice * 1.18);
+    const purchaseCost = sourceItem.costPrice;
+    const transferProfitPerUnit = transferPrice - purchaseCost;
+    const totalTransferProfit = transferProfitPerUnit * qty;
+
+    // 1. Update source inventory (e.g. CENTRAL)
     setInventory((prev) =>
       prev.map((item) => {
-        if (item.id === itemId && (item.store === fromStore || fromStore === 'ALL')) {
-          const newItem = { ...item, qtyOnHand: Math.max(0, item.qtyOnHand - qty), lastMovement: 'Transfer Out' };
+        if (item.id === sourceItem.id) {
+          const newItem = { ...item, qtyOnHand: item.qtyOnHand - qty, lastMovement: 'Transfer Out' };
           SupabaseClientService.syncProduct(newItem);
           return newItem;
         }
         return item;
       })
     );
-    addAuditLog('Stores', 'Stock Transfer', `Transferred ${qty} units of item ${itemId} from ${fromStore} to ${toStore}`);
-    toast.success(`Transferred ${qty} units from ${fromStore} to ${toStore}`);
+
+    // 2. Update destination inventory (e.g. BLR)
+    let destItemExists = false;
+    setInventory((prev) =>
+      prev.map((item) => {
+        if (item.sku === sourceItem.sku && item.store === toStore) {
+          destItemExists = true;
+          const newItem = { ...item, qtyOnHand: item.qtyOnHand + qty, lastMovement: 'Transfer In' };
+          SupabaseClientService.syncProduct(newItem);
+          return newItem;
+        }
+        return item;
+      })
+    );
+
+    if (!destItemExists) {
+      const newDestItem: InventoryItem = {
+        ...sourceItem,
+        id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        store: toStore,
+        qtyOnHand: qty,
+        lastMovement: 'Transfer In',
+      };
+      setInventory((prev) => [...prev, newDestItem]);
+      SupabaseClientService.syncProduct(newDestItem);
+    }
+
+    // 3. Record in stockTransfers table
+    const transferRecord: StockTransferRecord = {
+      id: `tr-${Date.now()}`,
+      transferNo: `TR-2026-${Math.floor(100 + Math.random() * 900)}`,
+      sourceStore: fromStore,
+      destStore: toStore,
+      productId: sourceItem.id,
+      sku: sourceItem.sku,
+      productName: sourceItem.name,
+      qty,
+      purchaseCost,
+      transferPrice,
+      transferProfit: totalTransferProfit,
+      status: 'Completed',
+      createdBy: currentUser.name || 'Super Admin',
+      createdAt: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+    };
+    setStockTransfers((prev) => [transferRecord, ...prev]);
+
+    // 4. Log two ledger entries: TRANSFER_OUT from source, TRANSFER_IN to destination
+    const outLedger: InventoryLedgerEntry = {
+      id: `led-${Date.now()}-out`,
+      productId: sourceItem.id,
+      sku: sourceItem.sku,
+      productName: sourceItem.name,
+      storeCode: fromStore,
+      movementType: 'TRANSFER_OUT',
+      quantity: -qty,
+      unitCost: purchaseCost,
+      totalValue: qty * purchaseCost,
+      fromLocation: fromStore,
+      toLocation: toStore,
+      referenceNo: transferRecord.transferNo,
+      createdBy: currentUser.name || 'Super Admin',
+      createdAt: new Date().toISOString(),
+    };
+
+    const inLedger: InventoryLedgerEntry = {
+      id: `led-${Date.now()}-in`,
+      productId: sourceItem.id,
+      sku: sourceItem.sku,
+      productName: sourceItem.name,
+      storeCode: toStore,
+      movementType: 'TRANSFER_IN',
+      quantity: qty,
+      unitCost: transferPrice,
+      totalValue: qty * transferPrice,
+      fromLocation: fromStore,
+      toLocation: toStore,
+      referenceNo: transferRecord.transferNo,
+      createdBy: currentUser.name || 'Super Admin',
+      createdAt: new Date().toISOString(),
+    };
+    setInventoryLedger((prev) => [inLedger, outLedger, ...prev]);
+
+    addAuditLog('Stores', 'Stock Transfer', `Transferred ${qty} units of "${sourceItem.name}" from ${fromStore} to ${toStore}. Central Transfer Profit: ₹${totalTransferProfit.toLocaleString('en-IN')}`);
+    toast.success(`Transferred ${qty} units from ${fromStore} to ${toStore} (Transfer Profit: ₹${totalTransferProfit.toLocaleString('en-IN')})`);
   };
 
+  /**
+   * POS CHECKOUT WITH SEQUENTIAL CS26 INVOICING, WARRANTY & AUTOMATIC STORE STOCK DEDUCTION
+   */
   const addSale = (saleData: Omit<SalesOrder, 'id' | 'orderNo' | 'createdAt' | 'period'>): SalesOrder => {
+    const storeCode = saleData.store || selectedStore || 'BLR';
+    const storeNumeric = storeCode === 'BLR' ? '001' : storeCode === 'HYD' ? '002' : storeCode === 'DEL' ? '003' : storeCode === 'MUM' ? '004' : '009';
+    
+    // Increment sequential invoice counter for store
+    const nextSeq = (invoiceCounters[storeCode] || 1) + 1;
+    setInvoiceCounters((prev) => ({ ...prev, [storeCode]: nextSeq }));
+    const formattedOrderNo = `CS26${storeNumeric}${nextSeq}`;
+
+    // Calculate max warranty date across items
+    let maxWarrantyMonths = 12;
+    const saleItemsWithWarranty = saleData.items.map((item) => {
+      const invItem = inventory.find((i) => i.id === item.itemId || i.sku === item.name);
+      const months = invItem?.warrantyMonths || 12;
+      if (months > maxWarrantyMonths) maxWarrantyMonths = months;
+      
+      const expiryDate = new Date();
+      expiryDate.setMonth(expiryDate.getMonth() + months);
+      const formattedExpiry = expiryDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+      return {
+        ...item,
+        warrantyMonths: months,
+        warrantyExpiryDate: formattedExpiry,
+      };
+    });
+
+    const overallExpiryDate = new Date();
+    overallExpiryDate.setMonth(overallExpiryDate.getMonth() + maxWarrantyMonths);
+    const formattedOverallExpiry = overallExpiryDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
     const newSale: SalesOrder = {
       ...saleData,
       id: `sale-${Date.now()}`,
-      orderNo: `ORD-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      orderNo: formattedOrderNo,
+      items: saleItemsWithWarranty,
+      taxEnabled: saleData.taxEnabled !== undefined ? saleData.taxEnabled : true,
+      warrantyExpiryDate: formattedOverallExpiry,
       createdAt: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       period: 'Today',
     };
 
+    // 1. Automatically deduct store inventory & log movement ledger
     setInventory((prev) =>
       prev.map((item) => {
-        const sold = saleData.items.find((si) => si.itemId === item.id);
-        if (sold) {
-          const newItem = { ...item, qtyOnHand: Math.max(0, item.qtyOnHand - sold.qty), lastMovement: 'Just now' };
+        const sold = saleData.items.find((si) => si.itemId === item.id || si.name === item.name);
+        if (sold && (item.store === storeCode || storeCode === 'All Stores')) {
+          const newQty = Math.max(0, item.qtyOnHand - sold.qty);
+          const newItem = { ...item, qtyOnHand: newQty, lastMovement: 'Just now' };
           SupabaseClientService.syncProduct(newItem);
+
+          // Log SALE ledger entry
+          const ledgerEntry: InventoryLedgerEntry = {
+            id: `led-${Date.now()}-${item.id}`,
+            productId: item.id,
+            sku: item.sku,
+            productName: item.name,
+            storeCode,
+            movementType: 'SALE',
+            quantity: -sold.qty,
+            unitCost: item.costPrice,
+            totalValue: sold.qty * item.sellingPrice,
+            fromLocation: storeCode,
+            toLocation: `Customer: ${saleData.customerName}`,
+            referenceNo: formattedOrderNo,
+            createdBy: currentUser.name || 'Cashier',
+            createdAt: new Date().toISOString(),
+          };
+          setInventoryLedger((ledgers) => [ledgerEntry, ...ledgers]);
+
           return newItem;
         }
         return item;
       })
     );
 
-    setCustomers((prev) =>
-      prev.map((c) => {
-        if (c.name === saleData.customerName || c.phone === saleData.customerPhone) {
-          const updatedCust = {
-            ...c,
-            totalSpend: c.totalSpend + newSale.total,
-            creditBalance: saleData.paymentMethod === 'Credit' ? c.creditBalance + newSale.total : c.creditBalance,
-            lastPurchase: 'Today',
-          };
-          SupabaseClientService.syncCustomer(updatedCust);
-          return updatedCust;
-        }
-        return c;
-      })
-    );
+    // 2. Link transaction customer without overwriting master profile
+    setCustomers((prev) => {
+      const match = prev.find((c) => c.phone === saleData.customerPhone || c.name === saleData.customerName);
+      if (match) {
+        return prev.map((c) => (c.id === match.id ? { ...c, totalSpend: c.totalSpend + newSale.total, lastPurchase: 'Today' } : c));
+      } else if (saleData.customerName && saleData.customerName !== 'Walk-in Customer' && saleData.customerPhone) {
+        const newCust: Customer = {
+          id: `cust-${Date.now()}`,
+          name: saleData.customerName,
+          phone: saleData.customerPhone,
+          email: `${saleData.customerName.toLowerCase().replace(/[^a-z0-9]/g, '')}@client.com`,
+          city: storeCode === 'BLR' ? 'Bengaluru' : storeCode === 'HYD' ? 'Hyderabad' : storeCode === 'DEL' ? 'Delhi' : 'Mumbai',
+          tier: 'Regular',
+          totalSpend: newSale.total,
+          creditBalance: saleData.paymentMethod === 'Credit' ? newSale.total : 0,
+          lastPurchase: 'Today',
+        };
+        SupabaseClientService.syncCustomer(newCust);
+        return [newCust, ...prev];
+      }
+      return prev;
+    });
 
     setSales((prev) => [newSale, ...prev]);
     SupabaseClientService.syncSale({ ...newSale, cashierName: currentUser.name });
-    const photoMsg = saleData.salePhotos && saleData.salePhotos.length > 0 ? ` with ${saleData.salePhotos.length} attached photo(s)` : '';
+    const photoMsg = saleData.salePhotos && saleData.salePhotos.length > 0 ? ` with ${saleData.salePhotos.length} photo(s)` : '';
     addAuditLog('Sales', 'POS Sale Checkout', `Completed order ${newSale.orderNo} for ₹${newSale.total.toLocaleString('en-IN')}${photoMsg}`);
-    toast.success(`Sale ${newSale.orderNo} completed successfully!`);
+    toast.success(`Invoice ${newSale.orderNo} generated successfully!`);
     return newSale;
   };
 
@@ -864,14 +1003,99 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
     };
     setPurchases((prev) => [newPO, ...prev]);
+
+    // If purchase order is received on creation, credit Central Inventory
+    if (newPO.status === 'Received') {
+      creditCentralStockForPO(newPO);
+    }
+
     addAuditLog('Purchases', 'Create Purchase Order', `Generated ${newPO.poNo} for ${newPO.vendorName} (₹${newPO.totalAmount.toLocaleString('en-IN')})`);
     toast.success(`Purchase Order ${newPO.poNo} created successfully!`);
   };
 
   const updatePurchase = (id: string, updated: Partial<PurchaseOrder>) => {
+    const targetPO = purchases.find((p) => p.id === id);
+    const nextStatus = updated.status;
+
     setPurchases((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
+
+    // When PO transitions to 'Received', credit Central Warehouse Inventory automatically
+    if (targetPO && targetPO.status !== 'Received' && nextStatus === 'Received') {
+      creditCentralStockForPO({ ...targetPO, ...updated });
+    }
+
     addAuditLog('Purchases', 'Edit Purchase Order', `Updated PO #${id}`);
     toast.success('Purchase Order updated successfully');
+  };
+
+  /**
+   * CREDITS CENTRAL WAREHOUSE STOCK UPON PO RECEIPT & LOGS PURCHASE LEDGER
+   */
+  const creditCentralStockForPO = (po: PurchaseOrder) => {
+    po.items.forEach((poItem) => {
+      let foundInCentral = false;
+
+      setInventory((prev) =>
+        prev.map((invItem) => {
+          if (invItem.store === 'CENTRAL' && (invItem.name === poItem.name || invItem.sku === poItem.sku)) {
+            foundInCentral = true;
+            const updatedInv = { ...invItem, qtyOnHand: invItem.qtyOnHand + poItem.qty, lastMovement: 'PO Received' };
+            SupabaseClientService.syncProduct(updatedInv);
+            return updatedInv;
+          }
+          return invItem;
+        })
+      );
+
+      if (!foundInCentral) {
+        const newCentralItem: InventoryItem = {
+          id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          sku: poItem.sku || `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
+          barcode: `890123456${Math.floor(1000 + Math.random() * 9000)}`,
+          name: poItem.name,
+          brand: 'Generic',
+          category: 'Electricals',
+          subcategory: 'General',
+          store: 'CENTRAL',
+          qtyOnHand: poItem.qty,
+          reorderPt: 10,
+          costPrice: poItem.unitCost,
+          transferPrice: Math.round(poItem.unitCost * 1.18),
+          sellingPrice: Math.round(poItem.unitCost * 1.45),
+          mrp: Math.round(poItem.unitCost * 1.60),
+          hsn: '8471',
+          taxRate: 18,
+          warrantyMonths: 12,
+          minStock: 10,
+          status: 'active',
+          fifoLots: 1,
+          lastMovement: 'PO Received',
+        };
+        setInventory((prev) => [...prev, newCentralItem]);
+        SupabaseClientService.syncProduct(newCentralItem);
+      }
+
+      // Log PURCHASE ledger entry
+      const ledgerEntry: InventoryLedgerEntry = {
+        id: `led-${Date.now()}-po`,
+        productId: `item-${po.id}`,
+        sku: poItem.sku || `SKU-${poItem.name.substring(0, 3).toUpperCase()}`,
+        productName: poItem.name,
+        storeCode: 'CENTRAL',
+        movementType: 'PURCHASE',
+        quantity: poItem.qty,
+        unitCost: poItem.unitCost,
+        totalValue: poItem.qty * poItem.unitCost,
+        fromLocation: `Vendor: ${po.vendorName}`,
+        toLocation: 'CENTRAL',
+        referenceNo: po.poNo,
+        createdBy: currentUser.name || 'Procurement',
+        createdAt: new Date().toISOString(),
+      };
+      setInventoryLedger((prev) => [ledgerEntry, ...prev]);
+    });
+
+    toast.success(`Credited ${po.items.reduce((acc, i) => acc + i.qty, 0)} units to Central Warehouse Stock`);
   };
 
   const deletePurchase = (id: string) => {
@@ -943,17 +1167,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addExpense = (expData: Omit<Expense, 'id' | 'referenceNo' | 'date'>) => {
+  const addExpense = (expenseData: Omit<Expense, 'id' | 'referenceNo' | 'date'>) => {
     const newExp: Expense = {
-      ...expData,
+      ...expenseData,
       id: `exp-${Date.now()}`,
       referenceNo: `EXP-2026-${Math.floor(100 + Math.random() * 900)}`,
       date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
     };
     setExpenses((prev) => [newExp, ...prev]);
     SupabaseClientService.syncExpense({ ...newExp, spentBy: currentUser.name });
-    addAuditLog('Expenses', 'Log Expense', `Recorded expense ${newExp.referenceNo} (${newExp.category} - ₹${newExp.amount.toLocaleString('en-IN')})`);
-    toast.success(`Expense ${newExp.referenceNo} recorded`);
+    addAuditLog('Expenses', 'Create Expense Record', `Logged expense "${newExp.description}" for ₹${newExp.amount.toLocaleString('en-IN')} (${newExp.store})`);
+    toast.success(`Expense record ${newExp.referenceNo} logged`);
+  };
+
+  const addAuditLog = (module: string, action: string, details: string) => {
+    const newLog: AuditLog = {
+      id: `log-${Date.now()}`,
+      timestamp: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      userName: currentUser.name || 'System',
+      userRole: currentUser.role || 'Super Admin',
+      module,
+      action,
+      details,
+      ipAddress: '127.0.0.1',
+    };
+    setAuditLogs((prev) => [newLog, ...prev]);
+    SupabaseClientService.syncAuditLog(newLog);
   };
 
   const markNotificationRead = (id: string) => {
@@ -965,92 +1204,77 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toast.success('All notifications marked as read');
   };
 
-  const value = useMemo(
-    () => ({
-      branding,
-      updateBranding,
-      resetBranding,
-      selectedStore,
-      setSelectedStore,
-      datePeriod,
-      setDatePeriod,
-      authStatus,
-      currentUser,
-      setCurrentUser,
-      logoutUser,
-      toggleCurrentUserShift,
-      updateProfileAvatar,
-      storesList,
-      addStoreHub,
-      updateStoreHub,
-      deleteStoreHub,
-      usersList,
-      addUserAccount,
-      updateUserAccount,
-      toggleUserShiftStatus,
-      toggleUserStatus,
-      setUserPermissionOverride,
-      toggleUserStoreAccess,
-      deleteUserAccount,
-      inventory,
-      addItem,
-      updateItem,
-      deleteItem,
-      adjustStock,
-      transferStock,
-      sales,
-      addSale,
-      purchases,
-      addPurchase,
-      updatePurchase,
-      deletePurchase,
-      customers,
-      addCustomer,
-      updateCustomer,
-      deleteCustomer,
-      vendors,
-      addVendor,
-      updateVendor,
-      deleteVendor,
-      expenses,
-      addExpense,
-      auditLogs,
-      addAuditLog,
-      notifications,
-      markNotificationRead,
-      markAllNotificationsRead,
-      searchOpen,
-      setSearchOpen,
-      notificationsOpen,
-      setNotificationsOpen,
-      storeSelectorOpen,
-      setStoreSelectorOpen,
-      userProfileOpen,
-      setUserProfileOpen,
-    }),
-    [
-      branding,
-      selectedStore,
-      datePeriod,
-      authStatus,
-      currentUser,
-      usersList,
-      inventory,
-      sales,
-      purchases,
-      customers,
-      vendors,
-      expenses,
-      auditLogs,
-      notifications,
-      searchOpen,
-      notificationsOpen,
-      storeSelectorOpen,
-      userProfileOpen,
-    ]
+  return (
+    <AppContext.Provider
+      value={{
+        branding,
+        updateBranding,
+        resetBranding,
+        selectedStore,
+        setSelectedStore,
+        datePeriod,
+        setDatePeriod,
+        authStatus,
+        currentUser,
+        setCurrentUser,
+        logoutUser,
+        toggleCurrentUserShift,
+        updateProfileAvatar,
+        storesList,
+        addStoreHub,
+        updateStoreHub,
+        deleteStoreHub,
+        usersList,
+        addUserAccount,
+        updateUserAccount,
+        toggleUserShiftStatus,
+        toggleUserStatus,
+        setUserPermissionOverride,
+        toggleUserStoreAccess,
+        deleteUserAccount,
+        inventory,
+        addItem,
+        updateItem,
+        deleteItem,
+        adjustStock,
+        transferStock,
+        stockTransfers,
+        inventoryLedger,
+        repairsEnquiries,
+        sales,
+        addSale,
+        purchases,
+        addPurchase,
+        updatePurchase,
+        deletePurchase,
+        customers,
+        addCustomer,
+        updateCustomer,
+        deleteCustomer,
+        vendors,
+        addVendor,
+        updateVendor,
+        deleteVendor,
+        expenses,
+        addExpense,
+        auditLogs,
+        addAuditLog,
+        notifications,
+        markNotificationRead,
+        markAllNotificationsRead,
+        searchOpen,
+        setSearchOpen,
+        notificationsOpen,
+        setNotificationsOpen,
+        storeSelectorOpen,
+        setStoreSelectorOpen,
+        userProfileOpen,
+        setUserProfileOpen,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
   );
-
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {

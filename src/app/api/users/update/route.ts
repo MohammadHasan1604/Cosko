@@ -1,24 +1,42 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xsujcrphkmtprvgncsdw.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-});
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   try {
+    // 1. Authorization check
+    let callerIsAuthorized = false;
+    try {
+      const serverClient = await createSupabaseServerClient();
+      const { data: { user: caller } } = await serverClient.auth.getUser();
+      if (caller) {
+        const { data: profile } = await serverClient.from('profiles').select('role, security_level').eq('id', caller.id).single();
+        if (profile && (profile.security_level >= 80 || profile.role === 'Super Admin' || profile.role === 'Store Manager')) {
+          callerIsAuthorized = true;
+        }
+      }
+    } catch {
+      const authHeader = request.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        callerIsAuthorized = true;
+      }
+    }
+
+    if (!callerIsAuthorized) {
+      return NextResponse.json(
+        { success: false, error: '403 Forbidden: Authorized Super Admin or Store Manager session required' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { id, name, role, store, status, securityLevel, password, shiftStatus } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'User ID is required' }, { status: 400 });
     }
+
+    const supabaseAdmin = createAdminClient();
 
     // Update public.profiles
     const updateData: any = { updated_at: new Date().toISOString() };

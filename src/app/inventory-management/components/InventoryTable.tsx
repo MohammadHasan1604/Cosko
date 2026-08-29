@@ -73,7 +73,7 @@ export default function InventoryTable() {
         search === '' ||
         item.name.toLowerCase().includes(search.toLowerCase()) ||
         item.sku.toLowerCase().includes(search.toLowerCase()) ||
-        item.barcode.includes(search) ||
+        (item.barcode && item.barcode.includes(search)) ||
         item.brand.toLowerCase().includes(search.toLowerCase());
 
       const matchStore = storeFilter === 'All Stores' || item.store === storeFilter;

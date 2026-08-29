@@ -46,11 +46,14 @@
     "lint:fix": "next lint --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md,json}\"",
     "serve": "next start",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "seed": "npx tsx scripts/seed-supabase.ts",
+    "test:security": "npx tsx scripts/run-security-tests.ts"
   },
   "dependencies": {
     "@dhiwise/component-tagger": "^1.0.16",
     "@heroicons/react": "^2.2.0",
+    "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/typography": "^0.5.16",
