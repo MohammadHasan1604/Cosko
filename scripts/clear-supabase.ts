@@ -75,6 +75,7 @@ async function clearSupabase() {
     'audit_logs',
     'notifications',
     'inventory',
+    'products',
     'store_invoice_sequences',
   ];
 
