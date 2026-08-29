@@ -1,5 +1,6 @@
 'use client';
 import React, { useState } from 'react';
+import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
@@ -105,29 +106,39 @@ export default function SettingsPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 border-b border-border pb-2 flex-wrap">
-          {(
-            [
-              { id: 'branding', label: 'White-Label Branding', icon: 'SparklesIcon' },
-              { id: 'profile', label: 'Business Profile', icon: 'BuildingStorefrontIcon' },
-              { id: 'tax', label: 'Tax & Invoicing', icon: 'DocumentCheckIcon' },
-              { id: 'security', label: 'Security & RBAC', icon: 'ShieldCheckIcon' },
-              { id: 'alerts', label: 'Automated Alerts', icon: 'BellIcon' },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={`tab-set-${tab.id}`}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                activeTab === tab.id
-                  ? 'bg-primary text-white shadow-xs'
-                  : 'bg-card border border-border text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Icon name={tab.icon as any} size={15} />
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 border-b border-border pb-2 flex-wrap justify-between">
+          <div className="flex items-center gap-2 flex-wrap">
+            {(
+              [
+                { id: 'branding', label: 'White-Label Branding', icon: 'SparklesIcon' },
+                { id: 'profile', label: 'Business Profile', icon: 'BuildingStorefrontIcon' },
+                { id: 'tax', label: 'Tax & Invoicing', icon: 'DocumentCheckIcon' },
+                { id: 'security', label: 'Security & RBAC', icon: 'ShieldCheckIcon' },
+                { id: 'alerts', label: 'Automated Alerts', icon: 'BellIcon' },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={`tab-set-${tab.id}`}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-primary text-white shadow-xs'
+                    : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Icon name={tab.icon as any} size={15} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <Link
+            href="/settings/data-connections"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all shadow-xs"
+          >
+            <Icon name="CircleStackIcon" size={15} />
+            <span>Legacy Data Connections</span>
+          </Link>
         </div>
 
         {/* Tab Contents Form */}

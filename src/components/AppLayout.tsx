@@ -44,6 +44,7 @@ const routePermissions: Record<string, string[]> = {
   '/users': superAdminOnly,
   '/audit-logs': superAdminOnly,
   '/settings': superAdminOnly,
+  '/settings/data-connections': superAdminOnly,
 };
 
 export default function AppLayout({ children, activeRoute }: AppLayoutProps) {

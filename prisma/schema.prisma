@@ -475,3 +475,30 @@ model BrandingSetting {
 
   @@map("branding_settings")
 }
+
+// 15. SECURE LEGACY DATA CONNECTIONS
+model LegacyDataSourceConfig {
+  id                 String    @id @default("legacy_customer_repair_db")
+  name               String    @default("Legacy Customer & Repair Database")
+  dbType             String    @default("MySQL") @map("db_type") @db.VarChar(32)
+  host               String    @default("127.0.0.1") @db.VarChar(128)
+  port               Int       @default(3306)
+  databaseName       String    @default("cosko_legacy_store") @map("database_name") @db.VarChar(64)
+  username           String    @default("cosko_legacy_reader") @db.VarChar(64)
+  encryptedPassword   String?   @map("encrypted_password") @db.Text
+  sslMode            String    @default("Preferred") @map("ssl_mode") @db.VarChar(32)
+  connectionTimeout  Int       @default(2500) @map("connection_timeout")
+  readTimeout        Int       @default(3000) @map("read_timeout")
+  status             String    @default("Connected") @db.VarChar(32)
+  isReadOnly         Boolean   @default(true) @map("is_read_only")
+  customerTable      String    @default("legacy_customers") @map("customer_table") @db.VarChar(64)
+  repairTable        String    @default("legacy_repair_enquiries") @map("repair_table") @db.VarChar(64)
+  fieldMappings      String?   @map("field_mappings") @db.Text
+  lastCheckedAt      DateTime? @map("last_checked_at")
+  lastLatencyMs      Int?      @default(12) @map("last_latency_ms")
+  updatedBy          String?   @map("updated_by") @db.VarChar(128)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@map("legacy_data_source_configs")
+}
