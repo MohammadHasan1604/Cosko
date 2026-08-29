@@ -353,7 +353,29 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [branding, setBranding] = useState<AppBranding>(defaultBranding);
+  const [branding, setBranding] = useState<AppBranding>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('cosko_branding');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return defaultBranding;
+  });
+
+  // Cross-tab live synchronization for white-label branding updates
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'cosko_branding' && e.newValue) {
+        try {
+          setBranding(JSON.parse(e.newValue));
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const [selectedStore, setSelectedStoreState] = useState<string>('All Stores');
   const [datePeriod, setDatePeriod] = useState<string>('This Month');
   const [usersList, setUsersList] = useState<UserAccount[]>(initialUsers);
@@ -504,13 +526,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBranding((prev) => {
       const updated = { ...prev, ...updatedPartial };
       try {
-        localStorage.setItem('cosko_branding', JSON.stringify(updated));
+        const jsonStr = JSON.stringify(updated);
+        localStorage.setItem('cosko_branding', jsonStr);
+        window.dispatchEvent(new StorageEvent('storage', { key: 'cosko_branding', newValue: jsonStr }));
       } catch {}
       return updated;
     });
 
-    addAuditLog('Settings', 'Update White-Label Branding', `Updated app name to "${updatedPartial.appName || branding.appName}"`);
-    toast.success('Application branding updated successfully!');
+    addAuditLog('Settings', 'Update White-Label Branding', `Updated app branding logo & details`);
+    toast.success('Application branding updated successfully across the entire system!');
   };
 
   const resetBranding = () => {

@@ -24,8 +24,8 @@ export default function UserProfileModal() {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('File size exceeds 2MB limit! Upload a smaller image.');
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size exceeds 5MB limit! Upload a smaller image.');
       return;
     }
 

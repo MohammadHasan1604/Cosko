@@ -170,8 +170,8 @@ export default function SalesPage() {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image size exceeds 2MB limit!');
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size exceeds 5MB limit!');
       return;
     }
 
@@ -211,8 +211,8 @@ export default function SalesPage() {
     if (!files.length) return;
 
     files.forEach((file) => {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error(`File ${file.name} exceeds 2MB size limit.`);
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`File ${file.name} exceeds 5MB size limit.`);
         return;
       }
 

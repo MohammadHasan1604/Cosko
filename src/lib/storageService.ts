@@ -14,7 +14,7 @@ export interface StorageUploadResult {
 }
 
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
-const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 export class StorageService {
   /**
@@ -25,7 +25,7 @@ export class StorageService {
       return { valid: false, error: `Invalid image format (${file.type}). Allowed: PNG, JPG, WebP, SVG.` };
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      return { valid: false, error: `File size exceeds 2MB limit (${(file.size / 1024 / 1024).toFixed(2)}MB).` };
+      return { valid: false, error: `File size exceeds 5MB limit (${(file.size / 1024 / 1024).toFixed(2)}MB).` };
     }
     return { valid: true };
   }

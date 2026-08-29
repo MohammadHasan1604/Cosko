@@ -47,7 +47,7 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
     if (!files.length) return;
 
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
-    const maxSize = 2 * 1024 * 1024; // 2MB
+    const maxSize = 5 * 1024 * 1024; // 5MB
 
     files.forEach((file) => {
       if (!allowedTypes.includes(file.type)) {
@@ -55,7 +55,7 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
         return;
       }
       if (file.size > maxSize) {
-        toast.error(`File too large (${file.name})! Max file size is 2MB.`);
+        toast.error(`File too large (${file.name})! Max file size is 5MB.`);
         return;
       }
 

@@ -47,9 +47,9 @@ export default function SettingsPage() {
       return;
     }
 
-    const maxSize = 2 * 1024 * 1024; // 2MB
+    const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      toast.error('File size exceeds 2MB! Please upload a smaller logo image.');
+      toast.error('File size exceeds 5MB! Please upload a smaller logo image.');
       return;
     }
 
@@ -198,7 +198,7 @@ export default function SettingsPage() {
                           Remove Custom Logo
                         </button>
                       )}
-                      <p className="text-2xs text-muted-foreground">Recommended size: 200×200px or SVG. Max 2MB.</p>
+                      <p className="text-2xs text-muted-foreground">Recommended size: 200×200px or SVG. Max 5MB.</p>
                     </div>
                   </div>
                 </div>
