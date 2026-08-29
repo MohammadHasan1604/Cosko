@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
-import { SupabaseClientService, isSupabaseConfigured } from '@/lib/supabase';
+import { MySQLDataService } from '@/lib/mysqlSync';
 
 export function normalizeMobileNumber(phone: string): string {
   if (!phone) return '';
@@ -569,7 +569,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addStoreHub = (storeData: Omit<StoreHub, 'id'>) => {
     const newStore: StoreHub = { ...storeData, id: `st-${Date.now()}` };
     setStoresList((prev) => [newStore, ...prev]);
-    SupabaseClientService.syncStore(newStore);
+    MySQLDataService.syncStore(newStore);
     addAuditLog('Stores', 'Create Store Hub', `Created store hub "${newStore.name}" (${newStore.code})`);
     toast.success(`Store Hub "${newStore.name}" created!`);
   };
@@ -577,7 +577,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateStoreHub = (id: string, updated: Partial<StoreHub>) => {
     setStoresList((prev) => prev.map((s) => (s.id === id ? { ...s, ...updated } : s)));
     const target = storesList.find((s) => s.id === id);
-    if (target) SupabaseClientService.syncStore({ ...target, ...updated });
+    if (target) MySQLDataService.syncStore({ ...target, ...updated });
     addAuditLog('Stores', 'Edit Store Hub', `Updated store #${id}`);
     toast.success('Store details updated');
   };
@@ -586,7 +586,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const s = storesList.find((st) => st.id === id);
     setStoresList((prev) => prev.filter((st) => st.id !== id));
     if (s) {
-      SupabaseClientService.deleteStore(id);
+      MySQLDataService.deleteStore(id);
       addAuditLog('Stores', 'Delete Store Hub', `Removed store hub "${s.name}" (${s.code})`);
       toast.success(`Removed store "${s.name}"`);
     }
@@ -600,7 +600,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       permissions: [],
     };
     setUsersList((prev) => [newUser, ...prev]);
-    SupabaseClientService.syncProfile(newUser);
+    MySQLDataService.syncProfile(newUser);
     addAuditLog('Users & Roles', 'Provision User', `Provisioned account for ${newUser.name} (${newUser.role})`);
     toast.success(`User "${newUser.name}" provisioned`);
   };
@@ -608,7 +608,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateUserAccount = (id: string, updated: Partial<UserAccount>) => {
     setUsersList((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
     const updatedUser = usersList.find((u) => u.id === id);
-    if (updatedUser) SupabaseClientService.syncProfile({ ...updatedUser, ...updated });
+    if (updatedUser) MySQLDataService.syncProfile({ ...updatedUser, ...updated });
     addAuditLog('Users & Roles', 'Edit User Profile', `Updated user profile #${id}`);
     toast.success('User record updated');
   };
@@ -619,7 +619,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (u.id === id) {
           const nextShift = u.shiftStatus === 'On Shift' ? 'On Leave' : 'On Shift';
           const updatedUser = { ...u, shiftStatus: nextShift as any };
-          SupabaseClientService.syncProfile(updatedUser);
+          MySQLDataService.syncProfile(updatedUser);
           return updatedUser;
         }
         return u;
@@ -633,7 +633,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       prev.map((u) => {
         if (u.id === id) {
           const updatedUser = { ...u, status: nextStatus };
-          SupabaseClientService.syncProfile(updatedUser);
+          MySQLDataService.syncProfile(updatedUser);
           return updatedUser;
         }
         return u;
@@ -684,7 +684,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const u = usersList.find((usr) => usr.id === id);
     setUsersList((prev) => prev.filter((usr) => usr.id !== id));
     if (u) {
-      SupabaseClientService.deleteProfile(id);
+      MySQLDataService.deleteProfile(id);
       addAuditLog('Users & Roles', 'Delete User Account', `Deleted account "${u.name}" (${u.email})`);
       toast.success(`Removed account "${u.name}"`);
     }
@@ -699,7 +699,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       minStock: itemData.minStock || 10,
     };
     setInventory((prev) => [newItem, ...prev]);
-    SupabaseClientService.syncProduct(newItem);
+    MySQLDataService.syncProduct(newItem);
     addAuditLog('Inventory', 'Add Product', `Created new item "${newItem.name}" (${newItem.sku})`);
     toast.success(`Successfully added "${newItem.name}" to inventory`);
   };
@@ -709,7 +709,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       prev.map((item) => {
         if (item.id === id) {
           const newItem = { ...item, ...updated };
-          SupabaseClientService.syncProduct(newItem);
+          MySQLDataService.syncProduct(newItem);
           addAuditLog('Inventory', 'Edit Product', `Updated details for "${newItem.name}" (${newItem.sku})`);
           return newItem;
         }
@@ -723,7 +723,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const itemToDelete = inventory.find((i) => i.id === id);
     setInventory((prev) => prev.filter((i) => i.id !== id));
     if (itemToDelete) {
-      SupabaseClientService.deleteProduct(id);
+      MySQLDataService.deleteProduct(id);
       addAuditLog('Inventory', 'Delete Product', `Deleted item "${itemToDelete.name}" (${itemToDelete.sku})`);
       toast.success(`Removed "${itemToDelete.name}" from inventory`);
     }
@@ -738,7 +738,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (item.id === id) {
           const newQty = Math.max(0, item.qtyOnHand + qtyChange);
           const newItem = { ...item, qtyOnHand: newQty, lastMovement: 'Today' };
-          SupabaseClientService.syncProduct(newItem);
+          MySQLDataService.syncProduct(newItem);
           return newItem;
         }
         return item;
@@ -814,7 +814,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         prev.map((item) => {
           if (item.id === sourceItem.id) {
             const newItem = { ...item, qtyOnHand: item.qtyOnHand - qty, lastMovement: 'Transfer Out' };
-            SupabaseClientService.syncProduct(newItem);
+            MySQLDataService.syncProduct(newItem);
             return newItem;
           }
           return item;
@@ -828,7 +828,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (item.sku === sourceItem.sku && item.store === toStore) {
             destItemExists = true;
             const newItem = { ...item, qtyOnHand: item.qtyOnHand + qty, lastMovement: 'Transfer In' };
-            SupabaseClientService.syncProduct(newItem);
+            MySQLDataService.syncProduct(newItem);
             return newItem;
           }
           return item;
@@ -844,7 +844,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           lastMovement: 'Transfer In',
         };
         setInventory((prev) => [...prev, newDestItem]);
-        SupabaseClientService.syncProduct(newDestItem);
+        MySQLDataService.syncProduct(newDestItem);
       }
     }
 
@@ -1000,7 +1000,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (sold && (item.store === storeCode || storeCode === 'All Stores')) {
           const newQty = Math.max(0, item.qtyOnHand - sold.qty);
           const newItem = { ...item, qtyOnHand: newQty, lastMovement: 'Just now' };
-          SupabaseClientService.syncProduct(newItem);
+          MySQLDataService.syncProduct(newItem);
 
           // Log SALE ledger entry
           const ledgerEntry: InventoryLedgerEntry = {
@@ -1044,14 +1044,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           creditBalance: saleData.paymentMethod === 'Credit' ? newSale.total : 0,
           lastPurchase: 'Today',
         };
-        SupabaseClientService.syncCustomer(newCust);
+        MySQLDataService.syncCustomer(newCust);
         return [newCust, ...prev];
       }
       return prev;
     });
 
     setSales((prev) => [newSale, ...prev]);
-    SupabaseClientService.syncSale({ ...newSale, cashierName: currentUser.name });
+    MySQLDataService.syncSale({ ...newSale, cashierName: currentUser.name });
     const photoMsg = saleData.salePhotos && saleData.salePhotos.length > 0 ? ` with ${saleData.salePhotos.length} photo(s)` : '';
     addAuditLog('Sales', 'POS Sale Checkout', `Completed order ${newSale.orderNo} for ₹${newSale.total.toLocaleString('en-IN')}${photoMsg}`);
     toast.success(`Invoice ${newSale.orderNo} generated successfully!`);
@@ -1103,7 +1103,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (invItem.store === 'CENTRAL' && (invItem.name === poItem.name || invItem.sku === poItem.sku)) {
             foundInCentral = true;
             const updatedInv = { ...invItem, qtyOnHand: invItem.qtyOnHand + poItem.qty, lastMovement: 'PO Received' };
-            SupabaseClientService.syncProduct(updatedInv);
+            MySQLDataService.syncProduct(updatedInv);
             return updatedInv;
           }
           return invItem;
@@ -1135,7 +1135,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           lastMovement: 'PO Received',
         };
         setInventory((prev) => [...prev, newCentralItem]);
-        SupabaseClientService.syncProduct(newCentralItem);
+        MySQLDataService.syncProduct(newCentralItem);
       }
 
       // Log PURCHASE ledger entry
@@ -1178,7 +1178,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lastPurchase: 'Never',
     };
     setCustomers((prev) => [newCust, ...prev]);
-    SupabaseClientService.syncCustomer(newCust);
+    MySQLDataService.syncCustomer(newCust);
     addAuditLog('Customers', 'Add Customer', `Registered customer "${newCust.name}"`);
     toast.success(`Customer "${newCust.name}" registered`);
     return newCust;
@@ -1187,7 +1187,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateCustomer = (id: string, updated: Partial<Customer>) => {
     setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
     const updatedCust = customers.find((c) => c.id === id);
-    if (updatedCust) SupabaseClientService.syncCustomer({ ...updatedCust, ...updated });
+    if (updatedCust) MySQLDataService.syncCustomer({ ...updatedCust, ...updated });
     addAuditLog('Customers', 'Edit Customer', `Updated profile for customer #${id}`);
     toast.success('Customer record updated');
   };
@@ -1208,7 +1208,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       code: `VND-${Math.floor(1000 + Math.random() * 9000)}`,
     };
     setVendors((prev) => [newVendor, ...prev]);
-    SupabaseClientService.syncVendor(newVendor);
+    MySQLDataService.syncVendor(newVendor);
     addAuditLog('Vendors', 'Add Vendor', `Onboarded supplier "${newVendor.name}"`);
     toast.success(`Vendor "${newVendor.name}" onboarded`);
   };
@@ -1216,7 +1216,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateVendor = (id: string, updated: Partial<Vendor>) => {
     setVendors((prev) => prev.map((v) => (v.id === id ? { ...v, ...updated } : v)));
     const updatedVend = vendors.find((v) => v.id === id);
-    if (updatedVend) SupabaseClientService.syncVendor({ ...updatedVend, ...updated });
+    if (updatedVend) MySQLDataService.syncVendor({ ...updatedVend, ...updated });
     addAuditLog('Vendors', 'Edit Vendor', `Updated supplier #${id}`);
     toast.success('Vendor profile updated');
   };
@@ -1238,7 +1238,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
     };
     setExpenses((prev) => [newExp, ...prev]);
-    SupabaseClientService.syncExpense({ ...newExp, spentBy: currentUser.name });
+    MySQLDataService.syncExpense({ ...newExp, spentBy: currentUser.name });
     addAuditLog('Expenses', 'Create Expense Record', `Logged expense "${newExp.description}" for ₹${newExp.amount.toLocaleString('en-IN')} (${newExp.store})`);
     toast.success(`Expense record ${newExp.referenceNo} logged`);
   };
@@ -1255,7 +1255,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ipAddress: '127.0.0.1',
     };
     setAuditLogs((prev) => [newLog, ...prev]);
-    SupabaseClientService.syncAuditLog(newLog);
+    MySQLDataService.syncAuditLog(newLog);
   };
 
   const markNotificationRead = (id: string) => {

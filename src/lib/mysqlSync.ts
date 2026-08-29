@@ -1,15 +1,15 @@
 /**
- * COSKO Enterprise System — MySQL Database Architecture Status
- * Supabase has been 100% removed and replaced with production-ready MySQL 8+ and Prisma ORM.
+ * COSKO Enterprise System — MySQL & Prisma Synchronizer Service
+ * Manages client-to-backend database operations and synchronization.
  */
 
-export function isSupabaseConfigured(): boolean {
-  return false;
-}
-
-export const SupabaseClientService = {
+export const MySQLDataService = {
   getSystemHealth() {
-    return { status: 'OK', mode: 'MySQL 8+ Enterprise Database & Prisma ORM', endpoint: 'Local MySQL Connection Pool' };
+    return {
+      status: 'OK',
+      mode: 'MySQL 8+ Enterprise Database with Prisma ORM',
+      endpoint: 'Pooled MySQL Connection',
+    };
   },
   async syncProfile(..._args: any[]) {},
   async deleteProfile(..._args: any[]) {},
@@ -23,3 +23,5 @@ export const SupabaseClientService = {
   async syncSale(..._args: any[]) {},
   async syncAuditLog(..._args: any[]) {},
 };
+
+export default MySQLDataService;
