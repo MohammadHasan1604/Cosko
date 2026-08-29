@@ -61,7 +61,7 @@ export default function ExpensesPage() {
         {/* Table */}
         <div className="card overflow-hidden">
           <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left">
+            <table className="w-full text-left min-w-[700px]">
               <thead>
                 <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
                   <th className="px-4 py-3">Ref No</th>
@@ -84,7 +84,7 @@ export default function ExpensesPage() {
                     <td className="px-4 py-3.5 font-bold font-tabular text-foreground">₹{exp.amount.toLocaleString('en-IN')}</td>
                     <td className="px-4 py-3.5 text-2xs text-muted-foreground">{exp.paymentMethod}</td>
                     <td className="px-4 py-3.5">
-                      <span className="text-2xs bg-success/10 text-success px-2 py-0.5 rounded font-semibold">{exp.status}</span>
+                      <span className="text-2xs bg-positive/10 text-positive px-2 py-0.5 rounded font-semibold">{exp.status}</span>
                     </td>
                     <td className="px-4 py-3.5 text-2xs text-muted-foreground">{exp.date}</td>
                   </tr>
@@ -110,7 +110,7 @@ export default function ExpensesPage() {
             <label className="text-xs font-semibold text-muted-foreground block mb-1">Description / Notes</label>
             <input required type="text" value={description} onChange={(e) => setDescription(e.target.value)} className="input-field py-2" placeholder="e.g. Monthly freight bill" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">Amount (₹)</label>
               <input type="number" min="1" value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="input-field py-2 font-tabular" />

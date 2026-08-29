@@ -41,7 +41,7 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 overflow-x-hidden"
       style={{ backgroundColor: 'rgba(15, 23, 42, 0.5)' }}
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
       role="dialog"
@@ -49,7 +49,7 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
       aria-labelledby="modal-title"
     >
       <div
-        className={`relative bg-card rounded-2xl shadow-modal border border-border w-full ${sizeClasses[size]} fade-in flex flex-col max-h-[90vh]`}
+        className={`relative bg-card rounded-xl sm:rounded-2xl shadow-modal border border-border w-full max-w-[calc(100vw-24px)] ${sizeClasses[size]} fade-in flex flex-col max-h-[90vh] my-auto`}
       >
         {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-border flex-shrink-0">

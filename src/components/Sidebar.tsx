@@ -158,14 +158,25 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   const renderSidebarContent = (isCollapsed: boolean) => (
     <>
       {/* Logo */}
-      <Link href="/dashboard" className={`flex items-center gap-2.5 px-3 py-4 border-b border-border flex-shrink-0 ${isCollapsed ? 'justify-center' : ''}`}>
-        <AppLogo size={32} />
+      <div className={`flex items-center justify-between gap-2.5 px-3 py-4 border-b border-border flex-shrink-0 ${isCollapsed ? 'justify-center' : ''}`}>
+        <Link href="/dashboard" onClick={onMobileClose} className="flex items-center gap-2.5 min-w-0">
+          <AppLogo size={32} />
+          {!isCollapsed && (
+            <span className="font-bold text-base text-foreground tracking-tight truncate max-w-[140px]">
+              {branding.appName}
+            </span>
+          )}
+        </Link>
         {!isCollapsed && (
-          <span className="font-bold text-base text-foreground tracking-tight truncate max-w-[160px]">
-            {branding.appName}
-          </span>
+          <button
+            onClick={onMobileClose}
+            className="lg:hidden text-muted-foreground hover:text-foreground p-1 rounded-md"
+            aria-label="Close sidebar"
+          >
+            <Icon name="XMarkIcon" size={20} />
+          </button>
         )}
-      </Link>
+      </div>
 
       {/* Store selector */}
       {!isCollapsed && (

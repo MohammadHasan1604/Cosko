@@ -78,21 +78,21 @@ export default function VendorsPage() {
   return (
     <AppLayout activeRoute="/vendors">
       <div className="space-y-6 fade-in">
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Vendor & Supplier Directory</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Vendor & Supplier Directory</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Supplier onboarding, lead times, outstanding payables, and commercial ratings.
             </p>
           </div>
-          <button onClick={() => { resetForm(); setOnboardModal(true); }} className="btn-primary gap-2">
+          <button onClick={() => { resetForm(); setOnboardModal(true); }} className="btn-primary gap-2 self-start sm:self-auto text-xs sm:text-sm">
             <Icon name="PlusIcon" size={18} />
             Onboard New Supplier
           </button>
         </div>
 
         {/* Vendors Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {vendors.map((v) => (
             <div key={`vend-${v.id}`} className="card p-5 space-y-4 hover:shadow-md transition-all duration-150 relative group">
               <div className="flex items-start justify-between">

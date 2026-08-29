@@ -98,7 +98,7 @@ export default function PurchasesPage() {
           </div>
 
           <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left">
+            <table className="w-full text-left min-w-[700px]">
               <thead>
                 <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
                   <th className="px-4 py-3">PO Number</th>
@@ -119,12 +119,12 @@ export default function PurchasesPage() {
                     <td className="px-4 py-3.5"><span className="badge-info text-2xs">{po.store}</span></td>
                     <td className="px-4 py-3.5 font-bold font-tabular text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</td>
                     <td className="px-4 py-3.5">
-                      <span className={`text-2xs font-semibold px-2 py-0.5 rounded ${po.status === 'Received' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                      <span className={`text-2xs font-semibold px-2 py-0.5 rounded ${po.status === 'Received' ? 'bg-positive/10 text-positive' : 'bg-warning/10 text-warning'}`}>
                         {po.status}
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className={`text-2xs font-semibold px-2 py-0.5 rounded ${po.paymentStatus === 'Paid' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+                      <span className={`text-2xs font-semibold px-2 py-0.5 rounded ${po.paymentStatus === 'Paid' ? 'bg-positive/10 text-positive' : 'bg-danger/10 text-danger'}`}>
                         {po.paymentStatus}
                       </span>
                     </td>
@@ -156,7 +156,7 @@ export default function PurchasesPage() {
         size="md"
       >
         <form onSubmit={handleCreatePo} className="space-y-4 py-2">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-foreground block mb-1">Select Supplier Vendor *</label>
               <select value={vendorName} onChange={(e) => setVendorName(e.target.value)} className="input-field text-xs font-medium">

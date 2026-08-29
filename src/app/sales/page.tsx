@@ -281,18 +281,18 @@ export default function SalesPage() {
     <AppLayout activeRoute="/sales">
       <div className="space-y-6 fade-in">
         {/* Page Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Sales & POS Billing Terminal</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Sales & POS Billing Terminal</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Rapid barcode scanning, product image search, photo proof attachments, cart billing, and tax receipts.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-muted p-1 rounded-xl">
+          <div className="flex items-center gap-1.5 bg-muted p-1 rounded-xl self-start sm:self-auto">
             <button
               onClick={() => setActiveTab('pos')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                 activeTab === 'pos' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -300,7 +300,7 @@ export default function SalesPage() {
             </button>
             <button
               onClick={() => setActiveTab('history')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                 activeTab === 'history' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -315,34 +315,38 @@ export default function SalesPage() {
             <div className="lg:col-span-7 space-y-4">
               {/* Search Bar & Image Search Button */}
               <div className="space-y-3">
-                <div className="card p-3 flex items-center gap-3">
-                  <Icon name="MagnifyingGlassIcon" size={18} className="text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Scan barcode EAN-13 or search name / SKU..."
-                    value={catalogSearch}
-                    onChange={(e) => setCatalogSearch(e.target.value)}
-                    className="flex-1 bg-transparent text-sm outline-none"
-                  />
-                  {catalogSearch && (
-                    <button onClick={() => setCatalogSearch('')} className="p-1 text-muted-foreground hover:text-foreground">
-                      <Icon name="XMarkIcon" size={16} />
+                <div className="card p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                  <div className="flex items-center gap-2 flex-1 min-w-0 bg-muted/50 px-2.5 py-1.5 rounded-lg border border-border">
+                    <Icon name="MagnifyingGlassIcon" size={18} className="text-muted-foreground flex-shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="Scan barcode EAN-13 or search name / SKU..."
+                      value={catalogSearch}
+                      onChange={(e) => setCatalogSearch(e.target.value)}
+                      className="flex-1 bg-transparent text-xs sm:text-sm outline-none min-w-0"
+                    />
+                    {catalogSearch && (
+                      <button onClick={() => setCatalogSearch('')} className="p-1 text-muted-foreground hover:text-foreground">
+                        <Icon name="XMarkIcon" size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Search by Image Button */}
+                    <button
+                      onClick={() => setImageSearchOpen(true)}
+                      className="btn-secondary text-2xs py-2 px-3 gap-1.5 font-bold flex-1 sm:flex-none justify-center"
+                      title="Upload photo to search catalog by visual similarity"
+                    >
+                      <Icon name="CameraIcon" size={14} className="text-primary" />
+                      Search by Image
                     </button>
-                  )}
 
-                  {/* Search by Image Button */}
-                  <button
-                    onClick={() => setImageSearchOpen(true)}
-                    className="btn-secondary text-2xs py-1.5 px-2.5 gap-1.5 font-bold flex-shrink-0"
-                    title="Upload photo to search catalog by visual similarity"
-                  >
-                    <Icon name="CameraIcon" size={14} className="text-primary" />
-                    Search by Image
-                  </button>
-
-                  <span className="text-2xs bg-primary/10 text-primary px-2.5 py-1 rounded-md font-mono flex-shrink-0 hidden sm:inline-block">
-                    EAN Scanner Ready
-                  </span>
+                    <span className="text-3xs bg-primary/10 text-primary px-2 py-1.5 rounded-md font-mono hidden md:inline-block">
+                      EAN Scanner Ready
+                    </span>
+                  </div>
                 </div>
 
                 {/* Category Pills */}

@@ -88,8 +88,8 @@ export default function KpiCard({ label, value, change, trend, subtext, icon, va
       </div>
 
       {/* Value */}
-      <div>
-        <p className={`metric-value ${isHero ? 'text-3xl' : 'text-2xl'} ${isPrimary ? 'text-white' : 'text-foreground'}`}>
+      <div className="min-w-0">
+        <p className={`metric-value ${isHero ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'} ${isPrimary ? 'text-white' : 'text-foreground'} truncate tracking-tight`}>
           {value}
         </p>
 

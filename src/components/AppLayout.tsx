@@ -121,10 +121,9 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
 
       {/* Main content */}
       <div
-        className="flex flex-col flex-1 min-w-0 content-transition"
-        style={{
-          marginLeft: sidebarCollapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)',
-        }}
+        className={`flex flex-col flex-1 min-w-0 content-transition transition-all duration-300 ml-0 ${
+          sidebarCollapsed ? 'lg:ml-[var(--sidebar-collapsed-width)]' : 'lg:ml-[var(--sidebar-width)]'
+        }`}
       >
         {/* Topbar */}
         <Topbar

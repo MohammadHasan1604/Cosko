@@ -16,10 +16,10 @@ export default function AuditLogsPage() {
     <AppLayout activeRoute="/audit-logs">
       <div className="space-y-6 fade-in">
         {/* Page Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">System Audit Logs & Security Trail</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">System Audit Logs & Security Trail</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Immutable audit trail recording all user transactions, stock adjustments, role changes, and IP addresses.
             </p>
           </div>
@@ -27,7 +27,7 @@ export default function AuditLogsPage() {
           <select
             value={filterModule}
             onChange={(e) => setFilterModule(e.target.value)}
-            className="input-field py-2 text-sm w-auto min-w-[160px]"
+            className="input-field py-2 text-xs sm:text-sm w-auto min-w-[160px] self-start sm:self-auto"
           >
             <option value="All">All Modules</option>
             <option value="Inventory">Inventory</option>
@@ -40,7 +40,7 @@ export default function AuditLogsPage() {
         {/* Audit Logs Table */}
         <div className="card overflow-hidden">
           <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left">
+            <table className="w-full text-left min-w-[750px]">
               <thead>
                 <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
                   <th className="px-4 py-3">Timestamp</th>

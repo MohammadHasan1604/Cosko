@@ -71,7 +71,7 @@ export default function AccountingPage() {
           </div>
 
           <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left">
+            <table className="w-full text-left min-w-[600px]">
               <thead>
                 <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
                   <th className="px-4 py-3">Account Code</th>

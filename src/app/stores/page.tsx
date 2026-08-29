@@ -115,21 +115,21 @@ export default function StoresPage() {
   return (
     <AppLayout activeRoute="/stores">
       <div className="space-y-6 fade-in">
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Multi-Store Locations Hubs</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Multi-Store Locations Hubs</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Manage store outlets, register terminals, store managers, edit/delete hub locations, and inter-store transfers.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button onClick={() => setTransferModal(true)} className="btn-secondary gap-2">
+          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+            <button onClick={() => setTransferModal(true)} className="btn-secondary gap-1.5 text-xs sm:text-sm">
               <Icon name="ArrowsRightLeftIcon" size={16} />
               Inter-Store Stock Transfer
             </button>
             {currentUser.role === 'Super Admin' && (
-              <button onClick={() => { resetForm(); setAddStoreModal(true); }} className="btn-primary gap-2">
+              <button onClick={() => { resetForm(); setAddStoreModal(true); }} className="btn-primary gap-1.5 text-xs sm:text-sm">
                 <Icon name="PlusIcon" size={18} />
                 Add New Store Hub
               </button>
@@ -138,7 +138,7 @@ export default function StoresPage() {
         </div>
 
         {/* Store Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {storesList.map((s) => (
             <div key={`store-card-${s.id}`} className="card p-5 space-y-4 hover:shadow-md transition-all duration-150 relative group">
               <div className="flex items-start justify-between">

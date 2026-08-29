@@ -14,33 +14,43 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <header className="flex-shrink-0 h-[60px] bg-card border-b border-border flex items-center gap-3 px-4 lg:px-6">
-      {/* Mobile menu */}
-      <button
-        onClick={onMobileMenuOpen}
-        className="btn-ghost lg:hidden p-2"
-        aria-label="Open navigation menu"
-      >
-        <Icon name="Bars3Icon" size={20} />
-      </button>
+    <header className="flex-shrink-0 h-[60px] bg-card border-b border-border flex items-center justify-between gap-2 px-3 sm:px-4 lg:px-6 w-full">
+      <div className="flex items-center gap-2 min-w-0">
+        {/* Mobile menu */}
+        <button
+          onClick={onMobileMenuOpen}
+          className="btn-ghost lg:hidden p-2 flex-shrink-0"
+          aria-label="Open navigation menu"
+        >
+          <Icon name="Bars3Icon" size={20} />
+        </button>
 
-      {/* Sidebar toggle (desktop) */}
-      <button
-        onClick={onToggleSidebar}
-        className="btn-ghost hidden lg:flex p-2"
-        aria-label="Toggle sidebar"
-      >
-        <Icon name="Bars3Icon" size={18} />
-      </button>
+        {/* Sidebar toggle (desktop) */}
+        <button
+          onClick={onToggleSidebar}
+          className="btn-ghost hidden lg:flex p-2 flex-shrink-0"
+          aria-label="Toggle sidebar"
+        >
+          <Icon name="Bars3Icon" size={18} />
+        </button>
 
-      {/* Breadcrumb / Page context */}
-      <div className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground">
-        <span className="text-foreground font-bold">{branding.appName}</span>
-        <Icon name="ChevronRightIcon" size={14} />
-        <span>Multi-Store Scope</span>
-        <span className="text-2xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
-          {selectedStore}
-        </span>
+        {/* Store Scope Badge on Mobile */}
+        <div className="flex lg:hidden items-center gap-1.5 min-w-0">
+          <span className="text-xs font-bold text-foreground truncate">{branding.appName}</span>
+          <span className="text-2xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold truncate max-w-[90px]">
+            {selectedStore}
+          </span>
+        </div>
+
+        {/* Breadcrumb / Page context (desktop) */}
+        <div className="hidden lg:flex items-center gap-1.5 text-sm text-muted-foreground">
+          <span className="text-foreground font-bold">{branding.appName}</span>
+          <Icon name="ChevronRightIcon" size={14} />
+          <span>Multi-Store Scope</span>
+          <span className="text-2xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
+            {selectedStore}
+          </span>
+        </div>
       </div>
 
       <div className="flex-1" />
