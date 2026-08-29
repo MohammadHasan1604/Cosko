@@ -169,11 +169,21 @@ export default function PurchasesPage() {
                     </td>
                     <td className="px-4 py-3.5 text-2xs text-muted-foreground">{po.expectedDate}</td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => openEdit(po)} className="p-1 text-muted-foreground hover:text-primary">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {po.status !== 'Received' && (
+                          <button
+                            onClick={() => updatePurchase(po.id, { status: 'Received' })}
+                            className="btn-primary text-3xs py-1 px-2 gap-1"
+                            title="Receive Goods Received Note (GRN) & Credit Stock"
+                          >
+                            <Icon name="CheckIcon" size={12} />
+                            Receive GRN
+                          </button>
+                        )}
+                        <button onClick={() => openEdit(po)} className="p-1 text-muted-foreground hover:text-primary" title="Edit PO">
                           <Icon name="PencilSquareIcon" size={15} />
                         </button>
-                        <button onClick={() => setDeletePoModal(po)} className="p-1 text-muted-foreground hover:text-danger">
+                        <button onClick={() => setDeletePoModal(po)} className="p-1 text-muted-foreground hover:text-danger" title="Delete PO">
                           <Icon name="TrashIcon" size={15} />
                         </button>
                       </div>
