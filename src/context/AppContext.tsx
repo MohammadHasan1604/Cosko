@@ -255,89 +255,31 @@ const initialStoreHubs: StoreHub[] = [
   { id: 'st-mum', code: 'MUM', name: 'Mumbai Commercial Hub', city: 'Mumbai', address: 'Bandra Kurla Complex, Mumbai', manager: 'Rakesh Verma', phone: '+91 22 6688 9900', registers: 4, skusCount: 1200, monthlyRevenue: 1350000, status: 'Active' },
 ];
 
-const initialInventory: InventoryItem[] = [
-  { id: 'item-001', sku: 'SKU-0091', barcode: '8901234567890', name: 'Crompton Fan Regulator 5-Speed', brand: 'Crompton', model: 'REG-5S', category: 'Electricals', subcategory: 'Fans', store: 'CENTRAL', qtyOnHand: 150, reorderPt: 8, costPrice: 320, transferPrice: 380, sellingPrice: 485, mrp: 550, hsn: '84145990', taxRate: 18, warrantyMonths: 12, minStock: 10, status: 'active', fifoLots: 5, lastMovement: '09 Aug 2026' },
-  { id: 'item-002', sku: 'SKU-0218', barcode: '8901234567891', name: 'Philips LED 9W Warm White (Pack of 6)', brand: 'Philips', model: 'LED-9W-PK6', category: 'Lighting', subcategory: 'LED Bulbs', store: 'HYD', qtyOnHand: 25, reorderPt: 20, costPrice: 480, transferPrice: 560, sellingPrice: 680, mrp: 750, hsn: '85395000', taxRate: 12, warrantyMonths: 24, minStock: 15, status: 'active', fifoLots: 2, lastMovement: '11 Aug 2026' },
-  { id: 'item-003', sku: 'SKU-0312', barcode: '8901234567892', name: 'Anchor Roma 3-Pin 6A Plug Top', brand: 'Anchor', model: 'ROMA-6A', category: 'Electricals', subcategory: 'Plugs & Sockets', store: 'BLR', qtyOnHand: 142, reorderPt: 50, costPrice: 28, transferPrice: 35, sellingPrice: 45, mrp: 55, hsn: '85364900', taxRate: 18, warrantyMonths: 6, minStock: 20, status: 'active', fifoLots: 4, lastMovement: '12 Aug 2026' },
-  { id: 'item-004', sku: 'SKU-0562', barcode: '8901234567893', name: 'Polycab 1.5 Sq mm FR Wire 90m Coil', brand: 'Polycab', model: 'FR-1.5-90M', category: 'Wiring', subcategory: 'FR Wires', store: 'HYD', qtyOnHand: 18, reorderPt: 12, costPrice: 1850, transferPrice: 2100, sellingPrice: 2400, mrp: 2650, hsn: '85444900', taxRate: 18, warrantyMonths: 60, minStock: 10, status: 'active', fifoLots: 1, lastMovement: '10 Aug 2026' },
-  { id: 'item-005', sku: 'SKU-0834', barcode: '8901234567894', name: 'Havells Crabtree 6A Switch 1-Way', brand: 'Havells', model: 'CT-6A-1W', category: 'Electricals', subcategory: 'Switches', store: 'BLR', qtyOnHand: 85, reorderPt: 15, costPrice: 65, transferPrice: 78, sellingPrice: 95, mrp: 115, hsn: '85365000', taxRate: 18, warrantyMonths: 12, minStock: 15, status: 'active', fifoLots: 3, lastMovement: '07 Aug 2026' },
-  { id: 'item-006', sku: 'SKU-1042', barcode: '8901234567895', name: 'Bosch GSR 12V-15 Cordless Drill', brand: 'Bosch', model: 'GSR-12V-15', category: 'Power Tools', subcategory: 'Drills', store: 'BLR', qtyOnHand: 12, reorderPt: 10, costPrice: 4800, transferPrice: 5600, sellingPrice: 6800, mrp: 7500, hsn: '84672900', taxRate: 18, warrantyMonths: 12, minStock: 5, status: 'active', fifoLots: 1, lastMovement: '08 Aug 2026' },
-  { id: 'item-007', sku: 'SKU-1198', barcode: '8901234567896', name: 'Anchor Roma 3-Pin 16A Socket', brand: 'Anchor', model: 'ROMA-16A', category: 'Electricals', subcategory: 'Plugs & Sockets', store: 'DEL', qtyOnHand: 48, reorderPt: 25, costPrice: 42, transferPrice: 52, sellingPrice: 68, mrp: 80, hsn: '85364900', taxRate: 18, warrantyMonths: 6, minStock: 15, status: 'active', fifoLots: 2, lastMovement: '11 Aug 2026' },
-  { id: 'item-008', sku: 'SKU-1341', barcode: '8901234567897', name: 'Syska LED Strip Light 5m RGB', brand: 'Syska', model: 'STRIP-5M-RGB', category: 'Lighting', subcategory: 'Strip Lights', store: 'HYD', qtyOnHand: 34, reorderPt: 15, costPrice: 680, transferPrice: 790, sellingPrice: 950, mrp: 1100, hsn: '85395000', taxRate: 12, warrantyMonths: 12, minStock: 10, status: 'active', fifoLots: 3, lastMovement: '12 Aug 2026' },
-  { id: 'item-009', sku: 'SKU-1512', barcode: '8901234567898', name: 'Legrand MCB 32A Single Pole', brand: 'Legrand', model: 'MCB-32A-1P', category: 'Circuit Protection', subcategory: 'MCBs', store: 'DEL', qtyOnHand: 96, reorderPt: 30, costPrice: 185, transferPrice: 220, sellingPrice: 270, mrp: 320, hsn: '85362000', taxRate: 18, warrantyMonths: 24, minStock: 20, status: 'active', fifoLots: 5, lastMovement: '09 Aug 2026' },
-  { id: 'item-010', sku: 'SKU-1688', barcode: '8901234567899', name: 'V-Guard Voltage Stabilizer 4kVA', brand: 'V-Guard', model: 'STAB-4KVA', category: 'Power Conditioning', subcategory: 'Stabilizers', store: 'BLR', qtyOnHand: 18, reorderPt: 8, costPrice: 3200, transferPrice: 3800, sellingPrice: 4500, mrp: 5200, hsn: '85044000', taxRate: 18, warrantyMonths: 36, minStock: 5, status: 'active', fifoLots: 2, lastMovement: '10 Aug 2026' },
-  { id: 'item-011', sku: 'SKU-1834', barcode: '8901234567900', name: 'Finolex 2.5 Sq mm FR PVC Wire 90m', brand: 'Finolex', model: 'FR-2.5-90M', category: 'Wiring', subcategory: 'FR Wires', store: 'HYD', qtyOnHand: 29, reorderPt: 20, costPrice: 2100, transferPrice: 2450, sellingPrice: 2800, mrp: 3100, hsn: '85444900', taxRate: 18, warrantyMonths: 60, minStock: 10, status: 'active', fifoLots: 3, lastMovement: '11 Aug 2026' },
-  { id: 'item-012', sku: 'SKU-2001', barcode: '8901234567901', name: 'Stanley 10-Piece Screwdriver Set', brand: 'Stanley', model: 'SD-SET-10P', category: 'Hand Tools', subcategory: 'Screwdrivers', store: 'DEL', qtyOnHand: 42, reorderPt: 15, costPrice: 420, transferPrice: 510, sellingPrice: 620, mrp: 720, hsn: '82059900', taxRate: 12, warrantyMonths: 12, minStock: 10, status: 'active', fifoLots: 2, lastMovement: '08 Aug 2026' },
-  { id: 'item-013', sku: 'SKU-2189', barcode: '8901234567902', name: 'Halonix 18W LED Batten Light 2FT', brand: 'Halonix', model: 'BAT-18W-2FT', category: 'Lighting', subcategory: 'Batten Lights', store: 'BLR', qtyOnHand: 74, reorderPt: 30, costPrice: 240, transferPrice: 290, sellingPrice: 360, mrp: 420, hsn: '94054090', taxRate: 12, warrantyMonths: 12, minStock: 15, status: 'active', fifoLots: 4, lastMovement: '12 Aug 2026' },
-  { id: 'item-014', sku: 'SKU-2341', barcode: '8901234567903', name: 'Schneider 32A 3-Phase MCB', brand: 'Schneider', model: 'MCB-32A-3P', category: 'Circuit Protection', subcategory: 'MCBs', store: 'HYD', qtyOnHand: 18, reorderPt: 10, costPrice: 680, transferPrice: 810, sellingPrice: 980, mrp: 1150, hsn: '85362000', taxRate: 18, warrantyMonths: 24, minStock: 5, status: 'inactive', fifoLots: 2, lastMovement: '03 Aug 2026' },
-  { id: 'item-015', sku: 'SKU-2498', barcode: '8901234567904', name: 'Makita 750W Angle Grinder 4.5"', brand: 'Makita', model: 'AG-750W', category: 'Power Tools', subcategory: 'Grinders', store: 'BLR', qtyOnHand: 14, reorderPt: 5, costPrice: 3400, transferPrice: 4000, sellingPrice: 4800, mrp: 5500, hsn: '84672900', taxRate: 18, warrantyMonths: 12, minStock: 5, status: 'active', fifoLots: 1, lastMovement: '07 Aug 2026' },
-  { id: 'item-016', sku: 'SKU-2138', barcode: '8901234567905', name: 'Havells Gold Fan 1200mm', brand: 'Havells', model: 'GF-1200MM', category: 'Electricals', subcategory: 'Fans', store: 'BLR', qtyOnHand: 22, reorderPt: 3, costPrice: 1800, transferPrice: 2100, sellingPrice: 2499, mrp: 2800, hsn: '84145990', taxRate: 18, warrantyMonths: 24, minStock: 5, status: 'active', fifoLots: 2, lastMovement: 'Today' },
-];
+const initialInventory: InventoryItem[] = [];
 
-const initialStockTransfers: StockTransferRecord[] = [
-  { id: 'tr-101', transferNo: 'TR-2026-001', sourceStore: 'CENTRAL', destStore: 'BLR', productId: 'item-003', sku: 'SKU-0312', productName: 'Anchor Roma 3-Pin 6A Plug Top', qty: 50, purchaseCost: 28, transferPrice: 35, transferProfit: 350, status: 'Completed', createdBy: 'Super Admin', createdAt: '20 Aug 2026' },
-  { id: 'tr-102', transferNo: 'TR-2026-002', sourceStore: 'CENTRAL', destStore: 'HYD', productId: 'item-004', sku: 'SKU-0562', productName: 'Polycab 1.5 Sq mm FR Wire 90m Coil', qty: 20, purchaseCost: 1850, transferPrice: 2100, transferProfit: 5000, status: 'Completed', createdBy: 'Super Admin', createdAt: '22 Aug 2026' },
-];
+const initialStockTransfers: StockTransferRecord[] = [];
 
-const initialInventoryLedger: InventoryLedgerEntry[] = [
-  { id: 'led-1', productId: 'item-003', sku: 'SKU-0312', productName: 'Anchor Roma 3-Pin 6A Plug Top', storeCode: 'CENTRAL', movementType: 'PURCHASE', quantity: 200, unitCost: 28, totalValue: 5600, fromLocation: 'Vendor: Anchor', toLocation: 'CENTRAL', referenceNo: 'PO-2026-0010', createdBy: 'Super Admin', createdAt: '15 Aug 2026' },
-  { id: 'led-2', productId: 'item-003', sku: 'SKU-0312', productName: 'Anchor Roma 3-Pin 6A Plug Top', storeCode: 'BLR', movementType: 'TRANSFER_IN', quantity: 50, unitCost: 35, totalValue: 1750, fromLocation: 'CENTRAL', toLocation: 'BLR', referenceNo: 'TR-2026-001', createdBy: 'Super Admin', createdAt: '20 Aug 2026' },
-];
+const initialInventoryLedger: InventoryLedgerEntry[] = [];
 
-const initialRepairsEnquiries: RepairEnquiry[] = [
-  { id: 'rep-1', customerPhone: '+91 98765 43210', customerName: 'Rajesh Kumar Electronics', enquiryDate: '24 Aug 2026 11:00 AM', repairStatus: 'Ready for Delivery', repairRequested: 'Bosch Cordless Drill motor brush replacement & battery check', technicianNotes: 'Replaced carbon brushes, recalibrated motor head.', internalCost: 450, createdAt: '24 Aug 2026' },
-  { id: 'rep-2', customerPhone: '+91 97432 50071', customerName: 'Mohammad Yunus', enquiryDate: '26 Aug 2026 03:30 PM', repairStatus: 'In Progress', repairRequested: 'V-Guard Stabilizer voltage trip indicator blinking continuously', technicianNotes: 'Testing relay board and primary coil capacitor.', internalCost: 320, createdAt: '26 Aug 2026' },
-];
+const initialRepairsEnquiries: RepairEnquiry[] = [];
 
-const initialSales: SalesOrder[] = [
-  { id: 'sale-101', orderNo: 'CS260011', customerName: 'Rajesh Kumar Electronics', customerPhone: '+91 98765 43210', store: 'BLR', items: [{ itemId: 'item-003', name: 'Anchor Roma 3-Pin 6A Plug Top', qty: 20, unitPrice: 45, taxRate: 18, warrantyMonths: 6, warrantyExpiryDate: '28 Feb 2027' }], subtotal: 900, taxTotal: 162, discount: 0, total: 1062, taxEnabled: true, paymentMethod: 'UPI', status: 'Completed', createdAt: '28 Aug 2026 10:15 AM', period: 'Today', warrantyExpiryDate: '28 Feb 2027' },
-  { id: 'sale-102', orderNo: 'CS260021', customerName: 'Priya Sharma Buildcon', customerPhone: '+91 98111 22334', store: 'HYD', items: [{ itemId: 'item-004', name: 'Polycab 1.5 Sq mm FR Wire 90m Coil', qty: 5, unitPrice: 2400, taxRate: 18, warrantyMonths: 60, warrantyExpiryDate: '28 Aug 2031' }], subtotal: 12000, taxTotal: 2160, discount: 500, total: 13660, taxEnabled: true, paymentMethod: 'Card', status: 'Completed', createdAt: '28 Aug 2026 11:30 AM', period: 'Today', warrantyExpiryDate: '28 Aug 2031' },
-  { id: 'sale-103', orderNo: 'CS260031', customerName: 'Apex Electrical Solutions', customerPhone: '+91 97222 33445', store: 'DEL', items: [{ itemId: 'item-009', name: 'Legrand MCB 32A Single Pole', qty: 12, unitPrice: 270, taxRate: 18, warrantyMonths: 24, warrantyExpiryDate: '28 Aug 2028' }], subtotal: 3240, taxTotal: 583.2, discount: 0, total: 3823.2, taxEnabled: true, paymentMethod: 'Cash', status: 'Completed', createdAt: '28 Aug 2026 01:05 PM', period: 'Today', warrantyExpiryDate: '28 Aug 2028' },
-];
+const initialSales: SalesOrder[] = [];
 
-const initialPurchases: PurchaseOrder[] = [
-  { id: 'po-301', poNo: 'PO-2026-0041', vendorName: 'Polycab India Ltd', store: 'CENTRAL', items: [{ name: 'Polycab 1.5 Sq mm FR Wire 90m Coil', qty: 25, unitCost: 1850, sku: 'SKU-0562' }], totalAmount: 46250, status: 'Received', paymentStatus: 'Paid', expectedDate: '25 Aug 2026', createdAt: '20 Aug 2026' },
-  { id: 'po-302', poNo: 'PO-2026-0042', vendorName: 'Havells India Limited', store: 'CENTRAL', items: [{ name: 'Havells Crabtree 6A Switch 1-Way', qty: 100, unitCost: 65, sku: 'SKU-0834' }], totalAmount: 6500, status: 'Sent', paymentStatus: 'Unpaid', expectedDate: '30 Aug 2026', createdAt: '26 Aug 2026' },
-];
+const initialPurchases: PurchaseOrder[] = [];
 
-const initialCustomers: Customer[] = [
-  { id: 'cust-1', name: 'Rajesh Kumar Electronics', email: 'rajesh@rk-elec.com', phone: '+91 98765 43210', city: 'Bengaluru', tier: 'VIP', totalSpend: 245000, creditBalance: 12500, lastPurchase: '28 Aug 2026' },
-  { id: 'cust-2', name: 'Priya Sharma Buildcon', email: 'priya@sharmabuild.in', phone: '+91 98111 22334', city: 'Hyderabad', tier: 'Regular', totalSpend: 182000, creditBalance: 0, lastPurchase: '28 Aug 2026' },
-  { id: 'cust-3', name: 'Apex Electrical Solutions', email: 'contact@apexelec.com', phone: '+91 97222 33445', city: 'Delhi', tier: 'Regular', totalSpend: 96400, creditBalance: 4200, lastPurchase: '28 Aug 2026' },
-  { id: 'cust-4', name: 'Mohammad Yunus', email: 'mohammedhasanudyavar1@gmail.com', phone: '+91 97432 50071', city: 'Bengaluru', tier: 'VIP', totalSpend: 5797, creditBalance: 0, lastPurchase: '27 Aug 2026' },
-];
+const initialCustomers: Customer[] = [];
 
-const initialVendors: Vendor[] = [
-  { id: 'vend-1', code: 'VND-1001', name: 'Polycab India Ltd', contactPerson: 'Suresh Menon', email: 'orders@polycab.com', phone: '+91 80 2345 6789', category: 'Wiring & Cables', outstandingPayable: 46250, rating: 4.8, leadTimeDays: 3 },
-  { id: 'vend-2', code: 'VND-1002', name: 'Havells India Limited', contactPerson: 'Vikram Joshi', email: 'b2b@havells.com', phone: '+91 11 4567 8901', category: 'Switchgear & Lighting', outstandingPayable: 185000, rating: 4.9, leadTimeDays: 4 },
-  { id: 'vend-3', code: 'VND-1003', name: 'Philips India Commercial', contactPerson: 'Ananya Roy', email: 'sales@lighting.philips.in', phone: '+91 22 6789 0123', category: 'Lighting Solutions', outstandingPayable: 34000, rating: 4.7, leadTimeDays: 2 },
-];
+const initialVendors: Vendor[] = [];
 
-const initialExpenses: Expense[] = [
-  { id: 'exp-1', referenceNo: 'EXP-2026-081', category: 'Store Rent', description: 'Monthly lease for Bengaluru Central Hub', store: 'BLR', amount: 85000, paymentMethod: 'Bank Transfer', status: 'Approved', date: '01 Aug 2026' },
-  { id: 'exp-2', referenceNo: 'EXP-2026-082', category: 'Utilities & Power', description: 'Electricity bill for Hyderabad Warehouse', store: 'HYD', amount: 24500, paymentMethod: 'Direct Debit', status: 'Approved', date: '15 Aug 2026' },
-  { id: 'exp-3', referenceNo: 'EXP-2026-083', category: 'Logistics & Freight', description: 'Inter-store inventory transfer freight DEL to BLR', store: 'DEL', amount: 12400, paymentMethod: 'Corporate Card', status: 'Pending', date: '26 Aug 2026' },
-];
+const initialExpenses: Expense[] = [];
 
 const initialUsers: UserAccount[] = [
   { id: 'usr-1', name: 'Super Admin', email: 'cosko@gmail.com', password: 'Cosko2026@', phone: '+91 98765 00000', role: 'Super Admin', securityLevel: 100, store: 'All Stores', allowedStores: ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'], status: 'Active', shiftStatus: 'On Shift', lastLogin: 'Just now', permissions: ['ALL_PERMISSIONS', 'super_admin.manage', 'roles.manage', 'permissions.manage', 'security.manage', 'audit_logs.enterprise_view', 'settings.global_manage'] },
-  { id: 'usr-2', name: 'Sneha Patel', email: 'sneha@cosko.com', password: 'Password2026@', phone: '+91 80 2555 1234', role: 'Store Manager', securityLevel: 80, store: 'BLR', allowedStores: ['BLR'], status: 'Active', shiftStatus: 'On Shift', lastLogin: '1 hour ago', permissions: ['dashboard.view', 'sales.view', 'sales.create', 'sales.discount', 'sales.refund', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'inventory.transfer', 'purchases.view', 'purchases.create', 'customers.view', 'customers.edit', 'vendors.view', 'expenses.view', 'accounting.view', 'reports.view', 'employees.view', 'stores.view'] },
-  { id: 'usr-3', name: 'Rohan Sharma', email: 'rohan@cosko.com', password: 'Password2026@', phone: '+91 11 4100 9988', role: 'Inventory Auditor', securityLevel: 60, store: 'DEL', allowedStores: ['DEL'], status: 'Active', shiftStatus: 'On Shift', lastLogin: '3 hours ago', permissions: ['dashboard.view', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'purchases.view', 'purchases.receive_grn', 'vendors.view', 'reports.view'] },
-  { id: 'usr-4', name: 'Karan Verma', email: 'karan@cosko.com', password: 'Password2026@', phone: '+91 40 6677 8899', role: 'POS Cashier', securityLevel: 20, store: 'HYD', allowedStores: ['HYD'], status: 'Active', shiftStatus: 'On Shift', lastLogin: 'Yesterday', permissions: ['sales.view', 'sales.create', 'customers.view'] },
-  { id: 'usr-5', name: 'Vikram Singh', email: 'vikram@cosko.com', password: 'Password2026@', phone: '+91 99000 11223', role: 'POS Cashier', securityLevel: 20, store: 'BLR', allowedStores: ['BLR'], status: 'Suspended', shiftStatus: 'On Leave', lastLogin: '5 days ago', permissions: ['sales.view'] },
-  { id: 'usr-6', name: 'Pooja Deshmukh', email: 'pooja@cosko.com', password: 'Password2026@', phone: '+91 98765 43210', role: 'Sales Executive', securityLevel: 40, store: 'BLR', allowedStores: ['BLR'], status: 'Active', shiftStatus: 'On Shift', lastLogin: '2 hours ago', permissions: ['sales.view', 'sales.create', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.print_receipt', 'sales.history', 'sales.attach_photo', 'customers.view', 'customers.add'] },
-  { id: 'usr-7', name: 'Rakesh Verma', email: 'rakesh@cosko.com', password: 'Password2026@', phone: '+91 98222 33445', role: 'Store Manager', securityLevel: 80, store: 'MUM', allowedStores: ['MUM'], status: 'Active', shiftStatus: 'On Shift', lastLogin: 'Today', permissions: ['dashboard.view', 'sales.view', 'sales.create', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'inventory.transfer', 'purchases.view', 'purchases.create', 'customers.view', 'customers.edit', 'expenses.view', 'reports.view', 'employees.view', 'stores.view'] },
 ];
 
-const initialAuditLogs: AuditLog[] = [
-  { id: 'log-1', timestamp: '28 Aug 2026 14:10:02', userName: 'Super Admin', userRole: 'Super Admin', module: 'Inventory', action: 'Stock Adjustment', details: 'Adjusted SKU-0312 qty from +20 to +142 (Physical Audit)', ipAddress: '192.168.1.14' },
-  { id: 'log-2', timestamp: '28 Aug 2026 11:30:15', userName: 'Super Admin', userRole: 'Super Admin', module: 'Sales', action: 'POS Sale Checkout', details: 'Completed Order CS260021 (₹13,660)', ipAddress: '192.168.1.42' },
-];
+const initialAuditLogs: AuditLog[] = [];
 
-const initialNotifications: NotificationItem[] = [
-  { id: 'notif-1', title: 'Low Stock Alert', message: '38 items across stores are below reorder threshold.', time: '10 min ago', type: 'warning', read: false },
-  { id: 'notif-2', title: 'New PO Received', message: 'PO-2026-0041 marked received at Central Warehouse.', time: '2 hours ago', type: 'success', read: false },
-];
+const initialNotifications: NotificationItem[] = [];
 
 interface AppContextType {
   branding: AppBranding;
