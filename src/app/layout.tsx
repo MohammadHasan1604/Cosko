@@ -35,7 +35,12 @@ export const metadata: Metadata = {
     nocache: false,
   },
   icons: {
-    icon: [{ url: '/favicon.ico', type: 'image/x-icon' }],
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', type: 'image/x-icon' },
+    ],
+    shortcut: ['/favicon.svg'],
+    apple: ['/favicon.svg'],
   },
 };
 

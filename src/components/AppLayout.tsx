@@ -61,7 +61,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
         document.title = `${branding.appName} — Multi-Store Retail & POS Management`;
       }
 
-      const activeFavicon = branding.faviconUrl || branding.logoUrl;
+      const activeFavicon = branding.faviconUrl || branding.logoUrl || '/favicon.svg';
       if (activeFavicon) {
         let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
         if (!link) {
