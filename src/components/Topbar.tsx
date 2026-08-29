@@ -95,15 +95,30 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
           onClick={() => setUserProfileOpen(true)}
           className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted cursor-pointer transition-colors duration-150"
         >
-          {currentUser.avatarUrl ? (
-            <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-7 h-7 rounded-full object-cover border border-border flex-shrink-0" />
-          ) : (
-            <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-              {currentUser.avatar}
-            </div>
-          )}
+          <div className="relative">
+            {currentUser.avatarUrl ? (
+              <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-7 h-7 rounded-full object-cover border border-border flex-shrink-0" />
+            ) : (
+              <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                {currentUser.avatar}
+              </div>
+            )}
+            <span
+              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-card ${
+                currentUser.shiftStatus === 'On Shift' ? 'bg-success' : 'bg-warning'
+              }`}
+              title={currentUser.shiftStatus}
+            />
+          </div>
           <div className="hidden lg:block">
-            <p className="text-xs font-semibold text-foreground leading-tight">{currentUser.name}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-foreground leading-tight">{currentUser.name}</p>
+              <span className={`px-1.5 py-0.2 text-3xs font-bold rounded ${
+                currentUser.shiftStatus === 'On Shift' ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'
+              }`}>
+                {currentUser.shiftStatus === 'On Shift' ? 'ON' : 'OFF'}
+              </span>
+            </div>
             <p className="text-2xs text-muted-foreground leading-tight">{currentUser.role}</p>
           </div>
           <Icon name="ChevronDownIcon" size={14} className="text-muted-foreground hidden lg:block" />

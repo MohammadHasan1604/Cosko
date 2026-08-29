@@ -5,16 +5,19 @@ import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
 import AppLogo from '@/components/ui/AppLogo';
 import CoskoLogo from '@/components/ui/CoskoLogo';
+import BarcodeScannerModal from '@/components/ui/BarcodeScannerModal';
+import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import { useApp, Customer, InventoryItem, SalePhoto, RepairEnquiry, normalizeMobileNumber } from '@/context/AppContext';
 import { toast } from 'sonner';
 
 export default function SalesPage() {
-  const { sales, inventory, customers, repairsEnquiries, addSale, addCustomer, selectedStore, branding, currentUser, addAuditLog } = useApp();
+  const { sales, inventory, customers, repairsEnquiries, categoriesList, addSale, addCustomer, selectedStore, branding, currentUser, addAuditLog } = useApp();
 
   const [activeTab, setActiveTab] = useState<'pos' | 'history'>('pos');
   const [catalogSearch, setCatalogSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [cart, setCart] = useState<{ itemId: string; name: string; sku: string; price: number; qty: number; maxQty: number; discountPercent: number; warrantyMonths: number }[]>([]);
+  const [scannerOpen, setScannerOpen] = useState(false);
   
   // Locked Sales Employee Parameters
   const activeEmployeeName = currentUser.name || 'Sales Executive';
@@ -24,7 +27,7 @@ export default function SalesPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(customers[0]?.id || 'walkin');
   const [customerName, setCustomerName] = useState(customers[0]?.name || 'Walk-in Customer');
   const [customerPhone, setCustomerPhone] = useState(customers[0]?.phone || '+91 98765 43210');
-  const [linkedRepair, setLinkedRepair] = useState<RepairEnquiry | null>(null);
+  const [linkedRepairs, setLinkedRepairs] = useState<RepairEnquiry[]>([]);
 
   // Tax Option Toggle
   const [taxEnabled, setTaxEnabled] = useState<boolean>(true);
@@ -53,7 +56,11 @@ export default function SalesPage() {
   const [newCustEmail, setNewCustEmail] = useState('');
   const [newCustCity, setNewCustCity] = useState('Bengaluru');
 
-  const categoriesList = ['All Categories', 'Electricals', 'Lighting', 'Wiring', 'Power Tools', 'Hand Tools', 'Circuit Protection'];
+  // Dynamic Category List from MySQL Context
+  const dynamicCategories = useMemo(() => {
+    const active = categoriesList.filter((c) => c.status === 'Active').map((c) => c.name);
+    return ['All Categories', ...Array.from(new Set(active))];
+  }, [categoriesList]);
 
   const filteredInventory = useMemo(() => {
     return inventory.filter((item) => {
@@ -74,13 +81,13 @@ export default function SalesPage() {
     const normalizedInput = normalizeMobileNumber(phoneInput);
 
     if (!normalizedInput || normalizedInput.length < 5) {
-      setLinkedRepair(null);
+      setLinkedRepairs([]);
       return;
     }
     
-    // Auto-search linked repair enquiry history by normalized phone number
-    const repairMatch = repairsEnquiries.find((r) => normalizeMobileNumber(r.customerPhone) === normalizedInput);
-    setLinkedRepair(repairMatch || null);
+    // Auto-search linked multi-device repair enquiry history by normalized phone number
+    const repairMatches = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizedInput);
+    setLinkedRepairs(repairMatches);
 
     // Auto-search registered customer profile
     const custMatch = customers.find((c) => normalizeMobileNumber(c.phone) === normalizedInput);
@@ -95,7 +102,7 @@ export default function SalesPage() {
     if (id === 'walkin') {
       setCustomerName('Walk-in Customer');
       setCustomerPhone('+91 99000 00000');
-      setLinkedRepair(null);
+      setLinkedRepairs([]);
     } else {
       const found = customers.find((c) => c.id === id);
       if (found) {
@@ -376,6 +383,17 @@ export default function SalesPage() {
                   </div>
 
                   <button
+                    type="button"
+                    onClick={() => setScannerOpen(true)}
+                    className="btn-secondary text-xs py-2.5 px-3 gap-1.5 flex-shrink-0 font-bold"
+                    title="Scan product packaging barcode"
+                  >
+                    <Icon name="QrCodeIcon" size={16} className="text-primary" />
+                    <span>Scan</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setImageSearchOpen(true)}
                     className="btn-secondary text-xs py-2.5 px-3 gap-1.5 flex-shrink-0"
                     title="Search catalog by image photo"
@@ -387,7 +405,7 @@ export default function SalesPage() {
 
                 {/* Categories Pill Bar */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                  {categoriesList.map((cat) => (
+                  {dynamicCategories.map((cat) => (
                     <button
                       key={`cat-pill-${cat}`}
                       onClick={() => setSelectedCategory(cat)}
@@ -478,18 +496,37 @@ export default function SalesPage() {
                   </div>
                 </div>
 
-                {/* Filtered Repair Enquiry History (Enquiry Date, Repair Status, Repair Requested ONLY - Hiding internal notes & costs) */}
-                {linkedRepair && (
-                  <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 space-y-1 fade-in">
+                {/* Filtered Multi-Device Repair Enquiry History */}
+                {linkedRepairs.length > 0 && (
+                  <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 space-y-2 fade-in">
                     <div className="flex items-center justify-between">
                       <span className="text-2xs font-bold text-primary flex items-center gap-1">
                         <Icon name="WrenchScrewdriverIcon" size={13} />
-                        Linked Repair Record Found
+                        Linked Customer Repairs ({linkedRepairs.length})
                       </span>
-                      <span className="badge-warning text-3xs">{linkedRepair.repairStatus}</span>
                     </div>
-                    <p className="text-xs font-semibold text-foreground">{linkedRepair.repairRequested}</p>
-                    <p className="text-3xs text-muted-foreground">Enquiry Date: {linkedRepair.enquiryDate}</p>
+
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                      {linkedRepairs.map((repair) => (
+                        <div key={`linked-rep-${repair.id}`} className="p-2 rounded-lg bg-card border border-border text-xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-foreground flex items-center gap-1">
+                              <span className={`px-1.5 py-0.2 rounded text-3xs font-bold ${
+                                repair.deviceType === 'EV' ? 'bg-success/15 text-success' :
+                                repair.deviceType === 'AC' || repair.deviceType === 'TV' ? 'bg-warning/15 text-warning' :
+                                'bg-primary/15 text-primary'
+                              }`}>
+                                {repair.deviceType || 'Device'}
+                              </span>
+                              {repair.deviceName}
+                            </span>
+                            <span className="badge-warning text-3xs">{repair.repairStatus}</span>
+                          </div>
+                          <p className="text-2xs text-muted-foreground">{repair.repairRequested}</p>
+                          <p className="text-3xs text-muted-foreground font-mono">Date: {repair.enquiryDate}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -502,16 +539,17 @@ export default function SalesPage() {
                     {heldCart && <span className="badge-warning text-3xs">Cart Held</span>}
                   </div>
 
-                  {/* Tax ON / OFF Toggle */}
-                  <button
-                    onClick={() => setTaxEnabled((v) => !v)}
-                    className={`px-2.5 py-1 rounded-lg text-2xs font-bold flex items-center gap-1 transition-all ${
-                      taxEnabled ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    <Icon name={taxEnabled ? 'CheckIcon' : 'XMarkIcon'} size={12} />
-                    Tax (GST 18%): {taxEnabled ? 'ON' : 'OFF'}
-                  </button>
+                  {/* High-Visibility Tax ON / OFF Toggle */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xs font-bold text-muted-foreground">GST (18%):</span>
+                    <ToggleSwitch
+                      checked={taxEnabled}
+                      onChange={setTaxEnabled}
+                      size="sm"
+                      onText="TAX ON"
+                      offText="TAX OFF"
+                    />
+                  </div>
                 </div>
 
                 {/* Cart Items List */}
@@ -834,6 +872,30 @@ export default function SalesPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* POS Barcode Scanner Modal */}
+      {scannerOpen && (
+        <BarcodeScannerModal
+          open={scannerOpen}
+          onClose={() => setScannerOpen(false)}
+          onScan={(scannedCode) => {
+            const match = inventory.find(
+              (i) =>
+                (effectiveStore === 'All Stores' || i.store === effectiveStore || i.store === 'CENTRAL') &&
+                ((i.barcode && i.barcode === scannedCode) || i.sku === scannedCode)
+            );
+            if (match) {
+              addToCart(match);
+              toast.success(`Scanned & added: "${match.name}"`);
+            } else {
+              setCatalogSearch(scannedCode);
+              toast.info(`Scanned code: ${scannedCode}. Filter applied.`);
+            }
+          }}
+          title="POS Barcode Scanner"
+          subtitle="Scan product retail barcode to instantly add items to the billing cart."
+        />
       )}
     </AppLayout>
   );

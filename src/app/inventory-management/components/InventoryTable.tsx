@@ -8,6 +8,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import StockAdjustmentForm from './StockAdjustmentForm';
 import AddItemModal from './AddItemModal';
 import ProductDetailModal from './ProductDetailModal';
+import BarcodeScannerModal from '@/components/ui/BarcodeScannerModal';
 import { useApp, InventoryItem } from '@/context/AppContext';
 import { toast } from 'sonner';
 
@@ -31,8 +32,6 @@ const ALL_COLUMNS = [
   { key: 'lastMovement', label: 'Last Movement', visible: false },
 ];
 
-const STORES = ['All Stores', 'BLR', 'HYD', 'DEL'];
-const CATEGORIES = ['All Categories', 'Electricals', 'Lighting', 'Wiring', 'Power Tools', 'Hand Tools', 'Circuit Protection', 'Power Conditioning'];
 const STATUSES = ['All Status', 'Active', 'Inactive', 'Low Stock', 'Out of Stock'];
 
 function getStockStatus(item: InventoryItem) {
@@ -43,7 +42,7 @@ function getStockStatus(item: InventoryItem) {
 }
 
 export default function InventoryTable() {
-  const { inventory, deleteItem: removeInventoryItem, updateItem, selectedStore } = useApp();
+  const { inventory, deleteItem: removeInventoryItem, updateItem, selectedStore, categoriesList, storesList } = useApp();
 
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState(selectedStore);
@@ -54,6 +53,7 @@ export default function InventoryTable() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnConfig, setColumnConfig] = useState(ALL_COLUMNS);
   const [colVisOpen, setColVisOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const [adjustItem, setAdjustItem] = useState<InventoryItem | null>(null);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
@@ -170,16 +170,27 @@ export default function InventoryTable() {
       <div className="card overflow-hidden">
         {/* Toolbar */}
         <div className="px-4 py-3.5 border-b border-border flex items-center gap-3 flex-wrap">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Icon name="MagnifyingGlassIcon" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search by name, SKU, barcode..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="input-field pl-9 py-2 text-sm"
-            />
+          {/* Search with Barcode Scanner button */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-[240px] max-w-md">
+            <div className="relative flex-1">
+              <Icon name="MagnifyingGlassIcon" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by name, SKU, barcode..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                className="input-field pl-9 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              className="btn-secondary py-2 px-3 text-xs gap-1.5 font-bold text-foreground"
+              title="Scan Barcode with Camera or USB Scanner"
+            >
+              <Icon name="QrCodeIcon" size={16} />
+              Scan
+            </button>
           </div>
 
           {/* Store filter */}
@@ -188,16 +199,20 @@ export default function InventoryTable() {
             onChange={(e) => { setStoreFilter(e.target.value); setPage(1); }}
             className="input-field py-2 text-sm w-auto min-w-[130px]"
           >
-            {STORES.map((s) => <option key={`store-opt-${s}`} value={s}>{s}</option>)}
+            <option value="All Stores">All Stores</option>
+            {storesList.map((s) => <option key={`store-opt-${s.code}`} value={s.code}>{s.code}</option>)}
           </select>
 
-          {/* Category filter */}
+          {/* Dynamic Category filter */}
           <select
             value={categoryFilter}
             onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
             className="input-field py-2 text-sm w-auto min-w-[160px]"
           >
-            {CATEGORIES.map((c) => <option key={`cat-opt-${c}`} value={c}>{c}</option>)}
+            <option value="All Categories">All Categories</option>
+            {categoriesList.filter((c) => c.status === 'Active').map((c) => (
+              <option key={`cat-opt-${c.id}`} value={c.name}>{c.name}</option>
+            ))}
           </select>
 
           {/* Status filter */}
@@ -657,6 +672,26 @@ export default function InventoryTable() {
         variant="danger"
         loading={deleteLoading}
       />
+
+      {/* Barcode Scanner Modal */}
+      {scannerOpen && (
+        <BarcodeScannerModal
+          open={scannerOpen}
+          onClose={() => setScannerOpen(false)}
+          onScan={(code) => {
+            setSearch(code);
+            setPage(1);
+            const found = inventory.find((i) => (i.barcode && i.barcode === code) || i.sku === code);
+            if (found) {
+              toast.success(`Found matching product: "${found.name}" (${found.sku})`);
+            } else {
+              toast.info(`Scanned code: ${code}. No direct match found.`);
+            }
+          }}
+          title="Scan Product Barcode"
+          subtitle="Scan retail packaging barcode to instantly filter product inventory."
+        />
+      )}
     </>
   );
 }

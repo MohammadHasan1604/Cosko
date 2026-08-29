@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useApp, InventoryItem } from '@/context/AppContext';
 import Modal from '@/components/ui/Modal';
 import Icon from '@/components/ui/AppIcon';
+import BarcodeScannerModal from '@/components/ui/BarcodeScannerModal';
 import { toast } from 'sonner';
 
 interface AddItemModalProps {
@@ -12,19 +13,23 @@ interface AddItemModalProps {
 }
 
 export default function AddItemModal({ open, onClose, editItem }: AddItemModalProps) {
-  const { addItem, updateItem, addAuditLog, storesList } = useApp();
+  const { addItem, updateItem, addAuditLog, storesList, categoriesList } = useApp();
 
   const [images, setImages] = useState<string[]>(editItem?.images || []);
   const [primaryImage, setPrimaryImage] = useState<string>(editItem?.primaryImage || editItem?.images?.[0] || '');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  const activeCategories = categoriesList.filter((c) => c.status === 'Active');
+  const defaultCategory = editItem ? editItem.category : (activeCategories[0]?.name || 'Screen / Display');
 
   const [formData, setFormData] = useState({
     sku: editItem ? editItem.sku : `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
     barcode: editItem ? (editItem.barcode || '') : '',
     name: editItem ? editItem.name : '',
-    brand: editItem ? editItem.brand : 'Generic',
+    brand: editItem ? editItem.brand : 'Cosko',
     model: editItem ? (editItem.model || '') : '',
-    category: editItem ? editItem.category : 'Electricals',
+    category: defaultCategory,
     subcategory: editItem ? editItem.subcategory : 'General',
     store: editItem ? editItem.store : 'CENTRAL',
     qtyOnHand: editItem ? editItem.qtyOnHand : 50,
@@ -163,14 +168,34 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
           </div>
 
           <div>
-            <label className="text-xs font-bold text-foreground mb-1 block">Barcode EAN-13 (Optional)</label>
-            <input
-              type="text"
-              placeholder="Optional Barcode"
-              value={formData.barcode}
-              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-              className="input-field py-2 text-xs font-mono"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-foreground block">Barcode EAN-13 (Optional)</label>
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                className="text-3xs text-primary font-bold hover:underline inline-flex items-center gap-1"
+              >
+                <Icon name="QrCodeIcon" size={12} />
+                Scan Barcode
+              </button>
+            </div>
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                placeholder="Optional Barcode / Scan"
+                value={formData.barcode}
+                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                className="input-field py-2 text-xs font-mono flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                className="btn-secondary py-1.5 px-2.5 text-xs text-foreground"
+                title="Open Camera Scanner"
+              >
+                <Icon name="QrCodeIcon" size={15} />
+              </button>
+            </div>
           </div>
 
           <div>
@@ -189,11 +214,17 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
             <select
               value={formData.category}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="input-field py-2 text-xs"
+              className="input-field py-2 text-xs font-medium"
             >
-              {['Electricals', 'Lighting', 'Wiring', 'Power Tools', 'Hand Tools', 'Circuit Protection', 'Power Conditioning'].map((cat) => (
-                <option key={`cat-select-${cat}`} value={cat}>{cat}</option>
-              ))}
+              {activeCategories.length > 0 ? (
+                activeCategories.map((cat) => (
+                  <option key={`cat-select-${cat.id}`} value={cat.name}>
+                    {cat.name} ({cat.categoryType})
+                  </option>
+                ))
+              ) : (
+                <option value="General">General</option>
+              )}
             </select>
           </div>
 
@@ -312,6 +343,19 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
           <button type="submit" className="btn-primary text-xs font-bold">{editItem ? 'Save Changes' : 'Create Product Record'}</button>
         </div>
       </form>
+
+      {scannerOpen && (
+        <BarcodeScannerModal
+          open={scannerOpen}
+          onClose={() => setScannerOpen(false)}
+          onScan={(scanned) => {
+            setFormData((prev) => ({ ...prev, barcode: scanned }));
+            toast.success(`Barcode ${scanned} assigned to item`);
+          }}
+          title="Scan Product Barcode"
+          subtitle="Align the product packaging barcode with the camera viewport."
+        />
+      )}
     </Modal>
   );
 }

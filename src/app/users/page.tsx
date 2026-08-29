@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
+import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import { useApp, UserAccount } from '@/context/AppContext';
 import { RBACEngine, RBACUser, PERMISSION_CATALOGUE, SUPER_ADMIN_PROTECTED_PERMISSIONS, PermissionDefinition, ROLE_SECURITY_LEVELS } from '@/lib/rbacEngine';
 import { toast } from 'sonner';
@@ -326,14 +327,13 @@ export default function UsersPage() {
                   </div>
 
                   <div className="flex items-center justify-between gap-2 pt-2">
-                    <button
-                      onClick={() => toggleUserShiftStatus(u.id)}
-                      className={`btn-ghost text-3xs py-1 px-2.5 rounded-lg border border-border ${
-                        u.shiftStatus === 'On Shift' ? 'text-positive bg-positive/5' : 'text-muted-foreground'
-                      }`}
-                    >
-                      Shift: {u.shiftStatus}
-                    </button>
+                    <ToggleSwitch
+                      checked={u.shiftStatus === 'On Shift'}
+                      onChange={() => toggleUserShiftStatus(u.id)}
+                      size="sm"
+                      onText="ON SHIFT"
+                      offText="OFF SHIFT"
+                    />
 
                     <div className="flex items-center gap-1.5">
                       {fullUserRecord && (
@@ -438,13 +438,14 @@ export default function UsersPage() {
                         </select>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => toggleUserShiftStatus(u.id)}
-                            className={`btn-ghost text-3xs py-1 px-2 ${u.shiftStatus === 'On Shift' ? 'text-positive' : 'text-muted-foreground'}`}
-                          >
-                            {u.shiftStatus}
-                          </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <ToggleSwitch
+                            checked={u.shiftStatus === 'On Shift'}
+                            onChange={() => toggleUserShiftStatus(u.id)}
+                            size="sm"
+                            onText="ON SHIFT"
+                            offText="OFF SHIFT"
+                          />
 
                           {/* Performance Analytics Button */}
                           {fullUserRecord && (

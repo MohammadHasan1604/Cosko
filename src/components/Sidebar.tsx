@@ -43,16 +43,16 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   // Strict RBAC Navigation Group Filtering
   const roleAllowedHrefs: Record<string, string[]> = {
     'Super Admin': [
-      '/dashboard', '/sales', '/inventory-management', '/purchases', '/customers',
+      '/dashboard', '/sales', '/inventory-management', '/categories', '/purchases', '/customers',
       '/vendors', '/expenses', '/accounting', '/central-profit', '/reports', '/employees', '/stores',
       '/users', '/audit-logs', '/settings'
     ],
     'Store Manager': [
-      '/dashboard', '/sales', '/inventory-management', '/purchases', '/customers',
+      '/dashboard', '/sales', '/inventory-management', '/categories', '/purchases', '/customers',
       '/vendors', '/expenses', '/accounting', '/central-profit', '/reports', '/employees'
     ],
     'Inventory Auditor': [
-      '/dashboard', '/inventory-management', '/purchases', '/vendors', '/reports'
+      '/dashboard', '/inventory-management', '/categories', '/purchases', '/vendors', '/reports'
     ],
     'POS Cashier': [
       '/sales', '/customers'
@@ -78,6 +78,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
       items: [
         { id: 'nav-sales', label: 'Sales & POS', icon: 'ShoppingCartIcon', href: '/sales' },
         { id: 'nav-inventory', label: 'Inventory', icon: 'CubeIcon', href: '/inventory-management', badge: lowStockCount, badgeVariant: 'warning' },
+        { id: 'nav-categories', label: 'Categories', icon: 'TagIcon', href: '/categories' },
         { id: 'nav-purchases', label: 'Purchases', icon: 'TruckIcon', href: '/purchases', badge: pendingPOCount, badgeVariant: 'info' },
         { id: 'nav-customers', label: 'Customers', icon: 'UsersIcon', href: '/customers' },
         { id: 'nav-vendors', label: 'Vendors', icon: 'BuildingStorefrontIcon', href: '/vendors' },

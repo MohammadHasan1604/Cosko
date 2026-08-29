@@ -254,44 +254,82 @@ export default function CustomersPage() {
           <div className="space-y-4 py-2 text-xs">
             {/* Customer Header Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+              <div className="p-3 rounded-xl bg-card border border-border">
                 <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Spend</p>
-                <p className="text-base font-bold text-foreground font-tabular">₹{crmViewCustomer.totalSpend.toLocaleString('en-IN')}</p>
+                <p className="text-base font-extrabold text-foreground font-tabular">₹{crmViewCustomer.totalSpend.toLocaleString('en-IN')}</p>
+                <p className="text-3xs text-success font-semibold">Verified Lifetime Value</p>
               </div>
-              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+              <div className="p-3 rounded-xl bg-card border border-border">
                 <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Credit Balance</p>
-                <p className="text-base font-bold text-warning font-tabular">₹{crmViewCustomer.creditBalance.toLocaleString('en-IN')}</p>
+                <p className="text-base font-extrabold text-warning font-tabular">₹{crmViewCustomer.creditBalance.toLocaleString('en-IN')}</p>
+                <p className="text-3xs text-muted-foreground">Account Ledger Balance</p>
               </div>
-              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+              <div className="p-3 rounded-xl bg-card border border-border">
                 <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Invoices</p>
-                <p className="text-base font-bold text-foreground font-tabular">
+                <p className="text-base font-extrabold text-foreground font-tabular">
                   {sales.filter((s) => normalizeMobileNumber(s.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || s.customerName === crmViewCustomer.name).length} Orders
                 </p>
+                <p className="text-3xs text-muted-foreground">Store Purchases</p>
               </div>
-              <div className="p-3 rounded-xl bg-muted/40 border border-border">
-                <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Repair Enquiries</p>
-                <p className="text-base font-bold text-primary font-tabular">
-                  {repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || r.customerName === crmViewCustomer.name).length} Enquiries
+              <div className="p-3 rounded-xl bg-card border border-border">
+                <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Linked Repairs</p>
+                <p className="text-base font-extrabold text-primary font-tabular">
+                  {repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || r.customerName === crmViewCustomer.name).length} Jobs
                 </p>
+                <p className="text-3xs text-primary font-semibold">Mobile, EV, Appliances</p>
               </div>
             </div>
 
-            {/* Repair Enquiry Linkage Section */}
+            {/* Repair Enquiry Linkage Section (Multi-Device) */}
             <div className="space-y-2 pt-2 border-t border-border">
-              <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Linked Repair & Service Records</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Icon name="WrenchScrewdriverIcon" size={14} className="text-primary" />
+                  Linked Multi-Device Repairs & Services
+                </h4>
+              </div>
+
               {repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || r.customerName === crmViewCustomer.name).length === 0 ? (
-                <p className="text-2xs text-muted-foreground italic">No repair enquiry records found for this customer phone number.</p>
+                <div className="p-4 rounded-xl bg-muted/20 border border-border text-center">
+                  <p className="text-2xs text-muted-foreground italic">No repair enquiry records found for this customer mobile number.</p>
+                </div>
               ) : (
-                <div className="space-y-2">
-                  {repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || r.customerName === crmViewCustomer.name).map((r) => (
-                    <div key={`crm-rep-${r.id}`} className="p-3 rounded-xl border border-primary/20 bg-primary/5 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-foreground">{r.repairRequested}</span>
-                        <span className="badge-info text-3xs">{r.repairStatus}</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {repairsEnquiries
+                    .filter((r) => normalizeMobileNumber(r.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || r.customerName === crmViewCustomer.name)
+                    .map((r) => (
+                      <div key={`crm-rep-${r.id}`} className="p-3 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`px-2 py-0.5 rounded text-3xs font-bold ${
+                              r.deviceType === 'EV' ? 'bg-success/20 text-success' :
+                              r.deviceType === 'AC' || r.deviceType === 'TV' || r.deviceType === 'Refrigerator' || r.deviceType === 'Washing Machine' ? 'bg-warning/20 text-warning' :
+                              'bg-primary/20 text-primary'
+                            }`}>
+                              {r.deviceType || 'Device'}
+                            </span>
+                            <span className="font-bold text-foreground text-xs">{r.deviceName}</span>
+                          </div>
+                          <span className={`badge-info text-3xs ${r.repairStatus === 'Delivered' || r.repairStatus === 'Ready for Delivery' ? 'badge-success' : ''}`}>
+                            {r.repairStatus}
+                          </span>
+                        </div>
+
+                        <p className="text-2xs font-medium text-foreground">{r.repairRequested}</p>
+
+                        {r.technicianNotes && (
+                          <div className="p-1.5 rounded-lg bg-card/80 border border-border text-3xs text-muted-foreground">
+                            <span className="font-bold text-foreground">Tech Notes: </span>
+                            {r.technicianNotes}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-3xs text-muted-foreground pt-1 border-t border-primary/10">
+                          <span>Tech: {r.assignedTech || 'COSKO Specialist'} · {r.storeCode || 'BLR'}</span>
+                          <span className="font-bold text-primary">{r.estimatedCost ? `Est: ₹${r.estimatedCost.toLocaleString('en-IN')}` : ''}</span>
+                        </div>
                       </div>
-                      <p className="text-3xs text-muted-foreground">Enquiry Date: {r.enquiryDate}</p>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </div>
