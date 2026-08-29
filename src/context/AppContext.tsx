@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
-import { SupabaseClientService, supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { SupabaseClientService, isSupabaseConfigured } from '@/lib/supabase';
 
 export function normalizeMobileNumber(phone: string): string {
   if (!phone) return '';
@@ -458,33 +458,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [usersList]);
 
-  // Realtime Live Supabase Change Synchronization
+  // Realtime Live Event Synchronization (Server-Sent Events)
   useEffect(() => {
-    if (!isSupabaseConfigured() || typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return;
 
     try {
-      const channel = supabase
-        .channel('cosko-realtime-global')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public' },
-          (payload: any) => {
-            console.log('⚡ [Supabase Realtime Change Received]:', payload.eventType, payload.table);
-            // Realtime toast indicator for live multi-user multi-store operations
-            if (payload.table === 'sales' && payload.eventType === 'INSERT') {
-              toast.info(`⚡ Live POS Sale Recorded on ${payload.new?.store_code || 'Store'}: ₹${payload.new?.grand_total || 0}`);
-            } else if (payload.table === 'inventory' && payload.eventType === 'UPDATE') {
-              toast.info(`⚡ Live Stock Updated on ${payload.new?.store || 'Store'}`);
-            }
+      const eventSource = new EventSource('/api/realtime');
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.channel === 'sales') {
+            toast.info(`⚡ Live POS Sale Recorded on ${data.payload?.storeCode || 'Store'}: ₹${data.payload?.grandTotal || 0}`);
+          } else if (data.channel === 'inventory') {
+            toast.info(`⚡ Live Stock Updated on ${data.payload?.storeCode || 'Store'}`);
           }
-        )
-        .subscribe();
-
+        } catch {}
+      };
       return () => {
-        supabase.removeChannel(channel);
+        eventSource.close();
       };
     } catch (err) {
-      console.warn('Supabase Realtime Channel setup error:', err);
+      console.warn('Realtime SSE setup error:', err);
     }
   }, []);
 
@@ -512,9 +506,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.removeItem('cosko_active_session');
       if (typeof window !== 'undefined') {
-        const { createSupabaseBrowserClient } = await import('@/lib/supabase/client');
-        const supabase = createSupabaseBrowserClient();
-        await supabase.auth.signOut();
+        await fetch('/api/auth/logout', { method: 'POST' });
       }
     } catch {}
     setCurrentUserState(unauthenticatedUser);

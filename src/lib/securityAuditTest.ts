@@ -101,7 +101,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   // =========================================================================
   // CATEGORY 2: AUTHENTICATION TESTING (Salted SHA-256, Rate Limiting)
   // =========================================================================
-  const hashed = await hashPassword('Cosko2026@', 'test_salt');
+  const hashed = await hashPassword('Cosko2026@');
   const passValid = await verifyPassword('Cosko2026@', hashed);
   assertTest('2. Authentication', 'Salted SHA-256 Password Hash Verification', 'PASS', passValid ? 'PASS' : 'DENIED', 'Salted password hash verifies correctly');
 
@@ -266,7 +266,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   // =========================================================================
   // CATEGORY 7: API SECURITY & SESSION REFRESH PERSISTENCE TESTING
   // =========================================================================
-  const sess = createSession(storeManagerUser.id, storeManagerUser.storeScope, storeManagerUser.securityLevel);
+  const sess = createSession('sm_001', 'BLR', 80);
   const sessVerif = verifySession(sess.token);
   assertTest('7. API Security', 'Server-Issued Active Session Token Verification', 'PASS', sessVerif.valid ? 'PASS' : 'DENIED', 'Active session token verified');
 
@@ -275,7 +275,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   assertTest('7. API Security', 'Revoked Session Token Rejection (401 Unauthorized)', 'DENIED', sessRevokedVerif.valid ? 'PASS' : 'DENIED', sessRevokedVerif.reason || 'Revoked session denied');
 
   // Test 7.3: Store Manager Session Persistence (Zero Fallback to Super Admin)
-  const smSess = createSession(storeManagerUser.id, storeManagerUser.storeScope, storeManagerUser.securityLevel);
+  const smSess = createSession('sm_001', 'BLR', 80);
   const smRestored = verifySession(smSess.token);
   const isSmRestoredAccurately = smRestored.valid && smRestored.session?.securityLevel === 80 && smRestored.session?.storeScope === 'BLR';
   assertTest('7. API Security', 'Store Manager Refresh Persistence (Level 80, Store BLR Restored)', 'PASS', isSmRestoredAccurately ? 'PASS' : 'DENIED', `Restored Level: ${smRestored.session?.securityLevel} | Store: ${smRestored.session?.storeScope}`);

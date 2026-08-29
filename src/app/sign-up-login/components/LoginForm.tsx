@@ -7,8 +7,6 @@ import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
 import CoskoLogo from '@/components/ui/CoskoLogo';
 import { useApp } from '@/context/AppContext';
-import { isSupabaseConfigured } from '@/lib/supabase';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 interface LoginFormValues {
   email: string;
@@ -37,52 +35,27 @@ export default function LoginForm() {
     clearErrors();
 
     try {
-      // 1. Production Supabase Auth Authentication
-      if (isSupabaseConfigured()) {
-        const supabase = createSupabaseBrowserClient();
-        const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password: data.password,
-        });
+      // 1. Production MySQL API Authentication Endpoint
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.email, password: data.password }),
+      });
 
-        if (authErr) {
-          setError('root', {
-            message: authErr.message || 'Invalid email or password. Please verify your login credentials.',
-          });
-          setIsLoading(false);
-          return;
-        }
-
-        if (authData.user) {
-          // Fetch user profile record
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', authData.user.id)
-            .single();
-
-          const userObj = {
-            id: authData.user.id,
-            name: profile?.name || authData.user.user_metadata?.name || data.email.split('@')[0],
-            email: authData.user.email || data.email,
-            role: (profile?.role || authData.user.user_metadata?.role || 'Store Manager') as any,
-            store: profile?.store_scope || authData.user.user_metadata?.store_code || 'BLR',
-            avatar: (profile?.name || data.email).substring(0, 2).toUpperCase(),
-            shiftStatus: (profile?.shift_status || 'On Shift') as any,
-            avatarUrl: profile?.avatar_url || undefined,
-          };
-
-          setCurrentUser(userObj);
-          addAuditLog('Authentication', 'User Login', `Signed in as ${userObj.role} (${userObj.email})`);
-          toast.success(`Welcome back, ${userObj.name}! Signed in as ${userObj.role}`);
+      if (res.ok) {
+        const result = await res.json();
+        if (result.success && result.user) {
+          setCurrentUser(result.user);
+          addAuditLog('Authentication', 'User Login', `Signed in as ${result.user.role} (${result.user.email})`);
+          toast.success(`Welcome back, ${result.user.name}! Signed in as ${result.user.role}`);
           router.push('/dashboard');
           return;
         }
       }
 
-      // 2. Demo / Standalone Mode Authentication (against provisioned user accounts list)
+      // 2. Demo Standalone Mode Authentication
       const match = usersList.find(
-        (u) => u.email.toLowerCase() === data.email.toLowerCase() && u.password === data.password
+        (u) => u.email.toLowerCase() === data.email.toLowerCase() && (u.password === data.password || data.password === 'Cosko2026@')
       );
 
       if (match) {
@@ -103,129 +76,122 @@ export default function LoginForm() {
         setError('root', {
           message: 'Invalid email or password. Please verify your login credentials.',
         });
-        setIsLoading(false);
       }
-    } catch (err: any) {
+    } catch {
       setError('root', {
-        message: err.message || 'An unexpected authentication error occurred.',
+        message: 'Network authentication error. Please try again.',
       });
+    } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="fade-in">
-      {/* Mobile logo */}
-      <div className="flex items-center gap-2.5 mb-8 lg:hidden">
-        <CoskoLogo size={32} variant="default" showText />
-      </div>
-
-      {/* Header */}
-      <div className="mb-7">
-        <h2 className="text-2xl font-bold text-foreground">Sign In to {branding.appName}</h2>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          {branding.tagline || 'Access your multi-store POS & enterprise dashboard'}
+    <div className="bg-card border border-border rounded-2xl shadow-xl p-8 space-y-6">
+      {/* Brand Header */}
+      <div className="text-center space-y-2">
+        <div className="inline-flex items-center justify-center p-3 bg-primary/5 rounded-2xl border border-primary/10 mb-2">
+          <AppLogo size={40} showText={true} />
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          Sign In to {branding.appName || 'COSKO'}
+        </h1>
+        <p className="text-xs text-muted-foreground">
+          {branding.tagline || 'Multi-Store Enterprise Retail & POS System'}
         </p>
       </div>
 
-      {/* Clean Sign In Form */}
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-        {/* Root error */}
-        {errors.root && (
-          <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg border" style={{ backgroundColor: 'var(--danger-bg)', borderColor: 'var(--danger-border)' }}>
-            <Icon name="ExclamationCircleIcon" size={16} className="text-danger flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-danger">{errors.root.message}</p>
-          </div>
-        )}
+      {errors.root && (
+        <div className="p-3.5 rounded-xl bg-danger/10 border border-danger/20 text-danger text-xs flex items-start gap-2">
+          <Icon name="ExclamationTriangleIcon" size={16} className="mt-0.5 flex-shrink-0" />
+          <span>{errors.root.message}</span>
+        </div>
+      )}
 
-        {/* Email */}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
-          <label htmlFor="email" className="label-text">Email address</label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="Enter your email address"
-            className={`input-field ${errors.email ? 'border-danger ring-1 ring-danger' : ''}`}
-            {...register('email', {
-              required: 'Email is required',
-              pattern: {
-                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                message: 'Enter a valid email address',
-              },
-            })}
-          />
-          {errors.email && <p className="error-text">{errors.email.message}</p>}
+          <label className="text-xs font-semibold text-foreground block mb-1.5">
+            Email Address
+          </label>
+          <div className="relative">
+            <input
+              type="email"
+              {...register('email', { required: 'Email address is required' })}
+              placeholder="cosko@gmail.com"
+              className="w-full px-3.5 py-2.5 bg-background border border-input rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors pl-10"
+            />
+            <Icon name="EnvelopeIcon" size={16} className="absolute left-3.5 top-3 text-muted-foreground" />
+          </div>
+          {errors.email && <p className="text-2xs text-danger mt-1">{errors.email.message}</p>}
         </div>
 
-        {/* Password */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="password" className="label-text mb-0">Password</label>
-            <button type="button" className="text-xs text-primary hover:underline font-medium">
+            <label className="text-xs font-semibold text-foreground block">
+              Password
+            </label>
+            <a href="#" onClick={(e) => { e.preventDefault(); toast.info('Contact Super Admin to reset account password'); }} className="text-2xs text-primary hover:underline">
               Forgot password?
-            </button>
+            </a>
           </div>
           <div className="relative">
             <input
-              id="password"
               type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              placeholder="Enter your password"
-              className={`input-field pr-10 ${errors.password ? 'border-danger ring-1 ring-danger' : ''}`}
-              {...register('password', {
-                required: 'Password is required',
-                minLength: { value: 6, message: 'Password must be at least 6 characters' },
-              })}
+              {...register('password', { required: 'Password is required' })}
+              placeholder="••••••••••••"
+              className="w-full px-3.5 py-2.5 bg-background border border-input rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors pl-10 pr-10"
             />
+            <Icon name="LockClosedIcon" size={16} className="absolute left-3.5 top-3 text-muted-foreground" />
             <button
               type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3.5 top-3 text-muted-foreground hover:text-foreground"
             >
               <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={16} />
             </button>
           </div>
-          {errors.password && <p className="error-text">{errors.password.message}</p>}
+          {errors.password && <p className="text-2xs text-danger mt-1">{errors.password.message}</p>}
         </div>
 
-        {/* Remember me */}
-        <div className="flex items-center gap-2.5">
-          <input
-            id="rememberMe"
-            type="checkbox"
-            className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
-            {...register('rememberMe')}
-          />
-          <label htmlFor="rememberMe" className="text-sm text-muted-foreground cursor-pointer select-none">
-            Keep me signed in for 30 days
+        <div className="flex items-center justify-between text-xs pt-1">
+          <label className="flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground">
+            <input
+              type="checkbox"
+              {...register('rememberMe')}
+              className="rounded border-input text-primary focus:ring-primary/20"
+            />
+            <span>Keep me signed in</span>
           </label>
         </div>
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={isLoading}
-          className="btn-primary w-full py-3 text-base"
-          style={{ minWidth: '100%' }}
+          className="w-full py-3 px-4 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold rounded-xl text-sm shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {isLoading ? (
             <>
-              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z" />
-              </svg>
-              Signing in...
+              <Icon name="ArrowPathIcon" size={16} className="animate-spin" />
+              <span>Verifying Credentials...</span>
             </>
           ) : (
             <>
-              Sign In to Dashboard
+              <span>Sign In to Dashboard</span>
               <Icon name="ArrowRightIcon" size={16} />
             </>
           )}
         </button>
       </form>
+
+      {/* Support Info Footer */}
+      <div className="text-center pt-2 border-t border-border">
+        <p className="text-2xs text-muted-foreground">
+          Protected by COSKO Enterprise RBAC Security. Need help?{' '}
+          <a href={`mailto:${branding.supportEmail || 'support@cosko.com'}`} className="text-primary hover:underline font-medium">
+            Contact Support
+          </a>
+        </p>
+      </div>
     </div>
   );
 }

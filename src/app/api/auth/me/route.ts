@@ -1,36 +1,32 @@
-import { NextResponse } from 'next/server';
-import { verifySession } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { verifySessionToken, isSessionRevoked } from '@/lib/auth';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    const cookieToken = request.cookies.get('cosko_session')?.value;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : cookieToken;
 
-    if (!token) {
+    if (!token || isSessionRevoked(token)) {
       return NextResponse.json(
         { authenticated: false, reason: 'Unauthenticated: No active session token provided' },
         { status: 401 }
       );
     }
 
-    const verification = verifySession(token);
-    if (!verification.valid || !verification.session) {
+    const sessionUser = verifySessionToken(token);
+    if (!sessionUser) {
       return NextResponse.json(
-        { authenticated: false, reason: verification.reason || 'Unauthenticated: Invalid or expired session' },
+        { authenticated: false, reason: 'Unauthenticated: Invalid or expired session' },
         { status: 401 }
       );
     }
 
     return NextResponse.json({
       authenticated: true,
-      user: {
-        userId: verification.session.userId,
-        storeScope: verification.session.storeScope,
-        securityLevel: verification.session.securityLevel,
-        expiresAt: verification.session.expiresAt,
-      },
+      user: sessionUser,
     });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
       { authenticated: false, reason: 'Internal Server Authentication Verification Error' },
       { status: 500 }

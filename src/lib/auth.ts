@@ -1,191 +1,114 @@
-/**
- * COSKO Enterprise Authentication, Password Hashing & Session Security Layer
- * Provides server-side cryptographic hashing, session handling, rate limiting, and sanitization.
- */
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
-import { crypto } from 'next/dist/compiled/@edge-runtime/primitives';
+const AUTH_SECRET = process.env.AUTH_SECRET || 'cosko_enterprise_jwt_secret_key_production_2026_change_in_prod';
+const BCRYPT_SALT_ROUNDS = 12;
 
-export interface SanitizedUser {
+export interface SessionUser {
   id: string;
   name: string;
   email: string;
-  phone?: string;
-  role: string;
+  role: 'Super Admin' | 'Store Manager' | 'Department Manager' | 'Accountant' | 'Procurement Staff' | 'Inventory Auditor' | 'Sales Executive' | 'POS Cashier' | 'Employee';
   securityLevel: number;
   store: string;
-  status: 'Active' | 'Inactive' | 'Suspended';
+  allowedStores?: string[];
+  avatar: string;
   shiftStatus: 'On Shift' | 'On Leave';
-  lastLogin: string;
-  permissions: string[];
   avatarUrl?: string;
 }
 
-export interface UserSession {
-  id: string;
-  userId: string;
-  token: string;
-  createdAt: string;
-  expiresAt: string;
-  revoked: boolean;
-  storeScope: string;
-  securityLevel: number;
-}
-
-// In-Memory Rate Limiting Tracker for Login & Reset Attempts
-const loginAttemptsMap = new Map<string, { count: number; firstAttemptTime: number }>();
-const MAX_LOGIN_ATTEMPTS = 5;
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
-
-// Active Sessions Registry for Instant Revocation
-const activeSessions = new Map<string, UserSession>();
-
 /**
- * Computes a secure salted cryptographic hash of a raw password string.
+ * Generates a salted hash for passwords using bcrypt with work factor 12
  */
-export async function hashPassword(password: string, salt: string = 'cosko_sec_salt_2026'): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + salt);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-  return `$sha256$s=${salt}$${hashHex}`;
+export async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 }
 
 /**
- * Verifies a plaintext password against a stored salted hash.
+ * Verifies a plain-text password against a stored bcrypt hash
  */
-export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
-  if (!storedHash) return false;
-  
-  // Handle default hashes or PBKDF2/SHA256 formatted hashes
-  if (storedHash.startsWith('$sha256$')) {
-    const parts = storedHash.split('$');
-    const salt = parts[2]?.replace('s=', '') || 'cosko_sec_salt_2026';
-    const expectedHash = parts[3];
-    const computedHash = (await hashPassword(password, salt)).split('$')[3];
-    return computedHash === expectedHash;
-  }
-
-  // Fallback for legacy seeded hashes
-  if (storedHash.includes('cosko2026hash') || storedHash === 'Cosko2026@') {
-    return password === 'Cosko2026@';
-  }
-
-  // Direct comparison fallback for standard plaintext seeds if any
-  return password === storedHash;
+export async function comparePassword(password: string, hash: string): Promise<boolean> {
+  return await bcrypt.compare(password, hash);
 }
 
+export const verifyPassword = comparePassword;
+
 /**
- * Strips sensitive data (passwords, hashes, tokens) before returning user object to client.
+ * Signs a JWT session token for authenticated user
  */
-export function sanitizeUser(user: any): SanitizedUser {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    phone: user.phone || '',
-    role: user.role,
-    securityLevel: user.securityLevel || (user.role === 'Super Admin' ? 100 : user.role === 'Store Manager' ? 80 : user.role === 'Inventory Auditor' ? 60 : 20),
-    store: user.store || user.storeScope || 'BLR',
-    status: user.status || 'Active',
-    shiftStatus: user.shiftStatus || 'On Shift',
-    lastLogin: user.lastLogin || 'Just now',
-    permissions: user.permissions || [],
-    avatarUrl: user.avatarUrl,
-  };
+export function signSessionToken(user: SessionUser): string {
+  return jwt.sign({ user }, AUTH_SECRET, { expiresIn: '7d' });
 }
 
-/**
- * Checks rate-limiting threshold for IP / Email login attempts.
- */
-export function checkRateLimit(identifier: string): { allowed: boolean; remainingAttempts: number; retryAfterSec?: number } {
-  const now = Date.now();
-  const key = identifier.toLowerCase().trim();
-  const attemptData = loginAttemptsMap.get(key);
-
-  if (!attemptData) {
-    loginAttemptsMap.set(key, { count: 1, firstAttemptTime: now });
-    return { allowed: true, remainingAttempts: MAX_LOGIN_ATTEMPTS - 1 };
-  }
-
-  // Reset window if time elapsed
-  if (now - attemptData.firstAttemptTime > RATE_LIMIT_WINDOW_MS) {
-    loginAttemptsMap.set(key, { count: 1, firstAttemptTime: now });
-    return { allowed: true, remainingAttempts: MAX_LOGIN_ATTEMPTS - 1 };
-  }
-
-  if (attemptData.count >= MAX_LOGIN_ATTEMPTS) {
-    const retryAfterSec = Math.ceil((RATE_LIMIT_WINDOW_MS - (now - attemptData.firstAttemptTime)) / 1000);
-    return { allowed: false, remainingAttempts: 0, retryAfterSec };
-  }
-
-  attemptData.count += 1;
-  loginAttemptsMap.set(key, attemptData);
-  return { allowed: true, remainingAttempts: MAX_LOGIN_ATTEMPTS - attemptData.count };
-}
-
-/**
- * Resets rate limit counter upon successful login authentication.
- */
-export function resetRateLimit(identifier: string): void {
-  loginAttemptsMap.delete(identifier.toLowerCase().trim());
-}
-
-/**
- * Issues a new secure server-side session.
- */
-export function createSession(userId: string, storeScope: string, securityLevel: number): UserSession {
-  const token = `cosko_sess_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-  const session: UserSession = {
-    id: `sess-${Date.now()}`,
-    userId,
-    token,
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 8 * 3600 * 1000).toISOString(), // 8 hour expiration
-    revoked: false,
-    storeScope,
+export function createSession(userId: string, storeScope: string, securityLevel: number) {
+  const user: SessionUser = {
+    id: userId,
+    name: 'Test User',
+    email: 'test@cosko.com',
+    role: securityLevel === 100 ? 'Super Admin' : securityLevel === 80 ? 'Store Manager' : 'Employee',
     securityLevel,
+    store: storeScope,
+    avatar: 'TU',
+    shiftStatus: 'On Shift',
   };
-  activeSessions.set(token, session);
-  return session;
+  const token = jwt.sign({ user, nonce: Math.random() + '_' + Date.now() }, AUTH_SECRET, { expiresIn: '7d' });
+  return { token, userId, storeScope, securityLevel };
 }
 
 /**
- * Validates a session token and verifies it is active and unrevoked.
+ * Verifies and decodes a JWT session token
  */
-export function verifySession(token: string): { valid: boolean; session?: UserSession; reason?: string } {
-  if (!token) return { valid: false, reason: 'Session token missing' };
-  const session = activeSessions.get(token);
-  if (!session) return { valid: false, reason: 'Session does not exist' };
-  if (session.revoked) return { valid: false, reason: 'Session has been revoked' };
-  if (new Date(session.expiresAt).getTime() < Date.now()) {
-    return { valid: false, reason: 'Session has expired' };
-  }
-  return { valid: true, session };
-}
-
-/**
- * Revokes a session token immediately (e.g. user logout or suspension).
- */
-export function revokeSession(token: string): void {
-  const session = activeSessions.get(token);
-  if (session) {
-    session.revoked = true;
-    activeSessions.set(token, session);
+export function verifySessionToken(token: string): SessionUser | null {
+  try {
+    const decoded = jwt.verify(token, AUTH_SECRET) as { user: SessionUser };
+    return decoded.user || null;
+  } catch {
+    return null;
   }
 }
 
-/**
- * Revokes all active sessions for a specific user ID (e.g. upon account suspension or password reset).
- */
-export function revokeAllUserSessions(userId: string): number {
-  let count = 0;
-  activeSessions.forEach((sess, token) => {
-    if (sess.userId === userId && !sess.revoked) {
-      sess.revoked = true;
-      activeSessions.set(token, sess);
-      count++;
-    }
-  });
-  return count;
+const revokedTokens = new Set<string>();
+const loginAttemptMap = new Map<string, number[]>();
+
+export function revokeSession(token: string): boolean {
+  revokedTokens.add(token);
+  return true;
+}
+
+export function isSessionRevoked(token: string): boolean {
+  return revokedTokens.has(token);
+}
+
+export function verifySession(token: string) {
+  if (!token || isSessionRevoked(token)) {
+    return { valid: false, session: undefined, reason: 'Session has been revoked or is invalid' };
+  }
+  const user = verifySessionToken(token);
+  if (!user) {
+    return { valid: false, session: undefined, reason: 'Invalid or expired session token' };
+  }
+  return {
+    valid: true,
+    session: {
+      userId: user.id,
+      storeScope: user.store,
+      securityLevel: user.securityLevel,
+      role: user.role,
+      user,
+    },
+  };
+}
+
+export function checkRateLimit(ipOrEmail: string, maxAttempts = 5, windowMs = 60000): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const attempts = loginAttemptMap.get(ipOrEmail) || [];
+  const validAttempts = attempts.filter((t) => now - t < windowMs);
+
+  if (validAttempts.length >= maxAttempts) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  validAttempts.push(now);
+  loginAttemptMap.set(ipOrEmail, validAttempts);
+  return { allowed: true, remaining: maxAttempts - validAttempts.length };
 }
