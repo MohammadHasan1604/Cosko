@@ -10,6 +10,7 @@ import StoreSelectorModal from './StoreSelectorModal';
 import UserProfileModal from './UserProfileModal';
 import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
+import CoskoLogo from '@/components/ui/CoskoLogo';
 import { useApp } from '@/context/AppContext';
 
 interface AppLayoutProps {
@@ -78,7 +79,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <AppLogo size={48} />
+          <CoskoLogo size={36} showText />
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mt-2" />
           <p className="text-xs font-semibold text-muted-foreground">Verifying COSKO Authenticated Session...</p>
         </div>

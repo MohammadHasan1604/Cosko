@@ -3,6 +3,7 @@ import React from 'react';
 import { useApp } from '@/context/AppContext';
 import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
+import CoskoLogo from '@/components/ui/CoskoLogo';
 import Modal from '@/components/ui/Modal';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -63,12 +64,14 @@ export default function UserProfileModal() {
             {branding.logoUrl ? (
               <img src={branding.logoUrl} alt={branding.appName} className="w-9 h-9 object-contain rounded-lg border border-border" />
             ) : (
-              <AppLogo size={32} />
+              <CoskoLogo size={26} showText />
             )}
-            <div>
-              <h4 className="text-xs font-bold text-foreground">{branding.appName}</h4>
-              <p className="text-3xs text-muted-foreground">{branding.tagline}</p>
-            </div>
+            {branding.logoUrl && (
+              <div>
+                <h4 className="text-xs font-bold text-foreground">{branding.appName}</h4>
+                <p className="text-3xs text-muted-foreground">{branding.tagline}</p>
+              </div>
+            )}
           </div>
           <span className="badge-primary text-2xs font-bold font-mono">Location: {selectedStore}</span>
         </div>
