@@ -49,7 +49,8 @@
     "type-check": "tsc --noEmit",
     "seed": "npx tsx scripts/seed-supabase.ts",
     "clear:supabase": "npx tsx scripts/clear-supabase.ts",
-    "test:security": "npx tsx scripts/run-security-tests.ts"
+    "test:security": "npx tsx scripts/run-security-tests.ts",
+    "test:realtime": "npx tsx scripts/test-realtime-and-crud.ts"
   },
   "dependencies": {
     "@dhiwise/component-tagger": "^1.0.16",

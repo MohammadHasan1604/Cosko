@@ -117,7 +117,7 @@ export class SupabaseClientService {
       const client = getClient();
       const payload = {
         sku: item.sku,
-        barcode: item.barcode || null,
+        barcode: item.barcode || item.sku,
         name: item.name,
         category: item.category,
         cost_price: item.costPrice,
