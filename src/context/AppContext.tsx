@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
-import { SupabaseClientService, supabase } from '@/lib/supabase';
+import { SupabaseClientService, supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export function normalizeMobileNumber(phone: string): string {
   if (!phone) return '';
@@ -436,15 +436,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [usersList]);
 
-  // Enforce store scope lock continuously for non-Super Admin users
+  // Realtime Live Supabase Change Synchronization
   useEffect(() => {
-    if (authStatus === 'AUTHENTICATED' && currentUser.role !== 'Super Admin') {
-      const assignedStore = (currentUser.store && currentUser.store !== 'All Stores') ? currentUser.store : 'BLR';
-      if (selectedStore === 'All Stores' || selectedStore !== assignedStore) {
-        setSelectedStoreState(assignedStore);
-      }
+    if (!isSupabaseConfigured() || typeof window === 'undefined') return;
+
+    try {
+      const channel = supabase
+        .channel('cosko-realtime-global')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public' },
+          (payload: any) => {
+            console.log('⚡ [Supabase Realtime Change Received]:', payload.eventType, payload.table);
+            // Realtime toast indicator for live multi-user multi-store operations
+            if (payload.table === 'sales' && payload.eventType === 'INSERT') {
+              toast.info(`⚡ Live POS Sale Recorded on ${payload.new?.store_code || 'Store'}: ₹${payload.new?.grand_total || 0}`);
+            } else if (payload.table === 'inventory' && payload.eventType === 'UPDATE') {
+              toast.info(`⚡ Live Stock Updated on ${payload.new?.store || 'Store'}`);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (err) {
+      console.warn('Supabase Realtime Channel setup error:', err);
     }
-  }, [currentUser, authStatus, selectedStore]);
+  }, []);
 
   const setCurrentUser = (user: any) => {
     if (!user || !user.id) {
