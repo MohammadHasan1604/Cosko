@@ -44,21 +44,22 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   const roleAllowedHrefs: Record<string, string[]> = {
     'Super Admin': [
       '/dashboard', '/sales', '/inventory-management', '/categories', '/purchases', '/customers',
-      '/vendors', '/expenses', '/accounting', '/central-profit', '/reports', '/employees', '/stores',
-      '/users', '/audit-logs', '/settings'
+      '/customers/existing', '/repairs', '/vendors', '/expenses', '/accounting', '/central-profit',
+      '/reports', '/employees', '/stores', '/users', '/audit-logs', '/settings'
     ],
     'Store Manager': [
       '/dashboard', '/sales', '/inventory-management', '/categories', '/purchases', '/customers',
-      '/vendors', '/expenses', '/accounting', '/central-profit', '/reports', '/employees'
+      '/customers/existing', '/repairs', '/vendors', '/expenses', '/accounting', '/central-profit',
+      '/reports', '/employees'
     ],
     'Inventory Auditor': [
       '/dashboard', '/inventory-management', '/categories', '/purchases', '/vendors', '/reports'
     ],
     'POS Cashier': [
-      '/sales', '/customers'
+      '/sales', '/customers', '/repairs'
     ],
     'Sales Executive': [
-      '/sales', '/customers'
+      '/sales', '/customers', '/repairs'
     ],
   };
 
@@ -81,6 +82,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
         { id: 'nav-categories', label: 'Categories', icon: 'TagIcon', href: '/categories' },
         { id: 'nav-purchases', label: 'Purchases', icon: 'TruckIcon', href: '/purchases', badge: pendingPOCount, badgeVariant: 'info' },
         { id: 'nav-customers', label: 'Customers', icon: 'UsersIcon', href: '/customers' },
+        { id: 'nav-repairs', label: 'Repairs & Service', icon: 'WrenchScrewdriverIcon', href: '/repairs' },
         { id: 'nav-vendors', label: 'Vendors', icon: 'BuildingStorefrontIcon', href: '/vendors' },
       ],
     },

@@ -257,9 +257,32 @@ model Customer {
 
   repairs RepairEnquiry[]
   sales   SalesOrder[]
+  externalLinks CustomerExternalLink[]
 
   @@index([normalizedPhone])
   @@map("customers")
+}
+
+model CustomerExternalLink {
+  id                   String    @id @default(uuid())
+  coskoCustomerId      String?   @map("cosko_customer_id")
+  sourceSystem         String    @default("LEGACY_MYSQL_DB") @map("source_system") @db.VarChar(64)
+  externalCustomerId   String    @map("external_customer_id") @db.VarChar(64)
+  externalCustomerName String    @map("external_customer_name") @db.VarChar(128)
+  normalizedMobile     String    @map("normalized_mobile") @db.VarChar(32)
+  linkStatus           String    @default("AUTO_MATCHED") @map("link_status") @db.VarChar(32)
+  matchType            String    @default("EXACT_PHONE") @map("match_type") @db.VarChar(32)
+  verifiedBy           String?   @map("verified_by") @db.VarChar(128)
+  verifiedAt           DateTime? @map("verified_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  customer Customer? @relation(fields: [coskoCustomerId], references: [id], onDelete: SetNull)
+
+  @@index([normalizedMobile])
+  @@index([externalCustomerId])
+  @@index([linkStatus])
+  @@map("customer_external_links")
 }
 
 model RepairEnquiry {

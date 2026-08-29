@@ -76,24 +76,95 @@ export default function SalesPage() {
     });
   }, [inventory, effectiveStore, catalogSearch, selectedCategory]);
 
-  const handleCustomerPhoneChange = (phoneInput: string) => {
+  const [legacyLookupState, setLegacyLookupState] = useState<{
+    found: boolean;
+    source: 'COSKO_MASTER' | 'LEGACY_CUSTOMER_DB' | 'NONE';
+    customerName?: string;
+    externalId?: string;
+    errorNotice?: string;
+  }>({ found: false, source: 'NONE' });
+
+  const handleCustomerPhoneChange = async (phoneInput: string) => {
     setCustomerPhone(phoneInput);
     const normalizedInput = normalizeMobileNumber(phoneInput);
 
     if (!normalizedInput || normalizedInput.length < 5) {
       setLinkedRepairs([]);
+      setLegacyLookupState({ found: false, source: 'NONE' });
       return;
     }
-    
-    // Auto-search linked multi-device repair enquiry history by normalized phone number
-    const repairMatches = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizedInput);
-    setLinkedRepairs(repairMatches);
 
-    // Auto-search registered customer profile
-    const custMatch = customers.find((c) => normalizeMobileNumber(c.phone) === normalizedInput);
-    if (custMatch) {
-      setSelectedCustomerId(custMatch.id);
-      setCustomerName(custMatch.name);
+    try {
+      const res = await fetch(`/api/customers/legacy/search?phone=${encodeURIComponent(normalizedInput)}`);
+      const data = await res.json();
+      if (data.success && data.found) {
+        setLegacyLookupState({
+          found: true,
+          source: data.source,
+          customerName: data.customer?.name,
+          externalId: data.externalCustomerId || data.customer?.id,
+        });
+        if (data.customer?.name) {
+          setCustomerName(data.customer.name);
+          if (data.customer?.id) setSelectedCustomerId(data.customer.id);
+        }
+        if (data.repairs && data.repairs.length > 0) {
+          setLinkedRepairs(
+            data.repairs.map((r: any) => ({
+              id: r.id,
+              customerName: r.customerName,
+              customerPhone: r.customerPhone,
+              deviceType: r.deviceType,
+              deviceName: r.deviceName,
+              repairRequested: r.issueDescription,
+              repairStatus: r.status,
+              enquiryDate: r.enquiryDate,
+              estimatedCost: r.estimatedCost,
+              storeCode: r.storeCode,
+            }))
+          );
+        } else {
+          setLinkedRepairs([]);
+        }
+      } else if (data.error) {
+        setLegacyLookupState({
+          found: false,
+          source: 'NONE',
+          errorNotice: data.error,
+        });
+      } else {
+        // Fallback local search
+        const repairMatches = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizedInput);
+        setLinkedRepairs(repairMatches);
+        const custMatch = customers.find((c) => normalizeMobileNumber(c.phone) === normalizedInput);
+        if (custMatch) {
+          setSelectedCustomerId(custMatch.id);
+          setCustomerName(custMatch.name);
+          setLegacyLookupState({
+            found: true,
+            source: 'COSKO_MASTER',
+            customerName: custMatch.name,
+          });
+        } else {
+          setLegacyLookupState({ found: false, source: 'NONE' });
+        }
+      }
+    } catch {
+      // Graceful offline fallback
+      const repairMatches = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizedInput);
+      setLinkedRepairs(repairMatches);
+      const custMatch = customers.find((c) => normalizeMobileNumber(c.phone) === normalizedInput);
+      if (custMatch) {
+        setSelectedCustomerId(custMatch.id);
+        setCustomerName(custMatch.name);
+        setLegacyLookupState({ found: true, source: 'COSKO_MASTER', customerName: custMatch.name });
+      } else {
+        setLegacyLookupState({
+          found: false,
+          source: 'NONE',
+          errorNotice: 'Historical lookup service temporarily unreachable. You can continue with checkout.',
+        });
+      }
     }
   };
 
@@ -103,6 +174,7 @@ export default function SalesPage() {
       setCustomerName('Walk-in Customer');
       setCustomerPhone('+91 99000 00000');
       setLinkedRepairs([]);
+      setLegacyLookupState({ found: false, source: 'NONE' });
     } else {
       const found = customers.find((c) => c.id === id);
       if (found) {
@@ -495,6 +567,34 @@ export default function SalesPage() {
                     />
                   </div>
                 </div>
+
+                {/* Existing Customer Status Banner */}
+                {legacyLookupState.found && (
+                  <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-between text-xs fade-in">
+                    <div className="flex items-center gap-2">
+                      <Icon name="CheckBadgeIcon" size={16} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                      <div>
+                        <span className="font-bold text-foreground block">
+                          {legacyLookupState.source === 'LEGACY_CUSTOMER_DB' ? 'Existing Legacy Customer Found' : 'Existing COSKO Customer Found'}
+                        </span>
+                        <span className="text-3xs text-muted-foreground">
+                          {legacyLookupState.customerName} {legacyLookupState.externalId ? `(${legacyLookupState.externalId})` : ''}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                      Auto-Linked
+                    </span>
+                  </div>
+                )}
+
+                {/* Legacy Offline / Degraded Notice */}
+                {legacyLookupState.errorNotice && (
+                  <div className="p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 flex items-center gap-2 text-xs">
+                    <Icon name="ExclamationTriangleIcon" size={16} className="flex-shrink-0" />
+                    <span className="text-2xs">{legacyLookupState.errorNotice}</span>
+                  </div>
+                )}
 
                 {/* Filtered Multi-Device Repair Enquiry History */}
                 {linkedRepairs.length > 0 && (
