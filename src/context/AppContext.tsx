@@ -3,6 +3,18 @@ import React, { createContext, useContext, useState, useMemo, useEffect } from '
 import { toast } from 'sonner';
 import { SupabaseClientService, supabase } from '@/lib/supabase';
 
+export function normalizeMobileNumber(phone: string): string {
+  if (!phone) return '';
+  const digitsOnly = phone.replace(/\D/g, '');
+  if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+    return digitsOnly.substring(2);
+  }
+  if (digitsOnly.length === 10) {
+    return digitsOnly;
+  }
+  return digitsOnly;
+}
+
 export interface AppBranding {
   appName: string;
   logoUrl: string | null;
@@ -351,7 +363,7 @@ interface AppContextType {
   updateItem: (id: string, updated: Partial<InventoryItem>) => void;
   deleteItem: (id: string) => void;
   adjustStock: (id: string, qtyChange: number, reason: string) => void;
-  transferStock: (fromStore: string, toStore: string, itemId: string, qty: number) => void;
+  transferStock: (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number) => void;
   stockTransfers: StockTransferRecord[];
   inventoryLedger: InventoryLedgerEntry[];
   repairsEnquiries: RepairEnquiry[];
@@ -769,9 +781,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   /**
-   * CENTRAL -> STORE TRANSFER WITH CENTRAL TRANSFER PROFIT CALCULATION
+   * CENTRAL -> STORE TRANSFER WITH CENTRAL TRANSFER PROFIT / LOSS CALCULATION
    */
-  const transferStock = (fromStore: string, toStore: string, itemId: string, qty: number) => {
+  const transferStock = (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number) => {
     const sourceItem = inventory.find((i) => i.id === itemId || i.sku === itemId);
     if (!sourceItem) {
       toast.error('Source item not found for transfer!');
@@ -783,7 +795,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const transferPrice = sourceItem.transferPrice || Math.round(sourceItem.costPrice * 1.18);
+    const transferPrice = customTransferPrice !== undefined ? customTransferPrice : (sourceItem.transferPrice || Math.round(sourceItem.costPrice * 1.18));
     const purchaseCost = sourceItem.costPrice;
     const transferProfitPerUnit = transferPrice - purchaseCost;
     const totalTransferProfit = transferProfitPerUnit * qty;

@@ -43,12 +43,12 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   const roleAllowedHrefs: Record<string, string[]> = {
     'Super Admin': [
       '/dashboard', '/sales', '/inventory-management', '/purchases', '/customers',
-      '/vendors', '/expenses', '/accounting', '/reports', '/employees', '/stores',
+      '/vendors', '/expenses', '/accounting', '/central-profit', '/reports', '/employees', '/stores',
       '/users', '/audit-logs', '/settings'
     ],
     'Store Manager': [
       '/dashboard', '/sales', '/inventory-management', '/purchases', '/customers',
-      '/vendors', '/expenses', '/accounting', '/reports', '/employees'
+      '/vendors', '/expenses', '/accounting', '/central-profit', '/reports', '/employees'
     ],
     'Inventory Auditor': [
       '/dashboard', '/inventory-management', '/purchases', '/vendors', '/reports'
@@ -88,6 +88,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
       items: [
         { id: 'nav-expenses', label: 'Expenses', icon: 'BanknotesIcon', href: '/expenses' },
         { id: 'nav-accounting', label: 'Accounting', icon: 'CalculatorIcon', href: '/accounting' },
+        { id: 'nav-central-profit', label: 'Central Profit', icon: 'ArrowTrendingUpIcon', href: '/central-profit' },
         { id: 'nav-reports', label: 'Reports', icon: 'ChartBarIcon', href: '/reports' },
       ],
     },

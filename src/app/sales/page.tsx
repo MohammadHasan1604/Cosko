@@ -4,7 +4,7 @@ import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
 import AppLogo from '@/components/ui/AppLogo';
-import { useApp, Customer, InventoryItem, SalePhoto, RepairEnquiry } from '@/context/AppContext';
+import { useApp, Customer, InventoryItem, SalePhoto, RepairEnquiry, normalizeMobileNumber } from '@/context/AppContext';
 import { toast } from 'sonner';
 
 export default function SalesPage() {
@@ -70,13 +70,19 @@ export default function SalesPage() {
 
   const handleCustomerPhoneChange = (phoneInput: string) => {
     setCustomerPhone(phoneInput);
+    const normalizedInput = normalizeMobileNumber(phoneInput);
+
+    if (!normalizedInput || normalizedInput.length < 5) {
+      setLinkedRepair(null);
+      return;
+    }
     
-    // Auto-search linked repair enquiry history by phone number
-    const repairMatch = repairsEnquiries.find((r) => r.customerPhone.trim() === phoneInput.trim());
+    // Auto-search linked repair enquiry history by normalized phone number
+    const repairMatch = repairsEnquiries.find((r) => normalizeMobileNumber(r.customerPhone) === normalizedInput);
     setLinkedRepair(repairMatch || null);
 
     // Auto-search registered customer profile
-    const custMatch = customers.find((c) => c.phone.trim() === phoneInput.trim());
+    const custMatch = customers.find((c) => normalizeMobileNumber(c.phone) === normalizedInput);
     if (custMatch) {
       setSelectedCustomerId(custMatch.id);
       setCustomerName(custMatch.name);

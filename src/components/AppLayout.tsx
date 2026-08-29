@@ -31,6 +31,7 @@ const routePermissions: Record<string, string[]> = {
   '/vendors': auditorRoles,
   '/expenses': managerRoles,
   '/accounting': managerRoles,
+  '/central-profit': managerRoles,
   '/reports': auditorRoles,
   '/employees': managerRoles,
   '/stores': superAdminOnly,

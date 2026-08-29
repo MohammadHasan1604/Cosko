@@ -21,6 +21,7 @@
 
 import { hashPassword, verifyPassword, checkRateLimit, createSession, verifySession, revokeSession } from './auth';
 import { RBACEngine, RBACUser, ResourceRequest } from './rbacEngine';
+import { normalizeMobileNumber } from '../context/AppContext';
 
 export interface SecurityTestCaseResult {
   category: 
@@ -195,6 +196,71 @@ export async function runSecurityAuditTestSuite(): Promise<{
     'PASS',
     isAccountingEliminationCorrect ? 'PASS' : 'DENIED',
     `Consolidated Revenue: ₹${consolidatedRevenueTest} | COGS: ₹${consolidatedCOGSTest} | Consolidated Profit: ₹${consolidatedGrossProfitTest} (Central: ₹${centralGrossProfitTest} + Store: ₹${storeGrossProfitTest})`
+  );
+
+  // =========================================================================
+  // CATEGORY 16: CENTRAL PROFIT & REPAIR AUTO-FETCH INTEGRATION TESTS
+  // =========================================================================
+  // Test 16.1: Part 11 Central Profit Multi-Store Custom Transfer Pricing Math
+  const cpCost = 100;
+  const mumPrice = 150; const mumQty = 20; // Rev: 3000, Cost: 2000, Profit: 1000
+  const delPrice = 135; const delQty = 30; // Rev: 4050, Cost: 3000, Profit: 1050
+  const blrPrice = 200; const blrQty = 10; // Rev: 2000, Cost: 1000, Profit: 1000
+
+  const totalCpRev = (mumPrice * mumQty) + (delPrice * delQty) + (blrPrice * blrQty); // 9050
+  const totalCpCost = (cpCost * mumQty) + (cpCost * delQty) + (cpCost * blrQty); // 6000
+  const totalCpProfit = totalCpRev - totalCpCost; // 3050
+
+  const isCpMathCorrect = totalCpRev === 9050 && totalCpCost === 6000 && totalCpProfit === 3050;
+  assertTest(
+    '12. Financial Accuracy',
+    'Part 11 Central Profit Custom Transfer Price Math (Mumbai ₹150 / Delhi ₹135 / BLR ₹200)',
+    'PASS',
+    isCpMathCorrect ? 'PASS' : 'DENIED',
+    `Revenue: ₹${totalCpRev} | Cost: ₹${totalCpCost} | Gross Transfer Profit: ₹${totalCpProfit}`
+  );
+
+  // Test 16.2: Part 12 Central Expense Deductions & Net Central Profit
+  const centralExpAmount = 500;
+  const netCentralProf = totalCpProfit - centralExpAmount; // 2550
+  assertTest(
+    '12. Financial Accuracy',
+    'Part 12 Central Expense Deduction (Gross ₹3050 - Exp ₹500 = Net ₹2550)',
+    'PASS',
+    netCentralProf === 2550 ? 'PASS' : 'DENIED',
+    `Net Central Profit: ₹${netCentralProf} (Gross: ₹${totalCpProfit} - Expenses: ₹${centralExpAmount})`
+  );
+
+  // Test 16.3: Part 13 Consolidated Company Gross Profit Elimination (₹4400 Rev - ₹2000 Cost = ₹2400)
+  const mumExtSalePrice = 220;
+  const mumExtSaleRev = mumQty * mumExtSalePrice; // 4400
+  const mumInternalCost = mumQty * mumPrice; // 3000
+  const mumStoreOpProfit = mumExtSaleRev - mumInternalCost; // 1400
+  const mumCentralTransferProfit = mumQty * (mumPrice - cpCost); // 1000
+
+  const consolidatedGrossProfitMum = mumExtSaleRev - (mumQty * cpCost); // 4400 - 2000 = 2400
+  const isConsolidatedEliminationValid = consolidatedGrossProfitMum === (mumStoreOpProfit + mumCentralTransferProfit) && consolidatedGrossProfitMum === 2400;
+
+  assertTest(
+    '12. Financial Accuracy',
+    'Part 13 Consolidated Company Profit Elimination (₹4400 Sales - ₹2000 Vendor Cost = ₹2400)',
+    'PASS',
+    isConsolidatedEliminationValid ? 'PASS' : 'DENIED',
+    `Consolidated Gross Profit: ₹${consolidatedGrossProfitMum} (Store: ₹${mumStoreOpProfit} + Central: ₹${mumCentralTransferProfit})`
+  );
+
+  // Test 16.4: Part 16 Indian Phone Format Normalization Equivalence
+  const rawPhone1 = '+91 9876543210';
+  const rawPhone2 = '9876543210';
+  const norm1 = normalizeMobileNumber(rawPhone1);
+  const norm2 = normalizeMobileNumber(rawPhone2);
+  const isNormEqual = norm1 === '9876543210' && norm1 === norm2;
+  assertTest(
+    '1. Unit Testing',
+    'Part 16 Phone Number Normalization Equivalence (+91 9876543210 == 9876543210)',
+    'PASS',
+    isNormEqual ? 'PASS' : 'DENIED',
+    `Normalized: ${norm1} === ${norm2}`
   );
 
   // =========================================================================

@@ -1,9 +1,9 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
-import { useApp, Customer } from '@/context/AppContext';
+import { useApp, Customer, normalizeMobileNumber } from '@/context/AppContext';
 
 export default function CustomersPage() {
   const { customers, sales, repairsEnquiries, addCustomer, updateCustomer, deleteCustomer } = useApp();
@@ -13,6 +13,10 @@ export default function CustomersPage() {
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<Customer | null>(null);
   const [crmViewCustomer, setCrmViewCustomer] = useState<Customer | null>(null);
 
+  // CRM Segment Filter & Deep Search State
+  const [selectedSegment, setSelectedSegment] = useState<string>('All Customers');
+  const [deepSearchQuery, setDeepSearchQuery] = useState('');
+
   // Form State
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -20,6 +24,59 @@ export default function CustomersPage() {
   const [city, setCity] = useState('Bengaluru');
   const [tier, setTier] = useState<'VIP' | 'Regular' | 'New'>('Regular');
   const [creditBalance, setCreditBalance] = useState(0);
+
+  const crmSegments = [
+    'All Customers',
+    'New Customer',
+    'Returning Customer',
+    'Repair Customer',
+    'Repair + Purchase Customer',
+    'High Value Customer',
+    'Inactive Customer',
+  ];
+
+  // Helper to determine customer segment tag dynamically
+  const getCustomerSegmentTag = (cust: Customer) => {
+    const custNormPhone = normalizeMobileNumber(cust.phone);
+    const custSales = sales.filter((s) => normalizeMobileNumber(s.customerPhone) === custNormPhone || s.customerName === cust.name);
+    const custRepairs = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === custNormPhone || r.customerName === cust.name);
+
+    const hasSales = custSales.length > 0;
+    const hasRepairs = custRepairs.length > 0;
+    const isHighValue = cust.totalSpend >= 50000;
+
+    if (hasSales && hasRepairs) return 'Repair + Purchase Customer';
+    if (hasRepairs) return 'Repair Customer';
+    if (isHighValue) return 'High Value Customer';
+    if (custSales.length > 1) return 'Returning Customer';
+    if (cust.tier === 'New' || custSales.length === 0) return 'New Customer';
+    return 'Returning Customer';
+  };
+
+  // Filtered Customer List based on Segment & Deep Search
+  const filteredCustomers = useMemo(() => {
+    return customers.filter((cust) => {
+      const custNormPhone = normalizeMobileNumber(cust.phone);
+      const custSales = sales.filter((s) => normalizeMobileNumber(s.customerPhone) === custNormPhone || s.customerName === cust.name);
+      const custRepairs = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === custNormPhone || r.customerName === cust.name);
+      const tag = getCustomerSegmentTag(cust);
+
+      // Segment Matching
+      const matchSegment = selectedSegment === 'All Customers' || tag === selectedSegment;
+
+      // Deep Search Matching (Customer Name, Mobile, Invoice #, Repair Ref / Requested)
+      const q = deepSearchQuery.toLowerCase().trim();
+      const matchSearch =
+        q === '' ||
+        cust.name.toLowerCase().includes(q) ||
+        cust.phone.includes(q) ||
+        custNormPhone.includes(q) ||
+        custSales.some((s) => s.orderNo.toLowerCase().includes(q)) ||
+        custRepairs.some((r) => r.repairRequested.toLowerCase().includes(q) || r.id.toLowerCase().includes(q));
+
+      return matchSegment && matchSearch;
+    });
+  }, [customers, sales, repairsEnquiries, selectedSegment, deepSearchQuery]);
 
   const handleCreateCustomer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,11 +130,12 @@ export default function CustomersPage() {
   return (
     <AppLayout activeRoute="/customers">
       <div className="space-y-6 fade-in">
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">COSKO CRM & Customer Intelligence</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">COSKO Customer CRM & Intelligence</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Unified customer profile linking repair enquiries, store visits, purchase histories, and credit ledgers.
+              Unified customer CRM linking repair enquiries, store visits, purchase histories, and credit ledgers.
             </p>
           </div>
           <button onClick={() => { resetForm(); setRegisterModal(true); }} className="btn-primary gap-2 self-start sm:self-auto text-xs sm:text-sm">
@@ -86,12 +144,43 @@ export default function CustomersPage() {
           </button>
         </div>
 
+        {/* Deep Search & Segment Pills Bar */}
+        <div className="card p-4 space-y-3">
+          <div className="relative">
+            <Icon name="MagnifyingGlassIcon" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Deep Search by Customer Name, Phone, Invoice # (e.g. CS260011), or Repair Enquiry..."
+              value={deepSearchQuery}
+              onChange={(e) => setDeepSearchQuery(e.target.value)}
+              className="input-field pl-9 text-xs sm:text-sm"
+            />
+          </div>
+
+          {/* CRM Segment Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {crmSegments.map((seg) => (
+              <button
+                key={`seg-${seg}`}
+                onClick={() => setSelectedSegment(seg)}
+                className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                  selectedSegment === seg ? 'bg-primary text-primary-foreground font-bold' : 'bg-muted/60 text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {seg}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Customer Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {customers.map((c) => {
-            const customerSales = sales.filter((s) => s.customerPhone === c.phone || s.customerName === c.name);
-            const customerRepairs = repairsEnquiries.filter((r) => r.customerPhone === c.phone || r.customerName === c.name);
+          {filteredCustomers.map((c) => {
+            const custNormPhone = normalizeMobileNumber(c.phone);
+            const customerSales = sales.filter((s) => normalizeMobileNumber(s.customerPhone) === custNormPhone || s.customerName === c.name);
+            const customerRepairs = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === custNormPhone || r.customerName === c.name);
             const storesVisited = Array.from(new Set(customerSales.map((s) => s.store)));
+            const segmentTag = getCustomerSegmentTag(c);
 
             return (
               <div key={`cust-${c.id}`} className="card p-5 space-y-4 hover:shadow-md transition-all duration-150 relative group">
@@ -106,9 +195,10 @@ export default function CustomersPage() {
                     </div>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
-                    c.tier === 'VIP' ? 'bg-amber-500/15 text-amber-600 border border-amber-500/20' : 'bg-muted text-muted-foreground'
+                    segmentTag.includes('Repair') ? 'bg-info/15 text-info border border-info/20' :
+                    segmentTag.includes('High') ? 'bg-amber-500/15 text-amber-600 border border-amber-500/20' : 'bg-muted text-muted-foreground'
                   }`}>
-                    {c.tier}
+                    {segmentTag}
                   </span>
                 </div>
 
@@ -152,13 +242,13 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Unified Customer CRM Modal */}
+      {/* Unified Customer CRM Profile Modal */}
       {crmViewCustomer && (
         <Modal
           open={!!crmViewCustomer}
           onClose={() => setCrmViewCustomer(null)}
           title={`CRM Profile — ${crmViewCustomer.name}`}
-          subtitle={`Unified History · Phone: ${crmViewCustomer.phone} · Tier: ${crmViewCustomer.tier}`}
+          subtitle={`Unified History · Phone: ${crmViewCustomer.phone} · Segment: ${getCustomerSegmentTag(crmViewCustomer)}`}
           size="lg"
         >
           <div className="space-y-4 py-2 text-xs">
@@ -175,13 +265,13 @@ export default function CustomersPage() {
               <div className="p-3 rounded-xl bg-muted/40 border border-border">
                 <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Invoices</p>
                 <p className="text-base font-bold text-foreground font-tabular">
-                  {sales.filter((s) => s.customerPhone === crmViewCustomer.phone || s.customerName === crmViewCustomer.name).length} Orders
+                  {sales.filter((s) => normalizeMobileNumber(s.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || s.customerName === crmViewCustomer.name).length} Orders
                 </p>
               </div>
               <div className="p-3 rounded-xl bg-muted/40 border border-border">
                 <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Repair Enquiries</p>
                 <p className="text-base font-bold text-primary font-tabular">
-                  {repairsEnquiries.filter((r) => r.customerPhone === crmViewCustomer.phone || r.customerName === crmViewCustomer.name).length} Enquiries
+                  {repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || r.customerName === crmViewCustomer.name).length} Enquiries
                 </p>
               </div>
             </div>
@@ -189,11 +279,11 @@ export default function CustomersPage() {
             {/* Repair Enquiry Linkage Section */}
             <div className="space-y-2 pt-2 border-t border-border">
               <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Linked Repair & Service Records</h4>
-              {repairsEnquiries.filter((r) => r.customerPhone === crmViewCustomer.phone || r.customerName === crmViewCustomer.name).length === 0 ? (
+              {repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || r.customerName === crmViewCustomer.name).length === 0 ? (
                 <p className="text-2xs text-muted-foreground italic">No repair enquiry records found for this customer phone number.</p>
               ) : (
                 <div className="space-y-2">
-                  {repairsEnquiries.filter((r) => r.customerPhone === crmViewCustomer.phone || r.customerName === crmViewCustomer.name).map((r) => (
+                  {repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || r.customerName === crmViewCustomer.name).map((r) => (
                     <div key={`crm-rep-${r.id}`} className="p-3 rounded-xl border border-primary/20 bg-primary/5 space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-foreground">{r.repairRequested}</span>
@@ -220,7 +310,7 @@ export default function CustomersPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border font-tabular">
-                    {sales.filter((s) => s.customerPhone === crmViewCustomer.phone || s.customerName === crmViewCustomer.name).map((s) => (
+                    {sales.filter((s) => normalizeMobileNumber(s.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || s.customerName === crmViewCustomer.name).map((s) => (
                       <tr key={`crm-sale-${s.id}`}>
                         <td className="px-3 py-2 font-mono font-bold text-primary">{s.orderNo}</td>
                         <td className="px-3 py-2 text-muted-foreground">{s.createdAt}</td>
