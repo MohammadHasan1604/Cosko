@@ -581,12 +581,12 @@ export default function SalesPage() {
           /* Sales History Table */
           <div className="card overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="text-base font-bold text-foreground">Completed Sales Orders Ledger</h3>
+              <h3 className="text-sm sm:text-base font-bold text-foreground">Completed Sales Orders Ledger</h3>
               <span className="text-xs text-muted-foreground">{sales.length} total orders</span>
             </div>
 
             <div className="overflow-x-auto scrollbar-thin">
-              <table className="w-full text-left">
+              <table className="w-full text-left min-w-[700px]">
                 <thead>
                   <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
                     <th className="px-4 py-3">Order No</th>

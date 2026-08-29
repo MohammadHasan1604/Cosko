@@ -90,14 +90,53 @@ export default function PurchasesPage() {
           </button>
         </div>
 
-        {/* Directory Table */}
+        {/* Purchase Orders Directory */}
         <div className="card overflow-hidden">
           <div className="p-4 border-b border-border flex items-center justify-between">
-            <h3 className="text-base font-bold text-foreground">Purchase Orders Directory</h3>
+            <h3 className="text-sm sm:text-base font-bold text-foreground">Purchase Orders Directory</h3>
             <span className="text-xs text-muted-foreground">{filteredPurchases.length} total orders</span>
           </div>
 
-          <div className="overflow-x-auto scrollbar-thin">
+          {/* Mobile PO Cards (<md) */}
+          <div className="block md:hidden divide-y divide-border">
+            {filteredPurchases.map((po) => (
+              <div key={`m-po-${po.id}`} className="p-4 space-y-3 bg-card hover:bg-muted/10 transition-colors">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs font-bold text-primary">{po.poNo}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-3xs font-semibold px-2 py-0.5 rounded ${po.status === 'Received' ? 'bg-positive/10 text-positive' : 'bg-warning/10 text-warning'}`}>
+                      {po.status}
+                    </span>
+                    <span className={`text-3xs font-semibold px-2 py-0.5 rounded ${po.paymentStatus === 'Paid' ? 'bg-positive/10 text-positive' : 'bg-danger/10 text-danger'}`}>
+                      {po.paymentStatus}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">{po.vendorName}</h4>
+                    <p className="text-2xs text-muted-foreground mt-0.5">Expected: {po.expectedDate} · Store: <span className="badge-info text-3xs font-mono">{po.store}</span></p>
+                  </div>
+                  <span className="text-sm font-extrabold font-tabular text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</span>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
+                  <button onClick={() => openEdit(po)} className="btn-secondary text-3xs py-1 px-2.5 gap-1">
+                    <Icon name="PencilSquareIcon" size={13} />
+                    Edit PO
+                  </button>
+                  <button onClick={() => setDeletePoModal(po)} className="btn-ghost text-3xs py-1 px-2 text-danger hover:bg-danger/10">
+                    <Icon name="TrashIcon" size={13} />
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop PO Table (>=md) */}
+          <div className="hidden md:block overflow-x-auto scrollbar-thin">
             <table className="w-full text-left min-w-[700px]">
               <thead>
                 <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">

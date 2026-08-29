@@ -266,8 +266,69 @@ export default function InventoryTable() {
           </div>
         )}
 
-        {/* Table */}
-        <div className="overflow-x-auto scrollbar-thin">
+        {/* Mobile Product Cards (<md) */}
+        <div className="block md:hidden divide-y divide-border">
+          {paginated.length === 0 ? (
+            <div className="p-6 text-center text-muted-foreground">
+              <Icon name="CubeIcon" size={32} className="mx-auto mb-2 opacity-40" />
+              <p className="text-sm font-semibold">No inventory items found</p>
+            </div>
+          ) : (
+            paginated.map((item) => {
+              const stockStatus = getStockStatus(item);
+              const isSelected = selectedIds.has(item.id);
+
+              return (
+                <div key={`m-inv-${item.id}`} className={`p-4 space-y-3 bg-card hover:bg-muted/10 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden border border-border flex items-center justify-center flex-shrink-0">
+                        {item.primaryImage || (item.images && item.images[0]) ? (
+                          <img src={item.primaryImage || item.images![0]} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Icon name="CubeIcon" size={20} className="text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-3xs text-muted-foreground">{item.sku}</span>
+                          <span className="badge-info text-3xs font-mono">{item.store}</span>
+                        </div>
+                        <h4 className="text-xs font-bold text-foreground truncate">{item.name}</h4>
+                        <p className="text-2xs text-muted-foreground">{item.brand} · {item.category}</p>
+                      </div>
+                    </div>
+
+                    <StatusBadge variant={stockStatus.variant} label={stockStatus.label} />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 text-2xs pt-2 border-t border-border/50">
+                    <span className="text-muted-foreground">Stock: <strong className="text-foreground font-tabular">{item.qtyOnHand} units</strong></span>
+                    <span className="font-extrabold font-tabular text-foreground">₹{item.sellingPrice.toLocaleString('en-IN')}</span>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-1.5 pt-1">
+                    <button onClick={() => setViewItem(item)} className="btn-ghost text-3xs py-1 px-2 text-info">
+                      <Icon name="EyeIcon" size={13} /> View
+                    </button>
+                    <button onClick={() => setAdjustItem(item)} className="btn-ghost text-3xs py-1 px-2 text-warning">
+                      <Icon name="AdjustmentsHorizontalIcon" size={13} /> Adjust Stock
+                    </button>
+                    <button onClick={() => setEditItem(item)} className="btn-ghost text-3xs py-1 px-2 text-primary">
+                      <Icon name="PencilSquareIcon" size={13} /> Edit
+                    </button>
+                    <button onClick={() => setDeleteItemModal(item)} className="btn-ghost text-3xs py-1 px-2 text-danger">
+                      <Icon name="TrashIcon" size={13} /> Delete
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop Inventory Table (>=md) */}
+        <div className="hidden md:block overflow-x-auto scrollbar-thin">
           <table className="w-full min-w-[900px]">
             <thead>
               <tr className="bg-muted">

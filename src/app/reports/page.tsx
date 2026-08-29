@@ -19,17 +19,17 @@ export default function ReportsPage() {
     <AppLayout activeRoute="/reports">
       <div className="space-y-6 fade-in">
         {/* Page Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Executive Analytics & Reports</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Executive Analytics & Reports</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Sales performance, inventory valuation, ABC analysis, profit margins, and export center.
             </p>
           </div>
         </div>
 
         {/* Report Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           <div className="card p-5 space-y-3 flex flex-col justify-between">
             <div>
               <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-3">

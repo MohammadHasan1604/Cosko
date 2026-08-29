@@ -37,8 +37,32 @@ export default function AuditLogsPage() {
           </select>
         </div>
 
-        {/* Audit Logs Table */}
-        <div className="card overflow-hidden">
+        {/* Audit Logs Cards (<md) */}
+        <div className="block md:hidden card overflow-hidden divide-y divide-border">
+          {filteredLogs.map((log) => (
+            <div key={`m-audit-${log.id}`} className="p-4 space-y-2 bg-card hover:bg-muted/10 transition-colors">
+              <div className="flex items-center justify-between gap-2">
+                <span className="badge-info text-3xs font-semibold">{log.module}</span>
+                <span className="text-3xs text-muted-foreground font-mono">{log.timestamp}</span>
+              </div>
+
+              <div>
+                <p className="text-xs font-bold text-foreground">{log.action}</p>
+                <p className="text-2xs text-muted-foreground mt-0.5">{log.details}</p>
+              </div>
+
+              <div className="flex items-center justify-between text-3xs pt-1 border-t border-border/50 text-muted-foreground">
+                <span>
+                  <strong className="text-foreground">{log.userName}</strong> ({log.userRole})
+                </span>
+                <span className="font-mono">{log.ipAddress}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Audit Logs Desktop Table (>=md) */}
+        <div className="hidden md:block card overflow-hidden">
           <div className="overflow-x-auto scrollbar-thin">
             <table className="w-full text-left min-w-[750px]">
               <thead>

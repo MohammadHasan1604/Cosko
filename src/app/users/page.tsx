@@ -260,8 +260,111 @@ export default function UsersPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          {/* Mobile User Cards (<md) */}
+          <div className="block md:hidden divide-y divide-border">
+            {visibleUsers.map((u) => {
+              const level = u.securityLevel || (u.role === 'Super Admin' ? 100 : u.role === 'Store Manager' ? 80 : u.role === 'Inventory Auditor' ? 60 : 20);
+              const isProtectedSuperAdmin = u.role === 'Super Admin';
+              const fullUserRecord = usersList.find((usr) => usr.id === u.id);
+              const allowedStores = u.allowedStores || [u.storeScope];
+
+              return (
+                <div key={`m-usr-${u.id}`} className="p-4 space-y-3 bg-card hover:bg-muted/10 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {u.avatarUrl ? (
+                        <img src={u.avatarUrl} alt={u.name} className="w-10 h-10 rounded-full object-cover border border-border flex-shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0">
+                          {u.name.substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-bold text-sm text-foreground truncate">{u.name}</p>
+                          {isProtectedSuperAdmin && (
+                            <span className="text-3xs bg-danger/10 text-danger border border-danger/20 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5">
+                              <Icon name="LockClosedIcon" size={10} /> Level 100
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-2xs text-muted-foreground truncate">{u.email}</p>
+                      </div>
+                    </div>
+
+                    <select
+                      value={u.status}
+                      disabled={isProtectedSuperAdmin && currentUser.role !== 'Super Admin'}
+                      onChange={(e) => toggleUserStatus(u.id, e.target.value as any)}
+                      className={`text-3xs font-bold px-2 py-1 rounded-md border flex-shrink-0 ${
+                        u.status === 'Active'
+                          ? 'bg-positive/10 text-positive border-positive/30'
+                          : u.status === 'Suspended'
+                          ? 'bg-danger/10 text-danger border-danger/30'
+                          : 'bg-muted text-muted-foreground border-border'
+                      }`}
+                    >
+                      <option value="Active">ACTIVE</option>
+                      <option value="Inactive">INACTIVE</option>
+                      <option value="Suspended">SUSPENDED</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 flex-wrap text-2xs pt-1 border-t border-border/50">
+                    <span className={`badge ${level === 100 ? 'badge-danger' : level === 80 ? 'badge-warning' : 'badge-info'} text-3xs`}>
+                      Level {level} · {u.role}
+                    </span>
+
+                    <div className="flex items-center gap-1">
+                      <span className="text-3xs text-muted-foreground font-semibold">Stores:</span>
+                      {allowedStores.map((st) => (
+                        <span key={`st-m-${st}`} className="badge-secondary text-3xs font-mono font-bold px-1.5 py-0.5">
+                          {st}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-2">
+                    <button
+                      onClick={() => toggleUserShiftStatus(u.id)}
+                      className={`btn-ghost text-3xs py-1 px-2.5 rounded-lg border border-border ${
+                        u.shiftStatus === 'On Shift' ? 'text-positive bg-positive/5' : 'text-muted-foreground'
+                      }`}
+                    >
+                      Shift: {u.shiftStatus}
+                    </button>
+
+                    <div className="flex items-center gap-1.5">
+                      {fullUserRecord && (
+                        <button
+                          onClick={() => setPerformanceModalUser(fullUserRecord)}
+                          className="btn-secondary text-3xs py-1 px-2 gap-1"
+                        >
+                          <Icon name="ChartBarIcon" size={13} />
+                          Metrics
+                        </button>
+                      )}
+
+                      {fullUserRecord && (
+                        <button
+                          onClick={() => setPermissionsModalUser(fullUserRecord)}
+                          className="btn-primary text-3xs py-1 px-2 gap-1"
+                        >
+                          <Icon name="KeyIcon" size={13} />
+                          Access Matrix
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop User Table (>=md) */}
+          <div className="hidden md:block overflow-x-auto scrollbar-thin">
+            <table className="w-full text-left border-collapse min-w-[700px]">
               <thead>
                 <tr className="bg-muted/50 text-2xs uppercase tracking-wider text-muted-foreground font-semibold border-b border-border">
                   <th className="py-3 px-4">User Identity</th>
@@ -323,7 +426,7 @@ export default function UsersPage() {
                           onChange={(e) => toggleUserStatus(u.id, e.target.value as any)}
                           className={`text-2xs font-bold px-2 py-1 rounded-md border ${
                             u.status === 'Active'
-                              ? 'bg-success/10 text-success border-success/30'
+                              ? 'bg-positive/10 text-positive border-positive/30'
                               : u.status === 'Suspended'
                               ? 'bg-danger/10 text-danger border-danger/30'
                               : 'bg-muted text-muted-foreground border-border'
@@ -338,7 +441,7 @@ export default function UsersPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => toggleUserShiftStatus(u.id)}
-                            className={`btn-ghost text-3xs py-1 px-2 ${u.shiftStatus === 'On Shift' ? 'text-success' : 'text-muted-foreground'}`}
+                            className={`btn-ghost text-3xs py-1 px-2 ${u.shiftStatus === 'On Shift' ? 'text-positive' : 'text-muted-foreground'}`}
                           >
                             {u.shiftStatus}
                           </button>
