@@ -193,20 +193,31 @@ export default function UserProfileModal() {
               </div>
             </div>
 
-            {/* High-Visibility Duty Shift Status Toggle */}
-            <div className="p-3.5 rounded-xl border border-border bg-card flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-foreground">Duty Shift Status</p>
-                <p className="text-3xs text-muted-foreground">Toggle whether you are actively on shift or on leave</p>
+            {/* High-Visibility Duty Shift Status Toggle Card */}
+            <div className="p-4 rounded-2xl border border-border bg-card flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm font-bold text-foreground">Duty Shift Status</p>
+                <p className="text-3xs text-muted-foreground mt-0.5">Toggle whether you are actively on shift or on leave</p>
               </div>
 
-              <ToggleSwitch
-                checked={currentUser.shiftStatus === 'On Shift'}
-                onChange={toggleCurrentUserShift}
-                size="md"
-                onText="ON SHIFT"
-                offText="OFF SHIFT"
-              />
+              <div className="flex items-center gap-2.5 flex-shrink-0">
+                <span className={`px-2.5 py-1 rounded-full text-3xs font-extrabold transition-colors flex items-center gap-1.5 ${
+                  currentUser.shiftStatus === 'On Shift'
+                    ? 'bg-success/15 text-success border border-success/30'
+                    : 'bg-warning/15 text-warning border border-warning/30'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${currentUser.shiftStatus === 'On Shift' ? 'bg-success animate-pulse' : 'bg-warning'}`} />
+                  {currentUser.shiftStatus}
+                </span>
+
+                <ToggleSwitch
+                  checked={currentUser.shiftStatus === 'On Shift'}
+                  onChange={toggleCurrentUserShift}
+                  size="sm"
+                  onText="ON"
+                  offText="OFF"
+                />
+              </div>
             </div>
 
             {/* Editable Profile Information */}

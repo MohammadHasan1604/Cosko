@@ -289,8 +289,8 @@ export default function CategoriesPage() {
                             checked={cat.status === 'Active'}
                             onChange={() => toggleCategoryStatus(cat.id)}
                             size="sm"
-                            onText="ACTIVE"
-                            offText="INACTIVE"
+                            onText="ON"
+                            offText="OFF"
                           />
                         </td>
 

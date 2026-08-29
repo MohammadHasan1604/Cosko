@@ -38,35 +38,35 @@ export default function ToggleSwitch({
     }
   };
 
-  // Dimensions based on size for optimal proportion, touch target, and text readability
+  // Dimensions based on size for optimal proportion, touch target, and zero text clipping
   const sizeConfig = {
     sm: {
-      container: 'w-16 h-7',
+      container: 'w-14 h-7',
       thumb: 'w-5 h-5',
-      thumbTranslate: 'translate-x-9',
-      thumbRest: 'translate-x-0.5',
+      thumbTranslate: 'translate-x-7',
+      thumbRest: 'translate-x-1',
       textChecked: 'left-2 text-[10px]',
       textUnchecked: 'right-2 text-[10px]',
     },
     md: {
-      container: 'w-20 h-8',
+      container: 'w-16 h-8',
       thumb: 'w-6 h-6',
-      thumbTranslate: 'translate-x-12',
+      thumbTranslate: 'translate-x-8',
+      thumbRest: 'translate-x-1',
+      textChecked: 'left-2 text-2xs',
+      textUnchecked: 'right-2 text-2xs',
+    },
+    lg: {
+      container: 'w-20 h-10',
+      thumb: 'w-8 h-8',
+      thumbTranslate: 'translate-x-10',
       thumbRest: 'translate-x-1',
       textChecked: 'left-2.5 text-xs',
       textUnchecked: 'right-2.5 text-xs',
     },
-    lg: {
-      container: 'w-24 h-10',
-      thumb: 'w-8 h-8',
-      thumbTranslate: 'translate-x-14',
-      thumbRest: 'translate-x-1',
-      textChecked: 'left-3 text-xs',
-      textUnchecked: 'right-3 text-xs',
-    },
   }[size];
 
-  // Active color styling
+  // Active color styling using official COSKO palette
   const activeBg =
     variant === 'brand'
       ? 'bg-[#002E86] dark:bg-[#009ADF] border-[#002E86] dark:border-[#009ADF] text-white shadow-sm'
@@ -94,18 +94,18 @@ export default function ToggleSwitch({
         } ${
           checked
             ? activeBg
-            : 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200'
+            : 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 shadow-inner'
         }`}
       >
         {/* Label Text Inside Switch Track */}
         <span
-          className={`absolute select-none font-extrabold tracking-wider uppercase transition-opacity duration-200 ${
+          className={`absolute select-none font-black tracking-wider uppercase transition-opacity duration-200 ${
             checked
               ? `${sizeConfig.textChecked} text-white`
-              : `${sizeConfig.textUnchecked} text-slate-700 dark:text-slate-300`
+              : `${sizeConfig.textUnchecked} text-slate-700 dark:text-slate-200`
           }`}
         >
-          {checked ? onText : offText}
+          {checked ? (onText.length > 3 ? 'ON' : onText) : (offText.length > 3 ? 'OFF' : offText)}
         </span>
 
         {/* Crisp Sliding Thumb */}

@@ -327,13 +327,20 @@ export default function UsersPage() {
                   </div>
 
                   <div className="flex items-center justify-between gap-2 pt-2">
-                    <ToggleSwitch
-                      checked={u.shiftStatus === 'On Shift'}
-                      onChange={() => toggleUserShiftStatus(u.id)}
-                      size="sm"
-                      onText="ON SHIFT"
-                      offText="OFF SHIFT"
-                    />
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-3xs font-extrabold px-2 py-0.5 rounded-full ${
+                        u.shiftStatus === 'On Shift' ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {u.shiftStatus}
+                      </span>
+                      <ToggleSwitch
+                        checked={u.shiftStatus === 'On Shift'}
+                        onChange={() => toggleUserShiftStatus(u.id)}
+                        size="sm"
+                        onText="ON"
+                        offText="OFF"
+                      />
+                    </div>
 
                     <div className="flex items-center gap-1.5">
                       {fullUserRecord && (
@@ -439,12 +446,17 @@ export default function UsersPage() {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <span className={`text-3xs font-extrabold px-2 py-0.5 rounded-full ${
+                            u.shiftStatus === 'On Shift' ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {u.shiftStatus}
+                          </span>
                           <ToggleSwitch
                             checked={u.shiftStatus === 'On Shift'}
                             onChange={() => toggleUserShiftStatus(u.id)}
                             size="sm"
-                            onText="ON SHIFT"
-                            offText="OFF SHIFT"
+                            onText="ON"
+                            offText="OFF"
                           />
 
                           {/* Performance Analytics Button */}
