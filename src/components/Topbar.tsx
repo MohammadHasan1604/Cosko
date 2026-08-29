@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import Icon from '@/components/ui/AppIcon';
+import CoskoLogo from '@/components/ui/CoskoLogo';
 import { useApp } from '@/context/AppContext';
 
 interface TopbarProps {
@@ -36,17 +37,17 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
 
         {/* Store Scope Badge on Mobile */}
         <div className="flex lg:hidden items-center gap-1.5 min-w-0">
-          <span className="text-xs font-bold text-foreground truncate">{branding.appName}</span>
+          <CoskoLogo size={20} showText />
           <span className="text-2xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold truncate max-w-[90px]">
             {selectedStore}
           </span>
         </div>
 
         {/* Breadcrumb / Page context (desktop) */}
-        <div className="hidden lg:flex items-center gap-1.5 text-sm text-muted-foreground">
-          <span className="text-foreground font-bold">{branding.appName}</span>
+        <div className="hidden lg:flex items-center gap-2 text-sm text-muted-foreground">
+          <CoskoLogo size={22} showText />
           <Icon name="ChevronRightIcon" size={14} />
-          <span>Multi-Store Scope</span>
+          <span className="text-xs font-medium">Multi-Store Scope</span>
           <span className="text-2xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
             {selectedStore}
           </span>

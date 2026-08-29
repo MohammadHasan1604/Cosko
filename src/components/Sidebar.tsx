@@ -2,6 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import AppLogo from '@/components/ui/AppLogo';
+import CoskoLogo from '@/components/ui/CoskoLogo';
 import Icon from '@/components/ui/AppIcon';
 import { useApp } from '@/context/AppContext';
 
@@ -159,14 +160,9 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   const renderSidebarContent = (isCollapsed: boolean) => (
     <>
       {/* Logo */}
-      <div className={`flex items-center justify-between gap-2.5 px-3 py-4 border-b border-border flex-shrink-0 ${isCollapsed ? 'justify-center' : ''}`}>
+      <div className={`flex items-center justify-between gap-2.5 px-3.5 py-4 border-b border-border flex-shrink-0 ${isCollapsed ? 'justify-center' : ''}`}>
         <Link href="/dashboard" onClick={onMobileClose} className="flex items-center gap-2.5 min-w-0">
-          <AppLogo size={32} />
-          {!isCollapsed && (
-            <span className="font-bold text-base text-foreground tracking-tight truncate max-w-[140px]">
-              {branding.appName}
-            </span>
-          )}
+          <CoskoLogo size={28} showText={!isCollapsed} />
         </Link>
         {!isCollapsed && (
           <button

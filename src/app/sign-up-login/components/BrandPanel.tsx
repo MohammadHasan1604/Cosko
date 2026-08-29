@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import AppLogo from '@/components/ui/AppLogo';
+import CoskoLogo from '@/components/ui/CoskoLogo';
 import { useApp } from '@/context/AppContext';
 
 export default function BrandPanel() {
@@ -30,8 +31,7 @@ export default function BrandPanel() {
       </div>
       {/* Logo */}
       <div className="relative z-10 flex items-center gap-3">
-        <AppLogo size={36} />
-        <span className="text-white font-bold text-xl tracking-tight">{branding.appName}</span>
+        <CoskoLogo size={36} variant="blue-bg" showText />
       </div>
       {/* Hero content */}
       <div className="relative z-10 flex-1 flex flex-col justify-center mt-12">

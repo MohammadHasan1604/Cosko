@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
+import CoskoLogo from '@/components/ui/CoskoLogo';
 import { useApp } from '@/context/AppContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
@@ -116,8 +117,7 @@ export default function LoginForm() {
     <div className="fade-in">
       {/* Mobile logo */}
       <div className="flex items-center gap-2.5 mb-8 lg:hidden">
-        <AppLogo size={32} />
-        <span className="font-bold text-lg text-foreground">{branding.appName}</span>
+        <CoskoLogo size={32} variant="default" showText />
       </div>
 
       {/* Header */}

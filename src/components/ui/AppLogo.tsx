@@ -5,24 +5,28 @@ import AppIcon from './AppIcon';
 import AppImage from './AppImage';
 import { useApp } from '@/context/AppContext';
 
+import CoskoLogo from './CoskoLogo';
+
 interface AppLogoProps {
-  src?: string; // Optional override image source
-  iconName?: string; // Icon name when no image
-  size?: number; // Size for icon/image
-  className?: string; // Additional classes
-  onClick?: () => void; // Click handler
+  src?: string;
+  iconName?: string;
+  size?: number;
+  variant?: 'default' | 'dark-bg' | 'blue-bg' | 'mono-white';
+  showText?: boolean;
+  className?: string;
+  onClick?: () => void;
 }
 
 const AppLogo = memo(function AppLogo({
   src,
-  iconName = 'SparklesIcon',
   size = 32,
+  variant = 'default',
+  showText = false,
   className = '',
   onClick,
 }: AppLogoProps) {
   const { branding } = useApp();
 
-  // Determine active logo source: explicit prop > branding.logoUrl > null
   const activeSrc = src || branding.logoUrl;
 
   const containerClassName = useMemo(() => {
@@ -33,21 +37,16 @@ const AppLogo = memo(function AppLogo({
   }, [onClick, className]);
 
   return (
-    <div className={containerClassName} onClick={onClick} style={{ width: size, height: size }}>
+    <div className={containerClassName} onClick={onClick}>
       {activeSrc ? (
         <img
           src={activeSrc}
           alt={branding.appName || 'App Logo'}
-          style={{ width: size, height: size, objectFit: 'contain' }}
+          style={{ height: size, objectFit: 'contain' }}
           className="rounded-lg flex-shrink-0"
         />
       ) : (
-        <div
-          className="gradient-primary text-white flex items-center justify-center rounded-xl font-extrabold shadow-sm flex-shrink-0"
-          style={{ width: size, height: size, fontSize: Math.max(12, size * 0.45) }}
-        >
-          {branding.appName ? branding.appName.substring(0, 2).toUpperCase() : 'CO'}
-        </div>
+        <CoskoLogo size={size} variant={variant} showText={showText} />
       )}
     </div>
   );

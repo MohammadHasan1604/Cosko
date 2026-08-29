@@ -4,6 +4,7 @@ import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
 import AppLogo from '@/components/ui/AppLogo';
+import CoskoLogo from '@/components/ui/CoskoLogo';
 import { useApp, Customer, InventoryItem, SalePhoto, RepairEnquiry, normalizeMobileNumber } from '@/context/AppContext';
 import { toast } from 'sonner';
 
@@ -786,8 +787,7 @@ export default function SalesPage() {
             <div className="relative z-10 space-y-4">
               <div className="p-4 rounded-xl bg-muted/40 border border-border text-center">
                 <div className="flex items-center justify-center gap-2 mb-1">
-                  <AppLogo size={24} />
-                  <h3 className="text-lg font-extrabold text-foreground">{branding.appName} Retail</h3>
+                  <CoskoLogo size={28} showText variant="default" />
                 </div>
                 <p className="text-2xs text-muted-foreground">Invoice #: <strong className="font-mono text-foreground">{receiptModal.orderNo}</strong> · Store: {receiptModal.store}</p>
               </div>

@@ -268,19 +268,19 @@ export default function CentralProfitPage() {
           </div>
 
           <div className="card p-3 space-y-1 border-l-4 border-l-positive">
-            <span className="text-3xs font-bold uppercase tracking-wider text-positive font-bold">Gross Profit</span>
+            <span className="text-3xs font-bold uppercase tracking-wider text-positive">Gross Profit</span>
             <span className="text-base font-extrabold text-positive block font-tabular">₹{totalGrossTransferProfit.toLocaleString('en-IN')}</span>
             <span className="text-3xs text-positive font-medium">Revenue − Cost</span>
           </div>
 
           <div className="card p-3 space-y-1 border-l-4 border-l-warning">
-            <span className="text-3xs font-bold uppercase tracking-wider text-warning font-bold">Central Expenses</span>
+            <span className="text-3xs font-bold uppercase tracking-wider text-warning">Central Expenses</span>
             <span className="text-base font-extrabold text-warning block font-tabular">₹{centralExpenses.toLocaleString('en-IN')}</span>
             <span className="text-3xs text-muted-foreground">Logistics & Ops</span>
           </div>
 
           <div className="card p-3 space-y-1 border-l-4 border-l-info">
-            <span className="text-3xs font-bold uppercase tracking-wider text-info font-bold">Net Central Profit</span>
+            <span className="text-3xs font-bold uppercase tracking-wider text-info">Net Central Profit</span>
             <span className="text-base font-extrabold text-info block font-tabular">₹{netCentralProfit.toLocaleString('en-IN')}</span>
             <span className="text-3xs text-muted-foreground">Gross Profit − Exp</span>
           </div>
