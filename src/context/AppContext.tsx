@@ -51,6 +51,13 @@ export interface InventoryItem {
   imageUrl?: string;
 }
 
+export interface ProductStoreTransferPrice {
+  id: string;
+  productId: string;
+  storeCode: string;
+  defaultTransferPrice: number;
+}
+
 export interface StockTransferRecord {
   id: string;
   transferNo: string;
@@ -63,7 +70,7 @@ export interface StockTransferRecord {
   purchaseCost: number;
   transferPrice: number;
   transferProfit: number;
-  status: 'Completed' | 'In Transit' | 'Cancelled';
+  status: 'Completed' | 'Draft' | 'In Transit' | 'Cancelled';
   createdBy: string;
   createdAt: string;
 }
@@ -363,7 +370,10 @@ interface AppContextType {
   updateItem: (id: string, updated: Partial<InventoryItem>) => void;
   deleteItem: (id: string) => void;
   adjustStock: (id: string, qtyChange: number, reason: string) => void;
-  transferStock: (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number) => void;
+  transferStock: (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number, status?: 'Completed' | 'Draft') => void;
+  updateTransferStatus: (id: string, nextStatus: 'Completed' | 'Cancelled') => void;
+  defaultStoreTransferPrices: ProductStoreTransferPrice[];
+  setDefaultStoreTransferPrice: (productId: string, storeCode: string, price: number) => void;
   stockTransfers: StockTransferRecord[];
   inventoryLedger: InventoryLedgerEntry[];
   repairsEnquiries: RepairEnquiry[];
@@ -780,10 +790,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toast.success(`Stock adjusted successfully`);
   };
 
+  const [defaultStoreTransferPrices, setDefaultStoreTransferPrices] = useState<ProductStoreTransferPrice[]>([
+    { id: 'stp-1', productId: 'item-001', storeCode: 'MUM', defaultTransferPrice: 420 },
+    { id: 'stp-2', productId: 'item-001', storeCode: 'DEL', defaultTransferPrice: 390 },
+    { id: 'stp-3', productId: 'item-001', storeCode: 'BLR', defaultTransferPrice: 400 },
+  ]);
+
+  const setDefaultStoreTransferPrice = (productId: string, storeCode: string, price: number) => {
+    setDefaultStoreTransferPrices((prev) => {
+      const idx = prev.findIndex((p) => p.productId === productId && p.storeCode === storeCode);
+      if (idx > -1) {
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], defaultTransferPrice: price };
+        return updated;
+      }
+      return [...prev, { id: `stp-${Date.now()}`, productId, storeCode, defaultTransferPrice: price }];
+    });
+    addAuditLog('Inventory', 'Set Default Store Transfer Price', `Updated transfer price for product #${productId} at store ${storeCode} to ₹${price}`);
+    toast.success(`Default transfer price set to ₹${price} for ${storeCode}`);
+  };
+
   /**
    * CENTRAL -> STORE TRANSFER WITH CENTRAL TRANSFER PROFIT / LOSS CALCULATION
    */
-  const transferStock = (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number) => {
+  const transferStock = (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number, status: 'Completed' | 'Draft' = 'Completed') => {
     const sourceItem = inventory.find((i) => i.id === itemId || i.sku === itemId);
     if (!sourceItem) {
       toast.error('Source item not found for transfer!');
@@ -800,42 +830,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const transferProfitPerUnit = transferPrice - purchaseCost;
     const totalTransferProfit = transferProfitPerUnit * qty;
 
-    // 1. Update source inventory (e.g. CENTRAL)
-    setInventory((prev) =>
-      prev.map((item) => {
-        if (item.id === sourceItem.id) {
-          const newItem = { ...item, qtyOnHand: item.qtyOnHand - qty, lastMovement: 'Transfer Out' };
-          SupabaseClientService.syncProduct(newItem);
-          return newItem;
-        }
-        return item;
-      })
-    );
+    if (status === 'Completed') {
+      // 1. Update source inventory (e.g. CENTRAL)
+      setInventory((prev) =>
+        prev.map((item) => {
+          if (item.id === sourceItem.id) {
+            const newItem = { ...item, qtyOnHand: item.qtyOnHand - qty, lastMovement: 'Transfer Out' };
+            SupabaseClientService.syncProduct(newItem);
+            return newItem;
+          }
+          return item;
+        })
+      );
 
-    // 2. Update destination inventory (e.g. BLR)
-    let destItemExists = false;
-    setInventory((prev) =>
-      prev.map((item) => {
-        if (item.sku === sourceItem.sku && item.store === toStore) {
-          destItemExists = true;
-          const newItem = { ...item, qtyOnHand: item.qtyOnHand + qty, lastMovement: 'Transfer In' };
-          SupabaseClientService.syncProduct(newItem);
-          return newItem;
-        }
-        return item;
-      })
-    );
+      // 2. Update destination inventory (e.g. BLR)
+      let destItemExists = false;
+      setInventory((prev) =>
+        prev.map((item) => {
+          if (item.sku === sourceItem.sku && item.store === toStore) {
+            destItemExists = true;
+            const newItem = { ...item, qtyOnHand: item.qtyOnHand + qty, lastMovement: 'Transfer In' };
+            SupabaseClientService.syncProduct(newItem);
+            return newItem;
+          }
+          return item;
+        })
+      );
 
-    if (!destItemExists) {
-      const newDestItem: InventoryItem = {
-        ...sourceItem,
-        id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        store: toStore,
-        qtyOnHand: qty,
-        lastMovement: 'Transfer In',
-      };
-      setInventory((prev) => [...prev, newDestItem]);
-      SupabaseClientService.syncProduct(newDestItem);
+      if (!destItemExists) {
+        const newDestItem: InventoryItem = {
+          ...sourceItem,
+          id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          store: toStore,
+          qtyOnHand: qty,
+          lastMovement: 'Transfer In',
+        };
+        setInventory((prev) => [...prev, newDestItem]);
+        SupabaseClientService.syncProduct(newDestItem);
+      }
     }
 
     // 3. Record in stockTransfers table
@@ -851,50 +883,91 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       purchaseCost,
       transferPrice,
       transferProfit: totalTransferProfit,
-      status: 'Completed',
+      status,
       createdBy: currentUser.name || 'Super Admin',
       createdAt: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
     };
     setStockTransfers((prev) => [transferRecord, ...prev]);
 
-    // 4. Log two ledger entries: TRANSFER_OUT from source, TRANSFER_IN to destination
-    const outLedger: InventoryLedgerEntry = {
-      id: `led-${Date.now()}-out`,
-      productId: sourceItem.id,
-      sku: sourceItem.sku,
-      productName: sourceItem.name,
-      storeCode: fromStore,
-      movementType: 'TRANSFER_OUT',
-      quantity: -qty,
-      unitCost: purchaseCost,
-      totalValue: qty * purchaseCost,
-      fromLocation: fromStore,
-      toLocation: toStore,
-      referenceNo: transferRecord.transferNo,
-      createdBy: currentUser.name || 'Super Admin',
-      createdAt: new Date().toISOString(),
-    };
+    if (status === 'Completed') {
+      // 4. Log two ledger entries: TRANSFER_OUT from source, TRANSFER_IN to destination
+      const outLedger: InventoryLedgerEntry = {
+        id: `led-${Date.now()}-out`,
+        productId: sourceItem.id,
+        sku: sourceItem.sku,
+        productName: sourceItem.name,
+        storeCode: fromStore,
+        movementType: 'TRANSFER_OUT',
+        quantity: -qty,
+        unitCost: purchaseCost,
+        totalValue: qty * purchaseCost,
+        fromLocation: fromStore,
+        toLocation: toStore,
+        referenceNo: transferRecord.transferNo,
+        createdBy: currentUser.name || 'Admin',
+        createdAt: new Date().toISOString(),
+      };
 
-    const inLedger: InventoryLedgerEntry = {
-      id: `led-${Date.now()}-in`,
-      productId: sourceItem.id,
-      sku: sourceItem.sku,
-      productName: sourceItem.name,
-      storeCode: toStore,
-      movementType: 'TRANSFER_IN',
-      quantity: qty,
-      unitCost: transferPrice,
-      totalValue: qty * transferPrice,
-      fromLocation: fromStore,
-      toLocation: toStore,
-      referenceNo: transferRecord.transferNo,
-      createdBy: currentUser.name || 'Super Admin',
-      createdAt: new Date().toISOString(),
-    };
-    setInventoryLedger((prev) => [inLedger, outLedger, ...prev]);
+      const inLedger: InventoryLedgerEntry = {
+        id: `led-${Date.now()}-in`,
+        productId: sourceItem.id,
+        sku: sourceItem.sku,
+        productName: sourceItem.name,
+        storeCode: toStore,
+        movementType: 'TRANSFER_IN',
+        quantity: qty,
+        unitCost: transferPrice,
+        totalValue: qty * transferPrice,
+        fromLocation: fromStore,
+        toLocation: toStore,
+        referenceNo: transferRecord.transferNo,
+        createdBy: currentUser.name || 'Admin',
+        createdAt: new Date().toISOString(),
+      };
 
-    addAuditLog('Stores', 'Stock Transfer', `Transferred ${qty} units of "${sourceItem.name}" from ${fromStore} to ${toStore}. Central Transfer Profit: ₹${totalTransferProfit.toLocaleString('en-IN')}`);
-    toast.success(`Transferred ${qty} units from ${fromStore} to ${toStore} (Transfer Profit: ₹${totalTransferProfit.toLocaleString('en-IN')})`);
+      setInventoryLedger((prev) => [outLedger, inLedger, ...prev]);
+    }
+
+    addAuditLog('Inventory', 'Stock Transfer', `Transferred ${qty}x ${sourceItem.name} (${fromStore} → ${toStore}) @ ₹${transferPrice}/unit. Central Profit: ₹${totalTransferProfit}. Status: ${status}`);
+    toast.success(`Transfer ${status === 'Completed' ? 'completed' : 'saved as draft'}! Central Profit: ₹${totalTransferProfit.toLocaleString('en-IN')}`);
+  };
+
+  const updateTransferStatus = (id: string, nextStatus: 'Completed' | 'Cancelled') => {
+    const target = stockTransfers.find((t) => t.id === id);
+    if (!target) return;
+
+    if (target.status === 'Completed' && nextStatus === 'Cancelled') {
+      toast.warning('Completed transfers cannot be directly cancelled. Corrective transfer required.');
+      return;
+    }
+
+    if (target.status === 'Draft' && nextStatus === 'Completed') {
+      const sourceItem = inventory.find((i) => i.id === target.productId || i.sku === target.sku);
+      if (!sourceItem || sourceItem.qtyOnHand < target.qty) {
+        toast.error(`Insufficient stock to complete transfer (${sourceItem?.qtyOnHand || 0} units available)`);
+        return;
+      }
+
+      // Execute atomic stock movement
+      setInventory((prev) =>
+        prev.map((item) => {
+          if (item.id === sourceItem.id) {
+            return { ...item, qtyOnHand: item.qtyOnHand - target.qty, lastMovement: 'Transfer Out' };
+          }
+          if (item.sku === sourceItem.sku && item.store === target.destStore) {
+            return { ...item, qtyOnHand: item.qtyOnHand + target.qty, lastMovement: 'Transfer In' };
+          }
+          return item;
+        })
+      );
+
+      setStockTransfers((prev) => prev.map((t) => (t.id === id ? { ...t, status: 'Completed' } : t)));
+      addAuditLog('Inventory', 'Complete Draft Transfer', `Completed draft transfer ${target.transferNo}`);
+      toast.success(`Draft transfer ${target.transferNo} completed!`);
+      return;
+    }
+
+    setStockTransfers((prev) => prev.map((t) => (t.id === id ? { ...t, status: nextStatus } : t)));
   };
 
   /**
@@ -1250,6 +1323,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteItem,
         adjustStock,
         transferStock,
+        updateTransferStatus,
+        defaultStoreTransferPrices,
+        setDefaultStoreTransferPrice,
         stockTransfers,
         inventoryLedger,
         repairsEnquiries,
