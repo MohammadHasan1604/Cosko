@@ -8,6 +8,7 @@ import GlobalSearchModal from './GlobalSearchModal';
 import NotificationsDrawer from './NotificationsDrawer';
 import StoreSelectorModal from './StoreSelectorModal';
 import UserProfileModal from './UserProfileModal';
+import AppErrorBoundary from './AppErrorBoundary';
 import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
 import CoskoLogo from '@/components/ui/CoskoLogo';
@@ -27,6 +28,7 @@ const routePermissions: Record<string, string[]> = {
   '/dashboard': managerRoles,
   '/sales': cashierRoles,
   '/inventory-management': auditorRoles,
+  '/categories': auditorRoles,
   '/purchases': auditorRoles,
   '/customers': cashierRoles,
   '/vendors': auditorRoles,
@@ -137,7 +139,9 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
         {/* Page content */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-12">
           {isAuthorized ? (
-            children
+            <AppErrorBoundary>
+              {children}
+            </AppErrorBoundary>
           ) : (
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center p-6 card">
               <div className="w-12 h-12 rounded-full bg-danger/10 text-danger flex items-center justify-center mb-3">

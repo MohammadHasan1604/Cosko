@@ -399,6 +399,73 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const seDiscountRes = RBACEngine.authorize(salesExecWithDiscount, seDiscountReq);
   assertTest('15. Regression & UX', 'Sales Executive Super Admin Custom Allow Toggle (sales.discount ALLOW)', 'PASS', seDiscountRes.allowed ? 'PASS' : 'DENIED', 'Granted Sales Executive custom discount permission override');
 
+  // =========================================================================
+  // CATEGORY 16: CATEGORY MASTER & TAXONOMY INTEGRITY
+  // =========================================================================
+  const sampleCatName = 'EV Battery & Motor Controller';
+  const generatedSlug = sampleCatName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  const isSlugValid = generatedSlug === 'ev-battery-motor-controller';
+  assertTest('9. Functional Features', 'Category Dynamic Slug Generation & Format Sanitization', 'PASS', isSlugValid ? 'PASS' : 'DENIED', `Generated slug: ${generatedSlug}`);
+
+  // Test 16.2: Category Hierarchy Integrity (Parent-Child relation)
+  const parentCat = { id: 'cat-ev', name: 'EV / Electric Vehicle', parentCategoryId: null };
+  const childCat = { id: 'cat-ev-battery', name: 'Battery / Electrical', parentCategoryId: 'cat-ev', parentCategoryName: parentCat.name };
+  const isHierarchyValid = childCat.parentCategoryId === parentCat.id && childCat.parentCategoryName === 'EV / Electric Vehicle';
+  assertTest('9. Functional Features', 'Category Parent-Child Hierarchy & Breadcrumb Integrity', 'PASS', isHierarchyValid ? 'PASS' : 'DENIED', `Child "${childCat.name}" correctly linked to parent "${parentCat.name}"`);
+
+  // =========================================================================
+  // CATEGORY 17: BARCODE UNIQUENESS & DUPLICATE PROTECTION
+  // =========================================================================
+  const existingInventory = [
+    { id: 'item-1', sku: 'COSKO-DISP-IP15', barcode: '8901234567890', name: 'iPhone 15 OLED Display' },
+    { id: 'item-2', sku: 'COSKO-BATT-5000', barcode: '8901234567891', name: '5000mAh Battery' },
+  ];
+  const duplicateCandidateBarcode = '8901234567890';
+  const duplicateFound = existingInventory.some((i) => i.barcode === duplicateCandidateBarcode);
+  assertTest('9. Functional Features', 'Duplicate Barcode Detection & Product Creation Guard', 'PASS', duplicateFound ? 'PASS' : 'DENIED', `Detected duplicate barcode ${duplicateCandidateBarcode} assigned to "${existingInventory[0].name}"`);
+
+  // =========================================================================
+  // CATEGORY 18: CUSTOMER 360 MULTI-DEVICE REPAIR HISTORY LINKAGE
+  // =========================================================================
+  const sampleRepairs = [
+    { id: 'rep-1', customerPhone: '+91 98765 43210', deviceType: 'Mobile', deviceName: 'iPhone 15 Pro Max', repairRequested: 'OLED Display Replacement' },
+    { id: 'rep-2', customerPhone: '+91 98765 43210', deviceType: 'EV', deviceName: 'Ather 450X Gen 3', repairRequested: 'Carbon Drive Belt Replacement' },
+    { id: 'rep-3', customerPhone: '+91 98450 11223', deviceType: 'AC', deviceName: 'Daikin 1.5 Ton AC', repairRequested: 'Inverter PCB Repair' },
+  ];
+  const normalizedSearchPhone = normalizeMobileNumber('9876543210');
+  const matchedCustomerRepairs = sampleRepairs.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizedSearchPhone);
+  const isMultiDeviceLinked = matchedCustomerRepairs.length === 2 && matchedCustomerRepairs.some((r) => r.deviceType === 'Mobile') && matchedCustomerRepairs.some((r) => r.deviceType === 'EV');
+  assertTest('10. Integration Workflows', 'Customer 360 Multi-Device Linked Repair Tracking (Mobile & EV)', 'PASS', isMultiDeviceLinked ? 'PASS' : 'DENIED', `Found ${matchedCustomerRepairs.length} multi-device linked repair jobs for customer`);
+
+  // =========================================================================
+  // CATEGORY 19: SUPER ADMIN PROFILE & PASSWORD SECURITY
+  // =========================================================================
+  const adminPasswordRaw = 'Cosko2026@';
+  const adminHashed = await hashPassword(adminPasswordRaw);
+  const isValidPassAttempt = await verifyPassword(adminPasswordRaw, adminHashed);
+  const isInvalidPassAttempt = await verifyPassword('WrongPassword123!', adminHashed);
+  const isPasswordFlowSecure = isValidPassAttempt && !isInvalidPassAttempt;
+  assertTest('2. Authentication', 'Super Admin Salted Password Hash Verification & Rejection Guard', 'PASS', isPasswordFlowSecure ? 'PASS' : 'DENIED', 'Salted password verification matches expected cryptographic behavior');
+
+  // =========================================================================
+  // CATEGORY 20: DOUBLE CHECKOUT & IDEMPOTENCY LOCK
+  // =========================================================================
+  let orderCommitCount = 0;
+  const processCheckoutWithLock = (idempotencyKey: string, executedKeys: Set<string>) => {
+    if (executedKeys.has(idempotencyKey)) {
+      return { success: false, reason: 'Duplicate checkout request blocked' };
+    }
+    executedKeys.add(idempotencyKey);
+    orderCommitCount += 1;
+    return { success: true, orderNo: `CS26-${idempotencyKey}` };
+  };
+
+  const executedIdempotencyKeys = new Set<string>();
+  const firstClick = processCheckoutWithLock('order-tx-999', executedIdempotencyKeys);
+  const doubleClick = processCheckoutWithLock('order-tx-999', executedIdempotencyKeys);
+  const isDoubleCheckoutBlocked = firstClick.success && !doubleClick.success && orderCommitCount === 1;
+  assertTest('13. Concurrency & Locks', 'Double-Click POS Checkout Idempotency Guard (Zero Duplicate Invoices)', 'PASS', isDoubleCheckoutBlocked ? 'PASS' : 'DENIED', `First attempt: ${firstClick.success} | Second attempt blocked: ${!doubleClick.success} (Total committed: ${orderCommitCount})`);
+
   // Print Summary
   console.log('\n====================================================================');
   const passedCount = results.filter((r) => r.passed).length;

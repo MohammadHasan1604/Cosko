@@ -9,6 +9,7 @@ interface ToggleSwitchProps {
   onText?: string;
   offText?: string;
   size?: 'sm' | 'md' | 'lg';
+  variant?: 'success' | 'brand';
   disabled?: boolean;
   id?: string;
   className?: string;
@@ -22,6 +23,7 @@ export default function ToggleSwitch({
   onText = 'ON',
   offText = 'OFF',
   size = 'md',
+  variant = 'success',
   disabled = false,
   id,
   className = '',
@@ -36,34 +38,46 @@ export default function ToggleSwitch({
     }
   };
 
-  // Dimensions based on size
+  // Dimensions based on size for optimal proportion, touch target, and text readability
   const sizeConfig = {
     sm: {
-      container: 'w-12 h-6',
-      thumb: 'w-4 h-4',
-      thumbTranslate: 'translate-x-6',
-      text: 'text-[9px]',
+      container: 'w-16 h-7',
+      thumb: 'w-5 h-5',
+      thumbTranslate: 'translate-x-9',
+      thumbRest: 'translate-x-0.5',
+      textChecked: 'left-2 text-[10px]',
+      textUnchecked: 'right-2 text-[10px]',
     },
     md: {
-      container: 'w-16 h-8',
+      container: 'w-20 h-8',
       thumb: 'w-6 h-6',
-      thumbTranslate: 'translate-x-8',
-      text: 'text-2xs font-extrabold',
+      thumbTranslate: 'translate-x-12',
+      thumbRest: 'translate-x-1',
+      textChecked: 'left-2.5 text-xs',
+      textUnchecked: 'right-2.5 text-xs',
     },
     lg: {
-      container: 'w-20 h-10',
+      container: 'w-24 h-10',
       thumb: 'w-8 h-8',
-      thumbTranslate: 'translate-x-10',
-      text: 'text-xs font-black',
+      thumbTranslate: 'translate-x-14',
+      thumbRest: 'translate-x-1',
+      textChecked: 'left-3 text-xs',
+      textUnchecked: 'right-3 text-xs',
     },
   }[size];
+
+  // Active color styling
+  const activeBg =
+    variant === 'brand'
+      ? 'bg-[#002E86] dark:bg-[#009ADF] border-[#002E86] dark:border-[#009ADF] text-white shadow-sm'
+      : 'bg-emerald-600 dark:bg-emerald-500 border-emerald-700/80 dark:border-emerald-400 text-white shadow-sm';
 
   return (
     <div className={`inline-flex items-center justify-between gap-3 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${className}`}>
       {(label || sublabel) && (
         <label htmlFor={switchId} className="cursor-pointer select-none text-left">
-          {label && <p className="text-xs font-bold text-foreground">{label}</p>}
-          {sublabel && <p className="text-2xs text-muted-foreground">{sublabel}</p>}
+          {label && <p className="text-xs font-bold text-foreground leading-tight">{label}</p>}
+          {sublabel && <p className="text-2xs text-muted-foreground mt-0.5 leading-tight">{sublabel}</p>}
         </label>
       )}
 
@@ -75,28 +89,30 @@ export default function ToggleSwitch({
         disabled={disabled}
         onClick={() => !disabled && onChange(!checked)}
         onKeyDown={handleKeyDown}
-        className={`relative inline-flex items-center flex-shrink-0 p-1 rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 border ${
+        className={`relative inline-flex items-center flex-shrink-0 rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 border select-none ${
           sizeConfig.container
         } ${
           checked
-            ? 'bg-success border-success/80 text-white shadow-xs'
-            : 'bg-muted/90 border-border text-muted-foreground'
+            ? activeBg
+            : 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200'
         }`}
       >
-        {/* State Label Text Inside Switch */}
+        {/* Label Text Inside Switch Track */}
         <span
-          className={`absolute select-none tracking-wider uppercase transition-opacity duration-200 ${sizeConfig.text} ${
-            checked ? 'left-2 opacity-100 text-white' : 'right-2 opacity-100 text-muted-foreground dark:text-gray-400 font-bold'
+          className={`absolute select-none font-extrabold tracking-wider uppercase transition-opacity duration-200 ${
+            checked
+              ? `${sizeConfig.textChecked} text-white`
+              : `${sizeConfig.textUnchecked} text-slate-700 dark:text-slate-300`
           }`}
         >
           {checked ? onText : offText}
         </span>
 
-        {/* Sliding Thumb Indicator */}
+        {/* Crisp Sliding Thumb */}
         <span
-          className={`inline-block rounded-full bg-white dark:bg-card shadow-md transform transition-transform duration-200 ease-in-out flex-shrink-0 ${
+          className={`inline-block rounded-full bg-white shadow-md border border-slate-300/40 transform transition-transform duration-200 ease-in-out flex-shrink-0 ${
             sizeConfig.thumb
-          } ${checked ? sizeConfig.thumbTranslate : 'translate-x-0'}`}
+          } ${checked ? sizeConfig.thumbTranslate : sizeConfig.thumbRest}`}
         />
       </button>
     </div>
