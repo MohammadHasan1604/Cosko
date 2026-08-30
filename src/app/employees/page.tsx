@@ -25,11 +25,12 @@ const initialEmployees: Employee[] = [
 ];
 
 export default function EmployeesPage() {
-  const { currentUser, selectedStore, addUserAccount, storesList } = useApp();
+  const { currentUser, selectedStore, addUserAccount, deleteUserAccount, usersList, storesList } = useApp();
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
 
   const [addModal, setAddModal] = useState(false);
   const [editModal, setEditModal] = useState<Employee | null>(null);
+  const [deleteEmpModal, setDeleteEmpModal] = useState<Employee | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -176,7 +177,7 @@ export default function EmployeesPage() {
                   <button onClick={() => openEdit(emp)} className="p-1 text-muted-foreground hover:text-primary" title="Edit employee">
                     <Icon name="PencilSquareIcon" size={15} />
                   </button>
-                  <button onClick={() => deleteEmp(emp.id)} className="p-1 text-muted-foreground hover:text-danger" title="Remove employee">
+                  <button onClick={() => setDeleteEmpModal(emp)} className="p-1 text-muted-foreground hover:text-danger" title="Remove employee">
                     <Icon name="TrashIcon" size={15} />
                   </button>
                 </div>
@@ -308,6 +309,81 @@ export default function EmployeesPage() {
               <button type="submit" className="btn-primary text-xs">Save Changes</button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Delete / Deactivate Employee Modal */}
+      {deleteEmpModal && (
+        <Modal
+          open={!!deleteEmpModal}
+          onClose={() => setDeleteEmpModal(null)}
+          title={`Deactivate / Remove Employee "${deleteEmpModal.name}"`}
+          subtitle={`Role: ${deleteEmpModal.role} · Store: ${deleteEmpModal.store} · Email: ${deleteEmpModal.email}`}
+          size="md"
+        >
+          <div className="space-y-4 py-2 text-xs">
+            {(() => {
+              const isSelf = currentUser.email && currentUser.email.toLowerCase() === deleteEmpModal.email.toLowerCase();
+
+              return (
+                <>
+                  <div className={`p-4 rounded-xl border ${isSelf ? 'bg-danger/10 border-danger/30 text-foreground' : 'bg-muted/40 border-border text-foreground'}`}>
+                    <div className="flex items-start gap-2.5">
+                      <Icon name={isSelf ? 'ExclamationCircleIcon' : 'InformationCircleIcon'} size={18} className={isSelf ? 'text-danger shrink-0 mt-0.5' : 'text-primary shrink-0 mt-0.5'} />
+                      <div>
+                        <p className="font-bold text-sm">
+                          {isSelf ? 'Cannot Remove Active Logged-In Account' : 'Team Member Lifecycle Management'}
+                        </p>
+                        <p className="text-muted-foreground mt-1">
+                          {isSelf
+                            ? 'You are currently logged into this account. System security rules prohibit deleting your own session.'
+                            : `Removing ${deleteEmpModal.name} will synchronize with user permissions and authentication records.`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                    <button onClick={() => setDeleteEmpModal(null)} className="btn-secondary text-xs">Cancel</button>
+                    {!isSelf && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const matchingUser = usersList.find((u) => u.email.toLowerCase() === deleteEmpModal.email.toLowerCase() || u.id === deleteEmpModal.id);
+                            if (matchingUser) {
+                              await deleteUserAccount(matchingUser.id, false);
+                            }
+                            setEmployees((prev) => prev.filter((e) => e.id !== deleteEmpModal.id));
+                            setDeleteEmpModal(null);
+                          }}
+                          className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4"
+                        >
+                          Deactivate Account
+                        </button>
+                        {currentUser.role === 'Super Admin' && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const matchingUser = usersList.find((u) => u.email.toLowerCase() === deleteEmpModal.email.toLowerCase() || u.id === deleteEmpModal.id);
+                              if (matchingUser) {
+                                await deleteUserAccount(matchingUser.id, true);
+                              }
+                              setEmployees((prev) => prev.filter((e) => e.id !== deleteEmpModal.id));
+                              setDeleteEmpModal(null);
+                            }}
+                            className="btn-danger text-xs font-bold px-4"
+                          >
+                            Permanent Delete
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
         </Modal>
       )}
     </AppLayout>

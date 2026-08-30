@@ -228,20 +228,59 @@ export default function VendorsPage() {
         <Modal
           open={!!deleteVendorModal}
           onClose={() => setDeleteVendorModal(null)}
-          title="Delete Supplier Record"
-          subtitle={`Remove ${deleteVendorModal.name}?`}
-          size="sm"
+          title={`Archive / Delete "${deleteVendorModal.name}"`}
+          subtitle="Relational validation against purchase orders and procurement history"
+          size="md"
         >
-          <div className="space-y-4 py-2">
-            <p className="text-xs text-muted-foreground">
-              Are you sure you want to delete vendor {deleteVendorModal.name}? This will remove vendor metrics.
-            </p>
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <button onClick={() => setDeleteVendorModal(null)} className="btn-secondary text-xs">Cancel</button>
-              <button onClick={() => { deleteVendor(deleteVendorModal.id); setDeleteVendorModal(null); }} className="btn-danger text-xs">
-                Delete Vendor
-              </button>
-            </div>
+          <div className="space-y-4 py-2 text-xs">
+            {(() => {
+              const poCount = (deleteVendorModal as any).purchasesCount || (deleteVendorModal.outstandingPayable > 0 ? 1 : 0);
+              return (
+                <>
+                  <div className={`p-4 rounded-xl border ${poCount > 0 ? 'bg-warning/10 border-warning/30 text-foreground' : 'bg-muted/40 border-border text-foreground'}`}>
+                    <div className="flex items-start gap-2.5">
+                      <Icon name={poCount > 0 ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'} size={18} className={poCount > 0 ? 'text-warning shrink-0 mt-0.5' : 'text-primary shrink-0 mt-0.5'} />
+                      <div>
+                        <p className="font-bold text-sm">
+                          {poCount > 0 ? 'Vendor Has Procurement / Financial Records' : 'Unused Vendor Record'}
+                        </p>
+                        <p className="text-muted-foreground mt-1">
+                          {poCount > 0
+                            ? `This vendor has purchase orders or an outstanding balance of ₹${deleteVendorModal.outstandingPayable.toLocaleString('en-IN')}. It will be safely Archived to preserve warehouse stock ledgers and accounting history.`
+                            : `This vendor has no linked purchase orders. You can archive it safely, or permanently delete it.`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                    <button onClick={() => setDeleteVendorModal(null)} className="btn-secondary text-xs">Cancel</button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await deleteVendor(deleteVendorModal.id, false);
+                        setDeleteVendorModal(null);
+                      }}
+                      className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4"
+                    >
+                      Safe Archive
+                    </button>
+                    {poCount === 0 && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await deleteVendor(deleteVendorModal.id, true);
+                          setDeleteVendorModal(null);
+                        }}
+                        className="btn-danger text-xs font-bold px-4"
+                      >
+                        Permanent Delete
+                      </button>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </Modal>
       )}

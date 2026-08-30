@@ -42,7 +42,7 @@ function getStockStatus(item: InventoryItem) {
 }
 
 export default function InventoryTable() {
-  const { inventory, deleteItem: removeInventoryItem, updateItem, selectedStore, categoriesList, storesList } = useApp();
+  const { inventory, deleteItem: removeInventoryItem, updateItem, selectedStore, categoriesList, storesList, currentUser, sales, inventoryLedger } = useApp();
 
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState(selectedStore);
@@ -661,17 +661,91 @@ export default function InventoryTable() {
         onClose={() => setViewItem(null)}
       />
 
-      {/* Delete Confirm Modal */}
-      <ConfirmModal
-        open={!!deleteItemModal}
-        onClose={() => setDeleteItemModal(null)}
-        onConfirm={handleDeleteConfirm}
-        title="Delete inventory item?"
-        message={`This will permanently remove "${deleteItemModal?.name}" (${deleteItemModal?.sku}) from the system.`}
-        confirmLabel="Delete Item"
-        variant="danger"
-        loading={deleteLoading}
-      />
+      {/* Safe Delete / Archive Confirm Modal */}
+      {deleteItemModal && (
+        <Modal
+          open={!!deleteItemModal}
+          onClose={() => !deleteLoading && setDeleteItemModal(null)}
+          title={`Archive / Delete Product "${deleteItemModal.name}"`}
+          subtitle={`SKU: ${deleteItemModal.sku} · Store: ${deleteItemModal.store}`}
+          size="md"
+        >
+          <div className="space-y-4 py-2 text-xs">
+            {(() => {
+              const hasLedger = inventoryLedger ? inventoryLedger.some((l) => l.productId === deleteItemModal.id || l.sku === deleteItemModal.sku) : false;
+              const hasSales = sales ? sales.some((s) => s.items.some((it) => it.itemId === deleteItemModal.id || it.name === deleteItemModal.name)) : false;
+              const hasHistory = hasLedger || hasSales || deleteItemModal.qtyOnHand > 0;
+
+              return (
+                <>
+                  <div className={`p-4 rounded-xl border ${hasHistory ? 'bg-warning/10 border-warning/30 text-foreground' : 'bg-muted/40 border-border text-foreground'}`}>
+                    <div className="flex items-start gap-2.5">
+                      <Icon name={hasHistory ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'} size={18} className={hasHistory ? 'text-warning shrink-0 mt-0.5' : 'text-primary shrink-0 mt-0.5'} />
+                      <div>
+                        <p className="font-bold text-sm">
+                          {hasHistory ? 'Product Has Stock / Sales History' : 'Unused Product Catalog Entry'}
+                        </p>
+                        <p className="text-muted-foreground mt-1">
+                          {hasHistory
+                            ? `This product has existing stock (${deleteItemModal.qtyOnHand} units) or historical sales/movement transactions. To maintain accounting integrity, it will be safely Archived (hidden from active catalog and POS checkout).`
+                            : `This product has 0 inventory movements and 0 sales. You can archive it safely, or permanently delete it.`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                    <button
+                      type="button"
+                      disabled={deleteLoading}
+                      onClick={() => setDeleteItemModal(null)}
+                      className="btn-secondary text-xs"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={deleteLoading}
+                      onClick={async () => {
+                        setDeleteLoading(true);
+                        try {
+                          await removeInventoryItem(deleteItemModal.id, false);
+                          setDeleteItemModal(null);
+                        } finally {
+                          setDeleteLoading(false);
+                        }
+                      }}
+                      className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4"
+                    >
+                      {deleteLoading ? 'Archiving...' : 'Safe Archive'}
+                    </button>
+
+                    {!hasHistory && currentUser.role === 'Super Admin' && (
+                      <button
+                        type="button"
+                        disabled={deleteLoading}
+                        onClick={async () => {
+                          setDeleteLoading(true);
+                          try {
+                            await removeInventoryItem(deleteItemModal.id, true);
+                            setDeleteItemModal(null);
+                          } finally {
+                            setDeleteLoading(false);
+                          }
+                        }}
+                        className="btn-danger text-xs font-bold px-4"
+                      >
+                        {deleteLoading ? 'Deleting...' : 'Permanent Delete'}
+                      </button>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </Modal>
+      )}
 
       {/* Barcode Scanner Modal */}
       {scannerOpen && (

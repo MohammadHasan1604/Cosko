@@ -1,22 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifySessionToken } from '@/lib/auth';
+import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 /**
- * GET /api/purchases - Retrieve purchase orders
+ * GET /api/purchases - Retrieve purchase orders (excludes Archived/Cancelled by default)
  */
 export async function GET(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('cosko_session')?.value;
-    const user = token ? verifySessionToken(token) : null;
+    const user = getAuthUserFromRequest(req);
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const includeArchived = searchParams.get('includeArchived') === 'true';
+
+    const whereClause: any = {};
+    if (!includeArchived) {
+      whereClause.status = { notIn: ['Archived', 'Cancelled'] };
+    }
+
     const purchases = await (prisma as any).purchaseOrder.findMany({
+      where: whereClause,
       include: {
         vendor: true,
         items: true,
@@ -27,7 +33,10 @@ export async function GET(req: NextRequest) {
       take: 100,
     });
 
-    return NextResponse.json({ success: true, purchases });
+    return NextResponse.json(
+      { success: true, purchases },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    );
   } catch (error: any) {
     console.error('API /api/purchases GET error:', error);
     return NextResponse.json({ error: 'Failed to retrieve purchase orders' }, { status: 500 });
@@ -39,9 +48,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('cosko_session')?.value;
-    const user = token ? verifySessionToken(token) : null;
+    const user = getAuthUserFromRequest(req);
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -144,3 +151,92 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to create purchase order' }, { status: 500 });
   }
 }
+
+/**
+ * PUT /api/purchases - Update purchase order status
+ */
+export async function PUT(req: NextRequest) {
+  try {
+    const user = getAuthUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    if (!body.id) {
+      return NextResponse.json({ error: 'Purchase Order ID is required' }, { status: 400 });
+    }
+
+    const po = await (prisma as any).purchaseOrder.update({
+      where: { id: body.id },
+      data: {
+        ...(body.status ? { status: body.status } : {}),
+        ...(body.paymentStatus ? { paymentStatus: body.paymentStatus } : {}),
+        ...(body.notes !== undefined ? { notes: body.notes } : {}),
+      },
+    });
+
+    return NextResponse.json({ success: true, purchaseOrder: po });
+  } catch (error: any) {
+    console.error('API /api/purchases PUT error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to update purchase order' }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/purchases - Delete a draft purchase order or cancel/archive received PO
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = getAuthUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (user.securityLevel < 80) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient security level' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Purchase Order ID is required' }, { status: 400 });
+    }
+
+    const existing = await (prisma as any).purchaseOrder.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ success: true, message: 'Purchase Order already deleted or non-existent' });
+    }
+
+    // Received POs have impacted inventory and financial ledgers; cancel/archive safely instead of destructive delete
+    if (existing.status === 'Received' || existing.status === 'Completed') {
+      const archived = await (prisma as any).purchaseOrder.update({
+        where: { id },
+        data: { status: 'Cancelled' },
+      });
+      return NextResponse.json({
+        success: true,
+        mode: 'archived',
+        purchaseOrder: archived,
+        message: `Completed Purchase Order ${existing.poNo} was cancelled/archived to preserve historical warehouse stock ledgers.`,
+      });
+    }
+
+    // Hard-delete drafts / pending POs
+    await (prisma as any).purchaseOrderItem.deleteMany({ where: { poId: id } });
+    await (prisma as any).purchaseOrder.delete({ where: { id } });
+
+    return NextResponse.json({
+      success: true,
+      mode: 'deleted',
+      message: `Draft Purchase Order ${existing.poNo} permanently deleted.`,
+    });
+  } catch (error: any) {
+    console.error('API /api/purchases DELETE error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to delete purchase order' }, { status: 500 });
+  }
+}
+

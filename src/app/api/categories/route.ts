@@ -1,24 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { verifySessionToken } from '@/lib/auth';
+import { getAuthUserFromRequest } from '@/lib/auth';
 
 /**
  * GET /api/categories
- * Returns full list of categories ordered by sort_order and name
+ * Returns full list of categories ordered by sort_order and name (excludes Archived by default)
  */
 export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const includeArchived = searchParams.get('includeArchived') === 'true';
+
+    const where: any = {};
+    if (!includeArchived) {
+      where.status = { not: 'Archived' };
+    }
+
     const categories = await (prisma as any).category.findMany({
+      where,
+      include: {
+        parent: true,
+      },
       orderBy: [
         { sortOrder: 'asc' },
         { name: 'asc' },
       ],
     });
 
-    return NextResponse.json({
-      success: true,
-      categories,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        categories,
+      },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    );
   } catch (error: any) {
     console.error('Error fetching categories:', error);
     return NextResponse.json(
@@ -34,8 +49,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const token = req.cookies.get('cosko_session')?.value;
-    const session = token ? verifySessionToken(token) : null;
+    const session = getAuthUserFromRequest(req);
 
     if (!session || (session.role !== 'Super Admin' && session.role !== 'Store Manager')) {
       return NextResponse.json(
@@ -89,8 +103,7 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const token = req.cookies.get('cosko_session')?.value;
-    const session = token ? verifySessionToken(token) : null;
+    const session = getAuthUserFromRequest(req);
 
     if (!session || (session.role !== 'Super Admin' && session.role !== 'Store Manager')) {
       return NextResponse.json(
@@ -136,42 +149,87 @@ export async function PUT(req: NextRequest) {
 
 /**
  * DELETE /api/categories
- * Safely archives a category
+ * Safe Archive or Permanent Delete for unlinked categories
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const token = req.cookies.get('cosko_session')?.value;
-    const session = token ? verifySessionToken(token) : null;
+    const session = getAuthUserFromRequest(req);
 
-    if (!session || session.role !== 'Super Admin') {
+    if (!session || (session.role !== 'Super Admin' && session.role !== 'Store Manager')) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized: Only Super Admin can archive categories' },
+        { success: false, message: 'Unauthorized: Only Admin or Store Manager can archive or delete categories' },
         { status: 403 }
       );
     }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const permanent = searchParams.get('permanent') === 'true';
 
     if (!id) {
       return NextResponse.json({ success: false, message: 'Category ID is required' }, { status: 400 });
     }
 
-    const archived = await (prisma as any).category.update({
-      where: { id },
-      data: { status: 'Archived' },
-    });
+    let target = await (prisma as any).category.findUnique({ where: { id } }).catch(() => null);
+    if (!target) {
+      target = await (prisma as any).category.findFirst({ where: { slug: id } });
+    }
+
+    if (!target) {
+      return NextResponse.json({ success: true, message: 'Category already deleted or non-existent' });
+    }
+
+    // Check if category is referenced by products
+    const [productsLinked, childCategories] = await Promise.all([
+      (prisma as any).product.count({
+        where: {
+          OR: [
+            { category: target.name },
+            { category: target.slug },
+            { subcategory: target.name },
+            { subcategory: target.slug },
+          ],
+        },
+      }),
+      (prisma as any).category.count({
+        where: { parentCategoryId: target.id, status: { not: 'Archived' } },
+      }),
+    ]);
+
+    const isReferenced = productsLinked > 0 || childCategories > 0;
+
+    // If referenced or not permanent, safe ARCHIVE
+    if (isReferenced || !permanent || session.role !== 'Super Admin') {
+      const archived = await (prisma as any).category.update({
+        where: { id: target.id },
+        data: { status: 'Archived' },
+      });
+
+      return NextResponse.json({
+        success: true,
+        mode: 'archived',
+        category: archived,
+        isReferenced,
+        message: isReferenced
+          ? `This category is currently in use (${productsLinked} products, ${childCategories} subcategories). Archived safely instead of permanent deletion.`
+          : `Category "${archived.name}" archived successfully.`,
+      });
+    }
+
+    // Hard-delete if safe & requested by Super Admin
+    await (prisma as any).category.delete({ where: { id: target.id } });
 
     return NextResponse.json({
       success: true,
-      category: archived,
-      message: `Category "${archived.name}" archived successfully`,
+      mode: 'deleted',
+      message: `Category "${target.name}" permanently deleted from database.`,
     });
   } catch (error: any) {
-    console.error('Error archiving category:', error);
+    console.error('Error archiving/deleting category:', error);
     return NextResponse.json(
-      { success: false, message: 'Failed to archive category', error: error.message },
+      { success: false, message: 'Failed to archive/delete category', error: error.message },
       { status: 500 }
     );
   }
 }
+

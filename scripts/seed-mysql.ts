@@ -24,6 +24,52 @@ async function main() {
   }
   console.log('✅ 5 Store Hubs created');
 
+  // 1B. CATEGORIES & TAXONOMY
+  const rootCategories = [
+    { id: 'cat-mobiles', name: 'Mobile / Device', slug: 'mobile-device', categoryType: 'Device', description: 'Smartphones, Tablets, Smartwatches, and Laptops', status: 'Active', sortOrder: 1 },
+    { id: 'cat-mobile-parts', name: 'Mobile Parts / Repair-Related', slug: 'mobile-parts-repair', categoryType: 'Spare Part', description: 'Displays, Batteries, Cameras, Ports, Charging Accessories', status: 'Active', sortOrder: 10 },
+    { id: 'cat-ev', name: 'EV / Electric Vehicle', slug: 'ev-electric-vehicle', categoryType: 'EV', description: 'EV Spare parts, batteries, general service components', status: 'Active', sortOrder: 30 },
+    { id: 'cat-home-appliances', name: 'Home Appliances', slug: 'home-appliances', categoryType: 'Home Appliance', description: 'AC, TV, Washing Machine, Refrigerator and Spares', status: 'Active', sortOrder: 50 },
+  ];
+
+  for (const cat of rootCategories) {
+    await (prisma as any).category.upsert({
+      where: { id: cat.id },
+      update: cat,
+      create: cat,
+    });
+  }
+
+  const subCategories = [
+    { id: 'cat-smartphones', name: 'Smartphones', slug: 'smartphones', parentCategoryId: 'cat-mobiles', categoryType: 'Device', description: 'Android & iOS Mobile Phones', status: 'Active', sortOrder: 2 },
+    { id: 'cat-tablets', name: 'Tablets', slug: 'tablets', parentCategoryId: 'cat-mobiles', categoryType: 'Device', description: 'iPads and Android Tablets', status: 'Active', sortOrder: 3 },
+    { id: 'cat-smartwatches', name: 'Apple Watch / Smart Watch', slug: 'smartwatches', parentCategoryId: 'cat-mobiles', categoryType: 'Device', description: 'Smartwatches & Wearables', status: 'Active', sortOrder: 4 },
+    { id: 'cat-laptops', name: 'Laptops', slug: 'laptops', parentCategoryId: 'cat-mobiles', categoryType: 'Device', description: 'Laptops & MacBooks', status: 'Active', sortOrder: 5 },
+    { id: 'cat-display', name: 'Screen / Display', slug: 'screen-display', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Touchscreen displays and LCD assemblies', status: 'Active', sortOrder: 11 },
+    { id: 'cat-backglass', name: 'Back Glass', slug: 'back-glass', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Rear housing and glass replacements', status: 'Active', sortOrder: 12 },
+    { id: 'cat-battery', name: 'Battery', slug: 'battery', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'OEM & High-capacity lithium replacement batteries', status: 'Active', sortOrder: 13 },
+    { id: 'cat-charging-port', name: 'Charging Port', slug: 'charging-port', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Type-C & Lightning charging flex cables', status: 'Active', sortOrder: 14 },
+    { id: 'cat-speaker', name: 'Speaker', slug: 'speaker', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Loudspeakers and ringer buzzers', status: 'Active', sortOrder: 15 },
+    { id: 'cat-mic', name: 'Mic / Microphone', slug: 'microphone', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Microphone flex modules and noise cancel mics', status: 'Active', sortOrder: 16 },
+    { id: 'cat-camera', name: 'Camera', slug: 'camera', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Rear and front selfie camera modules', status: 'Active', sortOrder: 18 },
+    { id: 'cat-chargers', name: 'Adapters / Chargers', slug: 'adapters-chargers', parentCategoryId: 'cat-mobile-parts', categoryType: 'Accessory', description: 'Fast chargers and power bricks', status: 'Active', sortOrder: 19 },
+    { id: 'cat-cables', name: 'Cables', slug: 'cables', parentCategoryId: 'cat-mobile-parts', categoryType: 'Accessory', description: 'Braided Type-C, Lightning, USB cables', status: 'Active', sortOrder: 20 },
+    { id: 'cat-ev-service', name: 'General Service', slug: 'ev-general-service', parentCategoryId: 'cat-ev', categoryType: 'Service', description: 'EV Periodic maintenance and servicing kits', status: 'Active', sortOrder: 31 },
+    { id: 'cat-ev-brakes', name: 'Brake Parts', slug: 'ev-brake-parts', parentCategoryId: 'cat-ev', categoryType: 'Spare Part', description: 'Disc pads, brake shoes, calipers', status: 'Active', sortOrder: 32 },
+    { id: 'cat-ev-battery', name: 'Battery / Electrical', slug: 'ev-battery-electrical', parentCategoryId: 'cat-ev', categoryType: 'EV', description: 'Lithium battery packs, BMS, and motor controllers', status: 'Active', sortOrder: 37 },
+    { id: 'cat-ac', name: 'AC (Air Conditioner)', slug: 'ac-air-conditioner', parentCategoryId: 'cat-home-appliances', categoryType: 'Home Appliance', description: 'Inverter ACs, Copper Coils, PCB, Gas kits', status: 'Active', sortOrder: 51 },
+    { id: 'cat-tv', name: 'TV (Television)', slug: 'tv-television', parentCategoryId: 'cat-home-appliances', categoryType: 'Home Appliance', description: 'LED Panels, Smart TV Motherboards, Backlights', status: 'Active', sortOrder: 52 },
+  ];
+
+  for (const cat of subCategories) {
+    await (prisma as any).category.upsert({
+      where: { id: cat.id },
+      update: cat,
+      create: cat,
+    });
+  }
+  console.log('✅ Categories and subcategories taxonomy seeded');
+
   // 2. USER ACCOUNTS & PROFILES (Salted Bcrypt Password Hashes)
   const defaultPasswordHash = await bcrypt.hash('Cosko2026@', 12);
 

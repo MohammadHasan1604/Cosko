@@ -1,28 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifySessionToken } from '@/lib/auth';
+import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 /**
- * GET /api/stores - Retrieve all store hubs
+ * GET /api/stores - Retrieve all store hubs (excludes Inactive by default)
  */
 export async function GET(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('cosko_session')?.value;
-    const user = token ? verifySessionToken(token) : null;
+    const user = getAuthUserFromRequest(req);
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const includeInactive = searchParams.get('includeInactive') === 'true';
+
+    const where: any = {};
+    if (!includeInactive) {
+      where.status = { not: 'Inactive' };
+    }
+
     const stores = await prisma.storeHub.findMany({
+      where,
       orderBy: {
         code: 'asc',
       },
     });
 
-    return NextResponse.json({ success: true, stores });
+    return NextResponse.json(
+      { success: true, stores },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    );
   } catch (error: any) {
     console.error('API /api/stores GET error:', error);
     return NextResponse.json({ error: 'Failed to retrieve store hubs' }, { status: 500 });
@@ -34,9 +43,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('cosko_session')?.value;
-    const user = token ? verifySessionToken(token) : null;
+    const user = getAuthUserFromRequest(req);
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -81,3 +88,86 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to save store hub' }, { status: 500 });
   }
 }
+
+/**
+ * DELETE /api/stores - Safe Deactivate or Permanent Delete for unused store hubs
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = getAuthUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (user.role !== 'Super Admin') {
+      return NextResponse.json({ error: 'Forbidden: Super Admin only' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    const permanent = searchParams.get('permanent') === 'true';
+
+    if (!id) {
+      return NextResponse.json({ error: 'Store ID or Code is required' }, { status: 400 });
+    }
+
+    let target = await prisma.storeHub.findUnique({ where: { id } }).catch(() => null);
+    if (!target) {
+      target = await prisma.storeHub.findFirst({
+        where: {
+          OR: [
+            { id },
+            { code: id },
+            { code: id.toUpperCase() },
+          ],
+        },
+      });
+    }
+
+    if (!target) {
+      return NextResponse.json({ success: true, message: 'Store already removed or non-existent' });
+    }
+
+    // Check store transaction & inventory history
+    const [invCount, salesCount, poCount, transferCount] = await Promise.all([
+      prisma.inventory.count({ where: { storeCode: target.code } }),
+      prisma.salesOrder.count({ where: { storeCode: target.code } }),
+      prisma.purchaseOrder.count({ where: { storeCode: target.code } }),
+      prisma.stockTransfer.count({ where: { OR: [{ sourceStore: target.code }, { destStore: target.code }] } }),
+    ]);
+
+    const hasHistory = invCount > 0 || salesCount > 0 || poCount > 0 || transferCount > 0;
+
+    if (hasHistory || !permanent) {
+      const store = await prisma.storeHub.update({
+        where: { id: target.id },
+        data: { status: 'Inactive' },
+      });
+
+      return NextResponse.json({
+        success: true,
+        mode: 'archived',
+        store,
+        hasHistory,
+        message: hasHistory
+          ? `Store Hub "${target.name}" (${target.code}) has active business records (${invCount} inventory items, ${salesCount} sales) and was deactivated safely.`
+          : `Store Hub "${target.name}" deactivated.`,
+      });
+    }
+
+    // Hard-delete if 0 history
+    await prisma.userStoreAssignment.deleteMany({ where: { storeCode: target.code } });
+    await prisma.storeHub.delete({ where: { id: target.id } });
+
+    return NextResponse.json({
+      success: true,
+      mode: 'deleted',
+      message: `Store Hub "${target.name}" (${target.code}) permanently deleted.`,
+    });
+  } catch (error: any) {
+    console.error('API /api/stores DELETE error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to deactivate/delete store' }, { status: 500 });
+  }
+}
+

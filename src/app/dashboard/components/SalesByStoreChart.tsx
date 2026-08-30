@@ -1,17 +1,12 @@
 'use client';
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-
-// Mock data — backend integration: GET /api/v1/reports/sales-by-store
-const data = [
-  { store: 'BLR', sales: 1248600, budget: 1200000 },
-  { store: 'HYD', sales: 874200, budget: 950000 },
-  { store: 'DEL', sales: 718850, budget: 700000 },
-];
+import { useApp } from '@/context/AppContext';
 
 const formatINR = (v: number) => {
   if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
-  return `₹${(v / 1000).toFixed(0)}K`;
+  if (v >= 1000) return `₹${(v / 1000).toFixed(0)}K`;
+  return `₹${v}`;
 };
 
 interface CustomTooltipProps {
@@ -34,9 +29,26 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   );
 };
 
-const barColors = ['var(--primary)', 'var(--accent)', 'var(--positive)'];
+const barColors = ['var(--primary)', 'var(--accent)', 'var(--positive)', 'var(--warning)', 'var(--info)'];
 
 export default function SalesByStoreChart() {
+  const { sales, storesList } = useApp();
+
+  const storeSalesMap: Record<string, number> = {};
+  storesList.forEach((st) => {
+    storeSalesMap[st.code] = 0;
+  });
+
+  sales.forEach((s) => {
+    const code = s.store || 'BLR';
+    storeSalesMap[code] = (storeSalesMap[code] || 0) + (s.total || 0);
+  });
+
+  const data = Object.keys(storeSalesMap).map((code) => ({
+    store: code,
+    sales: storeSalesMap[code],
+  }));
+
   return (
     <ResponsiveContainer width="100%" height={130}>
       <BarChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }} barSize={24}>

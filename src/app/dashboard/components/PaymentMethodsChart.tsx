@@ -1,15 +1,7 @@
 'use client';
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-
-// Mock data — backend integration: GET /api/v1/reports/payment-methods-summary
-const data = [
-  { method: 'UPI', value: 38, amount: '₹10.8L' },
-  { method: 'Cash', value: 28, amount: '₹7.96L' },
-  { method: 'Card', value: 21, amount: '₹5.97L' },
-  { method: 'Credit', value: 9, amount: '₹2.56L' },
-  { method: 'Bank', value: 4, amount: '₹1.14L' },
-];
+import { useApp } from '@/context/AppContext';
 
 const COLORS = ['var(--primary)', 'var(--positive)', 'var(--accent)', 'var(--warning)', 'var(--muted-foreground)'];
 
@@ -30,6 +22,29 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 };
 
 export default function PaymentMethodsChart() {
+  const { sales, selectedStore } = useApp();
+
+  const filteredSales = sales.filter((s) => selectedStore === 'All Stores' || s.store === selectedStore);
+
+  const methodTotals: Record<string, number> = { UPI: 0, Cash: 0, Card: 0, Credit: 0 };
+  let grandTotal = 0;
+
+  filteredSales.forEach((s) => {
+    const m = s.paymentMethod || 'Cash';
+    methodTotals[m] = (methodTotals[m] || 0) + (s.total || 0);
+    grandTotal += s.total || 0;
+  });
+
+  const data = Object.keys(methodTotals).map((method) => {
+    const amountVal = methodTotals[method];
+    const pct = grandTotal > 0 ? Math.round((amountVal / grandTotal) * 100) : 0;
+    return {
+      method,
+      value: grandTotal > 0 ? pct : 25, // default equal slices if empty
+      displayPct: pct,
+      amount: `₹${amountVal.toLocaleString('en-IN')}`,
+    };
+  });
   return (
     <div className="flex items-center gap-4">
       <ResponsiveContainer width={100} height={100}>
@@ -56,7 +71,7 @@ export default function PaymentMethodsChart() {
           <div key={`legend-${item.method}`} className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
             <span className="text-xs text-muted-foreground flex-1">{item.method}</span>
-            <span className="text-xs font-semibold text-foreground font-tabular">{item.value}%</span>
+            <span className="text-xs font-semibold text-foreground font-tabular">{item.displayPct}%</span>
           </div>
         ))}
       </div>

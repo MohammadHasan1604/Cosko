@@ -4,7 +4,7 @@ import KpiCard from './KpiCard';
 import { useApp } from '@/context/AppContext';
 
 export default function KpiBentoGrid() {
-  const { sales, inventory, expenses, vendors, selectedStore, datePeriod } = useApp();
+  const { sales, inventory, expenses, vendors, customers, storesList, usersList, selectedStore, datePeriod } = useApp();
 
   const filteredSales = sales.filter((s) => {
     const matchStore = selectedStore === 'All Stores' || s.store === selectedStore;
@@ -15,21 +15,22 @@ export default function KpiBentoGrid() {
   const filteredInv = selectedStore === 'All Stores' ? inventory : inventory.filter((i) => i.store === selectedStore);
   const filteredExpenses = selectedStore === 'All Stores' ? expenses : expenses.filter((e) => e.store === selectedStore);
 
-  const rawRevenue = filteredSales.reduce((acc, s) => acc + s.total, 0);
-  const totalRevenue = rawRevenue > 0 ? rawRevenue : datePeriod === 'Today' ? 18545.2 : datePeriod === 'Yesterday' ? 5797.6 : 2841650;
-  const grossProfit = totalRevenue * 0.35;
+  const totalRevenue = filteredSales.reduce((acc, s) => acc + s.total, 0);
+  const grossProfit = filteredSales.length > 0 ? totalRevenue * 0.30 : 0;
   const totalExp = filteredExpenses.reduce((acc, e) => acc + e.amount, 0);
   const netProfit = grossProfit - totalExp;
-  const invValue = filteredInv.reduce((acc, i) => acc + i.costPrice * i.qtyOnHand, 0);
-  const payablesTotal = vendors.reduce((acc, v) => acc + v.outstandingPayable, 0);
+  const invValue = filteredInv.reduce((acc, i) => acc + (i.costPrice || 0) * (i.qtyOnHand || 0), 0);
+  const receivablesTotal = customers.reduce((acc, c) => acc + (c.creditBalance || 0), 0);
+  const payablesTotal = vendors.reduce((acc, v) => acc + (v.outstandingPayable || 0), 0);
+  const activeOutletsCount = selectedStore === 'All Stores' ? storesList.filter(s => s.status === 'Active').length : 1;
 
   const kpiCards = [
     {
       id: 'kpi-revenue',
       label: `Total Sales Revenue (${datePeriod})`,
       value: `₹${totalRevenue.toLocaleString('en-IN')}`,
-      change: '+12.4%',
-      trend: 'up' as const,
+      change: filteredSales.length > 0 ? '+100%' : '0%',
+      trend: totalRevenue > 0 ? ('up' as const) : ('neutral' as const),
       subtext: `Scope: ${selectedStore} · Period: ${datePeriod}`,
       icon: 'CurrencyRupeeIcon',
       variant: 'hero' as const,
@@ -39,9 +40,9 @@ export default function KpiBentoGrid() {
       id: 'kpi-gross-profit',
       label: 'Gross Profit Est.',
       value: `₹${Math.round(grossProfit).toLocaleString('en-IN')}`,
-      change: '+8.1%',
-      trend: 'up' as const,
-      subtext: '34.3% gross margin',
+      change: grossProfit > 0 ? '+30.0%' : '0%',
+      trend: grossProfit > 0 ? ('up' as const) : ('neutral' as const),
+      subtext: totalRevenue > 0 ? 'Estimated gross margin' : 'No sales recorded',
       icon: 'ArrowTrendingUpIcon',
       variant: 'normal' as const,
       color: 'positive' as const,
@@ -50,20 +51,20 @@ export default function KpiBentoGrid() {
       id: 'kpi-net-profit',
       label: 'Net Profit',
       value: `₹${Math.round(netProfit).toLocaleString('en-IN')}`,
-      change: netProfit >= 0 ? '+5.2%' : '-3.2%',
+      change: netProfit > 0 ? 'Positive' : netProfit < 0 ? 'Loss' : '₹0',
       trend: netProfit >= 0 ? ('up' as const) : ('down' as const),
       subtext: `After ₹${totalExp.toLocaleString('en-IN')} expenses`,
       icon: 'ChartPieIcon',
       variant: 'normal' as const,
-      color: 'warning' as const,
+      color: netProfit >= 0 ? ('warning' as const) : ('danger' as const),
     },
     {
       id: 'kpi-expenses',
       label: 'Total Expenses',
       value: `₹${totalExp.toLocaleString('en-IN')}`,
-      change: '+18.7%',
-      trend: 'down' as const,
-      subtext: 'Rent + Salary + Logistics',
+      change: `${filteredExpenses.length} recorded`,
+      trend: 'neutral' as const,
+      subtext: 'Operating & Store Expenses',
       icon: 'ReceiptPercentIcon',
       variant: 'normal' as const,
       color: 'danger' as const,
@@ -72,8 +73,8 @@ export default function KpiBentoGrid() {
       id: 'kpi-inventory',
       label: 'Inventory Asset Value',
       value: `₹${invValue.toLocaleString('en-IN')}`,
-      change: '+5.3%',
-      trend: 'up' as const,
+      change: `${filteredInv.length} SKUs`,
+      trend: 'neutral' as const,
       subtext: `${filteredInv.length} SKUs in store scope`,
       icon: 'CubeIcon',
       variant: 'normal' as const,
@@ -82,10 +83,10 @@ export default function KpiBentoGrid() {
     {
       id: 'kpi-receivables',
       label: 'Receivables',
-      value: '₹8,24,100',
-      change: '+22.1%',
-      trend: 'alert' as const,
-      subtext: '14 customer accounts',
+      value: `₹${receivablesTotal.toLocaleString('en-IN')}`,
+      change: `${customers.filter(c => (c.creditBalance || 0) > 0).length} pending accounts`,
+      trend: receivablesTotal > 0 ? ('alert' as const) : ('neutral' as const),
+      subtext: `${customers.length} total customer accounts`,
       icon: 'ClockIcon',
       variant: 'normal' as const,
       color: 'warning' as const,
@@ -94,9 +95,9 @@ export default function KpiBentoGrid() {
       id: 'kpi-payables',
       label: 'Vendor Payables',
       value: `₹${payablesTotal.toLocaleString('en-IN')}`,
-      change: '8 bills pending',
-      trend: 'neutral' as const,
-      subtext: 'Due within 15 days',
+      change: `${vendors.filter(v => (v.outstandingPayable || 0) > 0).length} pending bills`,
+      trend: payablesTotal > 0 ? ('alert' as const) : ('neutral' as const),
+      subtext: `${vendors.length} total suppliers`,
       icon: 'BuildingStorefrontIcon',
       variant: 'normal' as const,
       color: 'neutral' as const,
@@ -104,10 +105,10 @@ export default function KpiBentoGrid() {
     {
       id: 'kpi-stores',
       label: 'Active Outlets',
-      value: selectedStore === 'All Stores' ? '3 Stores' : selectedStore,
-      change: '47 employees',
+      value: selectedStore === 'All Stores' ? `${activeOutletsCount} Outlets` : selectedStore,
+      change: `${usersList.length} staff`,
       trend: 'neutral' as const,
-      subtext: 'BLR · HYD · DEL',
+      subtext: storesList.map(s => s.code).slice(0, 4).join(' · '),
       icon: 'MapPinIcon',
       variant: 'normal' as const,
       color: 'info' as const,

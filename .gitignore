@@ -9,6 +9,9 @@ out/
 # Production build
 build/
 
+# Local MySQL Database Storage (Data Dir)
+mysql-data/
+
 # Environment Variables & Secrets
 .env
 .env*
@@ -19,6 +22,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Scratch & Temporary Debug Files
+scratch/
+scripts/backup_demo_data.json
 
 # OS-specific files
 .DS_Store

@@ -8,7 +8,7 @@ import Modal from '@/components/ui/Modal';
 import { toast } from 'sonner';
 
 export default function StoreSelectorModal() {
-  const { storeSelectorOpen, setStoreSelectorOpen, selectedStore, setSelectedStore, storesList, addStoreHub, updateStoreHub, deleteStoreHub, currentUser, branding, addAuditLog } = useApp();
+  const { storeSelectorOpen, setStoreSelectorOpen, selectedStore, setSelectedStore, storesList, addStoreHub, updateStoreHub, deleteStoreHub, currentUser, branding, addAuditLog, inventory } = useApp();
 
   const [addStoreModal, setAddStoreModal] = useState(false);
   const [editStoreModal, setEditStoreModal] = useState<StoreHub | null>(null);
@@ -318,11 +318,16 @@ export default function StoreSelectorModal() {
             <div className="flex justify-end gap-2 pt-2 border-t border-border">
               <button onClick={() => setDeleteStoreModal(null)} className="btn-secondary text-xs">Cancel</button>
               <button
-                onClick={() => {
-                  deleteStoreHub(deleteStoreModal.id);
+                onClick={async () => {
+                  const hasInventory = inventory.some((i) => i.store === deleteStoreModal.code);
+                  const permanent = !hasInventory && deleteStoreModal.monthlyRevenue === 0;
+                  await deleteStoreHub(deleteStoreModal.id, permanent);
+                  if (selectedStore === deleteStoreModal.code) {
+                    setSelectedStore('All Stores');
+                  }
                   setDeleteStoreModal(null);
                 }}
-                className="btn-danger text-xs"
+                className="btn-danger text-xs font-bold px-3 py-1.5"
               >
                 Delete Store Hub
               </button>

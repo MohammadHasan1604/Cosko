@@ -76,7 +76,7 @@ const INITIAL_LEGACY_CUSTOMERS: LegacyCustomerRow[] = [
 
 export default function ExistingCustomersPage() {
   const { currentUser } = useApp();
-  const [customers, setCustomers] = useState<LegacyCustomerRow[]>(INITIAL_LEGACY_CUSTOMERS);
+  const [customers, setCustomers] = useState<LegacyCustomerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');

@@ -353,18 +353,30 @@ export default function CustomersPage() {
                             Connected
                           </span>
                         </td>
-                        <td className="px-4 py-3.5 text-right space-x-2">
+                        <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
                           <button
+                            type="button"
                             onClick={() => setCrmViewCustomer(cust)}
-                            className="inline-flex items-center px-3 py-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold transition-colors"
+                            className="inline-flex items-center px-2.5 py-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold transition-colors"
+                            title="Customer 360"
                           >
-                            Customer 360
+                            360°
                           </button>
                           <button
+                            type="button"
                             onClick={() => openEdit(cust)}
-                            className="inline-flex items-center px-2 py-1 rounded-lg border border-border bg-card text-foreground hover:bg-secondary text-xs"
+                            className="inline-flex items-center p-1.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-secondary text-xs"
+                            title="Edit Customer"
                           >
                             <Icon name="PencilSquareIcon" className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirmModal(cust)}
+                            className="inline-flex items-center p-1.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-danger hover:bg-danger/10 text-xs transition-colors"
+                            title="Archive / Delete Customer"
+                          >
+                            <Icon name="ArchiveBoxIcon" className="w-3.5 h-3.5" />
                           </button>
                         </td>
                       </tr>
@@ -637,7 +649,82 @@ export default function CustomersPage() {
             </form>
           </Modal>
         )}
+
+        {/* Safe Delete / Archive Confirmation Dialog */}
+        {deleteConfirmModal && (
+          <Modal
+            open={!!deleteConfirmModal}
+            onClose={() => setDeleteConfirmModal(null)}
+            title={`Archive / Delete Customer "${deleteConfirmModal.name}"`}
+            subtitle="Relational validation against sales, credit balances, and repair enquiries"
+            size="md"
+          >
+            <div className="space-y-4 py-2 text-xs">
+              {(() => {
+                const norm = normalizeMobileNumber(deleteConfirmModal.phone);
+                const salesCount = sales.filter((s) => normalizeMobileNumber(s.customerPhone) === norm || s.customerName === deleteConfirmModal.name).length;
+                const repairCount = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === norm || r.customerName === deleteConfirmModal.name).length;
+                const hasHistory = salesCount > 0 || repairCount > 0 || deleteConfirmModal.totalSpend > 0 || deleteConfirmModal.creditBalance > 0;
+
+                return (
+                  <>
+                    <div className={`p-4 rounded-xl border ${hasHistory ? 'bg-warning/10 border-warning/30 text-foreground' : 'bg-muted/40 border-border text-foreground'}`}>
+                      <div className="flex items-start gap-2.5">
+                        <Icon name={hasHistory ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'} size={18} className={hasHistory ? 'text-warning shrink-0 mt-0.5' : 'text-primary shrink-0 mt-0.5'} />
+                        <div>
+                          <p className="font-bold text-sm">
+                            {hasHistory ? 'Customer Has Transaction History' : 'Unused Customer Record'}
+                          </p>
+                          <p className="text-muted-foreground mt-1">
+                            {hasHistory
+                              ? `This customer has ${salesCount} sales invoices, ${repairCount} repair jobs, and ₹${deleteConfirmModal.totalSpend.toLocaleString('en-IN')} total spend. They will be safely Archived to maintain financial ledger history.`
+                              : `This customer has 0 sales or service records. You can archive this profile, or Super Admins may permanently delete it.`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirmModal(null)}
+                        className="btn-secondary text-xs"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await deleteCustomer(deleteConfirmModal.id, false);
+                          setDeleteConfirmModal(null);
+                        }}
+                        className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4"
+                      >
+                        Safe Archive
+                      </button>
+
+                      {!hasHistory && currentUser.role === 'Super Admin' && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await deleteCustomer(deleteConfirmModal.id, true);
+                            setDeleteConfirmModal(null);
+                          }}
+                          className="btn-danger text-xs font-bold px-4"
+                        >
+                          Permanent Delete
+                        </button>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </Modal>
+        )}
       </div>
     </AppLayout>
   );
 }
+

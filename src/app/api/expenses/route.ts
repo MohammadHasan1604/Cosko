@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifySessionToken } from '@/lib/auth';
+import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 /**
@@ -8,9 +7,7 @@ import { prisma } from '@/lib/db';
  */
 export async function GET(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('cosko_session')?.value;
-    const user = token ? verifySessionToken(token) : null;
+    const user = getAuthUserFromRequest(req);
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -34,7 +31,10 @@ export async function GET(req: NextRequest) {
       take: 100,
     });
 
-    return NextResponse.json({ success: true, expenses });
+    return NextResponse.json(
+      { success: true, expenses },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    );
   } catch (error: any) {
     console.error('API /api/expenses GET error:', error);
     return NextResponse.json({ error: 'Failed to retrieve expenses' }, { status: 500 });
@@ -46,9 +46,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('cosko_session')?.value;
-    const user = token ? verifySessionToken(token) : null;
+    const user = getAuthUserFromRequest(req);
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -84,5 +82,36 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('API /api/expenses POST error:', error);
     return NextResponse.json({ error: error.message || 'Failed to record expense' }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/expenses - Delete an expense record
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = getAuthUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (user.securityLevel < 80) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient security level' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Expense ID is required' }, { status: 400 });
+    }
+
+    await (prisma as any).expense.delete({ where: { id } });
+
+    return NextResponse.json({ success: true, message: 'Expense record deleted' });
+  } catch (error: any) {
+    console.error('API /api/expenses DELETE error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to delete expense' }, { status: 500 });
   }
 }

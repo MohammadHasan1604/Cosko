@@ -1,19 +1,28 @@
+'use client';
+
 import React from 'react';
 import Icon from '@/components/ui/AppIcon';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Link from 'next/link';
-
-// Mock data — backend integration: GET /api/v1/inventory/alerts?type=low-stock&limit=6
-const alerts = [
-  { id: 'alert-item-001', sku: 'SKU-1042', name: 'Bosch 12V Drill', store: 'BLR', qty: 2, reorder: 10, severity: 'out-of-stock' as const },
-  { id: 'alert-item-002', sku: 'SKU-0218', name: 'Philips LED 9W (Pack of 6)', store: 'HYD', qty: 5, reorder: 20, severity: 'low-stock' as const },
-  { id: 'alert-item-003', sku: 'SKU-0834', name: 'Havells 6A Switch Board', store: 'BLR', qty: 0, reorder: 15, severity: 'out-of-stock' as const },
-  { id: 'alert-item-004', sku: 'SKU-1198', name: 'Anchor Roma 3 Pin Plug', store: 'DEL', qty: 8, reorder: 25, severity: 'low-stock' as const },
-  { id: 'alert-item-005', sku: 'SKU-0562', name: 'Polycab 1.5 Sq Wire 90m', store: 'HYD', qty: 3, reorder: 12, severity: 'low-stock' as const },
-  { id: 'alert-item-006', sku: 'SKU-0091', name: 'Crompton Fan Regulator', store: 'DEL', qty: 0, reorder: 8, severity: 'out-of-stock' as const },
-];
+import { useApp } from '@/context/AppContext';
 
 export default function LowStockAlerts() {
+  const { inventory, selectedStore } = useApp();
+
+  const filteredInv = selectedStore === 'All Stores' ? inventory : inventory.filter((i) => i.store === selectedStore);
+
+  const alerts = filteredInv
+    .filter((item) => item.qtyOnHand <= (item.reorderPt || 5) || item.qtyOnHand === 0)
+    .map((item) => ({
+      id: item.id,
+      sku: item.sku,
+      name: item.name,
+      store: item.store || 'BLR',
+      qty: item.qtyOnHand,
+      reorder: item.reorderPt || 10,
+      severity: (item.qtyOnHand === 0 ? 'out-of-stock' : 'low-stock') as 'out-of-stock' | 'low-stock',
+    }));
+
   const outOfStockCount = alerts.filter((a) => a.severity === 'out-of-stock').length;
   const lowStockCount = alerts.filter((a) => a.severity === 'low-stock').length;
 
@@ -36,24 +45,34 @@ export default function LowStockAlerts() {
 
       {/* Alert list */}
       <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-border">
-        {alerts.map((alert) => (
-          <div key={alert.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors duration-100">
-            <div
-              className={`w-2 h-2 rounded-full flex-shrink-0 ${alert.severity === 'out-of-stock' ? 'bg-danger' : 'bg-warning'}`}
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground truncate">{alert.name}</p>
-              <p className="text-2xs text-muted-foreground mt-0.5">{alert.sku} · {alert.store}</p>
+        {alerts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center h-48">
+            <div className="w-10 h-10 rounded-full bg-positive/10 flex items-center justify-center mb-2">
+              <Icon name="CheckCircleIcon" size={20} className="text-positive" />
             </div>
-            <div className="text-right flex-shrink-0">
-              <StatusBadge
-                variant={alert.severity}
-                label={alert.qty === 0 ? 'Out of Stock' : `${alert.qty} left`}
-              />
-              <p className="text-2xs text-muted-foreground mt-0.5">Reorder: {alert.reorder}</p>
-            </div>
+            <p className="text-xs font-medium text-foreground">All stock levels optimal</p>
+            <p className="text-2xs text-muted-foreground mt-1 max-w-[200px]">No out-of-stock or low-stock items detected in the system.</p>
           </div>
-        ))}
+        ) : (
+          alerts.map((alert) => (
+            <div key={alert.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors duration-100">
+              <div
+                className={`w-2 h-2 rounded-full flex-shrink-0 ${alert.severity === 'out-of-stock' ? 'bg-danger' : 'bg-warning'}`}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-foreground truncate">{alert.name}</p>
+                <p className="text-2xs text-muted-foreground mt-0.5">{alert.sku} · {alert.store}</p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <StatusBadge
+                  variant={alert.severity}
+                  label={alert.qty === 0 ? 'Out of Stock' : `${alert.qty} left`}
+                />
+                <p className="text-2xs text-muted-foreground mt-0.5">Reorder: {alert.reorder}</p>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Footer */}

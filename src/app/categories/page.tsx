@@ -115,6 +115,20 @@ export default function CategoriesPage() {
     setAddModalOpen(false);
   };
 
+  const [confirmDeleteCat, setConfirmDeleteCat] = useState<CategoryItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteConfirm = async (permanent = false) => {
+    if (!confirmDeleteCat) return;
+    setIsDeleting(true);
+    try {
+      await deleteCategory(confirmDeleteCat.id, permanent);
+      setConfirmDeleteCat(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <AppLayout activeRoute="/categories">
       <div className="space-y-6 fade-in">
@@ -234,7 +248,7 @@ export default function CategoriesPage() {
                 ) : (
                   filteredCategories.map((cat) => {
                     const productsLinked = inventory.filter(
-                      (i) => i.category === cat.name || i.category === cat.slug || i.subcategory === cat.name
+                      (i) => i.category === cat.name || i.category === cat.slug || i.subcategory === cat.name || i.subcategory === cat.slug
                     ).length;
 
                     return (
@@ -279,7 +293,7 @@ export default function CategoriesPage() {
                         </td>
 
                         <td className="px-4 py-3 text-center">
-                          <span className="font-bold text-foreground px-2 py-0.5 rounded-full bg-muted/60 text-2xs">
+                          <span className={`font-bold px-2 py-0.5 rounded-full text-2xs ${productsLinked > 0 ? 'bg-primary/10 text-primary font-extrabold' : 'bg-muted/60 text-muted-foreground'}`}>
                             {productsLinked} SKUs
                           </span>
                         </td>
@@ -307,9 +321,9 @@ export default function CategoriesPage() {
 
                             <button
                               type="button"
-                              onClick={() => deleteCategory(cat.id)}
+                              onClick={() => setConfirmDeleteCat(cat)}
                               className="p-1.5 rounded-lg hover:bg-danger/10 text-muted-foreground hover:text-danger transition-colors"
-                              title="Archive Category"
+                              title="Archive / Delete Category"
                             >
                               <Icon name="ArchiveBoxIcon" size={15} />
                             </button>
@@ -416,7 +430,78 @@ export default function CategoriesPage() {
             </form>
           </Modal>
         )}
+
+        {/* Safe Delete / Archive Confirmation Dialog */}
+        {confirmDeleteCat && (
+          <Modal
+            open={!!confirmDeleteCat}
+            onClose={() => !isDeleting && setConfirmDeleteCat(null)}
+            title={`Archive / Delete "${confirmDeleteCat.name}"`}
+            subtitle="Database relational verification and safe lifecycle management"
+            size="md"
+          >
+            <div className="space-y-4 py-2 text-xs">
+              {(() => {
+                const linkedCount = inventory.filter(
+                  (i) => i.category === confirmDeleteCat.name || i.category === confirmDeleteCat.slug || i.subcategory === confirmDeleteCat.name || i.subcategory === confirmDeleteCat.slug
+                ).length;
+
+                return (
+                  <>
+                    <div className={`p-4 rounded-xl border ${linkedCount > 0 ? 'bg-warning/10 border-warning/30 text-foreground' : 'bg-muted/40 border-border text-foreground'}`}>
+                      <div className="flex items-start gap-2.5">
+                        <Icon name={linkedCount > 0 ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'} size={18} className={linkedCount > 0 ? 'text-warning shrink-0 mt-0.5' : 'text-primary shrink-0 mt-0.5'} />
+                        <div>
+                          <p className="font-bold text-sm">
+                            {linkedCount > 0 ? 'Category in Active Use' : 'Unused Category'}
+                          </p>
+                          <p className="text-muted-foreground mt-1">
+                            {linkedCount > 0
+                              ? `This category is currently linked to ${linkedCount} inventory product(s). To maintain accounting and sales record integrity, it will be safely Archived (hidden from active selection while preserving historical records).`
+                              : `This category has 0 linked products. You may archive it safely, or Super Admins may permanently remove it from the database.`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                      <button
+                        type="button"
+                        disabled={isDeleting}
+                        onClick={() => setConfirmDeleteCat(null)}
+                        className="btn-secondary text-xs"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isDeleting}
+                        onClick={() => handleDeleteConfirm(false)}
+                        className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4"
+                      >
+                        {isDeleting ? 'Archiving...' : 'Safe Archive'}
+                      </button>
+
+                      {linkedCount === 0 && currentUser.role === 'Super Admin' && (
+                        <button
+                          type="button"
+                          disabled={isDeleting}
+                          onClick={() => handleDeleteConfirm(true)}
+                          className="btn-danger text-xs font-bold px-4"
+                        >
+                          {isDeleting ? 'Deleting...' : 'Permanent Delete'}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </Modal>
+        )}
       </div>
     </AppLayout>
   );
 }
+

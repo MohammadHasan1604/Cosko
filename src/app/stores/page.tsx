@@ -286,25 +286,66 @@ export default function StoresPage() {
         </Modal>
       )}
 
-      {/* Delete Store Modal */}
+      {/* Delete / Deactivate Store Modal */}
       {deleteStoreModal && (
         <Modal
           open={!!deleteStoreModal}
           onClose={() => setDeleteStoreModal(null)}
-          title="Delete Store Hub"
-          subtitle={`Remove store outlet ${deleteStoreModal.name}?`}
-          size="sm"
+          title={`Deactivate / Delete Store "${deleteStoreModal.name}"`}
+          subtitle={`Code: ${deleteStoreModal.code} · Location: ${deleteStoreModal.city}`}
+          size="md"
         >
-          <div className="space-y-4 py-2">
-            <p className="text-xs text-muted-foreground">
-              Are you sure you want to delete store outlet {deleteStoreModal.name} ({deleteStoreModal.code})?
-            </p>
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <button onClick={() => setDeleteStoreModal(null)} className="btn-secondary text-xs">Cancel</button>
-              <button onClick={() => handleDeleteStore(deleteStoreModal.id)} className="btn-danger text-xs">
-                Delete Store Hub
-              </button>
-            </div>
+          <div className="space-y-4 py-2 text-xs">
+            {(() => {
+              const storeInventoryCount = inventory.filter((i) => i.store === deleteStoreModal.code).length;
+              const hasHistory = storeInventoryCount > 0 || deleteStoreModal.monthlyRevenue > 0;
+
+              return (
+                <>
+                  <div className={`p-4 rounded-xl border ${hasHistory ? 'bg-warning/10 border-warning/30 text-foreground' : 'bg-muted/40 border-border text-foreground'}`}>
+                    <div className="flex items-start gap-2.5">
+                      <Icon name={hasHistory ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'} size={18} className={hasHistory ? 'text-warning shrink-0 mt-0.5' : 'text-primary shrink-0 mt-0.5'} />
+                      <div>
+                        <p className="font-bold text-sm">
+                          {hasHistory ? 'Store Hub Has Active Inventory / Sales' : 'Unused Store Location'}
+                        </p>
+                        <p className="text-muted-foreground mt-1">
+                          {hasHistory
+                            ? `This store currently manages ${storeInventoryCount} product SKUs and historical sales records. To prevent data corruption, it will be safely Deactivated / Archived.`
+                            : `This store has no linked inventory or sales records. You can safely remove it.`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                    <button onClick={() => setDeleteStoreModal(null)} className="btn-secondary text-xs">Cancel</button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await deleteStoreHub(deleteStoreModal.id, false);
+                        setDeleteStoreModal(null);
+                      }}
+                      className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4"
+                    >
+                      Safe Deactivate
+                    </button>
+                    {!hasHistory && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await deleteStoreHub(deleteStoreModal.id, true);
+                          setDeleteStoreModal(null);
+                        }}
+                        className="btn-danger text-xs font-bold px-4"
+                      >
+                        Permanent Delete
+                      </button>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </Modal>
       )}

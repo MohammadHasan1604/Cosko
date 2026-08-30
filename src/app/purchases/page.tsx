@@ -325,20 +325,48 @@ export default function PurchasesPage() {
         <Modal
           open={!!deletePoModal}
           onClose={() => setDeletePoModal(null)}
-          title="Delete Purchase Order"
-          subtitle={`Delete PO ${deletePoModal.poNo}?`}
-          size="sm"
+          title={`Archive / Delete PO ${deletePoModal.poNo}`}
+          subtitle={`Supplier: ${deletePoModal.vendorName} · Status: ${deletePoModal.status}`}
+          size="md"
         >
-          <div className="space-y-4 py-2">
-            <p className="text-xs text-muted-foreground">
-              Are you sure you want to delete purchase order {deletePoModal.poNo}? This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <button onClick={() => setDeletePoModal(null)} className="btn-secondary text-xs">Cancel</button>
-              <button onClick={() => { deletePurchase(deletePoModal.id); setDeletePoModal(null); }} className="btn-danger text-xs">
-                Delete PO
-              </button>
-            </div>
+          <div className="space-y-4 py-2 text-xs">
+            {(() => {
+              const isReceived = deletePoModal.status === 'Received' || (deletePoModal as any).status === 'Completed';
+
+              return (
+                <>
+                  <div className={`p-4 rounded-xl border ${isReceived ? 'bg-warning/10 border-warning/30 text-foreground' : 'bg-muted/40 border-border text-foreground'}`}>
+                    <div className="flex items-start gap-2.5">
+                      <Icon name={isReceived ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'} size={18} className={isReceived ? 'text-warning shrink-0 mt-0.5' : 'text-primary shrink-0 mt-0.5'} />
+                      <div>
+                        <p className="font-bold text-sm">
+                          {isReceived ? 'Purchase Order Already Received Into Stock' : 'Draft / Unreceived Purchase Order'}
+                        </p>
+                        <p className="text-muted-foreground mt-1">
+                          {isReceived
+                            ? `This purchase order has already been received into central inventory stock. To protect warehouse ledgers and audit records, this PO will be safely Cancelled / Archived.`
+                            : `This draft PO has not impacted warehouse stock and can be safely deleted.`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                    <button onClick={() => setDeletePoModal(null)} className="btn-secondary text-xs">Cancel</button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await deletePurchase(deletePoModal.id);
+                        setDeletePoModal(null);
+                      }}
+                      className={isReceived ? "btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4" : "btn-danger text-xs font-bold px-4"}
+                    >
+                      {isReceived ? 'Cancel & Archive PO' : 'Delete Draft PO'}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </Modal>
       )}

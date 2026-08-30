@@ -1,19 +1,10 @@
 'use client';
-import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { MySQLDataService } from '@/lib/mysqlSync';
 
-export function normalizeMobileNumber(phone: string): string {
-  if (!phone) return '';
-  const digitsOnly = phone.replace(/\D/g, '');
-  if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
-    return digitsOnly.substring(2);
-  }
-  if (digitsOnly.length === 10) {
-    return digitsOnly;
-  }
-  return digitsOnly;
-}
+import { normalizeMobileNumber } from '@/lib/phoneUtils';
+export { normalizeMobileNumber };
 
 export interface AppBranding {
   appName: string;
@@ -278,85 +269,21 @@ const initialStoreHubs: StoreHub[] = [
   { id: 'st-mum', code: 'MUM', name: 'Mumbai Commercial Hub', city: 'Mumbai', address: 'Bandra Kurla Complex, Mumbai', manager: 'Rakesh Verma', phone: '+91 22 6688 9900', registers: 4, skusCount: 1200, monthlyRevenue: 1350000, status: 'Active' },
 ];
 
-export const initialCategories: CategoryItem[] = [
-  // 1. Mobile & Devices
-  { id: 'cat-mobiles', name: 'Mobile / Device', slug: 'mobile-device', parentCategoryId: null, categoryType: 'Device', description: 'Smartphones, Tablets, Smartwatches, and Laptops', status: 'Active', sortOrder: 1 },
-  { id: 'cat-smartphones', name: 'Smartphones', slug: 'smartphones', parentCategoryId: 'cat-mobiles', parentCategoryName: 'Mobile / Device', categoryType: 'Device', description: 'Android & iOS Mobile Phones', status: 'Active', sortOrder: 2 },
-  { id: 'cat-tablets', name: 'Tablets', slug: 'tablets', parentCategoryId: 'cat-mobiles', parentCategoryName: 'Mobile / Device', categoryType: 'Device', description: 'iPads and Android Tablets', status: 'Active', sortOrder: 3 },
-  { id: 'cat-smartwatches', name: 'Apple Watch / Smart Watch', slug: 'smartwatches', parentCategoryId: 'cat-mobiles', parentCategoryName: 'Mobile / Device', categoryType: 'Device', description: 'Smartwatches & Wearables', status: 'Active', sortOrder: 4 },
-  { id: 'cat-laptops', name: 'Laptops', slug: 'laptops', parentCategoryId: 'cat-mobiles', parentCategoryName: 'Mobile / Device', categoryType: 'Device', description: 'Laptops & MacBooks', status: 'Active', sortOrder: 5 },
+export const initialCategories: CategoryItem[] = [];
 
-  // 2. Mobile Parts / Repair
-  { id: 'cat-mobile-parts', name: 'Mobile Parts / Repair-Related', slug: 'mobile-parts-repair', parentCategoryId: null, categoryType: 'Spare Part', description: 'Displays, Batteries, Cameras, Ports, Charging Accessories', status: 'Active', sortOrder: 10 },
-  { id: 'cat-display', name: 'Screen / Display', slug: 'screen-display', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Spare Part', description: 'Touchscreen displays and LCD assemblies', status: 'Active', sortOrder: 11 },
-  { id: 'cat-backglass', name: 'Back Glass', slug: 'back-glass', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Spare Part', description: 'Rear housing and glass replacements', status: 'Active', sortOrder: 12 },
-  { id: 'cat-battery', name: 'Battery', slug: 'battery', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Spare Part', description: 'OEM & High-capacity lithium replacement batteries', status: 'Active', sortOrder: 13 },
-  { id: 'cat-charging-port', name: 'Charging Port', slug: 'charging-port', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Spare Part', description: 'Type-C & Lightning charging flex cables', status: 'Active', sortOrder: 14 },
-  { id: 'cat-speaker', name: 'Speaker', slug: 'speaker', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Spare Part', description: 'Loudspeakers and ringer buzzers', status: 'Active', sortOrder: 15 },
-  { id: 'cat-mic', name: 'Mic / Microphone', slug: 'microphone', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Spare Part', description: 'Microphone flex modules and noise cancel mics', status: 'Active', sortOrder: 16 },
-  { id: 'cat-receiver', name: 'Receiver / Earpiece', slug: 'earpiece-receiver', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Spare Part', description: 'Ear speaker modules', status: 'Active', sortOrder: 17 },
-  { id: 'cat-camera', name: 'Camera', slug: 'camera', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Spare Part', description: 'Rear and front selfie camera modules', status: 'Active', sortOrder: 18 },
-  { id: 'cat-chargers', name: 'Adapters / Chargers', slug: 'adapters-chargers', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Accessory', description: 'Fast chargers and power bricks', status: 'Active', sortOrder: 19 },
-  { id: 'cat-cables', name: 'Cables', slug: 'cables', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Accessory', description: 'Braided Type-C, Lightning, USB cables', status: 'Active', sortOrder: 20 },
-  { id: 'cat-mobile-acc', name: 'Other Mobile Accessories', slug: 'mobile-accessories', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Accessory', description: 'Cases, tempered glass, stands', status: 'Active', sortOrder: 21 },
-  { id: 'cat-mobile-spare', name: 'Other Mobile Spare Parts', slug: 'other-mobile-spares', parentCategoryId: 'cat-mobile-parts', parentCategoryName: 'Mobile Parts / Repair-Related', categoryType: 'Spare Part', description: 'SIM trays, antennas, motherboards', status: 'Active', sortOrder: 22 },
-
-  // 3. EV (Electric Vehicle)
-  { id: 'cat-ev', name: 'EV / Electric Vehicle', slug: 'ev-electric-vehicle', parentCategoryId: null, categoryType: 'EV', description: 'EV Spare parts, batteries, general service components', status: 'Active', sortOrder: 30 },
-  { id: 'cat-ev-service', name: 'General Service', slug: 'ev-general-service', parentCategoryId: 'cat-ev', parentCategoryName: 'EV / Electric Vehicle', categoryType: 'Service', description: 'EV Periodic maintenance and servicing kits', status: 'Active', sortOrder: 31 },
-  { id: 'cat-ev-brakes', name: 'Brake Parts', slug: 'ev-brake-parts', parentCategoryId: 'cat-ev', parentCategoryName: 'EV / Electric Vehicle', categoryType: 'Spare Part', description: 'Disc pads, brake shoes, calipers', status: 'Active', sortOrder: 32 },
-  { id: 'cat-ev-belt', name: 'Belt', slug: 'ev-belt', parentCategoryId: 'cat-ev', parentCategoryName: 'EV / Electric Vehicle', categoryType: 'Spare Part', description: 'Transmission drive belts', status: 'Active', sortOrder: 33 },
-  { id: 'cat-ev-motor', name: 'Motor', slug: 'ev-motor', parentCategoryId: 'cat-ev', parentCategoryName: 'EV / Electric Vehicle', categoryType: 'Spare Part', description: 'Hub motors and mid-drive EV motors', status: 'Active', sortOrder: 34 },
-  { id: 'cat-ev-wheel', name: 'Wheel / Pulley', slug: 'ev-wheel-pulley', parentCategoryId: 'cat-ev', parentCategoryName: 'EV / Electric Vehicle', categoryType: 'Spare Part', description: 'Rims, pulleys, and axle hubs', status: 'Active', sortOrder: 35 },
-  { id: 'cat-ev-body', name: 'Body Panels', slug: 'ev-body-panels', parentCategoryId: 'cat-ev', parentCategoryName: 'EV / Electric Vehicle', categoryType: 'Spare Part', description: 'Fenders, side panels, fairings', status: 'Active', sortOrder: 36 },
-  { id: 'cat-ev-battery', name: 'Battery / Electrical', slug: 'ev-battery-electrical', parentCategoryId: 'cat-ev', parentCategoryName: 'EV / Electric Vehicle', categoryType: 'EV', description: 'Lithium battery packs, BMS, and motor controllers', status: 'Active', sortOrder: 37 },
-  { id: 'cat-ev-spares', name: 'EV Spare Parts', slug: 'ev-spare-parts', parentCategoryId: 'cat-ev', parentCategoryName: 'EV / Electric Vehicle', categoryType: 'Spare Part', description: 'Switches, wiring harnesses, throttles', status: 'Active', sortOrder: 38 },
-  { id: 'cat-ev-acc', name: 'EV Accessories', slug: 'ev-accessories', parentCategoryId: 'cat-ev', parentCategoryName: 'EV / Electric Vehicle', categoryType: 'Accessory', description: 'Helmets, seat covers, mobile mounts, chargers', status: 'Active', sortOrder: 39 },
-
-  // 4. Home Appliances
-  { id: 'cat-home-appliances', name: 'Home Appliances', slug: 'home-appliances', parentCategoryId: null, categoryType: 'Home Appliance', description: 'AC, TV, Washing Machine, Refrigerator and Spares', status: 'Active', sortOrder: 50 },
-  { id: 'cat-ac', name: 'AC (Air Conditioner)', slug: 'ac-air-conditioner', parentCategoryId: 'cat-home-appliances', parentCategoryName: 'Home Appliances', categoryType: 'Home Appliance', description: 'Inverter ACs, Copper Coils, PCB, Gas kits', status: 'Active', sortOrder: 51 },
-  { id: 'cat-tv', name: 'TV (Television)', slug: 'tv-television', parentCategoryId: 'cat-home-appliances', parentCategoryName: 'Home Appliances', categoryType: 'Home Appliance', description: 'LED Panels, Smart TV Motherboards, Backlights', status: 'Active', sortOrder: 52 },
-  { id: 'cat-washing-machine', name: 'Washing Machine', slug: 'washing-machine', parentCategoryId: 'cat-home-appliances', parentCategoryName: 'Home Appliances', categoryType: 'Home Appliance', description: 'Motors, Drain Valves, Inlet Valves, Belts', status: 'Active', sortOrder: 53 },
-  { id: 'cat-refrigerator', name: 'Refrigerator', slug: 'refrigerator', parentCategoryId: 'cat-home-appliances', parentCategoryName: 'Home Appliances', categoryType: 'Home Appliance', description: 'Compressors, Relays, Thermostats, Door Gaskets', status: 'Active', sortOrder: 54 },
-  { id: 'cat-appliance-spares', name: 'Appliance Spare Parts', slug: 'appliance-spare-parts', parentCategoryId: 'cat-home-appliances', parentCategoryName: 'Home Appliances', categoryType: 'Spare Part', description: 'Capacitors, Fan Motors, Heating Elements', status: 'Active', sortOrder: 55 },
-  { id: 'cat-appliance-acc', name: 'Appliance Accessories', slug: 'appliance-accessories', parentCategoryId: 'cat-home-appliances', parentCategoryName: 'Home Appliances', categoryType: 'Accessory', description: 'Stabilizers, AC Covers, Stands, Descalers', status: 'Active', sortOrder: 56 },
-];
-
-const initialInventory: InventoryItem[] = [
-  { id: 'item-1', sku: 'COSKO-DISP-IP15', barcode: '8901234567890', name: 'iPhone 15 OLED Super Retina Display Assembly', brand: 'Apple OEM', model: 'A3090', category: 'Screen / Display', subcategory: 'Mobile Repair', store: 'CENTRAL', qtyOnHand: 45, reorderPt: 10, costPrice: 3200, transferPrice: 3800, sellingPrice: 4800, mrp: 5500, hsn: '85177090', taxRate: 18, warrantyMonths: 6, minStock: 10, status: 'active', fifoLots: 4, lastMovement: 'Today' },
-  { id: 'item-2', sku: 'COSKO-BATT-5000', barcode: '8901234567891', name: 'High-Capacity 5000mAh Replacement Battery', brand: 'CoskoPower', model: 'CP-5000', category: 'Battery', subcategory: 'Mobile Repair', store: 'BLR', qtyOnHand: 60, reorderPt: 15, costPrice: 650, transferPrice: 850, sellingPrice: 1200, mrp: 1500, hsn: '85044090', taxRate: 18, warrantyMonths: 12, minStock: 15, status: 'active', fifoLots: 6, lastMovement: 'Today' },
-  { id: 'item-3', sku: 'COSKO-CHG-65W', barcode: '8901234567892', name: '65W GaN Dual-Port Fast Power Adapter', brand: 'CoskoGear', model: 'CG-GAN65', category: 'Adapters / Chargers', subcategory: 'Accessories', store: 'BLR', qtyOnHand: 80, reorderPt: 20, costPrice: 850, transferPrice: 1100, sellingPrice: 1499, mrp: 1999, hsn: '85044030', taxRate: 18, warrantyMonths: 12, minStock: 20, status: 'active', fifoLots: 8, lastMovement: 'Today' },
-  { id: 'item-4', sku: 'COSKO-CAB-100W', barcode: '8901234567893', name: 'Braided Type-C to Type-C 100W Fast Cable (2M)', brand: 'CoskoGear', model: 'CG-CC100', category: 'Cables', subcategory: 'Accessories', store: 'HYD', qtyOnHand: 120, reorderPt: 30, costPrice: 180, transferPrice: 280, sellingPrice: 499, mrp: 799, hsn: '85444299', taxRate: 18, warrantyMonths: 6, minStock: 30, status: 'active', fifoLots: 12, lastMovement: 'Today' },
-  { id: 'item-5', sku: 'COSKO-EV-BELT01', barcode: '8901234567894', name: 'Carbon Fiber Reinforced EV Drive Belt', brand: 'CoskoEV', model: 'EV-BELT-8M', category: 'Belt', subcategory: 'EV Spares', store: 'BLR', qtyOnHand: 35, reorderPt: 8, costPrice: 1200, transferPrice: 1600, sellingPrice: 2100, mrp: 2600, hsn: '40103990', taxRate: 18, warrantyMonths: 12, minStock: 8, status: 'active', fifoLots: 3, lastMovement: 'Yesterday' },
-  { id: 'item-6', sku: 'COSKO-EV-BRK01', barcode: '8901234567895', name: 'Ceramic Disc Brake Pads Set (Front + Rear)', brand: 'CoskoEV', model: 'EV-PAD-PRO', category: 'Brake Parts', subcategory: 'EV Spares', store: 'DEL', qtyOnHand: 50, reorderPt: 12, costPrice: 450, transferPrice: 650, sellingPrice: 850, mrp: 1100, hsn: '87141090', taxRate: 18, warrantyMonths: 6, minStock: 12, status: 'active', fifoLots: 5, lastMovement: 'Today' },
-  { id: 'item-7', sku: 'COSKO-AC-PCB01', barcode: '8901234567896', name: 'Universal Inverter AC Main Controller PCB Board', brand: 'CoskoCool', model: 'AC-UNI-PCB', category: 'AC (Air Conditioner)', subcategory: 'Appliance Spares', store: 'MUM', qtyOnHand: 25, reorderPt: 5, costPrice: 1400, transferPrice: 1850, sellingPrice: 2400, mrp: 3000, hsn: '84159000', taxRate: 18, warrantyMonths: 12, minStock: 5, status: 'active', fifoLots: 2, lastMovement: 'Today' },
-  { id: 'item-8', sku: 'COSKO-REF-COMP', barcode: '8901234567897', name: 'Eco-Friendly R600a Refrigerator Compressor 1/6 HP', brand: 'CoskoCool', model: 'REF-R600-6', category: 'Refrigerator', subcategory: 'Appliance Spares', store: 'CENTRAL', qtyOnHand: 20, reorderPt: 5, costPrice: 2800, transferPrice: 3500, sellingPrice: 4500, mrp: 5400, hsn: '84143000', taxRate: 18, warrantyMonths: 24, minStock: 5, status: 'active', fifoLots: 2, lastMovement: 'Yesterday' },
-  { id: 'item-9', sku: 'COSKO-TV-MB4K', barcode: '8901234567898', name: 'Smart 4K UHD LED TV Universal Motherboard', brand: 'CoskoVision', model: 'TV-4K-SMART', category: 'TV (Television)', subcategory: 'Appliance Spares', store: 'HYD', qtyOnHand: 30, reorderPt: 6, costPrice: 1900, transferPrice: 2450, sellingPrice: 3200, mrp: 3999, hsn: '85299090', taxRate: 18, warrantyMonths: 12, minStock: 6, status: 'active', fifoLots: 3, lastMovement: 'Today' },
-];
+const initialInventory: InventoryItem[] = [];
 
 const initialStockTransfers: StockTransferRecord[] = [];
 
 const initialInventoryLedger: InventoryLedgerEntry[] = [];
 
-const initialRepairsEnquiries: RepairEnquiry[] = [
-  { id: 'rep-101', customerPhone: '+91 98765 43210', customerName: 'Suresh Kumar', enquiryDate: 'Today', deviceType: 'Mobile', deviceName: 'iPhone 15 Pro Max', repairStatus: 'In Progress', repairRequested: 'Screen / Display Replacement (Cracked OLED Glass)', technicianNotes: 'OEM panel fitted, completing glue curing and touch calibration test', internalCost: 3200, estimatedCost: 4800, assignedTech: 'Kiran Tech', storeCode: 'BLR', warrantyStatus: '6 Months Screen Warranty', createdAt: '2026-08-29' },
-  { id: 'rep-102', customerPhone: '+91 98765 43210', customerName: 'Suresh Kumar', enquiryDate: 'Yesterday', deviceType: 'EV', deviceName: 'Ather 450X Gen 3', repairStatus: 'Ready for Delivery', repairRequested: 'Carbon Drive Belt Replacement & Brake Caliper Bleeding', technicianNotes: 'Drive tension adjusted to 65Hz spec. Test ride completed.', internalCost: 1650, estimatedCost: 2950, assignedTech: 'Manjunath EV Tech', storeCode: 'BLR', warrantyStatus: '1 Year Warranty', createdAt: '2026-08-28' },
-  { id: 'rep-103', customerPhone: '+91 98450 11223', customerName: 'Ananya Rao', enquiryDate: '2 days ago', deviceType: 'AC', deviceName: 'Daikin 1.5 Ton Inverter AC', repairStatus: 'Delivered', repairRequested: 'PCB Microcontroller Replacement & Gas Refill', technicianNotes: 'Installed CoskoCool Universal PCB, leak checked and pressurized to 140 PSI', internalCost: 1800, estimatedCost: 3400, assignedTech: 'Ramesh HVAC', storeCode: 'HYD', warrantyStatus: '12 Months PCB Warranty', createdAt: '2026-08-27' },
-  { id: 'rep-104', customerPhone: '+91 98111 22334', customerName: 'Vikram Malhotra', enquiryDate: '3 days ago', deviceType: 'TV', deviceName: 'Samsung 55-inch 4K QLED TV', repairStatus: 'Diagnosing', repairRequested: 'LED Backlight Strip Failure (Dark Left Quarter)', technicianNotes: 'Inspecting LED driver voltages and edge LED ribbon connections', internalCost: 950, estimatedCost: 2400, assignedTech: 'Sunil Vision Tech', storeCode: 'DEL', warrantyStatus: 'Pending', createdAt: '2026-08-26' },
-];
+const initialRepairsEnquiries: RepairEnquiry[] = [];
 
-const initialSales: SalesOrder[] = [
-  { id: 'sale-1', orderNo: 'CS26BLR0011', customerName: 'Suresh Kumar', customerPhone: '+91 98765 43210', store: 'BLR', items: [{ itemId: 'item-3', name: '65W GaN Dual-Port Fast Power Adapter', qty: 1, unitPrice: 1499, taxRate: 18 }], subtotal: 1270.34, taxTotal: 228.66, discount: 0, total: 1499, taxEnabled: true, paymentMethod: 'UPI', status: 'Completed', createdAt: 'Today', period: 'Today' },
-];
+const initialSales: SalesOrder[] = [];
 
 const initialPurchases: PurchaseOrder[] = [];
 
-const initialCustomers: Customer[] = [
-  { id: 'cust-1', name: 'Suresh Kumar', email: 'suresh.kumar@gmail.com', phone: '+91 98765 43210', city: 'Bengaluru', tier: 'VIP', totalSpend: 54990, creditBalance: 0, lastPurchase: 'Today' },
-  { id: 'cust-2', name: 'Ananya Rao', email: 'ananya.rao@gmail.com', phone: '+91 98450 11223', city: 'Hyderabad', tier: 'Regular', totalSpend: 18400, creditBalance: 0, lastPurchase: '2 days ago' },
-  { id: 'cust-3', name: 'Vikram Malhotra', email: 'vikram.m@gmail.com', phone: '+91 98111 22334', city: 'Delhi', tier: 'Regular', totalSpend: 12800, creditBalance: 0, lastPurchase: '3 days ago' },
-];
+const initialCustomers: Customer[] = [];
 
 const initialVendors: Vendor[] = [];
 
@@ -387,7 +314,7 @@ interface AppContextType {
   storesList: StoreHub[];
   addStoreHub: (store: Omit<StoreHub, 'id'>) => void;
   updateStoreHub: (id: string, updated: Partial<StoreHub>) => void;
-  deleteStoreHub: (id: string) => void;
+  deleteStoreHub: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   usersList: UserAccount[];
   addUserAccount: (user: Omit<UserAccount, 'id' | 'lastLogin' | 'permissions'>) => void;
   updateUserAccount: (id: string, updated: Partial<UserAccount>) => void;
@@ -395,18 +322,18 @@ interface AppContextType {
   toggleUserStatus: (id: string, nextStatus: 'Active' | 'Inactive' | 'Suspended') => void;
   setUserPermissionOverride: (userId: string, permissionCode: string, overrideType: 'ALLOW' | 'DENY' | 'RESET') => void;
   toggleUserStoreAccess: (userId: string, storeCode: string) => void;
-  deleteUserAccount: (id: string) => void;
+  deleteUserAccount: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   categoriesList: CategoryItem[];
   addCategory: (cat: Omit<CategoryItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateCategory: (id: string, updated: Partial<CategoryItem>) => void;
   toggleCategoryStatus: (id: string) => void;
-  deleteCategory: (id: string) => void;
+  deleteCategory: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   changeUserPassword: (currentPass: string, newPass: string, confirmPass: string) => Promise<{ success: boolean; message: string }>;
   updateUserProfile: (name: string, phone?: string, avatarUrl?: string) => Promise<{ success: boolean; message: string }>;
   inventory: InventoryItem[];
   addItem: (item: Omit<InventoryItem, 'id'>) => void;
   updateItem: (id: string, updated: Partial<InventoryItem>) => void;
-  deleteItem: (id: string) => void;
+  deleteItem: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   adjustStock: (id: string, qtyChange: number, reason: string) => void;
   transferStock: (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number, status?: 'Completed' | 'Draft') => void;
   updateTransferStatus: (id: string, nextStatus: 'Completed' | 'Cancelled') => void;
@@ -420,19 +347,21 @@ interface AppContextType {
   purchases: PurchaseOrder[];
   addPurchase: (po: Omit<PurchaseOrder, 'id' | 'poNo' | 'createdAt'>) => void;
   updatePurchase: (id: string, updated: Partial<PurchaseOrder>) => void;
-  deletePurchase: (id: string) => void;
+  deletePurchase: (id: string) => Promise<{ success: boolean; mode?: string; message?: string }>;
   customers: Customer[];
   addCustomer: (cust: Omit<Customer, 'id' | 'totalSpend' | 'lastPurchase'>) => Customer;
   updateCustomer: (id: string, updated: Partial<Customer>) => void;
-  deleteCustomer: (id: string) => void;
+  deleteCustomer: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   vendors: Vendor[];
   addVendor: (vendor: Omit<Vendor, 'id' | 'code'>) => void;
   updateVendor: (id: string, updated: Partial<Vendor>) => void;
-  deleteVendor: (id: string) => void;
+  deleteVendor: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   expenses: Expense[];
   addExpense: (expense: Omit<Expense, 'id' | 'referenceNo' | 'date'>) => void;
+  deleteExpense: (id: string) => Promise<{ success: boolean; mode?: string; message?: string }>;
   auditLogs: AuditLog[];
   addAuditLog: (module: string, action: string, details: string) => void;
+  refreshAllData: () => Promise<void>;
   notifications: NotificationItem[];
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
@@ -488,6 +417,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialAuditLogs);
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -554,6 +484,217 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAuthStatus('UNAUTHENTICATED');
     }
   }, [usersList]);
+
+  // ─── LOAD ALL DATA FROM MySQL API ON MOUNT & REFRESH ─────────────────────
+  // Authoritative persistence: fetch real data from MySQL database
+  const refreshAllData = useCallback(async () => {
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      const opts: RequestInit = { credentials: 'include', headers };
+
+      // Fetch all authoritative data in parallel
+      const [
+        storesRes, categoriesRes, inventoryRes, salesRes, purchasesRes,
+        customersRes, vendorsRes, expensesRes, repairsRes, usersRes
+      ] = await Promise.allSettled([
+        fetch('/api/stores', opts),
+        fetch('/api/categories', opts),
+        fetch('/api/inventory', opts),
+        fetch('/api/sales', opts),
+        fetch('/api/purchases', opts),
+        fetch('/api/customers', opts),
+        fetch('/api/vendors', opts),
+        fetch('/api/expenses', opts),
+        fetch('/api/repairs', opts),
+        fetch('/api/users', opts),
+      ]);
+
+      const safeJson = async (result: PromiseSettledResult<Response>) => {
+        if (result.status === 'fulfilled' && result.value.ok) {
+          return await result.value.json();
+        }
+        return null;
+      };
+
+      const storesData = await safeJson(storesRes);
+      if (storesData?.success && Array.isArray(storesData.stores)) {
+        setStoresList(storesData.stores.map((s: any) => ({
+          id: s.id, code: s.code, name: s.name, city: s.city,
+          address: s.address, manager: s.managerName || '',
+          phone: s.phone || '', registers: s.registersCount,
+          skusCount: s.skusCount, monthlyRevenue: Number(s.monthlyRevenue) || 0,
+          status: s.status,
+        })));
+      }
+
+      const categoriesData = await safeJson(categoriesRes);
+      if (categoriesData?.success && Array.isArray(categoriesData.categories)) {
+        setCategoriesList(categoriesData.categories.map((c: any) => ({
+          id: c.id, name: c.name, slug: c.slug,
+          parentCategoryId: c.parentCategoryId || null,
+          parentCategoryName: c.parent?.name,
+          categoryType: c.categoryType || 'Product',
+          description: c.description || '',
+          icon: c.icon, imageUrl: c.imageUrl,
+          status: c.status || 'Active',
+          sortOrder: c.sortOrder || 0,
+          createdAt: c.createdAt, updatedAt: c.updatedAt,
+        })));
+      }
+
+      const inventoryData = await safeJson(inventoryRes);
+      if (inventoryData?.success && Array.isArray(inventoryData.products)) {
+        const items: InventoryItem[] = [];
+        for (const p of inventoryData.products) {
+          if (p.status === 'deleted' || p.status === 'archived') continue;
+          if (p.inventoryItems && p.inventoryItems.length > 0) {
+            for (const inv of p.inventoryItems) {
+              items.push({
+                id: p.id, sku: p.sku, barcode: p.barcode || '',
+                name: p.name, brand: p.brand || '', model: p.model || '',
+                category: p.category, subcategory: p.subcategory || '',
+                store: inv.storeCode, qtyOnHand: inv.qtyOnHand,
+                reorderPt: inv.reorderPt || 5,
+                costPrice: Number(p.baseCostPrice),
+                transferPrice: Math.round(Number(p.baseCostPrice) * 1.18),
+                sellingPrice: Number(p.baseSellingPrice),
+                mrp: Math.round(Number(p.baseSellingPrice) * 1.2),
+                hsn: '', taxRate: Number(p.gstRate) || 18,
+                warrantyMonths: p.warrantyMonths || 12,
+                minStock: inv.reorderPt || 10,
+                status: p.status as any,
+                fifoLots: 1, lastMovement: 'Synced',
+                imageUrl: p.imageUrl,
+              });
+            }
+          } else {
+            items.push({
+              id: p.id, sku: p.sku, barcode: p.barcode || '',
+              name: p.name, brand: p.brand || '', model: p.model || '',
+              category: p.category, subcategory: p.subcategory || '',
+              store: 'CENTRAL', qtyOnHand: 0, reorderPt: 5,
+              costPrice: Number(p.baseCostPrice),
+              transferPrice: Math.round(Number(p.baseCostPrice) * 1.18),
+              sellingPrice: Number(p.baseSellingPrice),
+              mrp: Math.round(Number(p.baseSellingPrice) * 1.2),
+              hsn: '', taxRate: Number(p.gstRate) || 18,
+              warrantyMonths: p.warrantyMonths || 12,
+              minStock: 10, status: p.status as any,
+              fifoLots: 0, lastMovement: 'Never',
+              imageUrl: p.imageUrl,
+            });
+          }
+        }
+        setInventory(items);
+      }
+
+      const salesData = await safeJson(salesRes);
+      if (salesData?.success && Array.isArray(salesData.sales)) {
+        setSales(salesData.sales.map((s: any) => ({
+          id: s.id, orderNo: s.orderNo,
+          customerName: s.customerName, customerPhone: s.customerPhone,
+          store: s.storeCode,
+          items: s.items?.map((it: any) => ({
+            itemId: it.productId, name: it.productName, sku: it.sku,
+            qty: it.qty, unitPrice: Number(it.unitPrice), taxRate: 18,
+          })) || [],
+          subtotal: Number(s.subtotal), taxTotal: Number(s.taxAmount),
+          discount: Number(s.discountAmount) || 0,
+          total: Number(s.grandTotal), taxEnabled: true,
+          paymentMethod: s.paymentMethod, status: s.status,
+          createdAt: new Date(s.createdAt).toLocaleDateString('en-IN'),
+          period: 'DB',
+        })));
+      }
+
+      const purchasesData = await safeJson(purchasesRes);
+      if (purchasesData?.success && Array.isArray(purchasesData.purchases)) {
+        setPurchases(purchasesData.purchases.map((p: any) => ({
+          id: p.id, poNo: p.poNo, vendorName: p.vendor?.name || 'Unknown',
+          vendorId: p.vendorId,
+          store: p.storeCode || 'CENTRAL',
+          items: p.items?.map((it: any) => ({
+            name: it.productName || 'Item', sku: it.sku || '',
+            qty: it.qtyOrdered, unitCost: Number(it.unitCost),
+          })) || [],
+          totalAmount: Number(p.totalCost),
+          status: p.status, paymentStatus: p.paymentStatus,
+          createdAt: new Date(p.createdAt).toLocaleDateString('en-IN'),
+          expectedDate: p.expectedDate ? new Date(p.expectedDate).toLocaleDateString('en-IN') : 'ASAP',
+        })));
+      }
+
+      const customersData = await safeJson(customersRes);
+      if (customersData?.success && Array.isArray(customersData.customers)) {
+        setCustomers(customersData.customers.filter((c: any) => c.status !== 'Archived').map((c: any) => ({
+          id: c.id, name: c.name, phone: c.phone,
+          email: c.email || '', city: c.city || '',
+          tier: Number(c.totalSpent) > 50000 ? 'VIP' : 'Regular',
+          totalSpend: Number(c.totalSpent) || 0,
+          creditBalance: Number(c.creditBalance) || 0,
+          lastPurchase: c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('en-IN') : 'Never',
+        })));
+      }
+
+      const vendorsData = await safeJson(vendorsRes);
+      if (vendorsData?.success && Array.isArray(vendorsData.vendors)) {
+        setVendors(vendorsData.vendors.filter((v: any) => v.status !== 'Archived').map((v: any) => ({
+          id: v.id, code: v.code, name: v.name,
+          contactPerson: v.contactPerson, email: v.email,
+          phone: v.phone, city: v.city, address: v.address || '',
+          category: v.categories || 'General',
+          outstandingPayable: 0, rating: 4.8, leadTimeDays: 3,
+        })));
+      }
+
+      const expensesData = await safeJson(expensesRes);
+      if (expensesData?.success && Array.isArray(expensesData.expenses)) {
+        setExpenses(expensesData.expenses.map((e: any) => ({
+          id: e.id, referenceNo: e.expenseNo,
+          category: e.category, amount: Number(e.amount),
+          store: e.storeCode, description: e.description,
+          paymentMethod: e.paymentMethod, status: 'Approved',
+          date: new Date(e.date).toLocaleDateString('en-IN'),
+        })));
+      }
+
+      const usersData = await safeJson(usersRes);
+      if (usersData?.success && Array.isArray(usersData.users)) {
+        setUsersList(usersData.users.map((u: any) => ({
+          id: u.id, name: u.name, email: u.email,
+          role: u.role, securityLevel: u.securityLevel,
+          store: u.store, allowedStores: u.assignedStores,
+          status: u.status, shiftStatus: 'On Shift',
+          lastLogin: u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('en-IN') : 'Recent',
+          permissions: u.role === 'Super Admin' ? ['ALL_PERMISSIONS'] : [],
+        })));
+      }
+
+      const repairsData = await safeJson(repairsRes);
+      if (repairsData?.success && Array.isArray(repairsData.repairs)) {
+        setRepairsEnquiries(repairsData.repairs.map((r: any) => ({
+          id: r.id, customerPhone: r.customerPhone,
+          customerName: r.customerName, enquiryDate: new Date(r.createdAt).toLocaleDateString('en-IN'),
+          deviceType: 'Mobile', deviceName: r.deviceName,
+          repairStatus: r.status, repairRequested: r.issueDescription,
+          estimatedCost: Number(r.estimatedCost),
+          assignedTech: r.assignedTech || '',
+          storeCode: 'BLR', createdAt: r.createdAt,
+        })));
+      }
+
+      setDataLoaded(true);
+      console.log('[COSKO] Authoritative data loaded from MySQL database');
+    } catch (err) {
+      console.warn('[COSKO] Data loading error:', err);
+      setDataLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authStatus !== 'AUTHENTICATED' || dataLoaded) return;
+    refreshAllData();
+  }, [authStatus, dataLoaded, refreshAllData]);
 
   // Realtime Live Event Synchronization (Server-Sent Events)
   useEffect(() => {
@@ -663,29 +804,57 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSelectedStoreState(store);
   };
 
-  const addStoreHub = (storeData: Omit<StoreHub, 'id'>) => {
-    const newStore: StoreHub = { ...storeData, id: `st-${Date.now()}` };
+  const addStoreHub = async (storeData: Omit<StoreHub, 'id'>) => {
+    const tempId = `st-${Date.now()}`;
+    const newStore: StoreHub = { ...storeData, id: tempId };
     setStoresList((prev) => [newStore, ...prev]);
-    MySQLDataService.syncStore(newStore);
     addAuditLog('Stores', 'Create Store Hub', `Created store hub "${newStore.name}" (${newStore.code})`);
-    toast.success(`Store Hub "${newStore.name}" created!`);
+    
+    try {
+      const res = await MySQLDataService.syncStore(newStore);
+      if (res?.success && res.store) {
+        setStoresList((prev) =>
+          prev.map((s) => (s.id === tempId ? { ...s, id: res.store.id, code: res.store.code } : s))
+        );
+        toast.success(`Store Hub "${newStore.name}" (${newStore.code}) created & saved to MySQL!`);
+      } else {
+        toast.success(`Store Hub "${newStore.name}" created!`);
+      }
+    } catch {
+      toast.success(`Store Hub "${newStore.name}" created!`);
+    }
   };
 
   const updateStoreHub = (id: string, updated: Partial<StoreHub>) => {
-    setStoresList((prev) => prev.map((s) => (s.id === id ? { ...s, ...updated } : s)));
-    const target = storesList.find((s) => s.id === id);
+    setStoresList((prev) => prev.map((s) => (s.id === id || s.code === id ? { ...s, ...updated } : s)));
+    const target = storesList.find((s) => s.id === id || s.code === id);
     if (target) MySQLDataService.syncStore({ ...target, ...updated });
     addAuditLog('Stores', 'Edit Store Hub', `Updated store #${id}`);
     toast.success('Store details updated');
   };
 
-  const deleteStoreHub = (id: string) => {
-    const s = storesList.find((st) => st.id === id);
-    setStoresList((prev) => prev.filter((st) => st.id !== id));
-    if (s) {
-      MySQLDataService.deleteStore(id);
-      addAuditLog('Stores', 'Delete Store Hub', `Removed store hub "${s.name}" (${s.code})`);
-      toast.success(`Removed store "${s.name}"`);
+  const deleteStoreHub = async (id: string, permanent = false) => {
+    const s = storesList.find((st) => st.id === id || st.code === id || st.code.toUpperCase() === id.toUpperCase());
+    const lookupId = s ? s.code : id;
+    try {
+      const res = await MySQLDataService.deleteStore(lookupId, permanent);
+      if (res?.success) {
+        setStoresList((prev) => prev.filter((st) => st.id !== id && st.code !== id && (s ? st.id !== s.id && st.code !== s.code : true)));
+        if (selectedStore === (s?.code || id)) {
+          setSelectedStoreState('All Stores');
+        }
+        if (s) {
+          addAuditLog('Stores', res.mode === 'archived' ? 'Deactivate Store Hub' : 'Delete Store Hub', `${res.message || `Removed store "${s.name}"`}`);
+        }
+        toast.success(res.message || `Removed store "${s?.name || id}"`);
+        return { success: true, mode: res.mode, message: res.message };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to remove store hub');
+        return { success: false, message: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error('Network error while deleting store');
+      return { success: false, message: err.message };
     }
   };
 
@@ -777,13 +946,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toast.success(`Updated store scope access for ${storeCode}`);
   };
 
-  const deleteUserAccount = (id: string) => {
+  const deleteUserAccount = async (id: string, permanent = false) => {
     const u = usersList.find((usr) => usr.id === id);
-    setUsersList((prev) => prev.filter((usr) => usr.id !== id));
-    if (u) {
-      MySQLDataService.deleteProfile(id);
-      addAuditLog('Users & Roles', 'Delete User Account', `Deleted account "${u.name}" (${u.email})`);
-      toast.success(`Removed account "${u.name}"`);
+    try {
+      const res = await MySQLDataService.deleteProfile(id, permanent);
+      if (res?.success) {
+        setUsersList((prev) => prev.filter((usr) => usr.id !== id));
+        if (u) {
+          addAuditLog('Users & Roles', res.mode === 'archived' ? 'Deactivate User Account' : 'Delete User Account', res.message || `Removed account "${u.name}"`);
+        }
+        toast.success(res.message || `Removed account "${u?.name || id}"`);
+        return { success: true, mode: res.mode, message: res.message };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to delete user account');
+        return { success: false, message: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error('Network error while deleting user');
+      return { success: false, message: err.message };
     }
   };
 
@@ -845,12 +1025,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const deleteCategory = (id: string) => {
-    const target = categoriesList.find((c) => c.id === id);
-    setCategoriesList((prev) => prev.map((c) => (c.id === id ? { ...c, status: 'Archived' as const } : c)));
-    if (target) {
-      addAuditLog('Categories', 'Archive Category', `Archived category "${target.name}"`);
-      toast.success(`Category "${target.name}" archived`);
+  const deleteCategory = async (id: string, permanent = false) => {
+    const target = categoriesList.find((c) => c.id === id || c.slug === id);
+    try {
+      const res = await MySQLDataService.deleteCategory(id, permanent);
+      if (res?.success) {
+        setCategoriesList((prev) => prev.filter((c) => c.id !== id && c.slug !== id));
+        if (target) {
+          addAuditLog('Categories', res.mode === 'archived' ? 'Archive Category' : 'Delete Category', res.message || `Removed category "${target.name}"`);
+        }
+        toast.success(res.message || `Category "${target?.name || id}" removed`);
+        return { success: true, mode: res.mode, message: res.message };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to remove category');
+        return { success: false, message: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error('Network error while removing category');
+      return { success: false, message: err.message };
     }
   };
 
@@ -955,13 +1147,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toast.success('Inventory item updated successfully');
   };
 
-  const deleteItem = (id: string) => {
-    const itemToDelete = inventory.find((i) => i.id === id);
-    setInventory((prev) => prev.filter((i) => i.id !== id));
-    if (itemToDelete) {
-      MySQLDataService.deleteProduct(id);
-      addAuditLog('Inventory', 'Delete Product', `Deleted item "${itemToDelete.name}" (${itemToDelete.sku})`);
-      toast.success(`Removed "${itemToDelete.name}" from inventory`);
+  const deleteItem = async (id: string, permanent = false) => {
+    const itemToDelete = inventory.find((i) => i.id === id || i.sku === id);
+    try {
+      const res = await MySQLDataService.deleteProduct(id, permanent);
+      if (res?.success) {
+        setInventory((prev) => prev.filter((i) => i.id !== id && i.sku !== id));
+        if (itemToDelete) {
+          addAuditLog('Inventory', res.mode === 'archived' ? 'Archive Product' : 'Delete Product', res.message || `Removed item "${itemToDelete.name}" (${itemToDelete.sku})`);
+        }
+        toast.success(res.message || `Removed "${itemToDelete?.name || id}" from inventory`);
+        return { success: true, mode: res.mode, message: res.message };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to remove inventory item');
+        return { success: false, message: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error('Network error while removing item');
+      return { success: false, message: err.message };
     }
   };
 
@@ -1397,12 +1600,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toast.success(`Credited ${po.items.reduce((acc, i) => acc + i.qty, 0)} units to Central Warehouse Stock`);
   };
 
-  const deletePurchase = (id: string) => {
+  const deletePurchase = async (id: string) => {
     const poToDelete = purchases.find((p) => p.id === id);
-    setPurchases((prev) => prev.filter((p) => p.id !== id));
-    if (poToDelete) {
-      addAuditLog('Purchases', 'Delete Purchase Order', `Deleted PO ${poToDelete.poNo}`);
-      toast.success(`Removed Purchase Order ${poToDelete.poNo}`);
+    try {
+      const res = await MySQLDataService.deletePurchase(id);
+      if (res?.success) {
+        setPurchases((prev) => prev.filter((p) => p.id !== id));
+        if (poToDelete) {
+          addAuditLog('Purchases', res.mode === 'archived' ? 'Cancel Purchase Order' : 'Delete Purchase Order', res.message || `Removed PO ${poToDelete.poNo}`);
+        }
+        toast.success(res.message || `Removed Purchase Order ${poToDelete?.poNo || id}`);
+        return { success: true, mode: res.mode, message: res.message };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to delete purchase order');
+        return { success: false, message: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error('Network error while deleting purchase order');
+      return { success: false, message: err.message };
     }
   };
 
@@ -1428,12 +1643,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toast.success('Customer record updated');
   };
 
-  const deleteCustomer = (id: string) => {
+  const deleteCustomer = async (id: string, permanent = false) => {
     const cust = customers.find((c) => c.id === id);
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
-    if (cust) {
-      addAuditLog('Customers', 'Delete Customer', `Removed customer "${cust.name}"`);
-      toast.success(`Customer "${cust.name}" removed`);
+    try {
+      const res = await MySQLDataService.deleteCustomer(id, permanent);
+      if (res?.success) {
+        setCustomers((prev) => prev.filter((c) => c.id !== id));
+        if (cust) {
+          addAuditLog('Customers', res.mode === 'archived' ? 'Archive Customer' : 'Delete Customer', res.message || `Removed customer "${cust.name}"`);
+        }
+        toast.success(res.message || `Customer "${cust?.name || id}" removed`);
+        return { success: true, mode: res.mode, message: res.message };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to remove customer');
+        return { success: false, message: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error('Network error while deleting customer');
+      return { success: false, message: err.message };
     }
   };
 
@@ -1457,12 +1684,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toast.success('Vendor profile updated');
   };
 
-  const deleteVendor = (id: string) => {
-    const v = vendors.find((vend) => vend.id === id);
-    setVendors((prev) => prev.filter((vend) => vend.id !== id));
-    if (v) {
-      addAuditLog('Vendors', 'Delete Vendor', `Removed supplier "${v.name}"`);
-      toast.success(`Vendor "${v.name}" removed`);
+  const deleteVendor = async (id: string, permanent = false) => {
+    const v = vendors.find((vend) => vend.id === id || vend.code === id);
+    try {
+      const res = await MySQLDataService.deleteVendor(id, permanent);
+      if (res?.success) {
+        setVendors((prev) => prev.filter((vend) => vend.id !== id && vend.code !== id));
+        if (v) {
+          addAuditLog('Vendors', res.mode === 'archived' ? 'Archive Vendor' : 'Delete Vendor', res.message || `Removed supplier "${v.name}"`);
+        }
+        toast.success(res.message || `Vendor "${v?.name || id}" removed`);
+        return { success: true, mode: res.mode, message: res.message };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to remove vendor');
+        return { success: false, message: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error('Network error while deleting vendor');
+      return { success: false, message: err.message };
     }
   };
 
@@ -1477,6 +1716,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     MySQLDataService.syncExpense({ ...newExp, spentBy: currentUser.name });
     addAuditLog('Expenses', 'Create Expense Record', `Logged expense "${newExp.description}" for ₹${newExp.amount.toLocaleString('en-IN')} (${newExp.store})`);
     toast.success(`Expense record ${newExp.referenceNo} logged`);
+  };
+
+  const deleteExpense = async (id: string) => {
+    const exp = expenses.find((e) => e.id === id || e.referenceNo === id);
+    try {
+      const res = await MySQLDataService.deleteExpense(id);
+      if (res?.success) {
+        setExpenses((prev) => prev.filter((e) => e.id !== id && e.referenceNo !== id));
+        if (exp) {
+          addAuditLog('Expenses', 'Delete Expense Record', `Deleted expense "${exp.description}" (${exp.referenceNo})`);
+        }
+        toast.success(res.message || `Expense record ${exp?.referenceNo || id} deleted`);
+        return { success: true, mode: 'deleted', message: res.message };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to delete expense record');
+        return { success: false, message: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error('Network error while deleting expense');
+      return { success: false, message: err.message };
+    }
   };
 
   const addAuditLog = (module: string, action: string, details: string) => {
@@ -1566,8 +1826,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteVendor,
         expenses,
         addExpense,
+        deleteExpense,
         auditLogs,
         addAuditLog,
+        refreshAllData,
         notifications,
         markNotificationRead,
         markAllNotificationsRead,

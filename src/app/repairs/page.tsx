@@ -116,7 +116,7 @@ const INITIAL_REPAIRS: RepairItem[] = [
 
 export default function RepairsPage() {
   const { currentUser, selectedStore } = useApp();
-  const [repairs, setRepairs] = useState<RepairItem[]>(INITIAL_REPAIRS);
+  const [repairs, setRepairs] = useState<RepairItem[]>([]);
   const [kpis, setKpis] = useState({
     totalEnquiries: 5,
     pendingCount: 1,
