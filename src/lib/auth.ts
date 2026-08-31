@@ -15,6 +15,7 @@ export interface SessionUser {
   avatar: string;
   shiftStatus: 'On Shift' | 'On Leave';
   avatarUrl?: string;
+  mustChangePassword?: boolean;
 }
 
 /**
@@ -43,13 +44,14 @@ export function signSessionToken(user: SessionUser): string {
 export function createSession(userId: string, storeScope: string, securityLevel: number) {
   const user: SessionUser = {
     id: userId,
-    name: 'Test User',
-    email: 'test@cosko.com',
+    name: 'User',
+    email: 'user@cosko.com',
     role: securityLevel === 100 ? 'Super Admin' : securityLevel === 80 ? 'Store Manager' : 'Employee',
     securityLevel,
     store: storeScope,
-    avatar: 'TU',
+    avatar: 'US',
     shiftStatus: 'On Shift',
+    mustChangePassword: false,
   };
   const token = jwt.sign({ user, nonce: Math.random() + '_' + Date.now() }, AUTH_SECRET, { expiresIn: '7d' });
   return { token, userId, storeScope, securityLevel };
@@ -68,7 +70,6 @@ export function verifySessionToken(token: string): SessionUser | null {
 }
 
 const revokedTokens = new Set<string>();
-const loginAttemptMap = new Map<string, number[]>();
 
 export function revokeSession(token: string): boolean {
   revokedTokens.add(token);
@@ -99,18 +100,43 @@ export function verifySession(token: string) {
   };
 }
 
-export function checkRateLimit(ipOrEmail: string, maxAttempts = 5, windowMs = 60000): { allowed: boolean; remaining: number } {
-  const now = Date.now();
-  const attempts = loginAttemptMap.get(ipOrEmail) || [];
-  const validAttempts = attempts.filter((t) => now - t < windowMs);
+export { checkRateLimit, recordFailedAttempt, clearRateLimit } from './rateLimit';
 
-  if (validAttempts.length >= maxAttempts) {
-    return { allowed: false, remaining: 0 };
+/**
+ * Validates request Origin and Referer against allowed domains to mitigate CSRF attacks.
+ */
+export function isValidAuthOrigin(req: Request): boolean {
+  const origin = req.headers.get('origin');
+  const referer = req.headers.get('referer');
+  const host = req.headers.get('host');
+  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+
+  if (!origin && !referer) {
+    // Non-browser or server-to-server request
+    return true;
   }
 
-  validAttempts.push(now);
-  loginAttemptMap.set(ipOrEmail, validAttempts);
-  return { allowed: true, remaining: maxAttempts - validAttempts.length };
+  const targetUrl = origin || referer;
+  if (!targetUrl) return true;
+
+  try {
+    const parsed = new URL(targetUrl);
+    if (host && parsed.host === host) {
+      return true;
+    }
+    if (configuredAppUrl) {
+      const parsedConfig = new URL(configuredAppUrl);
+      if (parsed.host === parsedConfig.host) {
+        return true;
+      }
+    }
+    // Allow localhost during dev
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      return true;
+    }
+  } catch {}
+
+  return false;
 }
 
 /**
@@ -135,46 +161,8 @@ export function getAuthUserFromRequest(req: any): SessionUser | null {
       }
     }
 
-    // Header-based session fallback with token verification
-    if (req.headers?.get) {
-      const email = req.headers.get('x-user-email');
-      const role = req.headers.get('x-user-role');
-      const store = req.headers.get('x-user-store');
-
-      if (email && role) {
-        return {
-          id: 'usr-auth-session',
-          name: email.split('@')[0] || 'Authenticated User',
-          email: email,
-          role: (role as any) || 'Store Manager',
-          securityLevel: role === 'Super Admin' ? 100 : role === 'Store Manager' ? 80 : role === 'Inventory Auditor' ? 60 : role === 'Sales Executive' ? 40 : 20,
-          store: store || 'BLR',
-          allowedStores: store ? [store] : ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'],
-          avatar: email.substring(0, 2).toUpperCase(),
-          shiftStatus: 'On Shift',
-        };
-      }
-    }
-
-    // In local development mode ONLY, provide a fallback Super Admin for convenience if not in production
-    if (process.env.NODE_ENV !== 'production') {
-      return {
-        id: 'usr-1',
-        name: 'Super Admin',
-        email: 'cosko@gmail.com',
-        role: 'Super Admin',
-        securityLevel: 100,
-        store: 'All Stores',
-        allowedStores: ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'],
-        avatar: 'SA',
-        shiftStatus: 'On Shift',
-      };
-    }
-
     return null;
   } catch {
     return null;
   }
 }
-
-

@@ -234,6 +234,7 @@ export interface UserAccount {
   overrides?: UserPermissionOverride[];
   allowedStores?: string[];
   avatarUrl?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface AuditLog {
@@ -309,7 +310,7 @@ interface AppContextType {
   datePeriod: string;
   setDatePeriod: (period: string) => void;
   authStatus: 'AUTH_LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED';
-  currentUser: { id: string; name: string; email: string; role: UserAccount['role']; store: string; avatar: string; shiftStatus: 'On Shift' | 'On Leave'; avatarUrl?: string };
+  currentUser: { id: string; name: string; email: string; role: UserAccount['role']; store: string; avatar: string; shiftStatus: 'On Shift' | 'On Leave'; avatarUrl?: string; mustChangePassword?: boolean };
   setCurrentUser: (user: any) => void;
   logoutUser: () => void;
   toggleCurrentUserShift: () => void;

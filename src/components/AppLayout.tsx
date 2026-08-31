@@ -8,6 +8,7 @@ import GlobalSearchModal from './GlobalSearchModal';
 import NotificationsDrawer from './NotificationsDrawer';
 import StoreSelectorModal from './StoreSelectorModal';
 import UserProfileModal from './UserProfileModal';
+import ForcePasswordChangeModal from './ForcePasswordChangeModal';
 import AppErrorBoundary from './AppErrorBoundary';
 import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
@@ -98,8 +99,8 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-2">
-          <p className="text-xs font-bold text-danger">Unauthenticated Session</p>
-          <p className="text-2xs text-muted-foreground">Redirecting to login portal...</p>
+          <CoskoLogo size={36} showText />
+          <p className="text-xs font-semibold text-muted-foreground mt-2">Redirecting to Login...</p>
         </div>
       </div>
     );
@@ -107,7 +108,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
 
   // Route Permission Check: Verify current user role against allowed roles for this route
   const allowedRoles = activeRoute ? routePermissions[activeRoute] : undefined;
-  const isAuthorized = !allowedRoles || allowedRoles.includes(currentUser.role);
+  const isAuthorized = !allowedRoles || (currentUser.role && allowedRoles.includes(currentUser.role));
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -165,6 +166,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
       <NotificationsDrawer />
       <StoreSelectorModal />
       <UserProfileModal />
+      <ForcePasswordChangeModal />
     </div>
   );
 }

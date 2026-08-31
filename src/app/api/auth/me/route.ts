@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     if (dbUser.status === 'Suspended' || dbUser.status === 'Inactive') {
       return NextResponse.json(
-        { authenticated: false, reason: `Account is ${dbUser.status}` },
+        { authenticated: false, reason: `Account is ${dbUser.status}. Access denied.` },
         { status: 403 }
       );
     }
@@ -66,21 +66,22 @@ export async function GET(request: NextRequest) {
       avatar: dbUser.name.substring(0, 2).toUpperCase(),
       shiftStatus: dbUser.shiftStatus as any,
       avatarUrl: dbUser.avatarUrl || undefined,
+      mustChangePassword: dbUser.mustChangePassword || false,
     };
 
     return NextResponse.json(
       {
         authenticated: true,
         user: authoritativeUser,
+        mustChangePassword: authoritativeUser.mustChangePassword,
       },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
     );
   } catch (err: any) {
     console.error('Auth verification error in /api/auth/me:', err);
     return NextResponse.json(
-      { authenticated: false, reason: 'Database temporarily unavailable' },
-      { status: 500 }
+      { authenticated: false, reason: 'Authentication service temporarily unavailable' },
+      { status: 503 }
     );
   }
 }
-

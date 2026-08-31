@@ -28,20 +28,21 @@ model StoreHub {
 
 // 2. USER ACCOUNTS & PROFILES
 model UserAccount {
-  id            String   @id @default(uuid())
-  email         String   @unique @db.VarChar(128)
-  passwordHash  String   @map("password_hash") @db.VarChar(255)
-  name          String   @db.VarChar(128)
-  phone         String?  @db.VarChar(32)
-  role          String   @default("Store Manager") @db.VarChar(32)
-  securityLevel Int      @default(80) @map("security_level")
-  storeScope    String   @default("BLR") @map("store_scope") @db.VarChar(64)
-  status        String   @default("Active") @db.VarChar(16)
-  shiftStatus   String   @default("On Shift") @map("shift_status") @db.VarChar(16)
-  avatarUrl     String?  @map("avatar_url") @db.Text
-  lastLogin     DateTime? @map("last_login")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(uuid())
+  email              String   @unique @db.VarChar(128)
+  passwordHash       String   @map("password_hash") @db.VarChar(255)
+  name               String   @db.VarChar(128)
+  phone              String?  @db.VarChar(32)
+  role               String   @default("Store Manager") @db.VarChar(32)
+  securityLevel      Int      @default(80) @map("security_level")
+  storeScope         String   @default("BLR") @map("store_scope") @db.VarChar(64)
+  status             String   @default("Active") @db.VarChar(16)
+  shiftStatus        String   @default("On Shift") @map("shift_status") @db.VarChar(16)
+  mustChangePassword Boolean  @default(false) @map("must_change_password")
+  avatarUrl          String?  @map("avatar_url") @db.Text
+  lastLogin          DateTime? @map("last_login")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   storeAssignments UserStoreAssignment[]
   permissionOverrides UserPermissionOverride[]
