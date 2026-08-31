@@ -25,6 +25,7 @@ pnpm-debug.log*
 
 # Scratch & Temporary Debug Files
 scratch/
+backups/
 scripts/backup_demo_data.json
 
 # OS-specific files

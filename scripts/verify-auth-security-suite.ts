@@ -57,7 +57,7 @@ async function runAuthSecuritySuite() {
     // 4. AUTHENTICATION & PASSWORD COMPARISON
     // ------------------------------------------------------------------------
     console.log('\n--- Test Group 4: Password Verification & Hash Validation ---');
-    const tempPassword = 'Cosko2026@InitialAdmin';
+    const tempPassword = process.env.BOOTSTRAP_SUPERADMIN_PASSWORD || 'Cosko2026@';
     const isCorrectPassValid = await comparePassword(tempPassword, superAdmin!.passwordHash);
     assert(isCorrectPassValid, 'Authenticates with valid bootstrap temporary password');
 
