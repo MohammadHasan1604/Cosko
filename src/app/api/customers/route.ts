@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { normalizeMobileNumber } from '@/lib/phoneUtils';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 /**
  * GET /api/customers - Search customer by normalized phone or query (excludes Archived by default)
@@ -117,6 +118,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: customer.id, name: customer.name, phone: customer.phone, action: 'saved' });
+
     return NextResponse.json({ success: true, customer }, { status: 201 });
   } catch (error: any) {
     console.error('API /api/customers POST error:', error);
@@ -152,6 +155,8 @@ export async function PUT(req: NextRequest) {
         ...(body.creditBalance !== undefined ? { creditBalance: body.creditBalance } : {}),
       },
     });
+
+    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: customer.id, name: customer.name, phone: customer.phone, action: 'updated' });
 
     return NextResponse.json({ success: true, customer });
   } catch (error: any) {
@@ -202,6 +207,8 @@ export async function DELETE(req: NextRequest) {
         data: { status: 'Archived' },
       });
 
+      broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: target.id, name: target.name, action: 'archived' });
+
       return NextResponse.json({
         success: true,
         mode: 'archived',
@@ -217,6 +224,8 @@ export async function DELETE(req: NextRequest) {
     await (prisma as any).customerExternalLink.deleteMany({ where: { coskoCustomerId: target.id } });
     await (prisma as any).customer.delete({ where: { id: target.id } });
 
+    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: target.id, name: target.name, action: 'deleted' });
+
     return NextResponse.json({
       success: true,
       mode: 'deleted',
@@ -227,4 +236,5 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to archive/delete customer' }, { status: 500 });
   }
 }
+
 

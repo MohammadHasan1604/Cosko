@@ -3,34 +3,24 @@ import React, { useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
-import { useApp } from '@/context/AppContext';
+import { useApp, UserAccount } from '@/context/AppContext';
 import { toast } from 'sonner';
 
-interface Employee {
-  id: string;
-  name: string;
-  role: string;
-  store: string;
-  email: string;
-  phone: string;
-  status: 'On Shift' | 'Off Shift' | 'On Leave';
-  shiftTime: string;
-}
-
-const initialEmployees: Employee[] = [
-  { id: 'emp-1', name: 'Arjun Mehta', role: 'Super Admin', store: 'BLR', email: 'cosko@gmail.com', phone: '+91 98765 00000', status: 'On Shift', shiftTime: '09:00 AM - 06:00 PM' },
-  { id: 'emp-2', name: 'Sneha Patel', role: 'Store Manager', store: 'BLR', email: 'sneha@cosko.com', phone: '+91 80 2555 1234', status: 'On Shift', shiftTime: '09:00 AM - 06:00 PM' },
-  { id: 'emp-3', name: 'Karan Verma', role: 'POS Cashier', store: 'HYD', email: 'karan@cosko.com', phone: '+91 40 6677 8899', status: 'On Shift', shiftTime: '10:00 AM - 07:00 PM' },
-  { id: 'emp-4', name: 'Rohan Sharma', role: 'Inventory Auditor', store: 'DEL', email: 'rohan@cosko.com', phone: '+91 11 4100 9988', status: 'On Leave', shiftTime: 'Off Duty' },
-];
-
 export default function EmployeesPage() {
-  const { currentUser, selectedStore, addUserAccount, deleteUserAccount, usersList, storesList } = useApp();
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
+  const {
+    currentUser,
+    selectedStore,
+    usersList,
+    storesList,
+    addUserAccount,
+    updateUserAccount,
+    deleteUserAccount,
+    toggleUserShiftStatus,
+  } = useApp();
 
   const [addModal, setAddModal] = useState(false);
-  const [editModal, setEditModal] = useState<Employee | null>(null);
-  const [deleteEmpModal, setDeleteEmpModal] = useState<Employee | null>(null);
+  const [editModal, setEditModal] = useState<UserAccount | null>(null);
+  const [deleteEmpModal, setDeleteEmpModal] = useState<UserAccount | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -40,32 +30,19 @@ export default function EmployeesPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [shiftTime, setShiftTime] = useState('09:00 AM - 06:00 PM');
 
-  const filteredEmployees = employees.filter((e) => {
+  const filteredEmployees = usersList.filter((e) => {
     // Hide Super Admin employee records from lower-level roles
     if (e.role === 'Super Admin' && currentUser.role !== 'Super Admin') return false;
     // Filter by store location for Store Managers & staff
     if (currentUser.role !== 'Super Admin') {
-      return e.store === currentUser.store;
+      const allowed = e.allowedStores || [e.store];
+      return allowed.includes(currentUser.store) || e.store === currentUser.store;
     }
-    return selectedStore === 'All Stores' ? true : e.store === selectedStore;
+    return selectedStore === 'All Stores' ? true : (e.store === selectedStore || (e.allowedStores && e.allowedStores.includes(selectedStore)));
   });
 
-  const toggleShiftStatus = (id: string) => {
-    setEmployees((prev) =>
-      prev.map((emp) => {
-        if (emp.id === id) {
-          const nextStatus = emp.status === 'On Shift' ? 'On Leave' : 'On Shift';
-          toast.success(`${emp.name} marked as ${nextStatus}`);
-          return { ...emp, status: nextStatus, shiftTime: nextStatus === 'On Shift' ? '09:00 AM - 06:00 PM' : 'Off Duty' };
-        }
-        return emp;
-      })
-    );
-  };
-
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password) {
       toast.error('Full Name, Email, and Account Password are required');
@@ -79,21 +56,8 @@ export default function EmployeesPage() {
 
     const employeeEmail = email.trim().toLowerCase();
 
-    // 1. Create Employee HR Roster Record
-    const newEmp: Employee = {
-      id: `emp-${Date.now()}`,
-      name,
-      role,
-      store,
-      email: employeeEmail,
-      phone: phone || '+91 99000 12345',
-      status: 'On Shift',
-      shiftTime,
-    };
-    setEmployees((prev) => [newEmp, ...prev]);
-
-    // 2. Create User Account Credentials in AppContext
-    addUserAccount({
+    // Create User Account Credentials in AppContext & MySQL database
+    const res = await addUserAccount({
       name,
       email: employeeEmail,
       password,
@@ -105,35 +69,33 @@ export default function EmployeesPage() {
       shiftStatus: 'On Shift',
     });
 
-    setAddModal(false);
-    resetForm();
-    toast.success(`Registered employee & login user account for ${name}`);
+    if (res?.success !== false) {
+      setAddModal(false);
+      resetForm();
+    }
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editModal) return;
-    setEmployees((prev) =>
-      prev.map((emp) => (emp.id === editModal.id ? { ...emp, name, role, store, email, phone, shiftTime } : emp))
-    );
+    await updateUserAccount(editModal.id, {
+      name,
+      role: role as any,
+      store,
+      email,
+      phone,
+    });
     setEditModal(null);
     resetForm();
-    toast.success('Employee details updated');
   };
 
-  const deleteEmp = (id: string) => {
-    setEmployees((prev) => prev.filter((e) => e.id !== id));
-    toast.success('Employee removed from roster');
-  };
-
-  const openEdit = (emp: Employee) => {
+  const openEdit = (emp: UserAccount) => {
     setEditModal(emp);
     setName(emp.name);
     setRole(emp.role as any);
     setStore(emp.store);
     setEmail(emp.email);
-    setPhone(emp.phone);
-    setShiftTime(emp.shiftTime);
+    setPhone(emp.phone || '');
   };
 
   const resetForm = () => {
@@ -144,7 +106,6 @@ export default function EmployeesPage() {
     setPhone('');
     setPassword('');
     setShowPassword(false);
-    setShiftTime('09:00 AM - 06:00 PM');
   };
 
   return (
@@ -154,7 +115,7 @@ export default function EmployeesPage() {
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-foreground">Employee Roster & Attendance</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Staff management, shift schedules, active location assignments, and login credential provisioning.
+              Staff management, shift schedules, active location assignments, and login credential provisioning backed by MySQL.
             </p>
           </div>
 
@@ -186,19 +147,19 @@ export default function EmployeesPage() {
               <div className="text-xs space-y-1.5 text-muted-foreground border-y border-border py-3">
                 <p><strong className="text-foreground">Store Location:</strong> <span className="badge-info text-3xs font-mono font-bold">{emp.store}</span></p>
                 <p><strong className="text-foreground">Email:</strong> {emp.email}</p>
-                <p><strong className="text-foreground">Phone:</strong> {emp.phone}</p>
-                <p><strong className="text-foreground">Shift Schedule:</strong> {emp.shiftTime}</p>
+                <p><strong className="text-foreground">Phone:</strong> {emp.phone || 'N/A'}</p>
+                <p><strong className="text-foreground">Status:</strong> <span className={emp.status === 'Active' ? 'text-emerald-500 font-semibold' : 'text-rose-500 font-semibold'}>{emp.status}</span></p>
               </div>
 
               <div className="flex items-center justify-between pt-1">
                 <span className="text-2xs text-muted-foreground font-semibold">Current Shift Status:</span>
                 <button
-                  onClick={() => toggleShiftStatus(emp.id)}
+                  onClick={() => toggleUserShiftStatus(emp.id)}
                   className={`btn-ghost text-xs px-2.5 py-1 ${
-                    emp.status === 'On Shift' ? 'text-success font-bold' : 'text-warning font-bold'
+                    emp.shiftStatus === 'On Shift' ? 'text-success font-bold' : 'text-warning font-bold'
                   }`}
                 >
-                  ● {emp.status} (Click to toggle)
+                  ● {emp.shiftStatus} (Click to toggle)
                 </button>
               </div>
             </div>
@@ -266,11 +227,6 @@ export default function EmployeesPage() {
                 </button>
               </div>
             </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-foreground block mb-1">Shift Schedule</label>
-            <input type="text" placeholder="09:00 AM - 06:00 PM" value={shiftTime} onChange={(e) => setShiftTime(e.target.value)} className="input-field text-xs" />
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-border">
@@ -350,11 +306,7 @@ export default function EmployeesPage() {
                         <button
                           type="button"
                           onClick={async () => {
-                            const matchingUser = usersList.find((u) => u.email.toLowerCase() === deleteEmpModal.email.toLowerCase() || u.id === deleteEmpModal.id);
-                            if (matchingUser) {
-                              await deleteUserAccount(matchingUser.id, false);
-                            }
-                            setEmployees((prev) => prev.filter((e) => e.id !== deleteEmpModal.id));
+                            await deleteUserAccount(deleteEmpModal.id, false);
                             setDeleteEmpModal(null);
                           }}
                           className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4"
@@ -365,11 +317,7 @@ export default function EmployeesPage() {
                           <button
                             type="button"
                             onClick={async () => {
-                              const matchingUser = usersList.find((u) => u.email.toLowerCase() === deleteEmpModal.email.toLowerCase() || u.id === deleteEmpModal.id);
-                              if (matchingUser) {
-                                await deleteUserAccount(matchingUser.id, true);
-                              }
-                              setEmployees((prev) => prev.filter((e) => e.id !== deleteEmpModal.id));
+                              await deleteUserAccount(deleteEmpModal.id, true);
                               setDeleteEmpModal(null);
                             }}
                             className="btn-danger text-xs font-bold px-4"

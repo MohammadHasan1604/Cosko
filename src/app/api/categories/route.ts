@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getAuthUserFromRequest } from '@/lib/auth';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 /**
  * GET /api/categories
@@ -83,6 +84,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Broadcast SSE realtime event
+    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: newCategory.id, name: newCategory.name, action: 'created' });
+
     return NextResponse.json({
       success: true,
       category: newCategory,
@@ -132,6 +136,9 @@ export async function PUT(req: NextRequest) {
         ...(sortOrder !== undefined ? { sortOrder: Number(sortOrder) } : {}),
       },
     });
+
+    // Broadcast SSE realtime event
+    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: updated.id, name: updated.name, action: 'updated' });
 
     return NextResponse.json({
       success: true,
@@ -205,6 +212,8 @@ export async function DELETE(req: NextRequest) {
         data: { status: 'Archived' },
       });
 
+      broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: target.id, name: target.name, action: 'archived' });
+
       return NextResponse.json({
         success: true,
         mode: 'archived',
@@ -218,6 +227,8 @@ export async function DELETE(req: NextRequest) {
 
     // Hard-delete if safe & requested by Super Admin
     await (prisma as any).category.delete({ where: { id: target.id } });
+
+    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: target.id, name: target.name, action: 'deleted' });
 
     return NextResponse.json({
       success: true,

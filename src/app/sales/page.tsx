@@ -356,13 +356,13 @@ export default function SalesPage() {
     setCashTendered(0);
   };
 
-  const handleQuickRegisterSubmit = (e: React.FormEvent) => {
+  const handleQuickRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustName || !newCustPhone) {
       toast.error('Customer Name and Phone Number are required');
       return;
     }
-    const created = addCustomer({
+    const created = await addCustomer({
       name: newCustName,
       phone: newCustPhone,
       email: newCustEmail || `${newCustName.toLowerCase().replace(/\s+/g, '')}@guest.com`,
@@ -370,10 +370,12 @@ export default function SalesPage() {
       tier: 'New',
       creditBalance: 0,
     });
-    setSelectedCustomerId(created.id);
-    setCustomerName(created.name);
-    setCustomerPhone(created.phone);
-    handleCustomerPhoneChange(created.phone);
+    if (created) {
+      setSelectedCustomerId(created.id);
+      setCustomerName(created.name);
+      setCustomerPhone(created.phone);
+      handleCustomerPhoneChange(created.phone);
+    }
     setQuickRegModal(false);
     setNewCustName('');
     setNewCustPhone('');

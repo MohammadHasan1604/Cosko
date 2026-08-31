@@ -132,7 +132,7 @@ export interface SalesOrder {
   customerName: string;
   customerPhone: string;
   store: string;
-  items: { itemId: string; name: string; qty: number; unitPrice: number; taxRate: number; warrantyMonths?: number; warrantyExpiryDate?: string }[];
+  items: { itemId: string; name: string; qty: number; unitPrice: number; taxRate: number; sku?: string; warrantyMonths?: number; warrantyExpiryDate?: string }[];
   subtotal: number;
   taxTotal: number;
   discount: number;
@@ -150,6 +150,7 @@ export interface PurchaseOrder {
   id: string;
   poNo: string;
   vendorName: string;
+  vendorId?: string;
   store: string;
   items: { name: string; qty: number; unitCost: number; sku?: string }[];
   totalAmount: number;
@@ -179,6 +180,8 @@ export interface Vendor {
   email: string;
   phone: string;
   category: string;
+  city?: string;
+  address?: string;
   outstandingPayable: number;
   rating: number;
   leadTimeDays: number;
@@ -312,27 +315,27 @@ interface AppContextType {
   toggleCurrentUserShift: () => void;
   updateProfileAvatar: (avatarUrl: string | null) => void;
   storesList: StoreHub[];
-  addStoreHub: (store: Omit<StoreHub, 'id'>) => void;
-  updateStoreHub: (id: string, updated: Partial<StoreHub>) => void;
+  addStoreHub: (store: Omit<StoreHub, 'id'>) => Promise<any>;
+  updateStoreHub: (id: string, updated: Partial<StoreHub>) => Promise<any>;
   deleteStoreHub: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   usersList: UserAccount[];
-  addUserAccount: (user: Omit<UserAccount, 'id' | 'lastLogin' | 'permissions'>) => void;
-  updateUserAccount: (id: string, updated: Partial<UserAccount>) => void;
+  addUserAccount: (user: Omit<UserAccount, 'id' | 'lastLogin' | 'permissions'>) => Promise<any>;
+  updateUserAccount: (id: string, updated: Partial<UserAccount>) => Promise<any>;
   toggleUserShiftStatus: (id: string) => void;
   toggleUserStatus: (id: string, nextStatus: 'Active' | 'Inactive' | 'Suspended') => void;
   setUserPermissionOverride: (userId: string, permissionCode: string, overrideType: 'ALLOW' | 'DENY' | 'RESET') => void;
   toggleUserStoreAccess: (userId: string, storeCode: string) => void;
   deleteUserAccount: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   categoriesList: CategoryItem[];
-  addCategory: (cat: Omit<CategoryItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updateCategory: (id: string, updated: Partial<CategoryItem>) => void;
+  addCategory: (cat: Omit<CategoryItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<any>;
+  updateCategory: (id: string, updated: Partial<CategoryItem>) => Promise<any>;
   toggleCategoryStatus: (id: string) => void;
   deleteCategory: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   changeUserPassword: (currentPass: string, newPass: string, confirmPass: string) => Promise<{ success: boolean; message: string }>;
   updateUserProfile: (name: string, phone?: string, avatarUrl?: string) => Promise<{ success: boolean; message: string }>;
   inventory: InventoryItem[];
-  addItem: (item: Omit<InventoryItem, 'id'>) => void;
-  updateItem: (id: string, updated: Partial<InventoryItem>) => void;
+  addItem: (item: Omit<InventoryItem, 'id'>) => Promise<any>;
+  updateItem: (id: string, updated: Partial<InventoryItem>) => Promise<any>;
   deleteItem: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   adjustStock: (id: string, qtyChange: number, reason: string) => void;
   transferStock: (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number, status?: 'Completed' | 'Draft') => void;
@@ -345,19 +348,19 @@ interface AppContextType {
   sales: SalesOrder[];
   addSale: (sale: Omit<SalesOrder, 'id' | 'orderNo' | 'createdAt' | 'period'>) => SalesOrder;
   purchases: PurchaseOrder[];
-  addPurchase: (po: Omit<PurchaseOrder, 'id' | 'poNo' | 'createdAt'>) => void;
-  updatePurchase: (id: string, updated: Partial<PurchaseOrder>) => void;
+  addPurchase: (po: Omit<PurchaseOrder, 'id' | 'poNo' | 'createdAt'>) => Promise<any>;
+  updatePurchase: (id: string, updated: Partial<PurchaseOrder>) => Promise<any>;
   deletePurchase: (id: string) => Promise<{ success: boolean; mode?: string; message?: string }>;
   customers: Customer[];
-  addCustomer: (cust: Omit<Customer, 'id' | 'totalSpend' | 'lastPurchase'>) => Customer;
-  updateCustomer: (id: string, updated: Partial<Customer>) => void;
+  addCustomer: (cust: Omit<Customer, 'id' | 'totalSpend' | 'lastPurchase'>) => Promise<any> | Customer;
+  updateCustomer: (id: string, updated: Partial<Customer>) => Promise<any>;
   deleteCustomer: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   vendors: Vendor[];
-  addVendor: (vendor: Omit<Vendor, 'id' | 'code'>) => void;
-  updateVendor: (id: string, updated: Partial<Vendor>) => void;
+  addVendor: (vendor: Omit<Vendor, 'id' | 'code'>) => Promise<any>;
+  updateVendor: (id: string, updated: Partial<Vendor>) => Promise<any>;
   deleteVendor: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   expenses: Expense[];
-  addExpense: (expense: Omit<Expense, 'id' | 'referenceNo' | 'date'>) => void;
+  addExpense: (expense: Omit<Expense, 'id' | 'referenceNo' | 'date'>) => Promise<any>;
   deleteExpense: (id: string) => Promise<{ success: boolean; mode?: string; message?: string }>;
   auditLogs: AuditLog[];
   addAuditLog: (module: string, action: string, details: string) => void;
@@ -405,142 +408,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [datePeriod, setDatePeriod] = useState<string>('This Month');
   const [usersList, setUsersList] = useState<UserAccount[]>(initialUsers);
   
-  const [storesList, setStoresList] = useState<StoreHub[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('cosko_stores');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return initialStoreHubs;
-  });
-
-  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('cosko_categories');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return initialCategories;
-  });
-
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('cosko_inventory');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return initialInventory;
-  });
-
+  const [storesList, setStoresList] = useState<StoreHub[]>(initialStoreHubs);
+  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(initialCategories);
+  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
   const [stockTransfers, setStockTransfers] = useState<StockTransferRecord[]>(initialStockTransfers);
   const [inventoryLedger, setInventoryLedger] = useState<InventoryLedgerEntry[]>(initialInventoryLedger);
   const [repairsEnquiries, setRepairsEnquiries] = useState<RepairEnquiry[]>(initialRepairsEnquiries);
-  
-  const [sales, setSales] = useState<SalesOrder[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('cosko_sales');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return initialSales;
-  });
-
-  const [purchases, setPurchases] = useState<PurchaseOrder[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('cosko_purchases');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return initialPurchases;
-  });
-
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('cosko_customers');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return initialCustomers;
-  });
-
-  const [vendors, setVendors] = useState<Vendor[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('cosko_vendors');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return initialVendors;
-  });
-
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('cosko_expenses');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return initialExpenses;
-  });
-
+  const [sales, setSales] = useState<SalesOrder[]>(initialSales);
+  const [purchases, setPurchases] = useState<PurchaseOrder[]>(initialPurchases);
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [vendors, setVendors] = useState<Vendor[]>(initialVendors);
+  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialAuditLogs);
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
   const [dataLoaded, setDataLoaded] = useState(false);
-
-  // Hybrid LocalStorage Persistence Sync for Serverless/Netlify Compatibility
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try { localStorage.setItem('cosko_stores', JSON.stringify(storesList)); } catch {}
-    }
-  }, [storesList]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try { localStorage.setItem('cosko_categories', JSON.stringify(categoriesList)); } catch {}
-    }
-  }, [categoriesList]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try { localStorage.setItem('cosko_inventory', JSON.stringify(inventory)); } catch {}
-    }
-  }, [inventory]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try { localStorage.setItem('cosko_customers', JSON.stringify(customers)); } catch {}
-    }
-  }, [customers]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try { localStorage.setItem('cosko_vendors', JSON.stringify(vendors)); } catch {}
-    }
-  }, [vendors]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try { localStorage.setItem('cosko_expenses', JSON.stringify(expenses)); } catch {}
-    }
-  }, [expenses]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try { localStorage.setItem('cosko_purchases', JSON.stringify(purchases)); } catch {}
-    }
-  }, [purchases]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try { localStorage.setItem('cosko_sales', JSON.stringify(sales)); } catch {}
-    }
-  }, [sales]);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -569,44 +450,62 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [authStatus, setAuthStatus] = useState<'AUTH_LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED'>('AUTH_LOADING');
   const [currentUser, setCurrentUserState] = useState<{ id: string; name: string; email: string; role: UserAccount['role']; store: string; avatar: string; shiftStatus: 'On Shift' | 'On Leave'; avatarUrl?: string }>(unauthenticatedUser);
 
-  // Restore active user session & enforce store scope lock
+  // Restore active user session from server-authoritative /api/auth/me
   useEffect(() => {
-    try {
-      const savedSession = localStorage.getItem('cosko_active_session');
-      if (savedSession) {
-        const parsed = JSON.parse(savedSession);
-        const match = usersList.find((u) => (u.id === parsed.userId || u.email.toLowerCase() === (parsed.email || '').toLowerCase()) && u.status === 'Active');
-        if (match) {
-          const userObj = {
-            id: match.id,
-            name: match.name,
-            email: match.email,
-            role: match.role as any,
-            store: match.store,
-            avatar: match.name.substring(0, 2).toUpperCase(),
-            shiftStatus: match.shiftStatus || 'On Shift',
-            avatarUrl: match.avatarUrl,
-          };
-          setCurrentUserState(userObj);
-          setAuthStatus('AUTHENTICATED');
+    let isMounted = true;
+    const initAuth = async () => {
+      try {
+        let token = '';
+        if (typeof window !== 'undefined') {
+          try {
+            const saved = localStorage.getItem('cosko_active_session');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              token = parsed.token || '';
+            }
+          } catch {}
+        }
 
-          if (match.role !== 'Super Admin') {
-            const effectiveStore = (match.store && match.store !== 'All Stores') ? match.store : (match.allowedStores?.[0] || 'BLR');
-            userObj.store = effectiveStore;
-            setSelectedStoreState(effectiveStore);
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/auth/me', {
+          credentials: 'include',
+          headers,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated && data.user && isMounted) {
+            const user = data.user;
+            setCurrentUserState(user);
+            setAuthStatus('AUTHENTICATED');
+            if (user.role !== 'Super Admin') {
+              const effectiveStore = (user.store && user.store !== 'All Stores') ? user.store : (user.allowedStores?.[0] || 'BLR');
+              setSelectedStoreState(effectiveStore);
+            }
+            return;
           }
-          return;
+        }
+
+        if (isMounted) {
+          setCurrentUserState(unauthenticatedUser);
+          setAuthStatus('UNAUTHENTICATED');
+          setDataLoaded(true);
+        }
+      } catch (err) {
+        console.warn('[COSKO] Session init check:', err);
+        if (isMounted) {
+          setCurrentUserState(unauthenticatedUser);
+          setAuthStatus('UNAUTHENTICATED');
+          setDataLoaded(true);
         }
       }
-      localStorage.removeItem('cosko_active_session');
-      setCurrentUserState(unauthenticatedUser);
-      setAuthStatus('UNAUTHENTICATED');
-    } catch {
-      localStorage.removeItem('cosko_active_session');
-      setCurrentUserState(unauthenticatedUser);
-      setAuthStatus('UNAUTHENTICATED');
-    }
-  }, [usersList]);
+    };
+
+    initAuth();
+    return () => { isMounted = false; };
+  }, []);
 
   // ─── LOAD ALL DATA FROM MySQL API ON MOUNT & REFRESH ─────────────────────
   // Authoritative persistence: fetch real data from MySQL database
@@ -814,34 +713,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Load data immediately whenever user is authenticated
   useEffect(() => {
-    if (authStatus !== 'AUTHENTICATED' || dataLoaded) return;
-    refreshAllData();
-  }, [authStatus, dataLoaded, refreshAllData]);
+    if (authStatus === 'AUTHENTICATED') {
+      refreshAllData();
+    }
+  }, [authStatus, refreshAllData]);
 
-  // Realtime Live Event Synchronization (Server-Sent Events)
+  // Multi-Device Synchronization: Window Focus, Visibility Change, Periodic Polling, and SSE
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || authStatus !== 'AUTHENTICATED') return;
 
+    // 1. Revalidate on window focus
+    const handleFocus = () => {
+      refreshAllData();
+    };
+
+    // 2. Revalidate on tab visibility change
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshAllData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // 3. Periodic background sync (every 15s)
+    const interval = setInterval(() => {
+      refreshAllData();
+    }, 15000);
+
+    // 4. SSE Realtime Event Broadcaster
+    let eventSource: EventSource | null = null;
     try {
-      const eventSource = new EventSource('/api/realtime');
+      eventSource = new EventSource('/api/realtime');
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.channel === 'sales') {
-            toast.info(`⚡ Live POS Sale Recorded on ${data.payload?.storeCode || 'Store'}: ₹${data.payload?.grandTotal || 0}`);
-          } else if (data.channel === 'inventory') {
-            toast.info(`⚡ Live Stock Updated on ${data.payload?.storeCode || 'Store'}`);
+          if (data.channel) {
+            // Re-fetch fresh database state immediately on any entity mutation
+            refreshAllData();
+            if (data.channel === 'sales' && data.payload?.grandTotal) {
+              toast.info(`⚡ Live POS Sale Recorded on ${data.payload?.storeCode || 'Store'}: ₹${data.payload?.grandTotal}`);
+            }
           }
         } catch {}
-      };
-      return () => {
-        eventSource.close();
       };
     } catch (err) {
       console.warn('Realtime SSE setup error:', err);
     }
-  }, []);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(interval);
+      if (eventSource) eventSource.close();
+    };
+  }, [authStatus, refreshAllData]);
 
   const setCurrentUser = (user: any) => {
     if (!user || !user.id) {
@@ -859,8 +788,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAuthStatus('AUTHENTICATED');
 
     try {
-      localStorage.setItem('cosko_active_session', JSON.stringify({ userId: user.id, email: user.email, role: user.role, store: user.store, timestamp: Date.now() }));
+      localStorage.setItem('cosko_active_session', JSON.stringify({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        store: user.store,
+        token: user.token || '',
+        timestamp: Date.now(),
+      }));
     } catch {}
+
+    refreshAllData();
   };
 
   const logoutUser = async () => {
@@ -928,32 +866,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addStoreHub = async (storeData: Omit<StoreHub, 'id'>) => {
-    const tempId = `st-${Date.now()}`;
-    const newStore: StoreHub = { ...storeData, id: tempId };
-    setStoresList((prev) => [newStore, ...prev]);
-    addAuditLog('Stores', 'Create Store Hub', `Created store hub "${newStore.name}" (${newStore.code})`);
-    
     try {
-      const res = await MySQLDataService.syncStore(newStore);
+      const res = await MySQLDataService.syncStore(storeData);
       if (res?.success && res.store) {
-        setStoresList((prev) =>
-          prev.map((s) => (s.id === tempId ? { ...s, id: res.store.id, code: res.store.code } : s))
-        );
-        toast.success(`Store Hub "${newStore.name}" (${newStore.code}) created & saved to MySQL!`);
+        const newStore: StoreHub = {
+          id: res.store.id,
+          code: res.store.code,
+          name: res.store.name,
+          city: res.store.city,
+          address: res.store.address,
+          manager: res.store.managerName || '',
+          phone: res.store.phone || '',
+          registers: res.store.registersCount || 2,
+          skusCount: 0,
+          monthlyRevenue: 0,
+          status: res.store.status,
+        };
+        setStoresList((prev) => [newStore, ...prev.filter(s => s.id !== newStore.id && s.code !== newStore.code)]);
+        addAuditLog('Stores', 'Create Store Hub', `Created store hub "${newStore.name}" (${newStore.code})`);
+        toast.success(`Store Hub "${newStore.name}" (${newStore.code}) saved to MySQL!`);
+        refreshAllData();
+        return { success: true, store: newStore };
       } else {
-        toast.success(`Store Hub "${newStore.name}" created!`);
+        toast.error(res?.error || 'Failed to save store hub');
+        return { success: false, error: res?.error };
       }
-    } catch {
-      toast.success(`Store Hub "${newStore.name}" created!`);
+    } catch (err: any) {
+      toast.error(err.message || 'Error saving store');
+      return { success: false, error: err.message };
     }
   };
 
-  const updateStoreHub = (id: string, updated: Partial<StoreHub>) => {
-    setStoresList((prev) => prev.map((s) => (s.id === id || s.code === id ? { ...s, ...updated } : s)));
+  const updateStoreHub = async (id: string, updated: Partial<StoreHub>) => {
     const target = storesList.find((s) => s.id === id || s.code === id);
-    if (target) MySQLDataService.syncStore({ ...target, ...updated });
-    addAuditLog('Stores', 'Edit Store Hub', `Updated store #${id}`);
-    toast.success('Store details updated');
+    if (!target) return;
+    const merged = { ...target, ...updated };
+    setStoresList((prev) => prev.map((s) => (s.id === id || s.code === id ? merged : s)));
+    const res = await MySQLDataService.syncStore(merged);
+    if (res?.success) {
+      addAuditLog('Stores', 'Edit Store Hub', `Updated store #${id}`);
+      toast.success('Store details updated in MySQL');
+      refreshAllData();
+    } else {
+      toast.error(res?.error || 'Failed to update store');
+    }
   };
 
   const deleteStoreHub = async (id: string, permanent = false) => {
@@ -970,6 +926,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           addAuditLog('Stores', res.mode === 'archived' ? 'Deactivate Store Hub' : 'Delete Store Hub', `${res.message || `Removed store "${s.name}"`}`);
         }
         toast.success(res.message || `Removed store "${s?.name || id}"`);
+        refreshAllData();
         return { success: true, mode: res.mode, message: res.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to remove store hub');
@@ -981,25 +938,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addUserAccount = (userData: Omit<UserAccount, 'id' | 'lastLogin' | 'permissions'>) => {
-    const newUser: UserAccount = {
-      ...userData,
-      id: `usr-${Date.now()}`,
-      lastLogin: 'Never',
-      permissions: [],
-    };
-    setUsersList((prev) => [newUser, ...prev]);
-    MySQLDataService.syncProfile(newUser);
-    addAuditLog('Users & Roles', 'Provision User', `Provisioned account for ${newUser.name} (${newUser.role})`);
-    toast.success(`User "${newUser.name}" provisioned`);
+  const addUserAccount = async (userData: Omit<UserAccount, 'id' | 'lastLogin' | 'permissions'>) => {
+    try {
+      const res = await MySQLDataService.createProfile(userData);
+      if (res?.success && res.user) {
+        const newAccount: UserAccount = {
+          id: res.user.id,
+          name: res.user.name,
+          email: res.user.email,
+          role: res.user.role,
+          securityLevel: res.user.securityLevel,
+          store: res.user.store,
+          allowedStores: res.user.assignedStores || [res.user.store],
+          status: res.user.status,
+          shiftStatus: 'On Shift',
+          lastLogin: 'Never',
+          permissions: res.user.role === 'Super Admin' ? ['ALL_PERMISSIONS'] : [],
+        };
+        setUsersList((prev) => [newAccount, ...prev.filter(u => u.id !== newAccount.id && u.email !== newAccount.email)]);
+        addAuditLog('Users & Roles', 'Provision User', `Provisioned account for ${newAccount.name} (${newAccount.role})`);
+        toast.success(`User "${newAccount.name}" created & persisted to MySQL!`);
+        refreshAllData();
+        return { success: true, user: newAccount };
+      } else {
+        toast.error(res?.error || 'Failed to create user');
+        return { success: false, error: res?.error };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error creating user');
+      return { success: false, error: err.message };
+    }
   };
 
-  const updateUserAccount = (id: string, updated: Partial<UserAccount>) => {
-    setUsersList((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
+  const updateUserAccount = async (id: string, updated: Partial<UserAccount>) => {
     const updatedUser = usersList.find((u) => u.id === id);
-    if (updatedUser) MySQLDataService.syncProfile({ ...updatedUser, ...updated });
-    addAuditLog('Users & Roles', 'Edit User Profile', `Updated user profile #${id}`);
-    toast.success('User record updated');
+    if (!updatedUser) return;
+    const merged = { ...updatedUser, ...updated };
+    setUsersList((prev) => prev.map((u) => (u.id === id ? merged : u)));
+    const res = await MySQLDataService.createProfile(merged);
+    if (res?.success) {
+      addAuditLog('Users & Roles', 'Edit User Profile', `Updated user profile #${id}`);
+      toast.success('User record updated in MySQL');
+      refreshAllData();
+    }
   };
 
   const toggleUserShiftStatus = (id: string) => {
@@ -1008,7 +989,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (u.id === id) {
           const nextShift = u.shiftStatus === 'On Shift' ? 'On Leave' : 'On Shift';
           const updatedUser = { ...u, shiftStatus: nextShift as any };
-          MySQLDataService.syncProfile(updatedUser);
+          MySQLDataService.createProfile(updatedUser);
           return updatedUser;
         }
         return u;
@@ -1022,7 +1003,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       prev.map((u) => {
         if (u.id === id) {
           const updatedUser = { ...u, status: nextStatus };
-          MySQLDataService.syncProfile(updatedUser);
+          MySQLDataService.createProfile(updatedUser);
           return updatedUser;
         }
         return u;
@@ -1079,6 +1060,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           addAuditLog('Users & Roles', res.mode === 'archived' ? 'Deactivate User Account' : 'Delete User Account', res.message || `Removed account "${u.name}"`);
         }
         toast.success(res.message || `Removed account "${u?.name || id}"`);
+        refreshAllData();
         return { success: true, mode: res.mode, message: res.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to delete user account');
@@ -1090,27 +1072,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addCategory = (catData: Omit<CategoryItem, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const parent = categoriesList.find((c) => c.id === catData.parentCategoryId);
-    const newCat: CategoryItem = {
-      ...catData,
-      id: `cat-${Date.now()}`,
-      parentCategoryName: parent ? parent.name : undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setCategoriesList((prev) => [...prev, newCat]);
-    addAuditLog('Categories', 'Create Category', `Created category "${newCat.name}" (${newCat.categoryType})`);
-    toast.success(`Category "${newCat.name}" created successfully!`);
-
-    fetch('/api/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newCat),
-    }).catch((err) => console.warn('Category sync error:', err));
+  const addCategory = async (catData: Omit<CategoryItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const res = await MySQLDataService.createCategory(catData);
+      if (res?.success && res.category) {
+        const c = res.category;
+        const newCat: CategoryItem = {
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          parentCategoryId: c.parentCategoryId,
+          categoryType: c.categoryType || 'Product',
+          description: c.description || '',
+          icon: c.icon,
+          imageUrl: c.imageUrl,
+          status: c.status || 'Active',
+          sortOrder: c.sortOrder || 0,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+        };
+        setCategoriesList((prev) => [...prev.filter(cat => cat.id !== newCat.id), newCat]);
+        addAuditLog('Categories', 'Create Category', `Created category "${newCat.name}" (${newCat.categoryType})`);
+        toast.success(`Category "${newCat.name}" saved to MySQL!`);
+        refreshAllData();
+        return { success: true, category: newCat };
+      } else {
+        toast.error(res?.error || 'Failed to save category');
+        return { success: false, error: res?.error };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error saving category');
+      return { success: false, error: err.message };
+    }
   };
 
-  const updateCategory = (id: string, updated: Partial<CategoryItem>) => {
+  const updateCategory = async (id: string, updated: Partial<CategoryItem>) => {
     setCategoriesList((prev) =>
       prev.map((c) => {
         if (c.id === id) {
@@ -1118,19 +1114,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             ? (updated.parentCategoryId ? prev.find((p) => p.id === updated.parentCategoryId)?.name : undefined)
             : c.parentCategoryName;
           const updatedCat = { ...c, ...updated, parentCategoryName: parent, updatedAt: new Date().toISOString() };
-          addAuditLog('Categories', 'Update Category', `Updated category "${updatedCat.name}"`);
           return updatedCat;
         }
         return c;
       })
     );
-    toast.success('Category updated successfully');
 
-    fetch('/api/categories', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, ...updated }),
-    }).catch((err) => console.warn('Category update error:', err));
+    const res = await MySQLDataService.updateCategory({ id, ...updated });
+    if (res?.success) {
+      addAuditLog('Categories', 'Update Category', `Updated category #${id}`);
+      toast.success('Category updated successfully');
+      refreshAllData();
+    } else {
+      toast.error(res?.error || 'Failed to update category');
+    }
   };
 
   const toggleCategoryStatus = (id: string) => {
@@ -1139,6 +1136,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (c.id === id) {
           const nextStatus: 'Active' | 'Inactive' = c.status === 'Active' ? 'Inactive' : 'Active';
           const updated = { ...c, status: nextStatus, updatedAt: new Date().toISOString() };
+          MySQLDataService.updateCategory({ id: c.id, status: nextStatus });
           addAuditLog('Categories', 'Toggle Category Status', `Changed category "${c.name}" status to ${nextStatus}`);
           toast.success(`Category "${c.name}" is now ${nextStatus}`);
           return updated;
@@ -1152,21 +1150,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const target = categoriesList.find((c) => c.id === id || c.slug === id);
     try {
       const res = await MySQLDataService.deleteCategory(id, permanent);
-      if (res?.success || res === null) {
+      if (res?.success) {
         setCategoriesList((prev) => prev.filter((c) => c.id !== id && c.slug !== id));
         if (target) {
           addAuditLog('Categories', res?.mode === 'archived' ? 'Archive Category' : 'Delete Category', res?.message || `Removed category "${target.name}"`);
         }
         toast.success(res?.message || `Category "${target?.name || id}" removed`);
+        refreshAllData();
         return { success: true, mode: res?.mode || 'deleted', message: res?.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to remove category');
         return { success: false, message: res?.error || res?.message };
       }
-    } catch {
-      setCategoriesList((prev) => prev.filter((c) => c.id !== id && c.slug !== id));
-      toast.success(`Category "${target?.name || id}" removed`);
-      return { success: true, mode: 'deleted' };
+    } catch (err: any) {
+      toast.error(err.message || 'Error removing category');
+      return { success: false, message: err.message };
     }
   };
 
@@ -1222,31 +1220,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addItem = (itemData: Omit<InventoryItem, 'id'>) => {
+  const addItem = async (itemData: Omit<InventoryItem, 'id'>) => {
     // Check barcode duplicate
     if (itemData.barcode && itemData.barcode.trim()) {
       const cleanBarcode = itemData.barcode.trim();
       const duplicate = inventory.find((i) => i.barcode === cleanBarcode);
       if (duplicate) {
         toast.error(`Barcode "${cleanBarcode}" is already assigned to "${duplicate.name}" (${duplicate.sku})!`);
-        return;
+        return { success: false, error: 'Duplicate barcode' };
       }
     }
 
-    const newItem: InventoryItem = {
-      ...itemData,
-      id: `item-${Date.now()}`,
-      transferPrice: itemData.transferPrice || Math.round(itemData.costPrice * 1.18),
-      warrantyMonths: itemData.warrantyMonths || 12,
-      minStock: itemData.minStock || 10,
-    };
-    setInventory((prev) => [newItem, ...prev]);
-    MySQLDataService.syncProduct(newItem);
-    addAuditLog('Inventory', 'Add Product', `Created new item "${newItem.name}" (${newItem.sku})`);
-    toast.success(`Successfully added "${newItem.name}" to inventory`);
+    try {
+      const res = await MySQLDataService.createProduct(itemData);
+      if (res?.success && res.product) {
+        const p = res.product;
+        const newItem: InventoryItem = {
+          id: p.id,
+          sku: p.sku,
+          barcode: p.barcode || '',
+          name: p.name,
+          brand: p.brand || '',
+          model: p.model || '',
+          category: p.category,
+          subcategory: p.subcategory || '',
+          store: itemData.store || 'CENTRAL',
+          qtyOnHand: itemData.qtyOnHand || 0,
+          reorderPt: itemData.reorderPt || 5,
+          costPrice: Number(p.baseCostPrice),
+          transferPrice: Math.round(Number(p.baseCostPrice) * 1.18),
+          sellingPrice: Number(p.baseSellingPrice),
+          mrp: Math.round(Number(p.baseSellingPrice) * 1.2),
+          taxRate: Number(p.gstRate) || 18,
+          warrantyMonths: p.warrantyMonths || 12,
+          minStock: itemData.minStock || 10,
+          status: p.status as any,
+          fifoLots: 1,
+          lastMovement: 'Created',
+          imageUrl: p.imageUrl,
+        };
+        setInventory((prev) => [newItem, ...prev.filter(i => i.id !== newItem.id)]);
+        addAuditLog('Inventory', 'Add Product', `Created new item "${newItem.name}" (${newItem.sku})`);
+        toast.success(`Successfully saved "${newItem.name}" to MySQL inventory`);
+        refreshAllData();
+        return { success: true, item: newItem };
+      } else {
+        toast.error(res?.error || 'Failed to save product to database');
+        return { success: false, error: res?.error };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error saving product');
+      return { success: false, error: err.message };
+    }
   };
 
-  const updateItem = (id: string, updated: Partial<InventoryItem>) => {
+  const updateItem = async (id: string, updated: Partial<InventoryItem>) => {
     // Check barcode duplicate
     if (updated.barcode && updated.barcode.trim()) {
       const cleanBarcode = updated.barcode.trim();
@@ -1261,35 +1289,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       prev.map((item) => {
         if (item.id === id) {
           const newItem = { ...item, ...updated };
-          MySQLDataService.syncProduct(newItem);
-          addAuditLog('Inventory', 'Edit Product', `Updated details for "${newItem.name}" (${newItem.sku})`);
           return newItem;
         }
         return item;
       })
     );
-    toast.success('Inventory item updated successfully');
+
+    const res = await MySQLDataService.updateProduct({ id, ...updated });
+    if (res?.success) {
+      addAuditLog('Inventory', 'Edit Product', `Updated details for item #${id}`);
+      toast.success('Inventory item updated in MySQL');
+      refreshAllData();
+    } else {
+      toast.error(res?.error || 'Failed to update item in database');
+    }
   };
 
   const deleteItem = async (id: string, permanent = false) => {
     const itemToDelete = inventory.find((i) => i.id === id || i.sku === id);
     try {
       const res = await MySQLDataService.deleteProduct(id, permanent);
-      if (res?.success || res === null) {
+      if (res?.success) {
         setInventory((prev) => prev.filter((i) => i.id !== id && i.sku !== id));
         if (itemToDelete) {
           addAuditLog('Inventory', res?.mode === 'archived' ? 'Archive Product' : 'Delete Product', res?.message || `Removed item "${itemToDelete.name}" (${itemToDelete.sku})`);
         }
         toast.success(res?.message || `Removed "${itemToDelete?.name || id}" from inventory`);
+        refreshAllData();
         return { success: true, mode: res?.mode || 'deleted', message: res?.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to remove inventory item');
         return { success: false, message: res?.error || res?.message };
       }
-    } catch {
-      setInventory((prev) => prev.filter((i) => i.id !== id && i.sku !== id));
-      toast.success(`Removed "${itemToDelete?.name || id}" from inventory`);
-      return { success: true, mode: 'deleted' };
+    } catch (err: any) {
+      toast.error(err.message || 'Error removing item');
+      return { success: false, message: err.message };
     }
   };
 
@@ -1302,7 +1336,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (item.id === id) {
           const newQty = Math.max(0, item.qtyOnHand + qtyChange);
           const newItem = { ...item, qtyOnHand: newQty, lastMovement: 'Today' };
-          MySQLDataService.syncProduct(newItem);
+          MySQLDataService.createProduct(newItem);
           return newItem;
         }
         return item;
@@ -1352,9 +1386,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toast.success(`Default transfer price set to ₹${price} for ${storeCode}`);
   };
 
-  /**
-   * CENTRAL -> STORE TRANSFER WITH CENTRAL TRANSFER PROFIT / LOSS CALCULATION
-   */
   const transferStock = (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number, status: 'Completed' | 'Draft' = 'Completed') => {
     const sourceItem = inventory.find((i) => i.id === itemId || i.sku === itemId);
     if (!sourceItem) {
@@ -1373,26 +1404,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const totalTransferProfit = transferProfitPerUnit * qty;
 
     if (status === 'Completed') {
-      // 1. Update source inventory (e.g. CENTRAL)
       setInventory((prev) =>
         prev.map((item) => {
           if (item.id === sourceItem.id) {
             const newItem = { ...item, qtyOnHand: item.qtyOnHand - qty, lastMovement: 'Transfer Out' };
-            MySQLDataService.syncProduct(newItem);
+            MySQLDataService.createProduct(newItem);
             return newItem;
           }
           return item;
         })
       );
 
-      // 2. Update destination inventory (e.g. BLR)
       let destItemExists = false;
       setInventory((prev) =>
         prev.map((item) => {
           if (item.sku === sourceItem.sku && item.store === toStore) {
             destItemExists = true;
             const newItem = { ...item, qtyOnHand: item.qtyOnHand + qty, lastMovement: 'Transfer In' };
-            MySQLDataService.syncProduct(newItem);
+            MySQLDataService.createProduct(newItem);
             return newItem;
           }
           return item;
@@ -1408,11 +1437,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           lastMovement: 'Transfer In',
         };
         setInventory((prev) => [...prev, newDestItem]);
-        MySQLDataService.syncProduct(newDestItem);
+        MySQLDataService.createProduct(newDestItem);
       }
     }
 
-    // 3. Record in stockTransfers table
     const transferRecord: StockTransferRecord = {
       id: `tr-${Date.now()}`,
       transferNo: `TR-2026-${Math.floor(100 + Math.random() * 900)}`,
@@ -1432,7 +1460,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setStockTransfers((prev) => [transferRecord, ...prev]);
 
     if (status === 'Completed') {
-      // 4. Log two ledger entries: TRANSFER_OUT from source, TRANSFER_IN to destination
       const outLedger: InventoryLedgerEntry = {
         id: `led-${Date.now()}-out`,
         productId: sourceItem.id,
@@ -1490,7 +1517,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Execute atomic stock movement
       setInventory((prev) =>
         prev.map((item) => {
           if (item.id === sourceItem.id) {
@@ -1512,19 +1538,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setStockTransfers((prev) => prev.map((t) => (t.id === id ? { ...t, status: nextStatus } : t)));
   };
 
-  /**
-   * POS CHECKOUT WITH SEQUENTIAL CS26 INVOICING, WARRANTY & AUTOMATIC STORE STOCK DEDUCTION
-   */
   const addSale = (saleData: Omit<SalesOrder, 'id' | 'orderNo' | 'createdAt' | 'period'>): SalesOrder => {
     const storeCode = saleData.store || selectedStore || 'BLR';
     const storeNumeric = storeCode === 'BLR' ? '001' : storeCode === 'HYD' ? '002' : storeCode === 'DEL' ? '003' : storeCode === 'MUM' ? '004' : '009';
     
-    // Increment sequential invoice counter for store
     const nextSeq = (invoiceCounters[storeCode] || 1) + 1;
     setInvoiceCounters((prev) => ({ ...prev, [storeCode]: nextSeq }));
     const formattedOrderNo = `CS26${storeNumeric}${nextSeq}`;
 
-    // Calculate max warranty date across items
     let maxWarrantyMonths = 12;
     const saleItemsWithWarranty = saleData.items.map((item) => {
       const invItem = inventory.find((i) => i.id === item.itemId || i.sku === item.name);
@@ -1557,16 +1578,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       period: 'Today',
     };
 
-    // 1. Automatically deduct store inventory & log movement ledger
     setInventory((prev) =>
       prev.map((item) => {
         const sold = saleData.items.find((si) => si.itemId === item.id || si.name === item.name);
         if (sold && (item.store === storeCode || storeCode === 'All Stores')) {
           const newQty = Math.max(0, item.qtyOnHand - sold.qty);
           const newItem = { ...item, qtyOnHand: newQty, lastMovement: 'Just now' };
-          MySQLDataService.syncProduct(newItem);
 
-          // Log SALE ledger entry
           const ledgerEntry: InventoryLedgerEntry = {
             id: `led-${Date.now()}-${item.id}`,
             productId: item.id,
@@ -1591,7 +1609,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       })
     );
 
-    // 2. Link transaction customer without overwriting master profile
     setCustomers((prev) => {
       const match = prev.find((c) => c.phone === saleData.customerPhone || c.name === saleData.customerName);
       if (match) {
@@ -1608,121 +1625,86 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           creditBalance: saleData.paymentMethod === 'Credit' ? newSale.total : 0,
           lastPurchase: 'Today',
         };
-        MySQLDataService.syncCustomer(newCust);
+        MySQLDataService.createCustomer(newCust);
         return [newCust, ...prev];
       }
       return prev;
     });
 
     setSales((prev) => [newSale, ...prev]);
-    MySQLDataService.syncSale({ ...newSale, cashierName: currentUser.name });
+    
+    // Asynchronously commit POS sale transaction to MySQL API
+    MySQLDataService.createSale({
+      storeCode,
+      customerName: newSale.customerName,
+      customerPhone: newSale.customerPhone,
+      items: newSale.items.map((it) => ({
+        productId: it.itemId,
+        name: it.name,
+        sku: it.sku || it.name,
+        qty: it.qty,
+        unitPrice: it.unitPrice,
+        unitCost: it.unitPrice * 0.7,
+        taxRate: it.taxRate || 18,
+      })),
+      subtotal: newSale.subtotal,
+      taxAmount: newSale.taxTotal,
+      discount: newSale.discount,
+      total: newSale.total,
+      paymentMethod: newSale.paymentMethod,
+      cashierName: currentUser.name,
+    }).then(() => refreshAllData());
+
     const photoMsg = saleData.salePhotos && saleData.salePhotos.length > 0 ? ` with ${saleData.salePhotos.length} photo(s)` : '';
     addAuditLog('Sales', 'POS Sale Checkout', `Completed order ${newSale.orderNo} for ₹${newSale.total.toLocaleString('en-IN')}${photoMsg}`);
     toast.success(`Invoice ${newSale.orderNo} generated successfully!`);
     return newSale;
   };
 
-  const addPurchase = (poData: Omit<PurchaseOrder, 'id' | 'poNo' | 'createdAt'>) => {
-    const newPO: PurchaseOrder = {
-      ...poData,
-      id: `po-${Date.now()}`,
-      poNo: `PO-2026-${Math.floor(100 + Math.random() * 900)}`,
-      createdAt: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-    };
-    setPurchases((prev) => [newPO, ...prev]);
-
-    // If purchase order is received on creation, credit Central Inventory
-    if (newPO.status === 'Received') {
-      creditCentralStockForPO(newPO);
-    }
-
-    addAuditLog('Purchases', 'Create Purchase Order', `Generated ${newPO.poNo} for ${newPO.vendorName} (₹${newPO.totalAmount.toLocaleString('en-IN')})`);
-    toast.success(`Purchase Order ${newPO.poNo} created successfully!`);
-  };
-
-  const updatePurchase = (id: string, updated: Partial<PurchaseOrder>) => {
-    const targetPO = purchases.find((p) => p.id === id);
-    const nextStatus = updated.status;
-
-    setPurchases((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
-
-    // When PO transitions to 'Received', credit Central Warehouse Inventory automatically
-    if (targetPO && targetPO.status !== 'Received' && nextStatus === 'Received') {
-      creditCentralStockForPO({ ...targetPO, ...updated });
-    }
-
-    addAuditLog('Purchases', 'Edit Purchase Order', `Updated PO #${id}`);
-    toast.success('Purchase Order updated successfully');
-  };
-
-  /**
-   * CREDITS CENTRAL WAREHOUSE STOCK UPON PO RECEIPT & LOGS PURCHASE LEDGER
-   */
-  const creditCentralStockForPO = (po: PurchaseOrder) => {
-    po.items.forEach((poItem) => {
-      let foundInCentral = false;
-
-      setInventory((prev) =>
-        prev.map((invItem) => {
-          if (invItem.store === 'CENTRAL' && (invItem.name === poItem.name || invItem.sku === poItem.sku)) {
-            foundInCentral = true;
-            const updatedInv = { ...invItem, qtyOnHand: invItem.qtyOnHand + poItem.qty, lastMovement: 'PO Received' };
-            MySQLDataService.syncProduct(updatedInv);
-            return updatedInv;
-          }
-          return invItem;
-        })
-      );
-
-      if (!foundInCentral) {
-        const newCentralItem: InventoryItem = {
-          id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          sku: poItem.sku || `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
-          barcode: `890123456${Math.floor(1000 + Math.random() * 9000)}`,
-          name: poItem.name,
-          brand: 'Generic',
-          category: 'Electricals',
-          subcategory: 'General',
-          store: 'CENTRAL',
-          qtyOnHand: poItem.qty,
-          reorderPt: 10,
-          costPrice: poItem.unitCost,
-          transferPrice: Math.round(poItem.unitCost * 1.18),
-          sellingPrice: Math.round(poItem.unitCost * 1.45),
-          mrp: Math.round(poItem.unitCost * 1.60),
-          hsn: '8471',
-          taxRate: 18,
-          warrantyMonths: 12,
-          minStock: 10,
-          status: 'active',
-          fifoLots: 1,
-          lastMovement: 'PO Received',
+  const addPurchase = async (poData: Omit<PurchaseOrder, 'id' | 'poNo' | 'createdAt'>) => {
+    try {
+      const res = await MySQLDataService.createPurchase(poData);
+      if (res?.success && res.purchaseOrder) {
+        const p = res.purchaseOrder;
+        const newPO: PurchaseOrder = {
+          id: p.id,
+          poNo: p.poNo,
+          vendorName: poData.vendorName,
+          vendorId: p.vendorId,
+          store: p.storeCode || 'CENTRAL',
+          items: poData.items,
+          totalAmount: Number(p.totalCost),
+          status: p.status,
+          paymentStatus: p.paymentStatus,
+          createdAt: new Date(p.createdAt).toLocaleDateString('en-IN'),
+          expectedDate: poData.expectedDate || 'ASAP',
         };
-        setInventory((prev) => [...prev, newCentralItem]);
-        MySQLDataService.syncProduct(newCentralItem);
+        setPurchases((prev) => [newPO, ...prev.filter(po => po.id !== newPO.id)]);
+        addAuditLog('Purchases', 'Create Purchase Order', `Generated ${newPO.poNo} for ${newPO.vendorName} (₹${newPO.totalAmount.toLocaleString('en-IN')})`);
+        toast.success(`Purchase Order ${newPO.poNo} saved to MySQL!`);
+        refreshAllData();
+        return newPO;
+      } else {
+        toast.error(res?.error || 'Failed to create purchase order');
       }
+    } catch (err: any) {
+      toast.error(err.message || 'Error creating purchase order');
+    }
+  };
 
-      // Log PURCHASE ledger entry
-      const ledgerEntry: InventoryLedgerEntry = {
-        id: `led-${Date.now()}-po`,
-        productId: `item-${po.id}`,
-        sku: poItem.sku || `SKU-${poItem.name.substring(0, 3).toUpperCase()}`,
-        productName: poItem.name,
-        storeCode: 'CENTRAL',
-        movementType: 'PURCHASE',
-        quantity: poItem.qty,
-        unitCost: poItem.unitCost,
-        totalValue: poItem.qty * poItem.unitCost,
-        fromLocation: `Vendor: ${po.vendorName}`,
-        toLocation: 'CENTRAL',
-        referenceNo: po.poNo,
-        createdBy: currentUser.name || 'Procurement',
-        createdAt: new Date().toISOString(),
-      };
-      setInventoryLedger((prev) => [ledgerEntry, ...prev]);
-    });
+  const updatePurchase = async (id: string, updated: Partial<PurchaseOrder>) => {
+    setPurchases((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
+    const res = await fetch('/api/purchases', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updated }),
+    }).catch(() => null);
 
-    toast.success(`Credited ${po.items.reduce((acc, i) => acc + i.qty, 0)} units to Central Warehouse Stock`);
+    if (res && res.ok) {
+      addAuditLog('Purchases', 'Edit Purchase Order', `Updated PO #${id}`);
+      toast.success('Purchase Order updated in MySQL');
+      refreshAllData();
+    }
   };
 
   const deletePurchase = async (id: string) => {
@@ -1735,6 +1717,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           addAuditLog('Purchases', res.mode === 'archived' ? 'Cancel Purchase Order' : 'Delete Purchase Order', res.message || `Removed PO ${poToDelete.poNo}`);
         }
         toast.success(res.message || `Removed Purchase Order ${poToDelete?.poNo || id}`);
+        refreshAllData();
         return { success: true, mode: res.mode, message: res.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to delete purchase order');
@@ -1746,124 +1729,191 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addCustomer = (custData: Omit<Customer, 'id' | 'totalSpend' | 'lastPurchase'>): Customer => {
-    const newCust: Customer = {
-      ...custData,
-      id: `cust-${Date.now()}`,
-      totalSpend: 0,
-      lastPurchase: 'Never',
-    };
-    setCustomers((prev) => [newCust, ...prev]);
-    MySQLDataService.syncCustomer(newCust);
-    addAuditLog('Customers', 'Add Customer', `Registered customer "${newCust.name}"`);
-    toast.success(`Customer "${newCust.name}" registered`);
-    return newCust;
+  const addCustomer = async (custData: Omit<Customer, 'id' | 'totalSpend' | 'lastPurchase'>) => {
+    try {
+      const res = await MySQLDataService.createCustomer(custData);
+      if (res?.success && res.customer) {
+        const c = res.customer;
+        const newCust: Customer = {
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          email: c.email || '',
+          city: c.city || '',
+          tier: 'Regular',
+          totalSpend: Number(c.totalSpent) || 0,
+          creditBalance: Number(c.creditBalance) || 0,
+          lastPurchase: 'Never',
+        };
+        setCustomers((prev) => [newCust, ...prev.filter(cust => cust.id !== newCust.id)]);
+        addAuditLog('Customers', 'Add Customer', `Registered customer "${newCust.name}"`);
+        toast.success(`Customer "${newCust.name}" saved to MySQL!`);
+        refreshAllData();
+        return newCust;
+      } else {
+        toast.error(res?.error || 'Failed to save customer');
+        const tempCust: Customer = { ...custData, id: `cust-${Date.now()}`, totalSpend: 0, lastPurchase: 'Never' };
+        setCustomers((prev) => [tempCust, ...prev]);
+        return tempCust;
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error saving customer');
+      const tempCust: Customer = { ...custData, id: `cust-${Date.now()}`, totalSpend: 0, lastPurchase: 'Never' };
+      setCustomers((prev) => [tempCust, ...prev]);
+      return tempCust;
+    }
   };
 
-  const updateCustomer = (id: string, updated: Partial<Customer>) => {
-    setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
-    const updatedCust = customers.find((c) => c.id === id);
-    if (updatedCust) MySQLDataService.syncCustomer({ ...updatedCust, ...updated });
-    addAuditLog('Customers', 'Edit Customer', `Updated profile for customer #${id}`);
-    toast.success('Customer record updated');
+  const updateCustomer = async (id: string, updated: Partial<Customer>) => {
+    const cust = customers.find((c) => c.id === id);
+    if (!cust) return;
+    const merged = { ...cust, ...updated };
+    setCustomers((prev) => prev.map((c) => (c.id === id ? merged : c)));
+    const res = await MySQLDataService.updateCustomer({ id, ...updated });
+    if (res?.success) {
+      addAuditLog('Customers', 'Edit Customer', `Updated profile for customer #${id}`);
+      toast.success('Customer record updated in MySQL');
+      refreshAllData();
+    }
   };
 
   const deleteCustomer = async (id: string, permanent = false) => {
     const cust = customers.find((c) => c.id === id);
     try {
       const res = await MySQLDataService.deleteCustomer(id, permanent);
-      if (res?.success || res === null) {
+      if (res?.success) {
         setCustomers((prev) => prev.filter((c) => c.id !== id));
         if (cust) {
           addAuditLog('Customers', res?.mode === 'archived' ? 'Archive Customer' : 'Delete Customer', res?.message || `Removed customer "${cust.name}"`);
         }
         toast.success(res?.message || `Customer "${cust?.name || id}" removed`);
+        refreshAllData();
         return { success: true, mode: res?.mode || 'deleted', message: res?.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to remove customer');
         return { success: false, message: res?.error || res?.message };
       }
-    } catch {
-      setCustomers((prev) => prev.filter((c) => c.id !== id));
-      toast.success(`Customer "${cust?.name || id}" removed`);
-      return { success: true, mode: 'deleted' };
+    } catch (err: any) {
+      toast.error(err.message || 'Error removing customer');
+      return { success: false, message: err.message };
     }
   };
 
-  const addVendor = (vendorData: Omit<Vendor, 'id' | 'code'>) => {
-    const newVendor: Vendor = {
-      ...vendorData,
-      id: `vend-${Date.now()}`,
-      code: `VND-${Math.floor(1000 + Math.random() * 9000)}`,
-    };
-    setVendors((prev) => [newVendor, ...prev]);
-    MySQLDataService.syncVendor(newVendor);
-    addAuditLog('Vendors', 'Add Vendor', `Onboarded supplier "${newVendor.name}"`);
-    toast.success(`Vendor "${newVendor.name}" onboarded`);
+  const addVendor = async (vendorData: Omit<Vendor, 'id' | 'code'>) => {
+    try {
+      const res = await MySQLDataService.createVendor(vendorData);
+      if (res?.success && res.vendor) {
+        const v = res.vendor;
+        const newVendor: Vendor = {
+          id: v.id,
+          code: v.code,
+          name: v.name,
+          contactPerson: v.contactPerson || '',
+          email: v.email || '',
+          phone: v.phone || '',
+          city: v.city || '',
+          address: v.address || '',
+          category: v.categories || 'General',
+          outstandingPayable: 0,
+          rating: 4.8,
+          leadTimeDays: 3,
+        };
+        setVendors((prev) => [newVendor, ...prev.filter(vnd => vnd.id !== newVendor.id)]);
+        addAuditLog('Vendors', 'Add Vendor', `Onboarded supplier "${newVendor.name}"`);
+        toast.success(`Vendor "${newVendor.name}" saved to MySQL!`);
+        refreshAllData();
+        return newVendor;
+      } else {
+        toast.error(res?.error || 'Failed to save vendor');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error saving vendor');
+    }
   };
 
-  const updateVendor = (id: string, updated: Partial<Vendor>) => {
-    setVendors((prev) => prev.map((v) => (v.id === id ? { ...v, ...updated } : v)));
-    const updatedVend = vendors.find((v) => v.id === id);
-    if (updatedVend) MySQLDataService.syncVendor({ ...updatedVend, ...updated });
-    addAuditLog('Vendors', 'Edit Vendor', `Updated supplier #${id}`);
-    toast.success('Vendor profile updated');
+  const updateVendor = async (id: string, updated: Partial<Vendor>) => {
+    const vend = vendors.find((v) => v.id === id);
+    if (!vend) return;
+    const merged = { ...vend, ...updated };
+    setVendors((prev) => prev.map((v) => (v.id === id ? merged : v)));
+    const res = await MySQLDataService.updateVendor({ id, ...updated });
+    if (res?.success) {
+      addAuditLog('Vendors', 'Edit Vendor', `Updated supplier #${id}`);
+      toast.success('Vendor profile updated in MySQL');
+      refreshAllData();
+    }
   };
 
   const deleteVendor = async (id: string, permanent = false) => {
     const v = vendors.find((vend) => vend.id === id || vend.code === id);
     try {
       const res = await MySQLDataService.deleteVendor(id, permanent);
-      if (res?.success || res === null) {
+      if (res?.success) {
         setVendors((prev) => prev.filter((vend) => vend.id !== id && vend.code !== id));
         if (v) {
           addAuditLog('Vendors', res?.mode === 'archived' ? 'Archive Vendor' : 'Delete Vendor', res?.message || `Removed supplier "${v.name}"`);
         }
         toast.success(res?.message || `Vendor "${v?.name || id}" removed`);
+        refreshAllData();
         return { success: true, mode: res?.mode || 'deleted', message: res?.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to remove vendor');
         return { success: false, message: res?.error || res?.message };
       }
-    } catch {
-      setVendors((prev) => prev.filter((vend) => vend.id !== id && vend.code !== id));
-      toast.success(`Vendor "${v?.name || id}" removed`);
-      return { success: true, mode: 'deleted' };
+    } catch (err: any) {
+      toast.error(err.message || 'Error removing vendor');
+      return { success: false, message: err.message };
     }
   };
 
-  const addExpense = (expenseData: Omit<Expense, 'id' | 'referenceNo' | 'date'>) => {
-    const newExp: Expense = {
-      ...expenseData,
-      id: `exp-${Date.now()}`,
-      referenceNo: `EXP-2026-${Math.floor(100 + Math.random() * 900)}`,
-      date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-    };
-    setExpenses((prev) => [newExp, ...prev]);
-    MySQLDataService.syncExpense({ ...newExp, spentBy: currentUser.name });
-    addAuditLog('Expenses', 'Create Expense Record', `Logged expense "${newExp.description}" for ₹${newExp.amount.toLocaleString('en-IN')} (${newExp.store})`);
-    toast.success(`Expense record ${newExp.referenceNo} logged`);
+  const addExpense = async (expenseData: Omit<Expense, 'id' | 'referenceNo' | 'date'>) => {
+    try {
+      const res = await MySQLDataService.createExpense(expenseData);
+      if (res?.success && res.expense) {
+        const e = res.expense;
+        const newExp: Expense = {
+          id: e.id,
+          referenceNo: e.expenseNo,
+          category: e.category,
+          amount: Number(e.amount),
+          store: e.storeCode,
+          description: e.description,
+          paymentMethod: e.paymentMethod,
+          status: 'Approved',
+          date: new Date(e.date).toLocaleDateString('en-IN'),
+        };
+        setExpenses((prev) => [newExp, ...prev.filter(exp => exp.id !== newExp.id)]);
+        addAuditLog('Expenses', 'Create Expense Record', `Logged expense "${newExp.description}" for ₹${newExp.amount.toLocaleString('en-IN')} (${newExp.store})`);
+        toast.success(`Expense record ${newExp.referenceNo} saved to MySQL!`);
+        refreshAllData();
+        return newExp;
+      } else {
+        toast.error(res?.error || 'Failed to record expense');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error recording expense');
+    }
   };
 
   const deleteExpense = async (id: string) => {
     const exp = expenses.find((e) => e.id === id || e.referenceNo === id);
     try {
       const res = await MySQLDataService.deleteExpense(id);
-      if (res?.success || res === null) {
+      if (res?.success) {
         setExpenses((prev) => prev.filter((e) => e.id !== id && e.referenceNo !== id));
         if (exp) {
           addAuditLog('Expenses', 'Delete Expense Record', `Deleted expense "${exp.description}" (${exp.referenceNo})`);
         }
         toast.success(res?.message || `Expense record ${exp?.referenceNo || id} deleted`);
+        refreshAllData();
         return { success: true, mode: 'deleted', message: res?.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to delete expense record');
         return { success: false, message: res?.error || res?.message };
       }
-    } catch {
-      setExpenses((prev) => prev.filter((e) => e.id !== id && e.referenceNo !== id));
-      toast.success(`Expense record ${exp?.referenceNo || id} deleted`);
-      return { success: true, mode: 'deleted' };
+    } catch (err: any) {
+      toast.error(err.message || 'Error deleting expense');
+      return { success: false, message: err.message };
     }
   };
 

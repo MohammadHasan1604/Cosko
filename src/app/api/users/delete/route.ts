@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,6 +44,8 @@ export async function POST(request: NextRequest) {
         data: { status: 'Inactive' },
       });
 
+      broadcastRealtimeEvent('users', 'USER_UPDATED', { userId: target.id, email: target.email, action: 'deactivated' });
+
       return NextResponse.json({
         success: true,
         mode: 'archived',
@@ -56,6 +59,9 @@ export async function POST(request: NextRequest) {
     // Hard-delete if 0 history
     await prisma.userStoreAssignment.deleteMany({ where: { userId: target.id } });
     await prisma.userAccount.delete({ where: { id: target.id } });
+
+    // Broadcast SSE realtime event
+    broadcastRealtimeEvent('users', 'USER_UPDATED', { userId: target.id, email: target.email, action: 'deleted' });
 
     return NextResponse.json({
       success: true,

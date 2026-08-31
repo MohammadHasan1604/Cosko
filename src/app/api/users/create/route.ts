@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 export async function POST(request: Request) {
   try {
@@ -27,37 +28,56 @@ export async function POST(request: Request) {
     }
 
     const hashedPassword = await hashPassword(password);
+    const storeCode = store || 'BLR';
 
     const newUser = await prisma.userAccount.create({
       data: {
         email: cleanEmail,
         passwordHash: hashedPassword,
-        name,
+        name: name.trim(),
         phone: phone || null,
-        role: role || 'Employee',
+        role: role || 'Store Manager',
         securityLevel: level,
-        storeScope: store || 'BLR',
+        storeScope: storeCode,
         status: status || 'Active',
         shiftStatus: 'On Shift',
       },
     });
 
-    if (store) {
+    if (storeCode && storeCode !== 'All Stores') {
       await prisma.userStoreAssignment.create({
         data: {
           userId: newUser.id,
-          storeCode: store,
+          storeCode: storeCode,
         },
       });
     }
 
+    const sanitizedUser = {
+      id: newUser.id,
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      securityLevel: newUser.securityLevel,
+      store: newUser.storeScope,
+      status: newUser.status,
+      assignedStores: [storeCode],
+      createdAt: newUser.createdAt,
+      shiftStatus: newUser.shiftStatus,
+    };
+
+    // Broadcast SSE realtime event
+    broadcastRealtimeEvent('users', 'USER_CREATED', { userId: newUser.id, email: newUser.email, store: storeCode });
+
     return NextResponse.json({
       success: true,
+      user: sanitizedUser,
       userId: newUser.id,
-      message: 'User provisioned in MySQL database successfully',
-    });
+      message: `User "${newUser.name}" provisioned in MySQL database successfully`,
+    }, { status: 201 });
   } catch (error: any) {
     console.error('API /api/users/create error:', error);
     return NextResponse.json({ success: false, error: error.message || 'Server error' }, { status: 500 });
   }
 }
+

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 /**
  * GET /api/expenses - Retrieve store/central expenses
@@ -78,6 +79,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id: expense.id, expenseNo: expense.expenseNo, storeCode: expense.storeCode, action: 'saved' });
+
     return NextResponse.json({ success: true, expense }, { status: 201 });
   } catch (error: any) {
     console.error('API /api/expenses POST error:', error);
@@ -109,9 +112,12 @@ export async function DELETE(req: NextRequest) {
 
     await (prisma as any).expense.delete({ where: { id } });
 
+    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id, action: 'deleted' });
+
     return NextResponse.json({ success: true, message: 'Expense record deleted' });
   } catch (error: any) {
     console.error('API /api/expenses DELETE error:', error);
     return NextResponse.json({ error: error.message || 'Failed to delete expense' }, { status: 500 });
   }
 }
+

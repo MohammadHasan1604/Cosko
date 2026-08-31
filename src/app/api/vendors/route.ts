@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 /**
  * GET /api/vendors - Retrieve all vendors (excludes Archived by default)
@@ -89,6 +90,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: vendor.id, code: vendor.code, name: vendor.name, action: 'saved' });
+
     return NextResponse.json({ success: true, vendor }, { status: 201 });
   } catch (error: any) {
     console.error('API /api/vendors POST error:', error);
@@ -123,6 +126,8 @@ export async function PUT(req: NextRequest) {
         ...(body.status ? { status: body.status } : {}),
       },
     });
+
+    broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: vendor.id, code: vendor.code, name: vendor.name, action: 'updated' });
 
     return NextResponse.json({ success: true, vendor });
   } catch (error: any) {
@@ -172,6 +177,8 @@ export async function DELETE(req: NextRequest) {
         data: { status: 'Archived' },
       });
 
+      broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: target.id, code: target.code, name: target.name, action: 'archived' });
+
       return NextResponse.json({
         success: true,
         mode: 'archived',
@@ -186,6 +193,8 @@ export async function DELETE(req: NextRequest) {
     // Hard delete unused vendor
     await (prisma as any).vendor.delete({ where: { id: target.id } });
 
+    broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: target.id, code: target.code, name: target.name, action: 'deleted' });
+
     return NextResponse.json({
       success: true,
       mode: 'deleted',
@@ -196,4 +205,5 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to archive/delete vendor' }, { status: 500 });
   }
 }
+
 

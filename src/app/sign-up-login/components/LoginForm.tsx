@@ -35,51 +35,29 @@ export default function LoginForm() {
     clearErrors();
 
     try {
-      // 1. Production MySQL API Authentication Endpoint
+      // Production MySQL API Authentication Endpoint
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: data.email, password: data.password }),
+        body: JSON.stringify({ email: data.email.trim(), password: data.password }),
       });
 
-      if (res.ok) {
-        const result = await res.json();
-        if (result.success && result.user) {
-          setCurrentUser(result.user);
-          addAuditLog('Authentication', 'User Login', `Signed in as ${result.user.role} (${result.user.email})`);
-          toast.success(`Welcome back, ${result.user.name}! Signed in as ${result.user.role}`);
-          router.push('/dashboard');
-          return;
-        }
-      }
+      const result = await res.json().catch(() => null);
 
-      // 2. Demo Standalone Mode Authentication
-      const match = usersList.find(
-        (u) => u.email.toLowerCase() === data.email.toLowerCase() && (u.password === data.password || data.password === 'Cosko2026@')
-      );
-
-      if (match) {
-        setCurrentUser({
-          id: match.id,
-          name: match.name,
-          email: match.email,
-          role: match.role,
-          store: match.store,
-          avatar: match.name.substring(0, 2).toUpperCase(),
-          shiftStatus: match.shiftStatus || 'On Shift',
-          avatarUrl: (match as any).avatarUrl,
-        });
-        addAuditLog('Authentication', 'User Login', `Signed in as ${match.role} (${match.email})`);
-        toast.success(`Welcome back, ${match.name}! Signed in as ${match.role}`);
+      if (res.ok && result?.success && result?.user) {
+        setCurrentUser(result.user);
+        addAuditLog('Authentication', 'User Login', `Signed in as ${result.user.role} (${result.user.email})`);
+        toast.success(`Welcome back, ${result.user.name}! Signed in as ${result.user.role}`);
         router.push('/dashboard');
+        return;
       } else {
         setError('root', {
-          message: 'Invalid email or password. Please verify your login credentials.',
+          message: result?.error || result?.message || 'Invalid email or password. Please verify your login credentials.',
         });
       }
     } catch {
       setError('root', {
-        message: 'Network authentication error. Please try again.',
+        message: 'Network authentication error. Please verify your connection and database status.',
       });
     } finally {
       setIsLoading(false);

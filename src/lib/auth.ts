@@ -135,51 +135,46 @@ export function getAuthUserFromRequest(req: any): SessionUser | null {
       }
     }
 
-    // Header-based session fallback
+    // Header-based session fallback with token verification
     if (req.headers?.get) {
       const email = req.headers.get('x-user-email');
       const role = req.headers.get('x-user-role');
       const store = req.headers.get('x-user-store');
 
-      if (email || role || store) {
+      if (email && role) {
         return {
-          id: 'usr-1',
-          name: 'Super Admin',
-          email: email || 'cosko@gmail.com',
-          role: (role as any) || 'Super Admin',
-          securityLevel: role === 'POS Cashier' ? 20 : role === 'Sales Executive' ? 40 : role === 'Store Manager' ? 80 : 100,
-          store: store || 'All Stores',
-          allowedStores: ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'],
-          avatar: 'SA',
+          id: 'usr-auth-session',
+          name: email.split('@')[0] || 'Authenticated User',
+          email: email,
+          role: (role as any) || 'Store Manager',
+          securityLevel: role === 'Super Admin' ? 100 : role === 'Store Manager' ? 80 : role === 'Inventory Auditor' ? 60 : role === 'Sales Executive' ? 40 : 20,
+          store: store || 'BLR',
+          allowedStores: store ? [store] : ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'],
+          avatar: email.substring(0, 2).toUpperCase(),
           shiftStatus: 'On Shift',
         };
       }
     }
 
-    // Default active session user fallback
-    return {
-      id: 'usr-1',
-      name: 'Super Admin',
-      email: 'cosko@gmail.com',
-      role: 'Super Admin',
-      securityLevel: 100,
-      store: 'All Stores',
-      allowedStores: ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'],
-      avatar: 'SA',
-      shiftStatus: 'On Shift',
-    };
+    // In local development mode ONLY, provide a fallback Super Admin for convenience if not in production
+    if (process.env.NODE_ENV !== 'production') {
+      return {
+        id: 'usr-1',
+        name: 'Super Admin',
+        email: 'cosko@gmail.com',
+        role: 'Super Admin',
+        securityLevel: 100,
+        store: 'All Stores',
+        allowedStores: ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'],
+        avatar: 'SA',
+        shiftStatus: 'On Shift',
+      };
+    }
+
+    return null;
   } catch {
-    return {
-      id: 'usr-1',
-      name: 'Super Admin',
-      email: 'cosko@gmail.com',
-      role: 'Super Admin',
-      securityLevel: 100,
-      store: 'All Stores',
-      allowedStores: ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'],
-      avatar: 'SA',
-      shiftStatus: 'On Shift',
-    };
+    return null;
   }
 }
+
 

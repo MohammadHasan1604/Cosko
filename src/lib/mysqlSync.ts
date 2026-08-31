@@ -3,16 +3,25 @@
  * Manages client-to-backend database operations and synchronization.
  * 
  * IMPORTANT: Every function makes a real API call to persist data in MySQL.
- * This is NOT a no-op stub. All mutations go through authenticated API routes
- * that use Prisma ORM to write to the production MySQL database.
+ * All mutations go through authenticated API routes that use Prisma ORM to write
+ * directly to the authoritative production MySQL database.
  */
 
-async function apiCall(url: string, method: string, body?: any): Promise<any> {
+interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+  [key: string]: any;
+}
+
+async function apiCall<T = any>(url: string, method: string, body?: any): Promise<ApiResponse<T>> {
   try {
     let activeToken = '';
     let activeEmail = '';
     let activeRole = '';
     let activeStore = '';
+
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('cosko_active_session');
@@ -39,19 +48,34 @@ async function apiCall(url: string, method: string, body?: any): Promise<any> {
       headers,
       credentials: 'include', // Send cookies for auth
     };
+
     if (body && method !== 'GET' && method !== 'DELETE') {
       options.body = JSON.stringify(body);
     }
+
     const res = await fetch(url, options);
+    const result = await res.json().catch(() => ({ error: res.statusText }));
+
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      console.error(`[MySQLDataService] ${method} ${url} failed (${res.status}):`, err);
-      return null;
+      console.error(`[MySQLDataService] ${method} ${url} failed (${res.status}):`, result);
+      return {
+        success: false,
+        error: result.error || result.message || `Request failed with status ${res.status}`,
+        ...result,
+      };
     }
-    return await res.json();
-  } catch (err) {
+
+    return {
+      success: result.success !== false,
+      data: result,
+      ...result,
+    };
+  } catch (err: any) {
     console.error(`[MySQLDataService] ${method} ${url} network error:`, err);
-    return null;
+    return {
+      success: false,
+      error: err.message || 'Network connection failed. Check database and backend status.',
+    };
   }
 }
 
@@ -64,10 +88,50 @@ export const MySQLDataService = {
     };
   },
 
+  // ─── FETCH AUTHORITATIVE DATA ────────────────────────
+  async fetchInventory(store?: string) {
+    const url = store && store !== 'All Stores' ? `/api/inventory?store=${encodeURIComponent(store)}` : '/api/inventory';
+    return apiCall(url, 'GET');
+  },
+
+  async fetchStores() {
+    return apiCall('/api/stores', 'GET');
+  },
+
+  async fetchUsers() {
+    return apiCall('/api/users', 'GET');
+  },
+
+  async fetchCategories() {
+    return apiCall('/api/categories', 'GET');
+  },
+
+  async fetchCustomers(query?: string) {
+    const url = query ? `/api/customers?query=${encodeURIComponent(query)}` : '/api/customers';
+    return apiCall(url, 'GET');
+  },
+
+  async fetchVendors() {
+    return apiCall('/api/vendors', 'GET');
+  },
+
+  async fetchExpenses(store?: string) {
+    const url = store && store !== 'All Stores' ? `/api/expenses?store=${encodeURIComponent(store)}` : '/api/expenses';
+    return apiCall(url, 'GET');
+  },
+
+  async fetchPurchases() {
+    return apiCall('/api/purchases', 'GET');
+  },
+
+  async fetchSales(store?: string) {
+    const url = store && store !== 'All Stores' ? `/api/sales?store=${encodeURIComponent(store)}` : '/api/sales';
+    return apiCall(url, 'GET');
+  },
+
   // ─── PRODUCTS / INVENTORY ────────────────────────────
-  async syncProduct(item: any) {
+  async createProduct(item: any) {
     return apiCall('/api/inventory', 'POST', {
-      id: item.id,
       sku: item.sku,
       barcode: item.barcode,
       name: item.name,
@@ -83,6 +147,22 @@ export const MySQLDataService = {
       store: item.store,
       qtyOnHand: item.qtyOnHand,
       reorderPt: item.reorderPt,
+    });
+  },
+
+  async updateProduct(item: any) {
+    return apiCall('/api/inventory', 'PUT', {
+      id: item.id,
+      name: item.name,
+      barcode: item.barcode,
+      brand: item.brand,
+      category: item.category,
+      subcategory: item.subcategory,
+      costPrice: item.costPrice,
+      sellingPrice: item.sellingPrice,
+      taxRate: item.taxRate,
+      warrantyMonths: item.warrantyMonths,
+      status: item.status,
     });
   },
 
@@ -109,8 +189,17 @@ export const MySQLDataService = {
   },
 
   // ─── USER PROFILES ───────────────────────────────────
-  async syncProfile(user: any) {
-    return apiCall('/api/users/create', 'POST', user);
+  async createProfile(user: any) {
+    return apiCall('/api/users/create', 'POST', {
+      name: user.name,
+      email: user.email,
+      password: user.password || 'Cosko2026@',
+      role: user.role,
+      store: user.store,
+      phone: user.phone,
+      status: user.status || 'Active',
+      securityLevel: user.securityLevel,
+    });
   },
 
   async deleteProfile(id: string, permanent = false) {
@@ -118,14 +207,27 @@ export const MySQLDataService = {
   },
 
   // ─── CUSTOMERS ───────────────────────────────────────
-  async syncCustomer(cust: any) {
+  async createCustomer(cust: any) {
     return apiCall('/api/customers', 'POST', {
       name: cust.name,
       phone: cust.phone,
       email: cust.email,
       city: cust.city,
       address: cust.address,
-      totalSpend: cust.totalSpend,
+      totalSpend: cust.totalSpend || 0,
+      creditBalance: cust.creditBalance || 0,
+    });
+  },
+
+  async updateCustomer(cust: any) {
+    return apiCall('/api/customers', 'PUT', {
+      id: cust.id,
+      name: cust.name,
+      phone: cust.phone,
+      email: cust.email,
+      city: cust.city,
+      address: cust.address,
+      status: cust.status,
       creditBalance: cust.creditBalance,
     });
   },
@@ -135,7 +237,7 @@ export const MySQLDataService = {
   },
 
   // ─── VENDORS ─────────────────────────────────────────
-  async syncVendor(vendor: any) {
+  async createVendor(vendor: any) {
     return apiCall('/api/vendors', 'POST', {
       code: vendor.code,
       name: vendor.name,
@@ -146,6 +248,18 @@ export const MySQLDataService = {
       categories: vendor.categories,
       gstin: vendor.gstin,
       paymentTerms: vendor.paymentTerms,
+      status: vendor.status || 'Active',
+    });
+  },
+
+  async updateVendor(vendor: any) {
+    return apiCall('/api/vendors', 'PUT', {
+      id: vendor.id,
+      name: vendor.name,
+      contactPerson: vendor.contactPerson,
+      email: vendor.email,
+      phone: vendor.phone,
+      city: vendor.city,
       status: vendor.status,
     });
   },
@@ -155,11 +269,11 @@ export const MySQLDataService = {
   },
 
   // ─── EXPENSES ────────────────────────────────────────
-  async syncExpense(expense: any) {
+  async createExpense(expense: any) {
     return apiCall('/api/expenses', 'POST', {
       category: expense.category,
       amount: expense.amount,
-      storeCode: expense.store,
+      storeCode: expense.store || expense.storeCode,
       description: expense.description,
       paymentMethod: expense.paymentMethod,
       date: expense.date,
@@ -170,34 +284,17 @@ export const MySQLDataService = {
     return apiCall(`/api/expenses?id=${encodeURIComponent(id)}`, 'DELETE');
   },
 
-  // ─── SALES ───────────────────────────────────────────
-  async syncSale(sale: any) {
-    // Sales are persisted via the checkout flow in /api/sales POST
-    // This is called after local state update as a background sync
-    return apiCall('/api/sales', 'POST', {
-      storeCode: sale.store,
-      customerName: sale.customerName,
-      customerPhone: sale.customerPhone,
-      items: sale.items?.map((it: any) => ({
-        productId: it.itemId,
-        name: it.name,
-        sku: it.sku || it.name,
-        qty: it.qty,
-        unitPrice: it.unitPrice,
-        unitCost: it.costPrice || it.unitPrice * 0.7,
-        taxRate: it.taxRate || 18,
-      })),
-      subtotal: sale.subtotal,
-      taxAmount: sale.taxTotal,
-      discount: sale.discount,
-      total: sale.total,
-      paymentMethod: sale.paymentMethod,
-      cashierName: sale.cashierName,
-    });
+  // ─── SALES & TRANSFERS ───────────────────────────────
+  async createSale(sale: any) {
+    return apiCall('/api/sales', 'POST', sale);
+  },
+
+  async createStockTransfer(transfer: any) {
+    return apiCall('/api/transfers', 'POST', transfer);
   },
 
   // ─── PURCHASES ───────────────────────────────────────
-  async syncPurchase(po: any) {
+  async createPurchase(po: any) {
     return apiCall('/api/purchases', 'POST', po);
   },
 
@@ -206,8 +303,22 @@ export const MySQLDataService = {
   },
 
   // ─── CATEGORIES ──────────────────────────────────────
-  async syncCategory(cat: any) {
+  async createCategory(cat: any) {
     return apiCall('/api/categories', 'POST', {
+      name: cat.name,
+      parentCategoryId: cat.parentCategoryId,
+      categoryType: cat.categoryType,
+      description: cat.description,
+      icon: cat.icon,
+      imageUrl: cat.imageUrl,
+      status: cat.status || 'Active',
+      sortOrder: cat.sortOrder || 0,
+    });
+  },
+
+  async updateCategory(cat: any) {
+    return apiCall('/api/categories', 'PUT', {
+      id: cat.id,
       name: cat.name,
       parentCategoryId: cat.parentCategoryId,
       categoryType: cat.categoryType,
@@ -223,13 +334,16 @@ export const MySQLDataService = {
     return apiCall(`/api/categories?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`, 'DELETE');
   },
 
-  // ─── AUDIT LOGS ──────────────────────────────────────
-  async syncAuditLog(log: any) {
-    // Audit logs are append-only and synced via a dedicated internal endpoint
-    // For now, server-side API routes create their own audit logs
-    // This client-side sync is a best-effort fire-and-forget
-    console.log('[AuditLog]', log.module, log.action, log.details);
-  },
+  // Backward compatibility alias methods
+  syncProduct(item: any) { return this.createProduct(item); },
+  syncProfile(user: any) { return this.createProfile(user); },
+  syncCustomer(cust: any) { return this.createCustomer(cust); },
+  syncVendor(vendor: any) { return this.createVendor(vendor); },
+  syncExpense(expense: any) { return this.createExpense(expense); },
+  syncSale(sale: any) { return this.createSale(sale); },
+  syncPurchase(po: any) { return this.createPurchase(po); },
+  syncCategory(cat: any) { return this.createCategory(cat); },
+  async syncAuditLog(log: any) { console.log('[AuditLog]', log.module, log.action, log.details); },
 };
 
 export default MySQLDataService;

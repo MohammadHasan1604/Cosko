@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 /**
  * GET /api/inventory - Retrieve inventory with store filtering (excludes deleted & archived products by default)
@@ -136,6 +137,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode, productId: product.id, sku: product.sku });
+
     return NextResponse.json({ success: true, product }, { status: 201 });
   } catch (error: any) {
     console.error('API /api/inventory POST error:', error);
@@ -178,6 +181,8 @@ export async function PUT(req: NextRequest) {
         ...(body.status ? { status: body.status } : {}),
       },
     });
+
+    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { productId: product.id, sku: product.sku });
 
     return NextResponse.json({ success: true, product });
   } catch (error: any) {
@@ -236,6 +241,8 @@ export async function DELETE(req: NextRequest) {
         data: { status: 'archived' },
       });
 
+      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { productId: target.id, sku: target.sku, action: 'archived' });
+
       return NextResponse.json({
         success: true,
         mode: 'archived',
@@ -250,6 +257,8 @@ export async function DELETE(req: NextRequest) {
     // Permanent hard-delete for unused products with 0 history by Super Admin
     await (prisma as any).inventory.deleteMany({ where: { productId: target.id } });
     await (prisma as any).product.delete({ where: { id: target.id } });
+
+    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { productId: target.id, sku: target.sku, action: 'deleted' });
 
     return NextResponse.json({
       success: true,

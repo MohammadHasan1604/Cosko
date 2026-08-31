@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 /**
  * GET /api/purchases - Retrieve purchase orders (excludes Archived/Cancelled by default)
@@ -91,59 +92,100 @@ export async function POST(req: NextRequest) {
     const po = await (prisma as any).$transaction(async (tx: any) => {
       let subtotal = 0;
       for (const it of body.items) {
-        subtotal += it.qty * it.costPrice;
+        subtotal += it.qty * (it.unitCost || it.costPrice || 0);
       }
       const taxAmount = body.taxAmount || 0;
-      const totalAmount = subtotal + taxAmount;
+      const totalCost = subtotal + taxAmount;
 
       const createdPO = await tx.purchaseOrder.create({
         data: {
           poNo,
           vendorId: vendor.id,
-          storeCode: 'CENTRAL',
+          storeCode: body.storeCode || 'CENTRAL',
           status: body.status || 'Pending',
           paymentStatus: body.paymentStatus || 'Unpaid',
-          totalCost: totalAmount,
+          totalCost: totalCost,
           notes: body.notes || null,
           createdBy: user.name,
         },
       });
 
-      // If created with status "Received", automatically credit CENTRAL inventory
-      if (body.status === 'Received') {
-        for (const it of body.items) {
-          if (it.productId) {
-            const centralInv = await tx.inventory.findUnique({
-              where: { productId_storeCode: { productId: it.productId, storeCode: 'CENTRAL' } },
-            });
-            const prevQty = centralInv ? centralInv.qtyOnHand : 0;
-            const newQty = prevQty + it.qty;
+      for (const it of body.items) {
+        const itemUnitCost = it.unitCost || it.costPrice || 0;
+        const itemLineTotal = it.qty * itemUnitCost;
 
-            await tx.inventory.upsert({
-              where: { productId_storeCode: { productId: it.productId, storeCode: 'CENTRAL' } },
-              create: { productId: it.productId, storeCode: 'CENTRAL', qtyOnHand: newQty },
-              update: { qtyOnHand: newQty },
-            });
-
-            await tx.inventoryLedger.create({
+        // Ensure product exists
+        let prodId = it.productId;
+        if (!prodId) {
+          const matchedProd = await tx.product.findFirst({
+            where: { OR: [{ sku: it.sku || '' }, { name: it.name || '' }] },
+          });
+          if (matchedProd) {
+            prodId = matchedProd.id;
+          } else {
+            const newProd = await tx.product.create({
               data: {
-                productId: it.productId,
-                storeCode: 'CENTRAL',
-                refNo: poNo,
-                type: 'PO GRN In',
-                qtyChange: it.qty,
-                costPerUnit: it.costPrice,
-                balanceAfter: newQty,
-                notes: `GRN Received from ${body.vendorName} (${poNo})`,
-                createdBy: user.name,
+                sku: it.sku || `SKU-${Date.now().toString().slice(-6)}`,
+                name: it.name || 'Purchased Item',
+                category: 'General',
+                baseCostPrice: itemUnitCost,
+                baseSellingPrice: Math.round(itemUnitCost * 1.3),
+                status: 'active',
               },
             });
+            prodId = newProd.id;
           }
+        }
+
+        await tx.purchaseOrderItem.create({
+          data: {
+            poId: createdPO.id,
+            productId: prodId,
+            qtyOrdered: it.qty,
+            qtyReceived: body.status === 'Received' ? it.qty : 0,
+            unitCost: itemUnitCost,
+            lineTotal: itemLineTotal,
+          },
+        });
+
+        // If created with status "Received", automatically credit inventory
+        if (body.status === 'Received') {
+          const targetStore = body.storeCode || 'CENTRAL';
+          const centralInv = await tx.inventory.findUnique({
+            where: { productId_storeCode: { productId: prodId, storeCode: targetStore } },
+          });
+          const prevQty = centralInv ? centralInv.qtyOnHand : 0;
+          const newQty = prevQty + it.qty;
+
+          await tx.inventory.upsert({
+            where: { productId_storeCode: { productId: prodId, storeCode: targetStore } },
+            create: { productId: prodId, storeCode: targetStore, qtyOnHand: newQty },
+            update: { qtyOnHand: newQty },
+          });
+
+          await tx.inventoryLedger.create({
+            data: {
+              productId: prodId,
+              storeCode: targetStore,
+              refNo: poNo,
+              type: 'PO GRN In',
+              qtyChange: it.qty,
+              costPerUnit: itemUnitCost,
+              balanceAfter: newQty,
+              notes: `GRN Received from ${body.vendorName} (${poNo})`,
+              createdBy: user.name,
+            },
+          });
         }
       }
 
       return createdPO;
     });
+
+    broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', { id: po.id, poNo: po.poNo, status: po.status });
+    if (body.status === 'Received') {
+      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: body.storeCode || 'CENTRAL' });
+    }
 
     return NextResponse.json({ success: true, purchaseOrder: po }, { status: 201 });
   } catch (error: any) {
@@ -176,6 +218,8 @@ export async function PUT(req: NextRequest) {
         ...(body.notes !== undefined ? { notes: body.notes } : {}),
       },
     });
+
+    broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', { id: po.id, poNo: po.poNo, status: po.status });
 
     return NextResponse.json({ success: true, purchaseOrder: po });
   } catch (error: any) {
@@ -217,6 +261,9 @@ export async function DELETE(req: NextRequest) {
         where: { id },
         data: { status: 'Cancelled' },
       });
+
+      broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', { id: existing.id, poNo: existing.poNo, action: 'cancelled' });
+
       return NextResponse.json({
         success: true,
         mode: 'archived',
@@ -229,6 +276,8 @@ export async function DELETE(req: NextRequest) {
     await (prisma as any).purchaseOrderItem.deleteMany({ where: { poId: id } });
     await (prisma as any).purchaseOrder.delete({ where: { id } });
 
+    broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', { id: existing.id, poNo: existing.poNo, action: 'deleted' });
+
     return NextResponse.json({
       success: true,
       mode: 'deleted',
@@ -239,4 +288,5 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to delete purchase order' }, { status: 500 });
   }
 }
+
 

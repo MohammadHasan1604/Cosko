@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 /**
  * GET /api/stores - Retrieve all store hubs (excludes Inactive by default)
@@ -82,6 +83,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    broadcastRealtimeEvent('stores', 'STORE_UPDATED', { code: store.code, name: store.name, action: 'saved' });
+
     return NextResponse.json({ success: true, store }, { status: 201 });
   } catch (error: any) {
     console.error('API /api/stores POST error:', error);
@@ -145,6 +148,8 @@ export async function DELETE(req: NextRequest) {
         data: { status: 'Inactive' },
       });
 
+      broadcastRealtimeEvent('stores', 'STORE_UPDATED', { code: target.code, name: target.name, action: 'deactivated' });
+
       return NextResponse.json({
         success: true,
         mode: 'archived',
@@ -160,6 +165,8 @@ export async function DELETE(req: NextRequest) {
     await prisma.userStoreAssignment.deleteMany({ where: { storeCode: target.code } });
     await prisma.storeHub.delete({ where: { id: target.id } });
 
+    broadcastRealtimeEvent('stores', 'STORE_UPDATED', { code: target.code, name: target.name, action: 'deleted' });
+
     return NextResponse.json({
       success: true,
       mode: 'deleted',
@@ -170,4 +177,5 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to deactivate/delete store' }, { status: 500 });
   }
 }
+
 
