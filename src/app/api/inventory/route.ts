@@ -20,6 +20,12 @@ export async function GET(req: NextRequest) {
 
     const storeWhereClause: any = {};
     if (user.role !== 'Super Admin') {
+      if (store && store !== user.store && !user.allowedStores?.includes(store)) {
+        return NextResponse.json(
+          { error: `Forbidden: You do not have permission to view inventory for store "${store}"` },
+          { status: 403 }
+        );
+      }
       storeWhereClause.storeCode = user.store;
     } else if (store && store !== 'All Stores') {
       storeWhereClause.storeCode = store;

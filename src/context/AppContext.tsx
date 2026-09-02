@@ -310,7 +310,7 @@ interface AppContextType {
   datePeriod: string;
   setDatePeriod: (period: string) => void;
   authStatus: 'AUTH_LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED';
-  currentUser: { id: string; name: string; email: string; role: UserAccount['role']; store: string; avatar: string; shiftStatus: 'On Shift' | 'On Leave'; avatarUrl?: string; mustChangePassword?: boolean };
+  currentUser: { id: string; name: string; email: string; role: UserAccount['role']; store: string; allowedStores?: string[]; avatar: string; shiftStatus: 'On Shift' | 'On Leave'; avatarUrl?: string; mustChangePassword?: boolean };
   setCurrentUser: (user: any) => void;
   logoutUser: () => void;
   toggleCurrentUserShift: () => void;
@@ -449,7 +449,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const [authStatus, setAuthStatus] = useState<'AUTH_LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED'>('AUTH_LOADING');
-  const [currentUser, setCurrentUserState] = useState<{ id: string; name: string; email: string; role: UserAccount['role']; store: string; avatar: string; shiftStatus: 'On Shift' | 'On Leave'; avatarUrl?: string }>(unauthenticatedUser);
+  const [currentUser, setCurrentUserState] = useState<{ id: string; name: string; email: string; role: UserAccount['role']; store: string; allowedStores?: string[]; avatar: string; shiftStatus: 'On Shift' | 'On Leave'; avatarUrl?: string }>(unauthenticatedUser);
 
   // Restore active user session from server-authoritative /api/auth/me
   useEffect(() => {
@@ -518,7 +518,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Fetch all authoritative data in parallel
       const [
         storesRes, categoriesRes, inventoryRes, salesRes, purchasesRes,
-        customersRes, vendorsRes, expensesRes, repairsRes, usersRes
+        customersRes, vendorsRes, expensesRes, repairsRes, usersRes,
+        transfersRes, ledgerRes
       ] = await Promise.allSettled([
         fetch('/api/stores', opts),
         fetch('/api/categories', opts),
@@ -530,6 +531,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetch('/api/expenses', opts),
         fetch('/api/repairs', opts),
         fetch('/api/users', opts),
+        fetch('/api/transfers', opts),
+        fetch('/api/inventory/ledger', opts),
       ]);
 
       const safeJson = async (result: PromiseSettledResult<Response>) => {
@@ -703,6 +706,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           estimatedCost: Number(r.estimatedCost),
           assignedTech: r.assignedTech || '',
           storeCode: 'BLR', createdAt: r.createdAt,
+        })));
+      }
+
+      const transfersData = await safeJson(transfersRes);
+      if (transfersData?.success && Array.isArray(transfersData.transfers)) {
+        setStockTransfers(transfersData.transfers.map((t: any) => ({
+          id: t.id,
+          transferNo: t.transferNo,
+          sourceStore: t.sourceStore,
+          destStore: t.destStore,
+          status: t.status,
+          qty: t.totalUnits,
+          totalUnits: t.totalUnits,
+          transferPrice: Number(t.totalTransferValue) / (t.totalUnits || 1),
+          purchaseCost: Number(t.totalCost) / (t.totalUnits || 1),
+          totalCost: Number(t.totalCost),
+          totalTransferValue: Number(t.totalTransferValue),
+          grossProfit: Number(t.grossProfit),
+          transferProfit: Number(t.grossProfit),
+          notes: t.notes || '',
+          productName: t.items?.[0]?.product?.name || 'Stock Item',
+          sku: t.items?.[0]?.product?.sku || 'SKU',
+          createdAt: t.createdAt,
+          items: t.items || [],
+        })));
+      }
+
+      const ledgerData = await safeJson(ledgerRes);
+      if (ledgerData?.success && Array.isArray(ledgerData.ledger)) {
+        setInventoryLedger(ledgerData.ledger.map((l: any) => ({
+          id: l.id,
+          productId: l.productId,
+          productName: l.product?.name || 'Item',
+          sku: l.product?.sku || '',
+          storeCode: l.storeCode,
+          movementType: l.type,
+          qtyChange: l.qtyChange,
+          costPerUnit: Number(l.costPerUnit),
+          balanceAfter: l.balanceAfter,
+          referenceNo: l.refNo,
+          notes: l.notes || '',
+          userEmail: l.createdBy || 'System',
+          createdAt: l.createdAt,
         })));
       }
 

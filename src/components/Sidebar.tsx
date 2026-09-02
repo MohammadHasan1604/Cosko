@@ -43,17 +43,17 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   // Strict RBAC Navigation Group Filtering
   const roleAllowedHrefs: Record<string, string[]> = {
     'Super Admin': [
-      '/dashboard', '/sales', '/inventory-management', '/categories', '/purchases', '/customers',
+      '/dashboard', '/sales', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/customers',
       '/customers/existing', '/repairs', '/vendors', '/expenses', '/accounting', '/central-profit',
       '/reports', '/employees', '/stores', '/users', '/audit-logs', '/settings'
     ],
     'Store Manager': [
-      '/dashboard', '/sales', '/inventory-management', '/categories', '/purchases', '/customers',
+      '/dashboard', '/sales', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/customers',
       '/customers/existing', '/repairs', '/vendors', '/expenses', '/accounting', '/central-profit',
       '/reports', '/employees'
     ],
     'Inventory Auditor': [
-      '/dashboard', '/inventory-management', '/categories', '/purchases', '/vendors', '/reports'
+      '/dashboard', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/vendors', '/reports'
     ],
     'POS Cashier': [
       '/sales', '/customers', '/repairs'
@@ -79,6 +79,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
       items: [
         { id: 'nav-sales', label: 'Sales & POS', icon: 'ShoppingCartIcon', href: '/sales' },
         { id: 'nav-inventory', label: 'Inventory', icon: 'CubeIcon', href: '/inventory-management', badge: lowStockCount, badgeVariant: 'warning' },
+        { id: 'nav-stock-transfers', label: 'Stock Transfers', icon: 'ArrowsRightLeftIcon', href: '/stock-transfers' },
         { id: 'nav-categories', label: 'Categories', icon: 'TagIcon', href: '/categories' },
         { id: 'nav-purchases', label: 'Purchases', icon: 'TruckIcon', href: '/purchases', badge: pendingPOCount, badgeVariant: 'info' },
         { id: 'nav-customers', label: 'Customers', icon: 'UsersIcon', href: '/customers' },

@@ -19,6 +19,10 @@ export interface CreateTransferInput {
  * and gross Central Profit without inflating consolidated company profit.
  */
 export async function executeStockTransfer(input: CreateTransferInput) {
+  if (input.sourceStore.toUpperCase() === input.destStore.toUpperCase()) {
+    throw new Error('Source location and destination location cannot be identical.');
+  }
+
   return await prisma.$transaction(async (tx: any) => {
     const count = await tx.stockTransfer.count();
     const seqNo = String(count + 1).padStart(4, '0');
@@ -31,6 +35,22 @@ export async function executeStockTransfer(input: CreateTransferInput) {
     const preparedItems = [];
 
     for (const item of input.items) {
+      if (item.qty <= 0) {
+        throw new Error(`Transfer quantity must be greater than 0 for product ID ${item.productId}`);
+      }
+
+      // Check available stock at Source location with atomic verification
+      const sourceInv = await tx.inventory.findUnique({
+        where: { productId_storeCode: { productId: item.productId, storeCode: input.sourceStore } },
+      });
+
+      const availableQty = sourceInv ? sourceInv.qtyOnHand : 0;
+      if (availableQty < item.qty) {
+        throw new Error(
+          `Insufficient stock at ${input.sourceStore} for product ID ${item.productId}. Available: ${availableQty}, Requested: ${item.qty}`
+        );
+      }
+
       const lineCost = item.qty * item.costPerUnit;
       const lineValue = item.qty * item.transferPricePerUnit;
       const lineProfit = lineValue - lineCost;
@@ -49,17 +69,12 @@ export async function executeStockTransfer(input: CreateTransferInput) {
         lineProfit,
       });
 
-      // Deduct from Source Store (e.g. CENTRAL)
-      const sourceInv = await tx.inventory.findUnique({
-        where: { productId_storeCode: { productId: item.productId, storeCode: input.sourceStore } },
-      });
-      const sourceQty = sourceInv ? sourceInv.qtyOnHand : 0;
-      const newSourceQty = Math.max(0, sourceQty - item.qty);
+      // 1. Deduct from Source Store (e.g. CENTRAL)
+      const newSourceQty = availableQty - item.qty;
 
-      await tx.inventory.upsert({
+      await tx.inventory.update({
         where: { productId_storeCode: { productId: item.productId, storeCode: input.sourceStore } },
-        create: { productId: item.productId, storeCode: input.sourceStore, qtyOnHand: newSourceQty },
-        update: { qtyOnHand: newSourceQty },
+        data: { qtyOnHand: newSourceQty },
       });
 
       await tx.inventoryLedger.create({
@@ -76,7 +91,7 @@ export async function executeStockTransfer(input: CreateTransferInput) {
         },
       });
 
-      // Add to Destination Store (e.g. BLR / HYD / MUM)
+      // 2. Add to Destination Store (e.g. BLR / HYD / MUM / CHN)
       const destInv = await tx.inventory.findUnique({
         where: { productId_storeCode: { productId: item.productId, storeCode: input.destStore } },
       });
@@ -85,7 +100,7 @@ export async function executeStockTransfer(input: CreateTransferInput) {
 
       await tx.inventory.upsert({
         where: { productId_storeCode: { productId: item.productId, storeCode: input.destStore } },
-        create: { productId: item.productId, storeCode: input.destStore, qtyOnHand: newDestQty },
+        create: { productId: item.productId, storeCode: input.destStore, qtyOnHand: newDestQty, reorderPt: 5 },
         update: { qtyOnHand: newDestQty },
       });
 
@@ -135,11 +150,12 @@ export async function executeStockTransfer(input: CreateTransferInput) {
         details: `Dispatched ${totalUnits} units from ${input.sourceStore} to ${input.destStore} (Transfer Value: ₹${totalTransferValue.toFixed(2)}, Central Profit: ₹${grossProfit.toFixed(2)})`,
         userEmail: input.requestedBy,
         userRole: 'Super Admin',
-        storeCode: 'CENTRAL',
+        storeCode: input.sourceStore,
       },
     });
 
-    broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', { transferNo, destStore: input.destStore });
+    broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', { transferNo, sourceStore: input.sourceStore, destStore: input.destStore });
+    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: input.sourceStore });
     broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: input.destStore });
 
     return transfer;

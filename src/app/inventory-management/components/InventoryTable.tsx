@@ -65,6 +65,10 @@ export default function InventoryTable() {
   const [perPage, setPerPage] = useState(10);
   const [statusDropdownId, setStatusDropdownId] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    setStoreFilter(selectedStore);
+  }, [selectedStore]);
+
   const visibleColumns = columnConfig.filter((c) => c.visible);
 
   const filtered = useMemo(() => {
@@ -193,14 +197,19 @@ export default function InventoryTable() {
             </button>
           </div>
 
-          {/* Store filter */}
+          {/* Location filter */}
           <select
             value={storeFilter}
             onChange={(e) => { setStoreFilter(e.target.value); setPage(1); }}
-            className="input-field py-2 text-sm w-auto min-w-[130px]"
+            disabled={currentUser.role !== 'Super Admin'}
+            className="input-field py-2 text-sm w-auto min-w-[170px]"
           >
-            <option value="All Stores">All Stores</option>
-            {storesList.map((s) => <option key={`store-opt-${s.code}`} value={s.code}>{s.code}</option>)}
+            {currentUser.role === 'Super Admin' && <option value="All Stores">All Locations (Consolidated)</option>}
+            {storesList.map((s) => (
+              <option key={`store-opt-${s.code}`} value={s.code}>
+                {s.code === 'CENTRAL' ? 'Central Warehouse' : s.name} ({s.code})
+              </option>
+            ))}
           </select>
 
           {/* Dynamic Category filter */}

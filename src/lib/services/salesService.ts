@@ -28,11 +28,19 @@ export interface CreateSaleInput {
  */
 export async function executePOSCheckout(input: CreateSaleInput) {
   return await prisma.$transaction(async (tx: any) => {
-    // 1. Generate store-specific invoice number (e.g. CS26BLR0012)
+    // 1. Generate store-specific invoice number (e.g. CS260011, CS260012)
     const storeCode = input.storeCode.toUpperCase();
+    const storeNumericMap: Record<string, string> = {
+      BLR: '001',
+      HYD: '002',
+      DEL: '003',
+      MUM: '004',
+      CENTRAL: '000',
+    };
+    const store3Digit = storeNumericMap[storeCode] || storeCode.slice(0, 3);
     const count = await tx.salesOrder.count({ where: { storeCode } });
-    const seqNo = String(count + 1).padStart(4, '0');
-    const orderNo = `CS26${storeCode}${seqNo}`;
+    const seqNo = String(count + 1);
+    const orderNo = `CS26${store3Digit}${seqNo}`;
 
     let subtotal = 0;
     let totalCost = 0;
