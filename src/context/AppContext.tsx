@@ -16,6 +16,7 @@ export interface AppBranding {
 
 export interface InventoryItem {
   id: string;
+  productId?: string;
   sku: string;
   barcode?: string;
   name: string;
@@ -339,7 +340,7 @@ interface AppContextType {
   updateItem: (id: string, updated: Partial<InventoryItem>) => Promise<any>;
   deleteItem: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   adjustStock: (id: string, qtyChange: number, reason: string) => void;
-  transferStock: (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number, status?: 'Completed' | 'Draft') => void;
+  transferStock: (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number, status?: 'Completed' | 'Draft', notes?: string) => Promise<any>;
   updateTransferStatus: (id: string, nextStatus: 'Completed' | 'Cancelled') => void;
   defaultStoreTransferPrices: ProductStoreTransferPrice[];
   setDefaultStoreTransferPrice: (productId: string, storeCode: string, price: number) => void;
@@ -576,7 +577,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (p.inventoryItems && p.inventoryItems.length > 0) {
             for (const inv of p.inventoryItems) {
               items.push({
-                id: p.id, sku: p.sku, barcode: p.barcode || '',
+                id: inv.id || `${p.id}-${inv.storeCode}`,
+                productId: p.id,
+                sku: p.sku, barcode: p.barcode || '',
                 name: p.name, brand: p.brand || '', model: p.model || '',
                 category: p.category, subcategory: p.subcategory || '',
                 store: inv.storeCode, qtyOnHand: inv.qtyOnHand,
@@ -595,7 +598,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             }
           } else {
             items.push({
-              id: p.id, sku: p.sku, barcode: p.barcode || '',
+              id: `${p.id}-CENTRAL`,
+              productId: p.id,
+              sku: p.sku, barcode: p.barcode || '',
               name: p.name, brand: p.brand || '', model: p.model || '',
               category: p.category, subcategory: p.subcategory || '',
               store: 'CENTRAL', qtyOnHand: 0, reorderPt: 5,
@@ -1433,119 +1438,76 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toast.success(`Default transfer price set to ₹${price} for ${storeCode}`);
   };
 
-  const transferStock = (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number, status: 'Completed' | 'Draft' = 'Completed') => {
-    const sourceItem = inventory.find((i) => i.id === itemId || i.sku === itemId);
-    if (!sourceItem) {
-      toast.error('Source item not found for transfer!');
-      return;
-    }
-
-    if (sourceItem.qtyOnHand < qty) {
-      toast.error(`Insufficient stock in ${fromStore} (${sourceItem.qtyOnHand} units available)`);
-      return;
-    }
-
-    const transferPrice = customTransferPrice !== undefined ? customTransferPrice : (sourceItem.transferPrice || Math.round(sourceItem.costPrice * 1.18));
-    const purchaseCost = sourceItem.costPrice;
-    const transferProfitPerUnit = transferPrice - purchaseCost;
-    const totalTransferProfit = transferProfitPerUnit * qty;
-
-    if (status === 'Completed') {
-      setInventory((prev) =>
-        prev.map((item) => {
-          if (item.id === sourceItem.id) {
-            const newItem = { ...item, qtyOnHand: item.qtyOnHand - qty, lastMovement: 'Transfer Out' };
-            MySQLDataService.createProduct(newItem);
-            return newItem;
-          }
-          return item;
-        })
-      );
-
-      let destItemExists = false;
-      setInventory((prev) =>
-        prev.map((item) => {
-          if (item.sku === sourceItem.sku && item.store === toStore) {
-            destItemExists = true;
-            const newItem = { ...item, qtyOnHand: item.qtyOnHand + qty, lastMovement: 'Transfer In' };
-            MySQLDataService.createProduct(newItem);
-            return newItem;
-          }
-          return item;
-        })
-      );
-
-      if (!destItemExists) {
-        const newDestItem: InventoryItem = {
-          ...sourceItem,
-          id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          store: toStore,
-          qtyOnHand: qty,
-          lastMovement: 'Transfer In',
-        };
-        setInventory((prev) => [...prev, newDestItem]);
-        MySQLDataService.createProduct(newDestItem);
+  const transferStock = async (
+    fromStore: string,
+    toStore: string,
+    itemId: string,
+    qty: number,
+    customTransferPrice?: number,
+    status: 'Completed' | 'Draft' = 'Completed',
+    notes?: string
+  ) => {
+    try {
+      if (fromStore === toStore) {
+        toast.error('Source store and destination store cannot be identical');
+        return { success: false, error: 'Source and destination stores cannot be identical' };
       }
+
+      // Find the item matching the product AND the source store
+      const sourceItem =
+        inventory.find(
+          (i) => (i.id === itemId || i.sku === itemId || i.productId === itemId) && i.store === fromStore
+        ) ||
+        inventory.find((i) => i.id === itemId || i.sku === itemId || i.productId === itemId);
+
+      if (!sourceItem) {
+        toast.error(`Source product not found in ${fromStore}!`);
+        return { success: false, error: 'Source item not found' };
+      }
+
+      if (sourceItem.qtyOnHand < qty) {
+        toast.error(`Insufficient stock in ${fromStore} (${sourceItem.qtyOnHand} units available, requested ${qty})`);
+        return { success: false, error: 'Insufficient stock' };
+      }
+
+      const unitCost = sourceItem.costPrice;
+      const transferPrice =
+        customTransferPrice !== undefined ? customTransferPrice : (sourceItem.transferPrice || Math.round(sourceItem.costPrice * 1.18));
+
+      const realProductId = sourceItem.productId || (sourceItem.id.includes('-') ? sourceItem.id.split('-')[0] : sourceItem.id);
+
+      const res = await fetch('/api/transfers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          sourceStore: fromStore,
+          destStore: toStore,
+          notes: notes || `Transfer from ${fromStore} to ${toStore}`,
+          items: [
+            {
+              productId: realProductId,
+              qty,
+              costPerUnit: unitCost,
+              transferPricePerUnit: transferPrice,
+            },
+          ],
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Transfer failed');
+      }
+
+      toast.success(`Transferred ${qty} units from ${fromStore} to ${toStore} (${data.transfer.transferNo})`);
+      await refreshAllData();
+      return { success: true, transfer: data.transfer };
+    } catch (err: any) {
+      console.error('[COSKO] transferStock error:', err);
+      toast.error(err.message || 'Failed to complete stock transfer');
+      return { success: false, error: err.message };
     }
-
-    const transferRecord: StockTransferRecord = {
-      id: `tr-${Date.now()}`,
-      transferNo: `TR-2026-${Math.floor(100 + Math.random() * 900)}`,
-      sourceStore: fromStore,
-      destStore: toStore,
-      productId: sourceItem.id,
-      sku: sourceItem.sku,
-      productName: sourceItem.name,
-      qty,
-      purchaseCost,
-      transferPrice,
-      transferProfit: totalTransferProfit,
-      status,
-      createdBy: currentUser.name || 'Super Admin',
-      createdAt: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-    };
-    setStockTransfers((prev) => [transferRecord, ...prev]);
-
-    if (status === 'Completed') {
-      const outLedger: InventoryLedgerEntry = {
-        id: `led-${Date.now()}-out`,
-        productId: sourceItem.id,
-        sku: sourceItem.sku,
-        productName: sourceItem.name,
-        storeCode: fromStore,
-        movementType: 'TRANSFER_OUT',
-        quantity: -qty,
-        unitCost: purchaseCost,
-        totalValue: qty * purchaseCost,
-        fromLocation: fromStore,
-        toLocation: toStore,
-        referenceNo: transferRecord.transferNo,
-        createdBy: currentUser.name || 'Admin',
-        createdAt: new Date().toISOString(),
-      };
-
-      const inLedger: InventoryLedgerEntry = {
-        id: `led-${Date.now()}-in`,
-        productId: sourceItem.id,
-        sku: sourceItem.sku,
-        productName: sourceItem.name,
-        storeCode: toStore,
-        movementType: 'TRANSFER_IN',
-        quantity: qty,
-        unitCost: transferPrice,
-        totalValue: qty * transferPrice,
-        fromLocation: fromStore,
-        toLocation: toStore,
-        referenceNo: transferRecord.transferNo,
-        createdBy: currentUser.name || 'Admin',
-        createdAt: new Date().toISOString(),
-      };
-
-      setInventoryLedger((prev) => [outLedger, inLedger, ...prev]);
-    }
-
-    addAuditLog('Inventory', 'Stock Transfer', `Transferred ${qty}x ${sourceItem.name} (${fromStore} → ${toStore}) @ ₹${transferPrice}/unit. Central Profit: ₹${totalTransferProfit}. Status: ${status}`);
-    toast.success(`Transfer ${status === 'Completed' ? 'completed' : 'saved as draft'}! Central Profit: ₹${totalTransferProfit.toLocaleString('en-IN')}`);
   };
 
   const updateTransferStatus = (id: string, nextStatus: 'Completed' | 'Cancelled') => {

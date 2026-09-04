@@ -303,7 +303,7 @@ export default function InventoryTable() {
               const isSelected = selectedIds.has(item.id);
 
               return (
-                <div key={`m-inv-${item.id}`} className={`p-4 space-y-3 bg-card hover:bg-muted/10 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}>
+                <div key={`m-inv-${item.id}-${item.store}`} className={`p-4 space-y-3 bg-card hover:bg-muted/10 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden border border-border flex items-center justify-center flex-shrink-0">
@@ -404,7 +404,7 @@ export default function InventoryTable() {
 
                   return (
                     <tr
-                      key={item.id}
+                      key={`row-${item.id}-${item.store}`}
                       className={`table-row group ${isSelected ? 'bg-primary/5' : ''}`}
                     >
                       {/* Checkbox */}

@@ -42,22 +42,22 @@ export default function CentralProfitPage() {
   const [selectedStoreForPricing, setSelectedStoreForPricing] = useState('MUM');
   const [defaultPriceInput, setDefaultPriceInput] = useState<number>(0);
 
-  // Available Central Inventory Items
-  const centralItems = useMemo(() => {
-    return inventory.filter((i) => i.store === 'CENTRAL' || i.qtyOnHand > 0);
-  }, [inventory]);
+  // Available Inventory Items at selected source location
+  const sourceItems = useMemo(() => {
+    return inventory.filter((i) => i.store === fromStore && i.qtyOnHand > 0);
+  }, [inventory, fromStore]);
 
   // Currently selected item for transfer
   const activeItem = useMemo(() => {
-    if (!selectedProductId && centralItems.length > 0) return centralItems[0];
-    return centralItems.find((i) => i.id === selectedProductId) || centralItems[0] || null;
-  }, [selectedProductId, centralItems]);
+    if (!selectedProductId && sourceItems.length > 0) return sourceItems[0];
+    return sourceItems.find((i) => i.id === selectedProductId || i.productId === selectedProductId) || sourceItems[0] || null;
+  }, [selectedProductId, sourceItems]);
 
   // Pre-fill / update transfer price when item or destination store changes
   React.useEffect(() => {
     if (activeItem && toStore) {
       const matchDefault = defaultStoreTransferPrices.find(
-        (p) => p.productId === activeItem.id && p.storeCode === toStore
+        (p) => (p.productId === activeItem.id || p.productId === activeItem.productId) && p.storeCode === toStore
       );
       if (matchDefault) {
         setCustomTransferPriceInput(matchDefault.defaultTransferPrice);
@@ -140,8 +140,8 @@ export default function CentralProfitPage() {
   }, [completedTransfers]);
 
   const openCreateModal = () => {
-    if (centralItems.length > 0) {
-      setSelectedProductId(centralItems[0].id);
+    if (sourceItems.length > 0) {
+      setSelectedProductId(sourceItems[0].productId || sourceItems[0].id);
       setTransferQty(1);
     }
     setCreateModal(true);
@@ -155,18 +155,18 @@ export default function CentralProfitPage() {
       return;
     }
     if (transferQty > availableStock) {
-      toast.error(`Cannot transfer more than available Central stock (${availableStock} units)`);
+      toast.error(`Cannot transfer more than available stock at ${fromStore} (${availableStock} units)`);
       return;
     }
     setConfirmTransferModal(true);
   };
 
-  const executeTransfer = () => {
+  const executeTransfer = async () => {
     if (!activeItem) return;
-    transferStock(
+    await transferStock(
       fromStore,
       toStore,
-      activeItem.id,
+      activeItem.productId || activeItem.id,
       transferQty,
       effectiveTransferPrice,
       transferStatusInput
@@ -485,19 +485,27 @@ export default function CentralProfitPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">Source Location *</label>
-                <input
-                  type="text"
-                  disabled
-                  value="CENTRAL — COSKO Central Warehouse & Owner Stock"
-                  className="input-field text-xs bg-muted/50 cursor-not-allowed font-semibold"
-                />
+                <select
+                  value={fromStore}
+                  onChange={(e) => {
+                    setFromStore(e.target.value);
+                    setSelectedProductId('');
+                  }}
+                  className="input-field text-xs font-medium"
+                >
+                  {storesList.filter((s) => s.status === 'Active').map((st) => (
+                    <option key={`from-st-${st.code}`} value={st.code}>
+                      {st.code} — {st.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">Destination Store *</label>
                 <select value={toStore} onChange={(e) => setToStore(e.target.value)} className="input-field text-xs font-medium">
                   {storesList
-                    .filter((s) => s.code !== 'CENTRAL')
+                    .filter((s) => s.code !== fromStore && s.status === 'Active')
                     .map((st) => (
                       <option key={`st-opt-${st.code}`} value={st.code}>
                         {st.code} — {st.name}
@@ -515,14 +523,14 @@ export default function CentralProfitPage() {
                   onChange={(e) => setSelectedProductId(e.target.value)}
                   className="input-field text-xs font-medium"
                 >
-                  {centralItems.map((item) => (
-                    <option key={`citem-${item.id}`} value={item.id}>
+                  {sourceItems.map((item) => (
+                    <option key={`sitem-${item.id}`} value={item.id}>
                       {item.name} ({item.sku}) — Avail: {item.qtyOnHand} units
                     </option>
                   ))}
                 </select>
                 <p className="text-3xs text-muted-foreground mt-1">
-                  Available Central Stock: <strong className="text-primary">{availableStock} units</strong>
+                  Available at {fromStore}: <strong className="text-primary">{availableStock} units</strong>
                 </p>
               </div>
 

@@ -117,7 +117,7 @@ export default function StockTransfersPage() {
           notes: notes || undefined,
           items: [
             {
-              productId: activeItem.id,
+              productId: activeItem.productId || activeItem.id,
               qty: transferQty,
               costPerUnit: unitCost,
               transferPricePerUnit: effectivePrice,
