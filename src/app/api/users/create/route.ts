@@ -34,11 +34,11 @@ export async function POST(request: Request) {
     }
 
     const hashedPassword = await hashPassword(password);
-    const storeCode = store || 'BLR';
+    const storeCode = (store && store !== 'All Stores' && store !== 'ALL') ? store : 'CENTRAL';
 
     // Execute atomic transaction for user and store assignments
     const newUser = await prisma.$transaction(async (tx) => {
-      const user = await tx.userAccount.create({
+      const user = await (tx.userAccount as any).create({
         data: {
           email: cleanEmail,
           passwordHash: hashedPassword,
@@ -50,17 +50,15 @@ export async function POST(request: Request) {
           status: status || 'Active',
           shiftStatus: 'On Shift',
           mustChangePassword: true, // Force password change on first login
-        },
+        } as any,
       });
 
-      if (storeCode && storeCode !== 'All Stores') {
-        await tx.userStoreAssignment.create({
-          data: {
-            userId: user.id,
-            storeCode: storeCode,
-          },
-        });
-      }
+      await tx.userStoreAssignment.create({
+        data: {
+          userId: user.id,
+          storeCode: storeCode,
+        },
+      });
 
       return user;
     });

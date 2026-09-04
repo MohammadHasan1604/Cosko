@@ -235,9 +235,13 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
               onChange={(e) => setFormData({ ...formData, store: e.target.value })}
               className="input-field py-2 text-xs"
             >
-              {storesList.map((st) => (
-                <option key={`st-opt-${st.code}`} value={st.code}>{st.code} - {st.name}</option>
-              ))}
+              {[...storesList]
+                .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
+                .map((st) => (
+                  <option key={`st-opt-${st.code}`} value={st.code}>
+                    {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
+                  </option>
+                ))}
             </select>
           </div>
 

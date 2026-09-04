@@ -86,6 +86,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Source store and destination store are required' }, { status: 400 });
     }
 
+    if (
+      body.sourceStore === 'All Stores' ||
+      body.sourceStore === 'ALL' ||
+      body.destStore === 'All Stores' ||
+      body.destStore === 'ALL'
+    ) {
+      return NextResponse.json(
+        { error: '"All Stores" is a reporting scope only, not an inventory-owning physical store. Transfers must be between physical locations (e.g. CENTRAL, BLR, MUM).' },
+        { status: 400 }
+      );
+    }
+
     if (!body.items || body.items.length === 0) {
       return NextResponse.json({ error: 'Transfer items cannot be empty' }, { status: 400 });
     }

@@ -195,12 +195,18 @@ export default function StockTransfersPage() {
               onChange={(e) => setStoreFilter(e.target.value)}
               className="input-field text-xs py-2 px-3"
             >
-              <option value="All Stores">All Stores / Central</option>
-              {storesList.map((st) => (
-                <option key={st.id} value={st.code}>
-                  {st.name} ({st.code})
-                </option>
-              ))}
+              <optgroup label="Reporting Scope">
+                <option value="All Stores">All Stores (Consolidated Transfers)</option>
+              </optgroup>
+              <optgroup label="Physical Hubs & Stores">
+                {[...storesList]
+                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
+                  .map((st) => (
+                    <option key={st.id} value={st.code}>
+                      {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.name} (${st.code})`}
+                    </option>
+                  ))}
+              </optgroup>
             </select>
           </div>
         </div>

@@ -532,12 +532,13 @@ export default function UsersPage() {
             <div>
               <label className="text-xs font-bold text-foreground block mb-1">Primary Store *</label>
               <select value={store} onChange={(e) => setStore(e.target.value)} className="input-field text-xs font-medium">
-                {storesList.map((st) => (
-                  <option key={`prov-${st.code}`} value={st.code}>
-                    {st.code} — {st.name}
-                  </option>
-                ))}
-                <option value="All Stores">All Stores (Enterprise)</option>
+                {[...storesList]
+                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
+                  .map((st) => (
+                    <option key={`prov-${st.code}`} value={st.code}>
+                      {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
+                    </option>
+                  ))}
               </select>
             </div>
             <div>
@@ -607,12 +608,13 @@ export default function UsersPage() {
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">Primary Store</label>
                 <select value={store} onChange={(e) => setStore(e.target.value)} className="input-field text-xs font-medium">
-                  {storesList.map((st) => (
-                    <option key={`edit-${st.code}`} value={st.code}>
-                      {st.code} — {st.name}
-                    </option>
-                  ))}
-                  <option value="All Stores">All Stores (Enterprise)</option>
+                  {[...storesList]
+                    .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
+                    .map((st) => (
+                      <option key={`edit-${st.code}`} value={st.code}>
+                        {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
+                      </option>
+                    ))}
                 </select>
               </div>
               <div>

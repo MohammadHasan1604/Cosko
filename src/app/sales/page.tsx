@@ -19,9 +19,13 @@ export default function SalesPage() {
   const [cart, setCart] = useState<{ itemId: string; name: string; sku: string; price: number; qty: number; maxQty: number; discountPercent: number; warrantyMonths: number }[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   
-  // Locked Sales Employee Parameters
+  // Locked Sales Employee Parameters & Store Resolution
   const activeEmployeeName = currentUser.name || 'Sales Executive';
-  const effectiveStore = currentUser.role !== 'Super Admin' ? (currentUser.store || 'BLR') : (selectedStore === 'All Stores' ? 'BLR' : selectedStore);
+  // POS Checkout MUST always execute against a physical store, never "All Stores"
+  const effectiveStore =
+    currentUser.role !== 'Super Admin'
+      ? (currentUser.store && currentUser.store !== 'All Stores' ? currentUser.store : 'CENTRAL')
+      : (selectedStore === 'All Stores' ? 'CENTRAL' : selectedStore);
 
   // Customer & Repair Search State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(customers[0]?.id || 'walkin');
@@ -64,7 +68,7 @@ export default function SalesPage() {
 
   const filteredInventory = useMemo(() => {
     return inventory.filter((item) => {
-      const matchStore = effectiveStore === 'All Stores' || item.store === effectiveStore || item.store === 'CENTRAL';
+      const matchStore = item.store === effectiveStore;
       const matchSearch =
         catalogSearch === '' ||
         item.name.toLowerCase().includes(catalogSearch.toLowerCase()) ||
@@ -264,7 +268,7 @@ export default function SalesPage() {
 
       await new Promise((r) => setTimeout(r, 600));
 
-      const catalogAvailable = inventory.filter((item) => effectiveStore === 'All Stores' || item.store === effectiveStore || item.store === 'CENTRAL');
+      const catalogAvailable = inventory.filter((item) => item.store === effectiveStore);
 
       const matchesWithScores = catalogAvailable.map((prod) => {
         let score = Math.floor(70 + Math.random() * 28);
@@ -984,7 +988,7 @@ export default function SalesPage() {
           onScan={(scannedCode) => {
             const match = inventory.find(
               (i) =>
-                (effectiveStore === 'All Stores' || i.store === effectiveStore || i.store === 'CENTRAL') &&
+                i.store === effectiveStore &&
                 ((i.barcode && i.barcode === scannedCode) || i.sku === scannedCode)
             );
             if (match) {

@@ -101,6 +101,10 @@ export default function StoreSelectorModal() {
 
   const openDelete = (e: React.MouseEvent, st: StoreHub) => {
     e.stopPropagation();
+    if (st.code === 'CENTRAL') {
+      toast.error('The default Central Warehouse & Owner Store (CENTRAL) is permanent and cannot be deleted.');
+      return;
+    }
     setDeleteStoreModal(st);
   };
 
@@ -115,22 +119,12 @@ export default function StoreSelectorModal() {
     setSkusCount(500);
   };
 
-  // Prepend Enterprise "All Stores" option
-  const allStoresScopeOption = {
-    id: 'all',
-    code: 'ALL',
-    name: 'All Stores (Enterprise)',
-    city: 'Enterprise View',
-    address: `Enterprise Multi-Store Scope (${storesList.length} Hubs)`,
-    manager: 'Super Admin',
-    phone: '',
-    registers: storesList.reduce((acc, s) => acc + s.registers, 0),
-    skusCount: storesList.reduce((acc, s) => acc + s.skusCount, 0),
-    monthlyRevenue: storesList.reduce((acc, s) => acc + s.monthlyRevenue, 0),
-    status: 'Active' as const,
-  };
-
-  const fullStoreList = [allStoresScopeOption, ...storesList];
+  // Sort physical stores so CENTRAL is prominently at top, followed by regional stores
+  const sortedPhysicalStores = [...storesList].sort((a, b) => {
+    if (a.code === 'CENTRAL') return -1;
+    if (b.code === 'CENTRAL') return 1;
+    return a.code.localeCompare(b.code);
+  });
 
   return (
     <Modal
@@ -165,71 +159,57 @@ export default function StoreSelectorModal() {
           )}
         </div>
 
-        {/* Dynamic Store Hubs List */}
-        <div className="space-y-2.5 max-h-[420px] overflow-y-auto scrollbar-thin pr-1">
-          {fullStoreList.map((st) => {
-            const targetStoreCode = st.code === 'ALL' ? 'All Stores' : st.code;
-            const isSelected = selectedStore === targetStoreCode;
-            const assignedStore = (currentUser.store && currentUser.store !== 'All Stores') ? currentUser.store : 'BLR';
-            const isLocked = currentUser.role !== 'Super Admin' && (targetStoreCode === 'All Stores' || targetStoreCode !== assignedStore);
-            const isEnterpriseAll = st.code === 'ALL';
+        {/* SECTION 1: Enterprise Reporting Scope (Consolidated View) */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h5 className="text-2xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Icon name="ChartBarSquareIcon" size={13} />
+              Enterprise Reporting Scope (Aggregated View)
+            </h5>
+            <span className="text-3xs text-muted-foreground font-medium">Reporting & Filter Only</span>
+          </div>
 
+          {(() => {
+            const isSelected = selectedStore === 'All Stores';
+            const isLocked = currentUser.role !== 'Super Admin';
             return (
               <div
-                key={`scope-${st.id}`}
-                onClick={() => handleSelect(st.code, st.name)}
-                className={`p-4 rounded-xl border transition-all duration-150 flex items-center justify-between ${
+                onClick={() => {
+                  if (isLocked) {
+                    toast.error('Store Scope Restricted: Enterprise "All Stores" consolidated scope is restricted to Super Admin accounts only.');
+                    return;
+                  }
+                  handleSelect('ALL', 'All Stores (Consolidated View)');
+                }}
+                className={`p-3.5 rounded-xl border transition-all duration-150 flex items-center justify-between ${
                   isLocked
                     ? 'bg-muted/40 border-border opacity-60 cursor-not-allowed'
                     : isSelected
-                    ? 'bg-primary/10 border-primary shadow-xs cursor-pointer'
-                    : 'bg-card border-border hover:border-primary/50 hover:bg-muted/50 cursor-pointer'
+                    ? 'bg-primary/10 border-primary shadow-xs cursor-pointer ring-1 ring-primary/30'
+                    : 'bg-card border-border hover:border-primary/50 hover:bg-muted/40 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 ${isSelected ? 'bg-primary text-white' : 'bg-muted text-foreground'}`}>
-                    {st.code}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-xs flex-shrink-0 ${isSelected ? 'bg-primary text-white' : 'bg-muted text-foreground'}`}>
+                    ALL
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-bold text-foreground truncate">{st.name}</p>
-                      <span className="badge-info text-3xs">{st.status}</span>
+                      <p className="text-sm font-bold text-foreground">All Stores (Consolidated View)</p>
+                      <span className="text-3xs bg-primary/15 text-primary px-2 py-0.5 rounded-full font-bold">Consolidated Scope</span>
                       {isLocked && (
                         <span className="badge-danger text-3xs flex items-center gap-1">
                           <Icon name="LockClosedIcon" size={11} /> Restricted
                         </span>
                       )}
                     </div>
-                    <p className="text-2xs text-muted-foreground mt-0.5 truncate">{st.address}</p>
-                    <div className="flex items-center gap-3 text-2xs text-muted-foreground mt-1 font-tabular">
-                      <span>{st.registers} POS Registers</span>
-                      <span>·</span>
-                      <span>{st.skusCount.toLocaleString('en-IN')} SKUs Catalog</span>
-                    </div>
+                    <p className="text-2xs text-muted-foreground mt-0.5">
+                      Consolidated reporting & cross-store analytics across all {storesList.length} locations. (Non-physical / Non-inventory scope)
+                    </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {/* Edit & Delete Action Buttons for Store Hubs (SUPER ADMIN ONLY) */}
-                  {!isEnterpriseAll && currentUser.role === 'Super Admin' && (
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={(e) => openEdit(e, st)}
-                        className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
-                        title="Edit Store Hub details"
-                      >
-                        <Icon name="PencilSquareIcon" size={15} />
-                      </button>
-                      <button
-                        onClick={(e) => openDelete(e, st)}
-                        className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-danger transition-colors"
-                        title="Delete Store Hub"
-                      >
-                        <Icon name="TrashIcon" size={15} />
-                      </button>
-                    </div>
-                  )}
-
                   {isSelected ? (
                     <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center">
                       <Icon name="CheckIcon" size={14} />
@@ -240,7 +220,119 @@ export default function StoreSelectorModal() {
                 </div>
               </div>
             );
-          })}
+          })()}
+        </div>
+
+        {/* SECTION 2: Physical Store Locations & Warehouses */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h5 className="text-2xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Icon name="BuildingStorefrontIcon" size={13} />
+              Physical Store Locations & Hubs ({sortedPhysicalStores.length})
+            </h5>
+            <span className="text-3xs text-muted-foreground font-medium">Inventory & POS Owning</span>
+          </div>
+
+          <div className="space-y-2.5 max-h-[300px] overflow-y-auto scrollbar-thin pr-1">
+            {sortedPhysicalStores.map((st) => {
+              const isSelected = selectedStore === st.code;
+              const assignedStore = (currentUser.store && currentUser.store !== 'All Stores') ? currentUser.store : 'CENTRAL';
+              const isLocked = currentUser.role !== 'Super Admin' && st.code !== assignedStore;
+              const isCentral = st.code === 'CENTRAL';
+
+              return (
+                <div
+                  key={`scope-${st.id}`}
+                  onClick={() => handleSelect(st.code, st.name)}
+                  className={`p-3.5 rounded-xl border transition-all duration-150 flex items-center justify-between ${
+                    isLocked
+                      ? 'bg-muted/40 border-border opacity-60 cursor-not-allowed'
+                      : isSelected
+                      ? 'bg-primary/10 border-primary shadow-xs cursor-pointer ring-1 ring-primary/30'
+                      : 'bg-card border-border hover:border-primary/50 hover:bg-muted/50 cursor-pointer'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                      isCentral
+                        ? isSelected ? 'bg-primary text-white' : 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                        : isSelected ? 'bg-primary text-white' : 'bg-muted text-foreground'
+                    }`}>
+                      {st.code}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold text-foreground truncate">{st.name}</p>
+                        {isCentral ? (
+                          <span className="text-3xs bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                            Default Permanent Hub
+                          </span>
+                        ) : (
+                          <span className="badge-info text-3xs">{st.status}</span>
+                        )}
+                        {isLocked && (
+                          <span className="badge-danger text-3xs flex items-center gap-1">
+                            <Icon name="LockClosedIcon" size={11} /> Restricted
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-2xs text-muted-foreground mt-0.5 truncate">{st.address}</p>
+                      <div className="flex items-center gap-3 text-2xs text-muted-foreground mt-1 font-tabular">
+                        <span>{st.registers} POS Registers</span>
+                        <span>·</span>
+                        <span>{st.skusCount.toLocaleString('en-IN')} SKUs Catalog</span>
+                        {isCentral && (
+                          <>
+                            <span>·</span>
+                            <span className="text-primary font-medium">Owner Intake Hub</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Action Buttons for Store Hubs (SUPER ADMIN ONLY) */}
+                    {currentUser.role === 'Super Admin' && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => openEdit(e, st)}
+                          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
+                          title="Edit Store Hub details"
+                        >
+                          <Icon name="PencilSquareIcon" size={15} />
+                        </button>
+                        {isCentral ? (
+                          <span
+                            className="p-1.5 text-muted-foreground/60 cursor-help"
+                            title="The default Central Warehouse & Owner Store is permanent and cannot be deleted."
+                          >
+                            <Icon name="ShieldCheckIcon" size={16} className="text-primary" />
+                          </span>
+                        ) : (
+                          <button
+                            onClick={(e) => openDelete(e, st)}
+                            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-danger transition-colors"
+                            title="Delete Store Hub"
+                          >
+                            <Icon name="TrashIcon" size={15} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {isSelected ? (
+                      <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center">
+                        <Icon name="CheckIcon" size={14} />
+                      </div>
+                    ) : isLocked ? (
+                      <Icon name="LockClosedIcon" size={16} className="text-muted-foreground" />
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -319,6 +411,11 @@ export default function StoreSelectorModal() {
               <button onClick={() => setDeleteStoreModal(null)} className="btn-secondary text-xs">Cancel</button>
               <button
                 onClick={async () => {
+                  if (deleteStoreModal.code === 'CENTRAL') {
+                    toast.error('The default Central Warehouse & Owner Store (CENTRAL) cannot be deleted.');
+                    setDeleteStoreModal(null);
+                    return;
+                  }
                   const hasInventory = inventory.some((i) => i.store === deleteStoreModal.code);
                   const permanent = !hasInventory && deleteStoreModal.monthlyRevenue === 0;
                   await deleteStoreHub(deleteStoreModal.id, permanent);

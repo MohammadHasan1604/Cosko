@@ -6,19 +6,27 @@ import Modal from '@/components/ui/Modal';
 import { useApp } from '@/context/AppContext';
 
 export default function ExpensesPage() {
-  const { expenses, addExpense, selectedStore } = useApp();
+  const { expenses, addExpense, selectedStore, storesList } = useApp();
   const [modalOpen, setModalOpen] = useState(false);
   const [category, setCategory] = useState('Store Rent');
   const [description, setDescription] = useState('');
+  const [store, setStore] = useState(selectedStore === 'All Stores' ? 'CENTRAL' : selectedStore);
   const [amount, setAmount] = useState(5000);
   const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
+
+  // Keep store in sync when modal opens
+  React.useEffect(() => {
+    if (modalOpen) {
+      setStore(selectedStore === 'All Stores' ? 'CENTRAL' : selectedStore);
+    }
+  }, [modalOpen, selectedStore]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     addExpense({
       category,
       description,
-      store: selectedStore === 'All Stores' ? 'BLR' : selectedStore,
+      store: store || 'CENTRAL',
       amount,
       paymentMethod,
       status: 'Approved',
@@ -98,13 +106,27 @@ export default function ExpensesPage() {
       {/* Log Expense Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Log Business Expense" size="md">
         <form onSubmit={handleSubmit} className="space-y-4 py-2 text-sm">
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Expense Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="input-field py-2">
-              {['Store Rent', 'Utilities & Power', 'Logistics & Freight', 'Staff Salaries', 'Maintenance & Repairs', 'Marketing'].map((cat) => (
-                <option key={`exp-cat-${cat}`} value={cat}>{cat}</option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Expense Category</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className="input-field py-2">
+                {['Store Rent', 'Utilities & Power', 'Logistics & Freight', 'Staff Salaries', 'Maintenance & Repairs', 'Marketing'].map((cat) => (
+                  <option key={`exp-cat-${cat}`} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Store / Warehouse Hub *</label>
+              <select value={store} onChange={(e) => setStore(e.target.value)} className="input-field py-2 font-medium">
+                {[...storesList]
+                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
+                  .map((st) => (
+                    <option key={`exp-store-${st.code}`} value={st.code}>
+                      {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
+                    </option>
+                  ))}
+              </select>
+            </div>
           </div>
           <div>
             <label className="text-xs font-semibold text-muted-foreground block mb-1">Description / Notes</label>

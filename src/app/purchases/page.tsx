@@ -14,7 +14,7 @@ export default function PurchasesPage() {
 
   // Form state
   const [vendorName, setVendorName] = useState(vendors[0]?.name || 'Polycab India Ltd');
-  const [store, setStore] = useState('BLR');
+  const [store, setStore] = useState('CENTRAL');
   const [itemName, setItemName] = useState(inventory[0]?.name || 'Polycab 1.5 Sq mm Wire');
   const [qty, setQty] = useState(50);
   const [unitCost, setUnitCost] = useState(1850);
@@ -219,11 +219,13 @@ export default function PurchasesPage() {
             <div>
               <label className="text-xs font-bold text-foreground block mb-1">Target Receiving Store *</label>
               <select value={store} onChange={(e) => setStore(e.target.value)} className="input-field text-xs font-medium">
-                {storesList.map((st) => (
-                  <option key={`po-create-${st.code}`} value={st.code}>
-                    {st.code} — {st.name}
-                  </option>
-                ))}
+                {[...storesList]
+                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
+                  .map((st) => (
+                    <option key={`po-create-${st.code}`} value={st.code}>
+                      {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
+                    </option>
+                  ))}
               </select>
             </div>
           </div>
@@ -287,11 +289,13 @@ export default function PurchasesPage() {
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">Target Store</label>
                 <select value={store} onChange={(e) => setStore(e.target.value)} className="input-field text-xs font-medium">
-                  {storesList.map((st) => (
-                    <option key={`po-edit-${st.code}`} value={st.code}>
-                      {st.code} — {st.name}
-                    </option>
-                  ))}
+                  {[...storesList]
+                    .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
+                    .map((st) => (
+                      <option key={`po-edit-${st.code}`} value={st.code}>
+                        {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>

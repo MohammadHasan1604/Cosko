@@ -60,17 +60,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Store Code, Name, and City are required' }, { status: 400 });
     }
 
+    const upperCode = body.code.toUpperCase().trim();
+    if (upperCode === 'ALL' || body.name.toLowerCase().trim() === 'all stores') {
+      return NextResponse.json(
+        { error: '"All Stores" is a reporting/aggregation scope only and cannot be created as a physical store.' },
+        { status: 400 }
+      );
+    }
+
+    // Protect CENTRAL status: must always remain Active
+    const storeStatus = upperCode === 'CENTRAL' ? 'Active' : (body.status || 'Active');
+
     const store = await prisma.storeHub.upsert({
-      where: { code: body.code.toUpperCase() },
+      where: { code: upperCode },
       create: {
-        code: body.code.toUpperCase(),
-        name: body.name,
+        code: upperCode,
+        name: upperCode === 'CENTRAL' ? (body.name || 'COSKO Central Warehouse & Owner Stock') : body.name,
         city: body.city,
         address: body.address || 'COSKO Retail Hub',
         managerName: body.managerName || null,
         phone: body.phone || null,
-        registersCount: body.registersCount || 2,
-        status: body.status || 'Active',
+        registersCount: body.registersCount || (upperCode === 'CENTRAL' ? 0 : 2),
+        status: storeStatus,
       },
       update: {
         name: body.name,
@@ -79,7 +90,7 @@ export async function POST(req: NextRequest) {
         managerName: body.managerName || undefined,
         phone: body.phone || undefined,
         registersCount: body.registersCount || undefined,
-        status: body.status || undefined,
+        status: upperCode === 'CENTRAL' ? 'Active' : (body.status || undefined),
       },
     });
 
@@ -130,6 +141,14 @@ export async function DELETE(req: NextRequest) {
 
     if (!target) {
       return NextResponse.json({ success: true, message: 'Store already removed or non-existent' });
+    }
+
+    // STRICT PROTECTION: CENTRAL cannot be deleted or deactivated under any circumstances
+    if (target.code === 'CENTRAL') {
+      return NextResponse.json(
+        { error: 'The default Central Warehouse & Owner Store (CENTRAL) is permanent and cannot be deactivated or deleted.' },
+        { status: 400 }
+      );
     }
 
     // Check store transaction & inventory history

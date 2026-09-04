@@ -966,6 +966,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deleteStoreHub = async (id: string, permanent = false) => {
     const s = storesList.find((st) => st.id === id || st.code === id || st.code.toUpperCase() === id.toUpperCase());
+    if (s?.code === 'CENTRAL' || id === 'CENTRAL' || id.toUpperCase() === 'CENTRAL') {
+      toast.error('The default Central Warehouse & Owner Store (CENTRAL) is permanent and cannot be deleted.');
+      return { success: false, message: 'CENTRAL store cannot be deleted' };
+    }
     const lookupId = s ? s.code : id;
     try {
       const res = await MySQLDataService.deleteStore(lookupId, permanent);

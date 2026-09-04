@@ -73,6 +73,12 @@ export default function StoresPage() {
   };
 
   const handleDeleteStore = (id: string) => {
+    const target = storesList.find((s) => s.id === id || s.code === id);
+    if (target?.code === 'CENTRAL' || id === 'CENTRAL') {
+      toast.error('The default Central Warehouse & Owner Store (CENTRAL) is permanent and cannot be deleted.');
+      setDeleteStoreModal(null);
+      return;
+    }
     deleteStoreHub(id);
     setDeleteStoreModal(null);
   };
@@ -139,36 +145,57 @@ export default function StoresPage() {
 
         {/* Store Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {storesList.map((s) => (
-            <div key={`store-card-${s.id}`} className="card p-5 space-y-4 hover:shadow-md transition-all duration-150 relative group">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="badge-info text-2xs font-bold">{s.code}</span>
-                  <h3 className="text-base font-bold text-foreground mt-1">{s.name}</h3>
-                  <p className="text-2xs text-muted-foreground">{s.city}</p>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => { setSelectedStore(s.code); toast.success(`Switched active store scope to ${s.name}`); }}
-                    className="btn-ghost text-2xs text-primary font-bold hover:underline"
-                  >
-                    Select Scope
-                  </button>
-
-                  {/* Edit & Delete Controls (SUPER ADMIN ONLY) */}
-                  {currentUser.role === 'Super Admin' && (
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => openEdit(s)} className="p-1 text-muted-foreground hover:text-primary" title="Edit store hub">
-                        <Icon name="PencilSquareIcon" size={15} />
-                      </button>
-                      <button onClick={() => setDeleteStoreModal(s)} className="p-1 text-muted-foreground hover:text-danger" title="Delete store hub">
-                        <Icon name="TrashIcon" size={15} />
-                      </button>
+          {storesList.map((s) => {
+            const isCentral = s.code === 'CENTRAL';
+            return (
+              <div key={`store-card-${s.id}`} className="card p-5 space-y-4 hover:shadow-md transition-all duration-150 relative group">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`text-2xs font-bold px-2 py-0.5 rounded-full ${
+                        isCentral
+                          ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                          : 'badge-info'
+                      }`}>
+                        {s.code}
+                      </span>
+                      {isCentral && (
+                        <span className="text-3xs bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                          Default Permanent Hub
+                        </span>
+                      )}
                     </div>
-                  )}
+                    <h3 className="text-base font-bold text-foreground mt-1">{s.name}</h3>
+                    <p className="text-2xs text-muted-foreground">{s.city}</p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setSelectedStore(s.code); toast.success(`Switched active store scope to ${s.name}`); }}
+                      className="btn-ghost text-2xs text-primary font-bold hover:underline"
+                    >
+                      Select Scope
+                    </button>
+
+                    {/* Edit & Delete Controls (SUPER ADMIN ONLY) */}
+                    {currentUser.role === 'Super Admin' && (
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openEdit(s)} className="p-1 text-muted-foreground hover:text-primary" title="Edit store hub">
+                          <Icon name="PencilSquareIcon" size={15} />
+                        </button>
+                        {isCentral ? (
+                          <span className="p-1 text-muted-foreground/60 cursor-help" title="The default Central Warehouse & Owner Store is permanent and cannot be deleted">
+                            <Icon name="ShieldCheckIcon" size={16} className="text-primary" />
+                          </span>
+                        ) : (
+                          <button onClick={() => setDeleteStoreModal(s)} className="p-1 text-muted-foreground hover:text-danger" title="Delete store hub">
+                            <Icon name="TrashIcon" size={15} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
               <div className="text-xs space-y-1 text-muted-foreground border-y border-border py-2.5">
                 <p><strong className="text-foreground">Address:</strong> {s.address}</p>
@@ -188,9 +215,10 @@ export default function StoresPage() {
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
+    </div>
 
       {/* Add New Store Hub Modal */}
       <Modal

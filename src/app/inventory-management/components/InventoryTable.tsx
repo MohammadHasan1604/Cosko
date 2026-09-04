@@ -202,14 +202,22 @@ export default function InventoryTable() {
             value={storeFilter}
             onChange={(e) => { setStoreFilter(e.target.value); setPage(1); }}
             disabled={currentUser.role !== 'Super Admin'}
-            className="input-field py-2 text-sm w-auto min-w-[170px]"
+            className="input-field py-2 text-sm w-auto min-w-[200px]"
           >
-            {currentUser.role === 'Super Admin' && <option value="All Stores">All Locations (Consolidated)</option>}
-            {storesList.map((s) => (
-              <option key={`store-opt-${s.code}`} value={s.code}>
-                {s.code === 'CENTRAL' ? 'Central Warehouse' : s.name} ({s.code})
-              </option>
-            ))}
+            {currentUser.role === 'Super Admin' && (
+              <optgroup label="Reporting Scope">
+                <option value="All Stores">All Locations (Consolidated View)</option>
+              </optgroup>
+            )}
+            <optgroup label="Physical Warehouses & Stores">
+              {[...storesList]
+                .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
+                .map((s) => (
+                  <option key={`store-opt-${s.code}`} value={s.code}>
+                    {s.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${s.name} (${s.code})`}
+                  </option>
+                ))}
+            </optgroup>
           </select>
 
           {/* Dynamic Category filter */}

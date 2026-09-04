@@ -38,8 +38,8 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
         {/* Store Scope Badge on Mobile */}
         <div className="flex lg:hidden items-center gap-1.5 min-w-0">
           <CoskoLogo size={20} showText />
-          <span className="text-2xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold truncate max-w-[90px]">
-            {selectedStore}
+          <span className="text-2xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold truncate max-w-[130px]">
+            {selectedStore === 'All Stores' ? 'Consolidated' : selectedStore === 'CENTRAL' ? 'Central Hub' : selectedStore}
           </span>
         </div>
 
@@ -47,9 +47,13 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
         <div className="hidden lg:flex items-center gap-2 text-sm text-muted-foreground">
           <CoskoLogo size={22} showText />
           <Icon name="ChevronRightIcon" size={14} />
-          <span className="text-xs font-medium">Multi-Store Scope</span>
-          <span className="text-2xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
-            {selectedStore}
+          <span className="text-xs font-medium">Scope</span>
+          <span className="text-2xs bg-primary/10 text-primary px-2.5 py-0.5 rounded-full font-semibold">
+            {selectedStore === 'All Stores'
+              ? 'All Stores (Consolidated View)'
+              : selectedStore === 'CENTRAL'
+              ? 'COSKO Central Warehouse (CENTRAL)'
+              : `${selectedStore} Store Hub`}
           </span>
         </div>
       </div>

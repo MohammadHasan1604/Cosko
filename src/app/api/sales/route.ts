@@ -61,6 +61,13 @@ export async function POST(req: NextRequest) {
 
     const body: CreateSaleInput = await req.json();
 
+    if (body.storeCode === 'All Stores' || body.storeCode === 'ALL') {
+      return NextResponse.json(
+        { error: '"All Stores" is a reporting scope only. Sales must be processed under a real store outlet or Central Warehouse.' },
+        { status: 400 }
+      );
+    }
+
     // Verify cashier store authorization
     if (user.role !== 'Super Admin' && user.store !== body.storeCode) {
       return NextResponse.json({ error: 'Store Scope Lock: Cashier cannot execute sales for unauthorized store' }, { status: 403 });

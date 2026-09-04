@@ -186,12 +186,20 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
             onClick={() => setStoreSelectorOpen(true)}
             className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted cursor-pointer hover:bg-border transition-colors duration-150"
           >
-            <div className="w-5 h-5 rounded-md gradient-primary flex-shrink-0 flex items-center justify-center text-white text-2xs font-bold">
+            <div className={`w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center text-white text-2xs font-bold ${
+              selectedStore === 'All Stores' ? 'bg-primary' : selectedStore === 'CENTRAL' ? 'bg-slate-800 dark:bg-slate-200 dark:text-slate-900' : 'gradient-primary'
+            }`}>
               {selectedStore === 'All Stores' ? 'ALL' : selectedStore}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-foreground truncate">{branding.appName}</p>
-              <p className="text-2xs text-muted-foreground">{selectedStore}</p>
+              <p className="text-2xs text-muted-foreground truncate">
+                {selectedStore === 'All Stores'
+                  ? 'Consolidated View'
+                  : selectedStore === 'CENTRAL'
+                  ? 'Central Warehouse'
+                  : `${selectedStore} Store`}
+              </p>
             </div>
             <Icon name="ChevronUpDownIcon" size={14} className="text-muted-foreground flex-shrink-0" />
           </div>

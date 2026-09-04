@@ -89,7 +89,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const storeCode = body.store || (user.store !== 'All Stores' ? user.store : 'CENTRAL');
+    if (body.store === 'All Stores' || body.store === 'ALL') {
+      return NextResponse.json(
+        { error: '"All Stores" is a reporting/aggregation scope only. Physical inventory must be assigned to a specific store location or Central Warehouse (e.g., CENTRAL, BLR, MUM).' },
+        { status: 400 }
+      );
+    }
+
+    const storeCode = body.store || (user.store && user.store !== 'All Stores' && user.store !== 'ALL' ? user.store : 'CENTRAL');
     const qtyOnHand = typeof body.qtyOnHand === 'number' ? body.qtyOnHand : 0;
 
     const product = await (prisma as any).product.upsert({
