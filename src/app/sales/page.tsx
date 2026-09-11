@@ -31,6 +31,7 @@ export default function SalesPage() {
     repairsEnquiries,
     categoriesList,
     addSale,
+    voidSale,
     addCustomer,
     selectedStore,
     branding,
@@ -39,6 +40,8 @@ export default function SalesPage() {
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'pos' | 'history'>('pos');
+  const [voidModalOrder, setVoidModalOrder] = useState<any | null>(null);
+  const [isVoiding, setIsVoiding] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -1090,6 +1093,19 @@ export default function SalesPage() {
                           >
                             <Icon name="ChatBubbleOvalLeftEllipsisIcon" size={14} />
                           </button>
+                          {s.status === 'Cancelled' || s.status === 'Refunded' ? (
+                            <span className="px-1.5 py-0.5 rounded text-3xs font-bold bg-danger/10 text-danger border border-danger/20">Voided</span>
+                          ) : (
+                            (currentUser.role === 'Super Admin' || currentUser.role === 'Store Manager') && (
+                              <button
+                                onClick={() => setVoidModalOrder(s)}
+                                className="p-1 rounded-md bg-danger/10 text-danger hover:bg-danger hover:text-white transition-colors"
+                                title="Void Invoice & Restock Inventory"
+                              >
+                                <Icon name="TrashIcon" size={14} />
+                              </button>
+                            )
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1315,6 +1331,52 @@ export default function SalesPage() {
           title="POS Barcode Scanner"
           subtitle="Scan product retail barcode to instantly add items to the billing cart."
         />
+      )}
+
+      {/* Void Sales Order Confirmation Modal */}
+      {voidModalOrder && (
+        <Modal
+          open={!!voidModalOrder}
+          onClose={() => setVoidModalOrder(null)}
+          title={`Void Sales Order — ${voidModalOrder.orderNo}`}
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-danger/10 border border-danger/20 rounded-xl flex items-start gap-3">
+              <Icon name="ExclamationTriangleIcon" size={20} className="text-danger flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-foreground space-y-1">
+                <p className="font-bold">Are you sure you want to void this invoice?</p>
+                <p className="text-muted-foreground">
+                  This will mark order <strong>{voidModalOrder.orderNo}</strong> (₹{Number(voidModalOrder.total).toLocaleString('en-IN')}) as Cancelled, immediately restock all sold quantities back into store <strong>{voidModalOrder.store}</strong>, and reverse any customer spend updates in the database.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <button
+                onClick={() => setVoidModalOrder(null)}
+                className="btn-secondary text-xs px-3 py-1.5"
+                disabled={isVoiding}
+              >
+                Close
+              </button>
+              <button
+                onClick={async () => {
+                  if (!voidModalOrder) return;
+                  setIsVoiding(true);
+                  try {
+                    await voidSale(voidModalOrder.id);
+                    setVoidModalOrder(null);
+                  } finally {
+                    setIsVoiding(false);
+                  }
+                }}
+                className="btn-danger text-xs px-3 py-1.5 bg-danger text-white rounded-lg hover:bg-danger/90"
+                disabled={isVoiding}
+              >
+                {isVoiding ? 'Voiding...' : 'Confirm Void & Restock'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </AppLayout>
   );

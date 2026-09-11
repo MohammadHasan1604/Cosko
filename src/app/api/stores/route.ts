@@ -104,6 +104,13 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * PUT /api/stores - Update store hub details (delegates to upsert POST)
+ */
+export async function PUT(req: NextRequest) {
+  return POST(req);
+}
+
+/**
  * DELETE /api/stores - Safe Deactivate or Permanent Delete for unused store hubs
  */
 export async function DELETE(req: NextRequest) {

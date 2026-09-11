@@ -372,6 +372,14 @@ export const MySQLDataService = {
     return apiCall('/api/sales', 'POST', sale);
   },
 
+  async updateSale(sale: any) {
+    return apiCall('/api/sales', 'PUT', sale);
+  },
+
+  async deleteSale(id: string) {
+    return apiCall(`/api/sales?id=${encodeURIComponent(id)}`, 'DELETE');
+  },
+
   async createStockTransfer(transfer: any) {
     return apiCall('/api/transfers', 'POST', transfer);
   },

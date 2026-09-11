@@ -143,7 +143,7 @@ export interface SalesOrder {
   total: number;
   taxEnabled: boolean;
   paymentMethod: 'Cash' | 'UPI' | 'Card' | 'Credit';
-  status: 'Completed' | 'Refunded' | 'Pending';
+  status: 'Completed' | 'Refunded' | 'Pending' | 'Cancelled' | 'Voided';
   createdAt: string;
   period: 'Today' | 'Yesterday' | 'Last 7 Days' | 'This Month' | 'Last Month' | 'This Quarter' | 'This Year';
   salePhotos?: SalePhoto[];
@@ -352,6 +352,8 @@ interface AppContextType {
   deleteRepairEnquiry: (id: string) => Promise<any>;
   sales: SalesOrder[];
   addSale: (sale: Omit<SalesOrder, 'id' | 'orderNo' | 'createdAt' | 'period'>) => Promise<SalesOrder | null>;
+  updateSale: (id: string, updated: Partial<SalesOrder>) => Promise<any>;
+  voidSale: (id: string) => Promise<{ success: boolean; message?: string }>;
   purchases: PurchaseOrder[];
   addPurchase: (po: Omit<PurchaseOrder, 'id' | 'poNo' | 'createdAt'>) => Promise<any>;
   updatePurchase: (id: string, updated: Partial<PurchaseOrder>) => Promise<any>;
@@ -1764,6 +1766,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateSale = async (id: string, updated: Partial<SalesOrder>) => {
+    try {
+      const res = await MySQLDataService.updateSale({ id, ...updated });
+      if (res?.success) {
+        toast.success(res.message || 'Sale order updated');
+        await refreshAllData();
+        return { success: true };
+      } else {
+        toast.error(res?.error || 'Failed to update sale order');
+        return { success: false, error: res?.error };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating sale order');
+      return { success: false, error: err.message };
+    }
+  };
+
+  const voidSale = async (id: string) => {
+    try {
+      const res = await MySQLDataService.deleteSale(id);
+      if (res?.success) {
+        toast.success(res.message || 'Sale order voided and stock restored');
+        await refreshAllData();
+        return { success: true, message: res.message };
+      } else {
+        toast.error(res?.error || 'Failed to void sale order');
+        return { success: false, error: res?.error };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error voiding sale order');
+      return { success: false, error: err.message };
+    }
+  };
+
   const addPurchase = async (poData: Omit<PurchaseOrder, 'id' | 'poNo' | 'createdAt'>) => {
     try {
       const res = await MySQLDataService.createPurchase(poData);
@@ -2238,6 +2274,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteRepairEnquiry,
         sales,
         addSale,
+        updateSale,
+        voidSale,
         purchases,
         addPurchase,
         updatePurchase,

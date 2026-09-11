@@ -17,8 +17,12 @@ export default function ReportsPage() {
     return purchases.filter((p) => selectedStore === 'All Stores' || p.store === selectedStore);
   }, [purchases, selectedStore]);
 
-  const totalInvValue = useMemo(() => inventory.reduce((acc, i) => acc + i.costPrice * i.qtyOnHand, 0), [inventory]);
-  const totalInvSelling = useMemo(() => inventory.reduce((acc, i) => acc + i.sellingPrice * i.qtyOnHand, 0), [inventory]);
+  const filteredInventory = useMemo(() => {
+    return inventory.filter((i) => selectedStore === 'All Stores' || i.store === selectedStore);
+  }, [inventory, selectedStore]);
+
+  const totalInvValue = useMemo(() => filteredInventory.reduce((acc, i) => acc + i.costPrice * i.qtyOnHand, 0), [filteredInventory]);
+  const totalInvSelling = useMemo(() => filteredInventory.reduce((acc, i) => acc + i.sellingPrice * i.qtyOnHand, 0), [filteredInventory]);
   const totalRevenue = useMemo(() => filteredSales.reduce((acc, s) => acc + s.total, 0), [filteredSales]);
   
   const totalGrossProfit = useMemo(() => {
