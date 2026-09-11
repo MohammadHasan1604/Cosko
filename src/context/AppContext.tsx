@@ -65,7 +65,7 @@ export interface StockTransferRecord {
   purchaseCost: number;
   transferPrice: number;
   transferProfit: number;
-  status: 'Completed' | 'Draft' | 'In Transit' | 'Cancelled';
+  status: 'Completed' | 'Received' | 'Draft' | 'In Transit' | 'Cancelled';
   createdBy: string;
   createdAt: string;
 }
@@ -341,7 +341,7 @@ interface AppContextType {
   deleteItem: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   adjustStock: (id: string, qtyChange: number, reason: string) => void;
   transferStock: (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number, status?: 'Completed' | 'Draft', notes?: string) => Promise<any>;
-  updateTransferStatus: (id: string, nextStatus: 'Completed' | 'Cancelled') => void;
+  updateTransferStatus: (id: string, nextStatus: 'Completed' | 'Cancelled') => Promise<void> | void;
   defaultStoreTransferPrices: ProductStoreTransferPrice[];
   setDefaultStoreTransferPrice: (productId: string, storeCode: string, price: number) => void;
   stockTransfers: StockTransferRecord[];
@@ -527,7 +527,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const [
         storesRes, categoriesRes, inventoryRes, salesRes, purchasesRes,
         customersRes, vendorsRes, expensesRes, repairsRes, usersRes,
-        transfersRes, ledgerRes, settingsRes
+        transfersRes, ledgerRes, settingsRes, auditLogsRes
       ] = await Promise.allSettled([
         fetch('/api/stores', opts),
         fetch('/api/categories', opts),
@@ -542,6 +542,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetch('/api/transfers', opts),
         fetch('/api/inventory/ledger', opts),
         fetch('/api/settings', opts),
+        fetch('/api/audit-logs?limit=200', opts),
       ]);
 
       const safeJson = async (result: PromiseSettledResult<Response>) => {
@@ -835,6 +836,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           notes: l.notes || '',
           userEmail: l.createdBy || 'System',
           createdAt: l.createdAt,
+        })));
+      }
+
+      const auditLogsData = await safeJson(auditLogsRes);
+      if (auditLogsData?.success && Array.isArray(auditLogsData.logs)) {
+        setAuditLogs(auditLogsData.logs.map((a: any) => ({
+          id: a.id,
+          timestamp: a.createdAt ? new Date(a.createdAt).toLocaleString('en-IN') : 'Recent',
+          userName: a.userName || a.userEmail || 'System',
+          userRole: a.userRole || 'Admin',
+          module: a.module || 'System',
+          action: a.action || 'Action',
+          details: a.details || a.description || '',
+          ipAddress: a.ipAddress || '127.0.0.1',
         })));
       }
 
@@ -1643,7 +1658,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateTransferStatus = (id: string, nextStatus: 'Completed' | 'Cancelled') => {
+  const updateTransferStatus = async (id: string, nextStatus: 'Completed' | 'Cancelled') => {
     const target = stockTransfers.find((t) => t.id === id);
     if (!target) return;
 
@@ -1652,32 +1667,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (target.status === 'Draft' && nextStatus === 'Completed') {
-      const sourceItem = inventory.find((i) => i.id === target.productId || i.sku === target.sku);
-      if (!sourceItem || sourceItem.qtyOnHand < target.qty) {
-        toast.error(`Insufficient stock to complete transfer (${sourceItem?.qtyOnHand || 0} units available)`);
-        return;
+    try {
+      const res = await fetch('/api/transfers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          id,
+          status: nextStatus === 'Completed' ? 'Received' : 'Cancelled',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update transfer status');
       }
 
-      setInventory((prev) =>
-        prev.map((item) => {
-          if (item.id === sourceItem.id) {
-            return { ...item, qtyOnHand: item.qtyOnHand - target.qty, lastMovement: 'Transfer Out' };
-          }
-          if (item.sku === sourceItem.sku && item.store === target.destStore) {
-            return { ...item, qtyOnHand: item.qtyOnHand + target.qty, lastMovement: 'Transfer In' };
-          }
-          return item;
-        })
-      );
-
-      setStockTransfers((prev) => prev.map((t) => (t.id === id ? { ...t, status: 'Completed' } : t)));
-      addAuditLog('Inventory', 'Complete Draft Transfer', `Completed draft transfer ${target.transferNo}`);
-      toast.success(`Draft transfer ${target.transferNo} completed!`);
-      return;
+      toast.success(`Transfer ${target.transferNo} ${nextStatus === 'Cancelled' ? 'cancelled with inventory reversal' : 'completed'}!`);
+      await refreshAllData();
+    } catch (err: any) {
+      console.error('[COSKO] updateTransferStatus error:', err);
+      toast.error(err.message || 'Failed to update transfer status');
     }
-
-    setStockTransfers((prev) => prev.map((t) => (t.id === id ? { ...t, status: nextStatus } : t)));
   };
 
   const addSale = async (saleData: Omit<SalesOrder, 'id' | 'orderNo' | 'createdAt' | 'period'>): Promise<SalesOrder | null> => {

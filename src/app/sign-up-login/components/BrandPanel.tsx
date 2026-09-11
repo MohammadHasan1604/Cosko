@@ -63,9 +63,9 @@ export default function BrandPanel() {
       {/* Bottom stats */}
       <div className="relative z-10 grid grid-cols-3 gap-4 pt-8 border-t border-white/20">
         {[
-          { value: '50+', label: 'Demo Products' },
-          { value: '3', label: 'Store Locations' },
-          { value: '5', label: 'User Roles' },
+          { value: '50+', label: 'Catalog SKUs' },
+          { value: '5', label: 'Store Locations' },
+          { value: '8', label: 'User Roles' },
         ]?.map((stat) => (
           <div key={`stat-${stat?.label}`} className="text-center">
             <p className="text-white font-bold text-xl font-tabular">{stat?.value}</p>

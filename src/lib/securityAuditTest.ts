@@ -19,7 +19,7 @@
  * 15. Regression & UX Testing (Zero-Integrations check & usability)
  */
 
-import { hashPassword, verifyPassword, checkRateLimit, createSession, verifySession, revokeSession } from './auth';
+import { hashPassword, verifyPassword, checkRateLimit, recordFailedAttempt, createSession, verifySession, revokeSession } from './auth';
 import { RBACEngine, RBACUser, ResourceRequest } from './rbacEngine';
 import { normalizeMobileNumber } from '../context/AppContext';
 
@@ -110,7 +110,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
 
   const testEmail = 'rate_limit_test@cosko.com';
   for (let i = 0; i < 5; i++) {
-    checkRateLimit(testEmail);
+    recordFailedAttempt(testEmail);
   }
   const rateLimitCheck = checkRateLimit(testEmail);
   assertTest('2. Authentication', 'Rate Limiting Brute Force Protection (6th Attempt Block)', 'DENIED', rateLimitCheck.allowed ? 'PASS' : 'DENIED', '6th login attempt within window blocked');

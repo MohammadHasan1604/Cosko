@@ -81,9 +81,14 @@ export default function CentralProfitPage() {
 
   // Filtered Transfers List
   const filteredTransfers = useMemo(() => {
+    const isCompletedStatus = (st: string) => st === 'Completed' || st === 'Received';
     return stockTransfers.filter((t) => {
       const matchStore = storeFilter === 'All Stores' || t.destStore === storeFilter || t.sourceStore === storeFilter;
-      const matchStatus = statusFilter === 'All' || t.status === statusFilter;
+      const matchStatus = statusFilter === 'All' 
+        ? true 
+        : statusFilter === 'Completed' 
+          ? isCompletedStatus(t.status) 
+          : t.status === statusFilter;
       const matchSearch =
         searchRef === '' ||
         t.transferNo.toLowerCase().includes(searchRef.toLowerCase()) ||
@@ -93,8 +98,9 @@ export default function CentralProfitPage() {
     });
   }, [stockTransfers, storeFilter, statusFilter, searchRef]);
 
-  // High-Level Central Profit KPIs (Completed Transfers Only for Profit)
-  const completedTransfers = useMemo(() => filteredTransfers.filter((t) => t.status === 'Completed'), [filteredTransfers]);
+  // High-Level Central Profit KPIs (Completed/Received Transfers Only for Profit)
+  const isCompletedTransfer = (status: string) => status === 'Completed' || status === 'Received';
+  const completedTransfers = useMemo(() => filteredTransfers.filter((t) => isCompletedTransfer(t.status)), [filteredTransfers]);
   const totalTransferRevenue = useMemo(() => completedTransfers.reduce((acc, t) => acc + t.transferPrice * t.qty, 0), [completedTransfers]);
   const totalInventoryCost = useMemo(() => completedTransfers.reduce((acc, t) => acc + t.purchaseCost * t.qty, 0), [completedTransfers]);
   const totalGrossTransferProfit = useMemo(() => completedTransfers.reduce((acc, t) => acc + t.transferProfit, 0), [completedTransfers]);
@@ -444,7 +450,7 @@ export default function CentralProfitPage() {
                     <td className="px-4 py-3">
                       <span
                         className={`px-2 py-0.5 rounded text-3xs font-bold ${
-                          t.status === 'Completed'
+                          isCompletedTransfer(t.status)
                             ? 'bg-positive/10 text-positive'
                             : t.status === 'Draft'
                             ? 'bg-warning/10 text-warning'

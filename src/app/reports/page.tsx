@@ -39,7 +39,7 @@ export default function ReportsPage() {
   // Supplier analytics breakdown
   const supplierAnalytics = useMemo(() => {
     return vendors.map((v) => {
-      const pos = purchases.filter((p) => p.vendorName === v.name);
+      const pos = filteredPurchases.filter((p) => p.vendorName === v.name);
       const totalSpend = pos.reduce((acc, p) => acc + p.totalAmount, 0);
       const paid = pos.filter((p) => p.paymentStatus === 'Paid').reduce((acc, p) => acc + p.totalAmount, 0);
       const pending = totalSpend - paid;
@@ -55,7 +55,7 @@ export default function ReportsPage() {
         avgUnitPrice,
       };
     });
-  }, [vendors, purchases]);
+  }, [vendors, filteredPurchases]);
 
   // Best-selling products rollup
   const bestSellingProducts = useMemo(() => {
