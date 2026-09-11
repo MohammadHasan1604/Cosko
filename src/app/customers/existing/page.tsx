@@ -107,12 +107,15 @@ export default function ExistingCustomersPage() {
 
   const handleLinkAction = async (legacyId: string, action: 'verify' | 'unlink') => {
     try {
+      const target = customers.find((c) => c.id === legacyId);
       const res = await fetch('/api/customers/legacy/link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           legacyCustomerId: legacyId,
-          coskoCustomerId: 'cust-ahmed-01',
+          coskoCustomerId: target?.coskoCustomerId || null,
+          customerName: target?.name,
+          phone: target?.phone,
           action,
         }),
       });

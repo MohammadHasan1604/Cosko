@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { useApp } from '@/context/AppContext';
@@ -105,10 +106,10 @@ export default function RecentActivityFeed() {
 
       {/* Footer */}
       <div className="px-5 py-3 border-t border-border">
-        <button className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:underline">
+        <Link href="/audit-logs" className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:underline">
           View full audit log
           <Icon name="ArrowRightIcon" size={12} />
-        </button>
+        </Link>
       </div>
     </div>
   );

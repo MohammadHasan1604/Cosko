@@ -16,7 +16,17 @@ export default function KpiBentoGrid() {
   const filteredExpenses = selectedStore === 'All Stores' ? expenses : expenses.filter((e) => e.store === selectedStore);
 
   const totalRevenue = filteredSales.reduce((acc, s) => acc + s.total, 0);
-  const grossProfit = filteredSales.length > 0 ? totalRevenue * 0.30 : 0;
+  // Calculate real COGS from inventory cost prices
+  const totalCogs = filteredSales.reduce((acc, s) => {
+    const saleCogs = s.items?.reduce((itemAcc, it) => {
+      const invMatch = inventory.find((inv) => inv.productId === it.itemId || inv.sku === it.sku || inv.name === it.name);
+      const unitCost = invMatch ? invMatch.costPrice : (it.unitPrice * 0.70);
+      return itemAcc + (unitCost * it.qty);
+    }, 0) || 0;
+    return acc + saleCogs;
+  }, 0);
+  const grossProfit = totalRevenue > 0 ? Math.max(0, totalRevenue - totalCogs) : 0;
+  const grossMarginPct = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0';
   const totalExp = filteredExpenses.reduce((acc, e) => acc + e.amount, 0);
   const netProfit = grossProfit - totalExp;
   const invValue = filteredInv.reduce((acc, i) => acc + (i.costPrice || 0) * (i.qtyOnHand || 0), 0);
@@ -38,11 +48,11 @@ export default function KpiBentoGrid() {
     },
     {
       id: 'kpi-gross-profit',
-      label: 'Gross Profit Est.',
+      label: 'Gross Profit',
       value: `₹${Math.round(grossProfit).toLocaleString('en-IN')}`,
-      change: grossProfit > 0 ? '+30.0%' : '0%',
+      change: grossProfit > 0 ? `+${grossMarginPct}%` : '0%',
       trend: grossProfit > 0 ? ('up' as const) : ('neutral' as const),
-      subtext: totalRevenue > 0 ? 'Estimated gross margin' : 'No sales recorded',
+      subtext: totalRevenue > 0 ? `Real gross margin (${grossMarginPct}%)` : 'No sales recorded',
       icon: 'ArrowTrendingUpIcon',
       variant: 'normal' as const,
       color: 'positive' as const,

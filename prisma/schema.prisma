@@ -40,7 +40,7 @@ model UserAccount {
   status             String   @default("Active") @db.VarChar(16)
   shiftStatus        String   @default("On Shift") @map("shift_status") @db.VarChar(16)
   mustChangePassword Boolean  @default(false) @map("must_change_password")
-  avatarUrl          String?  @map("avatar_url") @db.Text
+  avatarUrl          String?  @map("avatar_url") @db.LongText
   lastLogin          DateTime? @map("last_login")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
@@ -109,7 +109,7 @@ model Category {
   parentCategoryId String?   @map("parent_category_id")
   categoryType     String    @default("Product") @map("category_type") @db.VarChar(64)
   description      String?   @db.VarChar(255)
-  imageUrl         String?   @map("image_url") @db.Text
+  imageUrl         String?   @map("image_url") @db.LongText
   icon             String?   @db.VarChar(64)
   status           String    @default("Active") @db.VarChar(16)
   sortOrder        Int       @default(0) @map("sort_order")
@@ -141,7 +141,7 @@ model Product {
   mrp              Decimal? @db.Decimal(12, 2)
   gstRate          Decimal  @default(0) @map("gst_rate") @db.Decimal(5, 2)
   warrantyMonths   Int      @default(0) @map("warranty_months")
-  imageUrl         String?  @map("image_url") @db.Text
+  imageUrl         String?  @map("image_url") @db.LongText
   description      String?  @db.Text
   status           String   @default("active") @db.VarChar(16)
   createdAt        DateTime @default(now()) @map("created_at")
@@ -510,8 +510,8 @@ model AuditLog {
 model BrandingSetting {
   id           String   @id @default("cosko_branding_config")
   appName      String   @default("COSKO") @map("app_name") @db.VarChar(128)
-  logoUrl      String?  @map("logo_url") @db.Text
-  faviconUrl   String?  @map("favicon_url") @db.Text
+  logoUrl      String?  @map("logo_url") @db.LongText
+  faviconUrl   String?  @map("favicon_url") @db.LongText
   tagline      String   @default("Multi-Store Enterprise Retail & POS System") @db.VarChar(255)
   supportEmail String   @default("support@cosko.com") @map("support_email") @db.VarChar(128)
   createdAt    DateTime @default(now()) @map("created_at")

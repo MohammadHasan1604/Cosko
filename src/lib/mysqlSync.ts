@@ -316,8 +316,55 @@ export const MySQLDataService = {
     });
   },
 
+  async updateExpense(idOrExpense: string | any, updated?: any) {
+    const payload = typeof idOrExpense === 'string' ? { id: idOrExpense, ...updated } : idOrExpense;
+    return apiCall('/api/expenses', 'PUT', {
+      id: payload.id,
+      category: payload.category,
+      amount: payload.amount,
+      storeCode: payload.store || payload.storeCode,
+      description: payload.description,
+      paymentMethod: payload.paymentMethod,
+      date: payload.date,
+    });
+  },
+
   async deleteExpense(id: string) {
     return apiCall(`/api/expenses?id=${encodeURIComponent(id)}`, 'DELETE');
+  },
+
+  // ─── REPAIRS & ENQUIRIES ─────────────────────────────
+  async fetchRepairs(params?: { status?: string; search?: string; store?: string }) {
+    const q = new URLSearchParams();
+    if (params?.status && params.status !== 'All') q.append('status', params.status);
+    if (params?.search) q.append('search', params.search);
+    if (params?.store && params.store !== 'All Stores') q.append('store', params.store);
+    const qs = q.toString();
+    return apiCall(`/api/repairs${qs ? `?${qs}` : ''}`, 'GET');
+  },
+
+  async createRepair(repair: any) {
+    return apiCall('/api/repairs', 'POST', {
+      customerName: repair.customerName,
+      customerPhone: repair.customerPhone,
+      deviceType: repair.deviceType || 'Mobile',
+      deviceName: repair.deviceName,
+      issueDescription: repair.issueDescription,
+      estimatedCost: repair.estimatedCost,
+      status: repair.status || 'Pending Diagnosis',
+      assignedTech: repair.assignedTech,
+      technicianNotes: repair.technicianNotes,
+      storeCode: repair.storeCode || repair.store || 'CENTRAL',
+    });
+  },
+
+  async updateRepair(idOrRepair: string | any, updated?: any) {
+    const payload = typeof idOrRepair === 'string' ? { id: idOrRepair, ...updated } : idOrRepair;
+    return apiCall('/api/repairs', 'PUT', payload);
+  },
+
+  async deleteRepair(id: string) {
+    return apiCall(`/api/repairs?id=${encodeURIComponent(id)}`, 'DELETE');
   },
 
   // ─── SALES & TRANSFERS ───────────────────────────────
@@ -334,8 +381,21 @@ export const MySQLDataService = {
     return apiCall('/api/purchases', 'POST', po);
   },
 
+  async updatePurchase(po: any) {
+    return apiCall('/api/purchases', 'PUT', po);
+  },
+
   async deletePurchase(id: string) {
     return apiCall(`/api/purchases?id=${encodeURIComponent(id)}`, 'DELETE');
+  },
+
+  // ─── SETTINGS & BRANDING ─────────────────────────────
+  async fetchBranding() {
+    return apiCall('/api/settings', 'GET');
+  },
+
+  async updateBrandingSettings(branding: any) {
+    return apiCall('/api/settings', 'POST', branding);
   },
 
   // ─── CATEGORIES ──────────────────────────────────────

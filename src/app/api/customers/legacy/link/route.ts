@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifySessionToken } from '@/lib/auth';
+import { getAuthUserFromRequest } from '@/lib/auth';
+import { prisma } from '@/lib/db';
 import { getLegacyCustomersList } from '@/lib/services/legacyCustomerService';
 
 /**
@@ -8,9 +8,7 @@ import { getLegacyCustomersList } from '@/lib/services/legacyCustomerService';
  */
 export async function GET(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('cosko_session')?.value;
-    const user = token ? verifySessionToken(token) : null;
+    const user = getAuthUserFromRequest(req);
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -20,9 +18,38 @@ export async function GET(req: NextRequest) {
     const linkStatus = searchParams.get('linkStatus') || 'All';
     const search = searchParams.get('search') || '';
 
-    const customers = await getLegacyCustomersList({ linkStatus, search });
+    // Retrieve database links
+    const externalLinks = await prisma.customerExternalLink.findMany({
+      include: { customer: true },
+    });
 
-    return NextResponse.json({ success: true, customers });
+    const linkMap = new Map<string, any>();
+    externalLinks.forEach((l) => {
+      linkMap.set(l.externalCustomerId, l);
+    });
+
+    const legacyList = await getLegacyCustomersList({ linkStatus, search });
+
+    // Overlay real database link statuses
+    const mergedList = legacyList.map((c) => {
+      const dbLink = linkMap.get(c.id);
+      if (dbLink) {
+        return {
+          ...c,
+          linkStatus: dbLink.linkStatus,
+          coskoCustomerId: dbLink.coskoCustomerId,
+        };
+      }
+      return c;
+    });
+
+    const filtered = linkStatus === 'All'
+      ? mergedList
+      : mergedList.filter((c) => c.linkStatus === linkStatus);
+
+    return NextResponse.json({ success: true, customers: filtered }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+    });
   } catch (error: any) {
     console.error('API /api/customers/legacy/link GET error:', error);
     return NextResponse.json({ error: 'Failed to retrieve legacy customer list' }, { status: 500 });
@@ -30,39 +57,79 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST /api/customers/legacy/link - Create or verify customer link bridge
+ * POST /api/customers/legacy/link - Create, verify, or unlink customer bridge in MySQL
  */
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('cosko_session')?.value;
-    const user = token ? verifySessionToken(token) : null;
+    const user = getAuthUserFromRequest(req);
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (user.securityLevel < 80) {
+    if (user.securityLevel < 60) {
       return NextResponse.json({ error: 'Forbidden: Insufficient permissions to link customer records' }, { status: 403 });
     }
 
     const body = await req.json();
-    const { legacyCustomerId, coskoCustomerId, action } = body;
+    const { legacyCustomerId, coskoCustomerId, action, customerName, phone } = body;
 
-    // Simulate link state update in bridge layer
+    if (!legacyCustomerId) {
+      return NextResponse.json({ error: 'Legacy Customer ID is required' }, { status: 400 });
+    }
+
+    const newStatus = action === 'unlink' ? 'UNLINKED' : 'VERIFIED';
+
+    // Find or resolve target cosko customer
+    let resolvedCoskoId = coskoCustomerId;
+    if (!resolvedCoskoId && phone) {
+      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+      const matched = await prisma.customer.findFirst({
+        where: { normalizedPhone: { contains: cleanPhone } },
+      });
+      if (matched) resolvedCoskoId = matched.id;
+    }
+
+    // Persist real external link in MySQL
+    const existing = await prisma.customerExternalLink.findFirst({
+      where: { externalCustomerId: legacyCustomerId },
+    });
+
+    let link;
+    if (existing) {
+      link = await prisma.customerExternalLink.update({
+        where: { id: existing.id },
+        data: {
+          linkStatus: newStatus,
+          coskoCustomerId: newStatus === 'UNLINKED' ? null : (resolvedCoskoId || existing.coskoCustomerId),
+          verifiedBy: user.name,
+          verifiedAt: new Date(),
+        },
+      });
+    } else {
+      const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10) || '0000000000';
+      link = await prisma.customerExternalLink.create({
+        data: {
+          externalCustomerId: legacyCustomerId,
+          externalCustomerName: customerName || 'Historical Customer',
+          normalizedMobile: cleanPhone,
+          linkStatus: newStatus,
+          sourceSystem: 'LEGACY_MYSQL_DB',
+          matchType: 'EXACT_PHONE',
+          coskoCustomerId: newStatus === 'UNLINKED' ? null : resolvedCoskoId,
+          verifiedBy: user.name,
+          verifiedAt: new Date(),
+        },
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      message: action === 'unlink' ? 'Customer identity unlinked successfully' : 'Customer identity link verified successfully',
-      link: {
-        legacyCustomerId,
-        coskoCustomerId,
-        status: action === 'unlink' ? 'UNLINKED' : 'VERIFIED',
-        verifiedBy: user.name,
-        verifiedAt: new Date().toISOString(),
-      },
+      message: action === 'unlink' ? 'Customer identity unlinked successfully in MySQL' : 'Customer identity link verified successfully in MySQL',
+      link,
     });
   } catch (error: any) {
     console.error('API /api/customers/legacy/link POST error:', error);
-    return NextResponse.json({ error: 'Failed to update link status' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to update link status' }, { status: 500 });
   }
 }

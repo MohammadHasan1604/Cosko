@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const whereClause: any = {};
     if (user.role !== 'Super Admin') {
       whereClause.storeCode = user.store;
-    } else if (store && store !== 'All Stores') {
+    } else if (store && store !== 'All Stores' && store !== 'ALL') {
       whereClause.storeCode = store;
     }
 
@@ -59,19 +59,19 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    if (!body.category || !body.amount) {
+    if (!body.category || body.amount === undefined) {
       return NextResponse.json({ error: 'Category and Amount are required' }, { status: 400 });
     }
 
     const count = await (prisma as any).expense.count();
-    const expenseNo = `EXP-2026-${String(count + 1).padStart(4, '0')}`;
+    const expenseNo = body.expenseNo || `EXP-2026-${String(count + 1).padStart(4, '0')}`;
 
     const expense = await (prisma as any).expense.create({
       data: {
         expenseNo,
         category: body.category,
         amount: Number(body.amount),
-        storeCode: body.storeCode || user.store,
+        storeCode: body.storeCode || body.store || user.store || 'CENTRAL',
         description: body.description || '',
         paymentMethod: body.paymentMethod || 'Bank Transfer',
         approvedBy: user.name,
@@ -81,10 +81,74 @@ export async function POST(req: NextRequest) {
 
     broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id: expense.id, expenseNo: expense.expenseNo, storeCode: expense.storeCode, action: 'saved' });
 
-    return NextResponse.json({ success: true, expense }, { status: 201 });
+    return NextResponse.json({
+      success: true,
+      expense: {
+        ...expense,
+        amount: Number(expense.amount),
+      },
+    }, { status: 201 });
   } catch (error: any) {
     console.error('API /api/expenses POST error:', error);
     return NextResponse.json({ error: error.message || 'Failed to record expense' }, { status: 500 });
+  }
+}
+
+/**
+ * PUT /api/expenses - Update an existing expense record in MySQL
+ */
+export async function PUT(req: NextRequest) {
+  try {
+    const user = getAuthUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (user.securityLevel < 80) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient security level to edit expenses' }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const id = body.id || body.expenseId;
+
+    if (!id && !body.expenseNo) {
+      return NextResponse.json({ error: 'Expense ID or Reference No is required' }, { status: 400 });
+    }
+
+    const target = id
+      ? await (prisma as any).expense.findUnique({ where: { id } })
+      : await (prisma as any).expense.findUnique({ where: { expenseNo: body.expenseNo } });
+
+    if (!target) {
+      return NextResponse.json({ error: 'Expense record not found' }, { status: 404 });
+    }
+
+    const updateData: any = {};
+    if (body.category) updateData.category = body.category;
+    if (body.amount !== undefined) updateData.amount = Number(body.amount);
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.paymentMethod) updateData.paymentMethod = body.paymentMethod;
+    if (body.storeCode || body.store) updateData.storeCode = body.storeCode || body.store;
+    if (body.date) updateData.date = new Date(body.date);
+
+    const updated = await (prisma as any).expense.update({
+      where: { id: target.id },
+      data: updateData,
+    });
+
+    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id: updated.id, expenseNo: updated.expenseNo, storeCode: updated.storeCode, action: 'updated' });
+
+    return NextResponse.json({
+      success: true,
+      expense: {
+        ...updated,
+        amount: Number(updated.amount),
+      },
+    });
+  } catch (error: any) {
+    console.error('API /api/expenses PUT error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to update expense' }, { status: 500 });
   }
 }
 
@@ -110,9 +174,17 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Expense ID is required' }, { status: 400 });
     }
 
-    await (prisma as any).expense.delete({ where: { id } });
+    const target = await (prisma as any).expense.findFirst({
+      where: { OR: [{ id }, { expenseNo: id }] },
+    });
 
-    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id, action: 'deleted' });
+    if (!target) {
+      return NextResponse.json({ success: true, message: 'Expense already removed' });
+    }
+
+    await (prisma as any).expense.delete({ where: { id: target.id } });
+
+    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id: target.id, action: 'deleted' });
 
     return NextResponse.json({ success: true, message: 'Expense record deleted' });
   } catch (error: any) {
@@ -120,4 +192,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to delete expense' }, { status: 500 });
   }
 }
-

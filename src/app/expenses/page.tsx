@@ -1,12 +1,14 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
-import { useApp } from '@/context/AppContext';
+import { useApp, Expense } from '@/context/AppContext';
 
 export default function ExpensesPage() {
-  const { expenses, addExpense, selectedStore, storesList } = useApp();
+  const { expenses, addExpense, updateExpense, deleteExpense, selectedStore, storesList } = useApp();
+  
+  // Create state
   const [modalOpen, setModalOpen] = useState(false);
   const [category, setCategory] = useState('Store Rent');
   const [description, setDescription] = useState('');
@@ -14,16 +16,37 @@ export default function ExpensesPage() {
   const [amount, setAmount] = useState(5000);
   const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
 
-  // Keep store in sync when modal opens
-  React.useEffect(() => {
+  // Edit state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editCategory, setEditCategory] = useState('Store Rent');
+  const [editDescription, setEditDescription] = useState('');
+  const [editStore, setEditStore] = useState('CENTRAL');
+  const [editAmount, setEditAmount] = useState(0);
+  const [editPaymentMethod, setEditPaymentMethod] = useState('Bank Transfer');
+
+  // Delete state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Keep store in sync when create modal opens
+  useEffect(() => {
     if (modalOpen) {
       setStore(selectedStore === 'All Stores' ? 'CENTRAL' : selectedStore);
     }
   }, [modalOpen, selectedStore]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Filtered expenses based on active store scope
+  const filteredExpenses = selectedStore === 'All Stores'
+    ? expenses
+    : expenses.filter((e) => e.store === selectedStore);
+
+  const totalExpense = filteredExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+
+  const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    addExpense({
+    await addExpense({
       category,
       description,
       store: store || 'CENTRAL',
@@ -32,9 +55,49 @@ export default function ExpensesPage() {
       status: 'Approved',
     });
     setModalOpen(false);
+    setDescription('');
   };
 
-  const totalExpense = expenses.reduce((acc, e) => acc + e.amount, 0);
+  const handleOpenEdit = (exp: Expense) => {
+    setEditingExpense(exp);
+    setEditCategory(exp.category);
+    setEditDescription(exp.description);
+    setEditStore(exp.store);
+    setEditAmount(exp.amount);
+    setEditPaymentMethod(exp.paymentMethod);
+    setEditModalOpen(true);
+  };
+
+  const handleSubmitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingExpense) return;
+    await updateExpense(editingExpense.id, {
+      category: editCategory,
+      description: editDescription,
+      store: editStore,
+      amount: editAmount,
+      paymentMethod: editPaymentMethod,
+    });
+    setEditModalOpen(false);
+    setEditingExpense(null);
+  };
+
+  const handleOpenDelete = (exp: Expense) => {
+    setDeletingExpense(exp);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingExpense) return;
+    try {
+      setIsDeleting(true);
+      await deleteExpense(deletingExpense.id);
+      setDeleteModalOpen(false);
+      setDeletingExpense(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <AppLayout activeRoute="/expenses">
@@ -59,7 +122,9 @@ export default function ExpensesPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Logged Expenses</p>
             <h2 className="text-2xl font-extrabold text-foreground font-tabular mt-1">₹{totalExpense.toLocaleString('en-IN')}</h2>
-            <p className="text-2xs text-muted-foreground mt-0.5">{expenses.length} approved transactions in active store scope</p>
+            <p className="text-2xs text-muted-foreground mt-0.5">
+              {filteredExpenses.length} approved transactions in active store scope ({selectedStore})
+            </p>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center font-bold text-lg">
             ₹
@@ -69,7 +134,7 @@ export default function ExpensesPage() {
         {/* Table */}
         <div className="card overflow-hidden">
           <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left min-w-[700px]">
+            <table className="w-full text-left min-w-[750px]">
               <thead>
                 <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
                   <th className="px-4 py-3">Ref No</th>
@@ -80,23 +145,48 @@ export default function ExpensesPage() {
                   <th className="px-4 py-3">Payment Method</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border text-sm">
-                {expenses.map((exp) => (
-                  <tr key={`exp-${exp.id}`} className="hover:bg-muted/40 transition-colors">
-                    <td className="px-4 py-3.5 font-mono text-xs font-bold text-primary">{exp.referenceNo}</td>
-                    <td className="px-4 py-3.5 font-semibold text-foreground">{exp.category}</td>
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{exp.description}</td>
-                    <td className="px-4 py-3.5"><span className="badge-info text-2xs">{exp.store}</span></td>
-                    <td className="px-4 py-3.5 font-bold font-tabular text-foreground">₹{exp.amount.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3.5 text-2xs text-muted-foreground">{exp.paymentMethod}</td>
-                    <td className="px-4 py-3.5">
-                      <span className="text-2xs bg-positive/10 text-positive px-2 py-0.5 rounded font-semibold">{exp.status}</span>
+                {filteredExpenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground text-xs">
+                      No expense records found for {selectedStore}. Click &quot;Log New Expense&quot; to add one.
                     </td>
-                    <td className="px-4 py-3.5 text-2xs text-muted-foreground">{exp.date}</td>
                   </tr>
-                ))}
+                ) : (
+                  filteredExpenses.map((exp) => (
+                    <tr key={`exp-${exp.id}`} className="hover:bg-muted/40 transition-colors">
+                      <td className="px-4 py-3.5 font-mono text-xs font-bold text-primary">{exp.referenceNo}</td>
+                      <td className="px-4 py-3.5 font-semibold text-foreground">{exp.category}</td>
+                      <td className="px-4 py-3.5 text-xs text-muted-foreground">{exp.description}</td>
+                      <td className="px-4 py-3.5"><span className="badge-info text-2xs">{exp.store}</span></td>
+                      <td className="px-4 py-3.5 font-bold font-tabular text-foreground">₹{exp.amount.toLocaleString('en-IN')}</td>
+                      <td className="px-4 py-3.5 text-2xs text-muted-foreground">{exp.paymentMethod}</td>
+                      <td className="px-4 py-3.5">
+                        <span className="text-2xs bg-positive/10 text-positive px-2 py-0.5 rounded font-semibold">{exp.status}</span>
+                      </td>
+                      <td className="px-4 py-3.5 text-2xs text-muted-foreground">{exp.date}</td>
+                      <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
+                        <button
+                          onClick={() => handleOpenEdit(exp)}
+                          className="p-1.5 rounded-lg border border-border hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                          title="Edit Expense"
+                        >
+                          <Icon name="PencilSquareIcon" size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleOpenDelete(exp)}
+                          className="p-1.5 rounded-lg border border-rose-500/20 hover:bg-rose-500/10 text-rose-500 transition-colors"
+                          title="Delete Expense"
+                        >
+                          <Icon name="TrashIcon" size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -105,7 +195,7 @@ export default function ExpensesPage() {
 
       {/* Log Expense Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Log Business Expense" size="md">
-        <form onSubmit={handleSubmit} className="space-y-4 py-2 text-sm">
+        <form onSubmit={handleSubmitCreate} className="space-y-4 py-2 text-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">Expense Category</label>
@@ -152,6 +242,75 @@ export default function ExpensesPage() {
             <button type="submit" className="btn-primary">Record Expense</button>
           </div>
         </form>
+      </Modal>
+
+      {/* Edit Expense Modal */}
+      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)} title={`Edit Expense (${editingExpense?.referenceNo || ''})`} size="md">
+        <form onSubmit={handleSubmitEdit} className="space-y-4 py-2 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Expense Category</label>
+              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="input-field py-2">
+                {['Store Rent', 'Utilities & Power', 'Logistics & Freight', 'Staff Salaries', 'Maintenance & Repairs', 'Marketing'].map((cat) => (
+                  <option key={`edit-exp-cat-${cat}`} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Store / Warehouse Hub *</label>
+              <select value={editStore} onChange={(e) => setEditStore(e.target.value)} className="input-field py-2 font-medium">
+                {[...storesList]
+                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
+                  .map((st) => (
+                    <option key={`edit-exp-store-${st.code}`} value={st.code}>
+                      {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground block mb-1">Description / Notes</label>
+            <input required type="text" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="input-field py-2" placeholder="e.g. Monthly freight bill" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Amount (₹)</label>
+              <input type="number" min="1" value={editAmount} onChange={(e) => setEditAmount(Number(e.target.value))} className="input-field py-2 font-tabular" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">Payment Method</label>
+              <select value={editPaymentMethod} onChange={(e) => setEditPaymentMethod(e.target.value)} className="input-field py-2">
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Direct Debit">Direct Debit</option>
+                <option value="Corporate Card">Corporate Card</option>
+                <option value="Cash">Cash</option>
+              </select>
+            </div>
+          </div>
+          <div className="pt-2 border-t border-border flex justify-end gap-2">
+            <button type="button" onClick={() => setEditModalOpen(false)} className="btn-ghost">Cancel</button>
+            <button type="submit" className="btn-primary">Update Expense</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Delete Expense Record" size="sm">
+        <div className="py-2 space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            Are you sure you want to delete expense <span className="font-mono font-bold text-foreground">{deletingExpense?.referenceNo}</span> ({deletingExpense?.description}) for <span className="font-bold text-foreground">₹{deletingExpense?.amount.toLocaleString('en-IN')}</span>?
+          </p>
+          <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs text-rose-600 dark:text-rose-400">
+            This action permanently deletes this expense record from the MySQL database.
+          </div>
+          <div className="pt-2 border-t border-border flex justify-end gap-2">
+            <button type="button" onClick={() => setDeleteModalOpen(false)} className="btn-ghost text-xs" disabled={isDeleting}>Cancel</button>
+            <button type="button" onClick={handleConfirmDelete} className="btn-danger text-xs" disabled={isDeleting}>
+              {isDeleting ? 'Deleting...' : 'Delete Expense'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </AppLayout>
   );

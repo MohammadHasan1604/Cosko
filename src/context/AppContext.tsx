@@ -347,6 +347,9 @@ interface AppContextType {
   stockTransfers: StockTransferRecord[];
   inventoryLedger: InventoryLedgerEntry[];
   repairsEnquiries: RepairEnquiry[];
+  addRepairEnquiry: (enquiry: any) => Promise<any>;
+  updateRepairEnquiry: (id: string, updated: any) => Promise<any>;
+  deleteRepairEnquiry: (id: string) => Promise<any>;
   sales: SalesOrder[];
   addSale: (sale: Omit<SalesOrder, 'id' | 'orderNo' | 'createdAt' | 'period'>) => Promise<SalesOrder | null>;
   purchases: PurchaseOrder[];
@@ -371,6 +374,7 @@ interface AppContextType {
   deleteVendor: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   expenses: Expense[];
   addExpense: (expense: Omit<Expense, 'id' | 'referenceNo' | 'date'>) => Promise<any>;
+  updateExpense: (id: string, updated: Partial<Expense>) => Promise<any>;
   deleteExpense: (id: string) => Promise<{ success: boolean; mode?: string; message?: string }>;
   auditLogs: AuditLog[];
   addAuditLog: (module: string, action: string, details: string) => void;
@@ -521,7 +525,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const [
         storesRes, categoriesRes, inventoryRes, salesRes, purchasesRes,
         customersRes, vendorsRes, expensesRes, repairsRes, usersRes,
-        transfersRes, ledgerRes
+        transfersRes, ledgerRes, settingsRes
       ] = await Promise.allSettled([
         fetch('/api/stores', opts),
         fetch('/api/categories', opts),
@@ -535,6 +539,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetch('/api/users', opts),
         fetch('/api/transfers', opts),
         fetch('/api/inventory/ledger', opts),
+        fetch('/api/settings', opts),
       ]);
 
       const safeJson = async (result: PromiseSettledResult<Response>) => {
@@ -758,14 +763,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const repairsData = await safeJson(repairsRes);
       if (repairsData?.success && Array.isArray(repairsData.repairs)) {
         setRepairsEnquiries(repairsData.repairs.map((r: any) => ({
-          id: r.id, customerPhone: r.customerPhone,
-          customerName: r.customerName, enquiryDate: new Date(r.createdAt).toLocaleDateString('en-IN'),
-          deviceType: 'Mobile', deviceName: r.deviceName,
-          repairStatus: r.status, repairRequested: r.issueDescription,
-          estimatedCost: Number(r.estimatedCost),
+          id: r.id,
+          ticketNo: r.ticketNo,
+          customerPhone: r.customerPhone,
+          customerName: r.customerName,
+          enquiryDate: r.enquiryDate || (r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : 'Recent'),
+          deviceType: r.deviceType || 'Mobile',
+          deviceName: r.deviceName,
+          repairStatus: r.status,
+          repairRequested: r.issueDescription,
+          technicianNotes: r.technicianNotes || '',
+          estimatedCost: Number(r.estimatedCost) || 0,
           assignedTech: r.assignedTech || '',
-          storeCode: 'BLR', createdAt: r.createdAt,
+          storeCode: r.storeCode || 'CENTRAL',
+          createdAt: r.createdAt,
         })));
+      }
+
+      const settingsData = await safeJson(settingsRes);
+      if (settingsData?.success && settingsData.branding) {
+        setBranding((prev) => ({
+          ...prev,
+          appName: settingsData.branding.appName || prev.appName,
+          logoUrl: settingsData.branding.logoUrl !== undefined ? settingsData.branding.logoUrl : prev.logoUrl,
+          faviconUrl: settingsData.branding.faviconUrl !== undefined ? settingsData.branding.faviconUrl : prev.faviconUrl,
+          tagline: settingsData.branding.tagline || prev.tagline,
+          supportEmail: settingsData.branding.supportEmail || prev.supportEmail,
+          taxNumber: settingsData.branding.taxNumber || prev.taxNumber,
+        }));
       }
 
       const transfersData = await safeJson(transfersRes);
@@ -930,6 +955,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
 
+    MySQLDataService.updateBrandingSettings(updatedPartial).catch((err) => {
+      console.warn('Failed to sync branding to MySQL:', err);
+    });
+
     addAuditLog('Settings', 'Update White-Label Branding', `Updated app branding logo & details`);
     toast.success('Application branding updated successfully across the entire system!');
   };
@@ -938,6 +967,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBranding(defaultBranding);
     try {
       localStorage.removeItem('cosko_branding');
+      MySQLDataService.updateBrandingSettings({
+        appName: defaultBranding.appName,
+        logoUrl: null,
+        tagline: defaultBranding.tagline,
+        supportEmail: defaultBranding.supportEmail,
+      }).catch((err) => console.warn('Failed to reset branding in MySQL:', err));
     } catch {}
     addAuditLog('Settings', 'Reset Branding', 'Reset white-label branding to system default');
     toast.info('Application branding reset to defaults');
@@ -2042,6 +2077,91 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateExpense = async (id: string, updated: Partial<Expense>) => {
+    try {
+      const res = await MySQLDataService.updateExpense(id, updated);
+      if (res?.success && res.expense) {
+        const e = res.expense;
+        const updatedExp: Expense = {
+          id: e.id,
+          referenceNo: e.expenseNo,
+          category: e.category,
+          amount: Number(e.amount),
+          store: e.storeCode,
+          description: e.description,
+          paymentMethod: e.paymentMethod,
+          status: 'Approved',
+          date: new Date(e.date).toLocaleDateString('en-IN'),
+        };
+        setExpenses((prev) => prev.map((item) => (item.id === id || item.referenceNo === id ? updatedExp : item)));
+        addAuditLog('Expenses', 'Update Expense Record', `Updated expense "${updatedExp.description}" for ₹${updatedExp.amount.toLocaleString('en-IN')} (${updatedExp.store})`);
+        toast.success(`Expense record ${updatedExp.referenceNo} updated successfully`);
+        refreshAllData();
+        return { success: true, expense: updatedExp };
+      } else {
+        toast.error(res?.error || 'Failed to update expense record');
+        return { success: false, message: res?.error };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating expense');
+      return { success: false, message: err.message };
+    }
+  };
+
+  const addRepairEnquiry = async (repairData: any) => {
+    try {
+      const res = await MySQLDataService.createRepair(repairData);
+      if (res?.success && res.repair) {
+        toast.success(`Repair ticket ${res.repair.ticketNo} created successfully!`);
+        addAuditLog('Repairs', 'Create Repair Ticket', `Created ticket ${res.repair.ticketNo} for ${res.repair.customerName} (${res.repair.deviceName})`);
+        refreshAllData();
+        return { success: true, repair: res.repair };
+      } else {
+        toast.error(res?.error || 'Failed to create repair ticket');
+        return { success: false, message: res?.error };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error creating repair ticket');
+      return { success: false, message: err.message };
+    }
+  };
+
+  const updateRepairEnquiry = async (id: string, updated: any) => {
+    try {
+      const res = await MySQLDataService.updateRepair(id, updated);
+      if (res?.success && res.repair) {
+        toast.success(`Repair ticket ${res.repair.ticketNo} updated successfully!`);
+        addAuditLog('Repairs', 'Update Repair Ticket', `Updated ticket ${res.repair.ticketNo} (${res.repair.status})`);
+        refreshAllData();
+        return { success: true, repair: res.repair };
+      } else {
+        toast.error(res?.error || 'Failed to update repair ticket');
+        return { success: false, message: res?.error };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating repair ticket');
+      return { success: false, message: err.message };
+    }
+  };
+
+  const deleteRepairEnquiry = async (id: string) => {
+    try {
+      const res = await MySQLDataService.deleteRepair(id);
+      if (res?.success) {
+        toast.success(res?.message || 'Repair ticket deleted successfully');
+        addAuditLog('Repairs', 'Delete Repair Ticket', `Deleted ticket ID ${id}`);
+        refreshAllData();
+        return { success: true, message: res?.message };
+      } else {
+        toast.error(res?.error || 'Failed to delete repair ticket');
+        return { success: false, message: res?.error };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error deleting repair ticket');
+      return { success: false, message: err.message };
+    }
+  };
+
   const addAuditLog = (module: string, action: string, details: string) => {
     const newLog: AuditLog = {
       id: `log-${Date.now()}`,
@@ -2113,6 +2233,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         stockTransfers,
         inventoryLedger,
         repairsEnquiries,
+        addRepairEnquiry,
+        updateRepairEnquiry,
+        deleteRepairEnquiry,
         sales,
         addSale,
         purchases,
@@ -2130,6 +2253,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteVendor,
         expenses,
         addExpense,
+        updateExpense,
         deleteExpense,
         auditLogs,
         addAuditLog,
