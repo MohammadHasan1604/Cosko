@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import Icon from '@/components/ui/AppIcon';
+import { useApp } from '@/context/AppContext';
 
 interface StockAdjustmentFormValues {
   adjustmentType: 'add' | 'remove' | 'set';
@@ -36,6 +37,7 @@ interface StockAdjustmentFormProps {
 }
 
 export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFormProps) {
+  const { adjustStock } = useApp();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -66,11 +68,17 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
 
   const onSubmit = async (data: StockAdjustmentFormValues) => {
     setIsSubmitting(true);
-    // Backend integration: POST /api/v1/inventory/adjustments { itemId, storeId, adjustmentType, quantity, reason, notes }
-    await new Promise((r) => setTimeout(r, 1000));
-    setIsSubmitting(false);
-    onClose();
-    toast.success(`Stock adjusted for ${item.name} — new qty: ${getNewQty()}`);
+    try {
+      const newQty = getNewQty();
+      const diff = newQty - item.qtyOnHand;
+      const reasonText = `${data.reason || 'Manual Adjustment'}${data.notes ? ` - ${data.notes}` : ''}`;
+      await adjustStock(item.id, diff, reasonText);
+      onClose();
+    } catch (err: any) {
+      toast.error(err.message || 'Stock adjustment failed');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

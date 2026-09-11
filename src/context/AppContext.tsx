@@ -32,6 +32,7 @@ export interface InventoryItem {
   transferPrice: number;
   sellingPrice: number;
   mrp: number;
+  description?: string;
   hsn?: string;
   taxRate: number;
   warrantyMonths: number;
@@ -42,6 +43,7 @@ export interface InventoryItem {
   images?: string[];
   primaryImage?: string;
   imageUrl?: string;
+  locationStock?: Record<string, number>;
 }
 
 export interface ProductStoreTransferPrice {
@@ -573,45 +575,81 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const items: InventoryItem[] = [];
         for (const p of inventoryData.products) {
           if (p.status === 'deleted' || p.status === 'archived') continue;
+
+          // Build location stock map for this product
+          const locStock: Record<string, number> = {};
+          if (p.inventoryItems && p.inventoryItems.length > 0) {
+            p.inventoryItems.forEach((inv: any) => {
+              locStock[inv.storeCode] = inv.qtyOnHand;
+            });
+          }
+
+          const productMrp = p.mrp !== null && p.mrp !== undefined ? Number(p.mrp) : (Number(p.baseSellingPrice) || 0);
+          const productImg = p.imageUrl || undefined;
+
           if (p.inventoryItems && p.inventoryItems.length > 0) {
             for (const inv of p.inventoryItems) {
               items.push({
                 id: inv.id || `${p.id}-${inv.storeCode}`,
                 productId: p.id,
-                sku: p.sku, barcode: p.barcode || '',
-                name: p.name, brand: p.brand || '', model: p.model || '',
-                category: p.category, subcategory: p.subcategory || '',
-                store: inv.storeCode, qtyOnHand: inv.qtyOnHand,
+                sku: p.sku,
+                barcode: p.barcode || '',
+                name: p.name,
+                brand: p.brand || '',
+                model: p.model || '',
+                category: p.category,
+                subcategory: p.subcategory || '',
+                description: p.description || '',
+                store: inv.storeCode,
+                qtyOnHand: inv.qtyOnHand,
                 reorderPt: inv.reorderPt || 5,
                 costPrice: Number(p.baseCostPrice),
                 transferPrice: Number(p.baseCostPrice),
                 sellingPrice: Number(p.baseSellingPrice),
-                mrp: Number(p.mrp) || 0,
-                hsn: '', taxRate: Number(p.gstRate) || 0,
+                mrp: productMrp,
+                hsn: '',
+                taxRate: Number(p.gstRate) || 0,
                 warrantyMonths: p.warrantyMonths || 0,
                 minStock: inv.reorderPt || 10,
                 status: p.status as any,
-                fifoLots: 1, lastMovement: 'Synced',
-                imageUrl: p.imageUrl,
+                fifoLots: 1,
+                lastMovement: 'Synced',
+                imageUrl: productImg,
+                primaryImage: productImg,
+                images: productImg ? [productImg] : [],
+                locationStock: locStock,
               });
             }
           } else {
             items.push({
-              id: `${p.id}-CENTRAL`,
+              id: `${p.id}-UNASSIGNED`,
               productId: p.id,
-              sku: p.sku, barcode: p.barcode || '',
-              name: p.name, brand: p.brand || '', model: p.model || '',
-              category: p.category, subcategory: p.subcategory || '',
-              store: 'CENTRAL', qtyOnHand: 0, reorderPt: 5,
+              sku: p.sku,
+              barcode: p.barcode || '',
+              name: p.name,
+              brand: p.brand || '',
+              model: p.model || '',
+              category: p.category,
+              subcategory: p.subcategory || '',
+              description: p.description || '',
+              store: 'UNASSIGNED',
+              qtyOnHand: 0,
+              reorderPt: 5,
               costPrice: Number(p.baseCostPrice),
               transferPrice: Number(p.baseCostPrice),
               sellingPrice: Number(p.baseSellingPrice),
-              mrp: Number(p.mrp) || 0,
-              hsn: '', taxRate: Number(p.gstRate) || 0,
+              mrp: productMrp,
+              hsn: '',
+              taxRate: Number(p.gstRate) || 0,
               warrantyMonths: p.warrantyMonths || 0,
-              minStock: 10, status: p.status as any,
-              fifoLots: 0, lastMovement: 'Never',
-              imageUrl: p.imageUrl,
+              minStock: 10,
+              status: p.status as any,
+              fifoLots: 0,
+              lastMovement: 'Never',
+              imageUrl: productImg,
+              primaryImage: productImg,
+              images: productImg ? [productImg] : [],
+              locationStock: locStock,
             });
           }
         }
@@ -1343,6 +1381,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const p = res.product;
         const newItem: InventoryItem = {
           id: p.id,
+          productId: p.id,
           sku: p.sku,
           barcode: p.barcode || '',
           name: p.name,
@@ -1350,25 +1389,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           model: p.model || '',
           category: p.category,
           subcategory: p.subcategory || '',
+          description: p.description || '',
           store: itemData.store || 'CENTRAL',
           qtyOnHand: itemData.qtyOnHand || 0,
           reorderPt: itemData.reorderPt || 5,
           costPrice: Number(p.baseCostPrice),
           transferPrice: Math.round(Number(p.baseCostPrice) * 1.18),
           sellingPrice: Number(p.baseSellingPrice),
-          mrp: Math.round(Number(p.baseSellingPrice) * 1.2),
+          mrp: p.mrp !== null && p.mrp !== undefined ? Number(p.mrp) : (Number(itemData.mrp) || 0),
           taxRate: Number(p.gstRate) || 18,
           warrantyMonths: p.warrantyMonths || 12,
           minStock: itemData.minStock || 10,
           status: p.status as any,
           fifoLots: 1,
           lastMovement: 'Created',
-          imageUrl: p.imageUrl,
+          imageUrl: p.imageUrl || itemData.imageUrl,
+          primaryImage: p.imageUrl || itemData.primaryImage || itemData.imageUrl,
+          images: itemData.images || (p.imageUrl ? [p.imageUrl] : []),
         };
-        setInventory((prev) => [newItem, ...prev.filter(i => i.id !== newItem.id)]);
+        setInventory((prev) => [newItem, ...prev.filter(i => i.id !== newItem.id && i.sku !== newItem.sku)]);
         addAuditLog('Inventory', 'Add Product', `Created new item "${newItem.name}" (${newItem.sku})`);
         toast.success(`Successfully saved "${newItem.name}" to MySQL inventory`);
-        refreshAllData();
+        await refreshAllData();
         return { success: true, item: newItem };
       } else {
         toast.error(res?.error || 'Failed to save product to database');
@@ -1384,25 +1426,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Check barcode duplicate
     if (updated.barcode && updated.barcode.trim()) {
       const cleanBarcode = updated.barcode.trim();
-      const duplicate = inventory.find((i) => i.id !== id && i.barcode === cleanBarcode);
+      const duplicate = inventory.find((i) => i.id !== id && i.productId !== id && i.barcode === cleanBarcode);
       if (duplicate) {
         toast.error(`Barcode "${cleanBarcode}" is already assigned to "${duplicate.name}" (${duplicate.sku})!`);
         return { success: false, error: 'Duplicate barcode' };
       }
     }
 
+    const currentItem = inventory.find((i) => i.id === id || i.productId === id || i.sku === id);
+    const targetProductId = currentItem?.productId || id;
+
     try {
-      const res = await MySQLDataService.updateProduct({ id, ...updated });
+      const res = await MySQLDataService.updateProduct({
+        id,
+        productId: targetProductId,
+        sku: currentItem?.sku,
+        ...updated,
+      });
       if (res?.success) {
         setInventory((prev) =>
           prev.map((item) => {
-            if (item.id === id) {
+            if (item.id === id || item.productId === targetProductId) {
               return { ...item, ...updated };
             }
             return item;
           })
         );
-        addAuditLog('Inventory', 'Edit Product', `Updated details for item #${id}`);
+        addAuditLog('Inventory', 'Edit Product', `Updated details for item "${currentItem?.name || id}"`);
         toast.success('Inventory item updated in MySQL');
         await refreshAllData();
         return { success: true };

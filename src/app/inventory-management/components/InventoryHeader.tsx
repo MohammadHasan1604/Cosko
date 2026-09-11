@@ -26,6 +26,13 @@ export default function InventoryHeader() {
     toast.success("Inventory exported as CSV");
   };
 
+  const activeSKUsCount = React.useMemo(() => {
+    if (selectedStore === 'All Stores' || selectedStore === 'ALL') {
+      return new Set(inventory.map((i) => i.productId || i.sku)).size;
+    }
+    return inventory.filter((i) => i.store === selectedStore).length;
+  }, [inventory, selectedStore]);
+
   return (
     <>
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -37,7 +44,7 @@ export default function InventoryHeader() {
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">Inventory & Movement Ledger</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            {inventory.length} total SKUs · Active Scope: <span className="font-semibold text-foreground">{selectedStore}</span> · Central Stock & FIFO Lot tracking
+            {activeSKUsCount} {selectedStore === 'All Stores' ? 'Catalog SKUs' : 'Store SKUs'} · Active Scope: <span className="font-semibold text-foreground">{selectedStore === 'All Stores' ? 'All Locations (Consolidated)' : selectedStore}</span> · Real-time stock tracking
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

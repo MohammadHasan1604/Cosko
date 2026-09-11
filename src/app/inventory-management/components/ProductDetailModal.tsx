@@ -22,11 +22,23 @@ export default function ProductDetailModal({ item, onClose }: ProductDetailModal
     >
       <div className="space-y-5 py-2">
         {/* Title Card */}
-        <div className="p-4 rounded-xl bg-muted/40 border border-border flex items-start justify-between">
-          <div>
-            <span className="badge-info text-2xs mb-1">{item.brand}</span>
-            <h3 className="text-base font-bold text-foreground">{item.name}</h3>
-            <p className="text-xs text-muted-foreground">{item.category} · {item.subcategory}</p>
+        <div className="p-4 rounded-xl bg-muted/40 border border-border flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            {item.primaryImage || (item.images && item.images[0]) || item.imageUrl ? (
+              <img
+                src={item.primaryImage || (item.images && item.images[0]) || item.imageUrl}
+                alt={item.name}
+                className="w-14 h-14 rounded-xl object-cover border border-border flex-shrink-0"
+              />
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <span className="badge-info text-2xs mb-1">{item.brand || 'General'}</span>
+              <h3 className="text-base font-bold text-foreground truncate">{item.name}</h3>
+              <p className="text-xs text-muted-foreground">{item.category}{item.subcategory ? ` · ${item.subcategory}` : ''}</p>
+              {item.description && (
+                <p className="text-2xs text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
+              )}
+            </div>
           </div>
           <StatusBadge variant={item.qtyOnHand === 0 ? 'out-of-stock' : item.qtyOnHand <= item.reorderPt ? 'low-stock' : 'active'} label={item.qtyOnHand === 0 ? 'Out of Stock' : item.qtyOnHand <= item.reorderPt ? 'Low Stock' : 'Active'} dot />
         </div>

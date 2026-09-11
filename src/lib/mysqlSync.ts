@@ -129,6 +129,10 @@ export const MySQLDataService = {
     return apiCall(url, 'GET');
   },
 
+  async fetchProduct(idOrSku: string) {
+    return apiCall(`/api/inventory?id=${encodeURIComponent(idOrSku)}`, 'GET');
+  },
+
   // ─── PRODUCTS / INVENTORY ────────────────────────────
   async createProduct(item: any) {
     return apiCall('/api/inventory', 'POST', {
@@ -139,30 +143,44 @@ export const MySQLDataService = {
       model: item.model,
       category: item.category,
       subcategory: item.subcategory,
+      description: item.description,
       costPrice: item.costPrice,
       sellingPrice: item.sellingPrice,
+      mrp: item.mrp,
       taxRate: item.taxRate,
       warrantyMonths: item.warrantyMonths,
+      imageUrl: item.imageUrl || item.primaryImage || (Array.isArray(item.images) ? item.images[0] : null),
       status: item.status,
       store: item.store,
       qtyOnHand: item.qtyOnHand,
       reorderPt: item.reorderPt,
+      minStock: item.minStock,
     });
   },
 
   async updateProduct(item: any) {
     return apiCall('/api/inventory', 'PUT', {
       id: item.id,
+      productId: item.productId || item.id,
+      sku: item.sku,
       name: item.name,
       barcode: item.barcode,
       brand: item.brand,
+      model: item.model,
       category: item.category,
       subcategory: item.subcategory,
+      description: item.description,
       costPrice: item.costPrice,
       sellingPrice: item.sellingPrice,
+      mrp: item.mrp,
       taxRate: item.taxRate,
       warrantyMonths: item.warrantyMonths,
+      imageUrl: item.imageUrl || item.primaryImage || (Array.isArray(item.images) ? item.images[0] : null),
       status: item.status,
+      store: item.store,
+      qtyOnHand: item.qtyOnHand,
+      reorderPt: item.reorderPt,
+      minStock: item.minStock,
     });
   },
 

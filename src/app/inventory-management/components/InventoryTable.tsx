@@ -47,10 +47,9 @@ interface InventoryTableProps {
 }
 
 export default function InventoryTable({ categoryFilter: propCategoryFilter, setCategoryFilter: propSetCategoryFilter }: InventoryTableProps = {}) {
-  const { inventory, deleteItem: removeInventoryItem, updateItem, selectedStore, categoriesList, storesList, currentUser, sales, inventoryLedger } = useApp();
+  const { inventory, deleteItem: removeInventoryItem, updateItem, selectedStore, setSelectedStore, categoriesList, storesList, currentUser, sales, inventoryLedger } = useApp();
 
   const [search, setSearch] = useState('');
-  const [storeFilter, setStoreFilter] = useState(selectedStore);
   const [localCategoryFilter, setLocalCategoryFilter] = useState('All Categories');
   const categoryFilter = propCategoryFilter !== undefined ? propCategoryFilter : localCategoryFilter;
   const setCategoryFilter = propSetCategoryFilter || setLocalCategoryFilter;
@@ -74,14 +73,84 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
   const [perPage, setPerPage] = useState(10);
   const [statusDropdownId, setStatusDropdownId] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    setStoreFilter(selectedStore);
-  }, [selectedStore]);
-
   const visibleColumns = columnConfig.filter((c) => c.visible);
 
+  const handleOpenEdit = async (item: InventoryItem) => {
+    try {
+      const targetId = item.productId || item.id;
+      const res = await fetch(`/api/inventory?id=${encodeURIComponent(targetId)}`);
+      const data = await res.json();
+      if (data?.success && data?.product) {
+        const p = data.product;
+        const currentStoreInv = (p.inventoryItems || []).find(
+          (inv: any) => inv.storeCode === (selectedStore !== 'All Stores' && selectedStore !== 'ALL' ? selectedStore : item.store)
+        ) || (p.inventoryItems || [])[0];
+
+        setEditItem({
+          id: p.id,
+          productId: p.id,
+          sku: p.sku,
+          barcode: p.barcode || '',
+          name: p.name,
+          brand: p.brand || '',
+          model: p.model || '',
+          category: p.category,
+          subcategory: p.subcategory || '',
+          description: p.description || '',
+          store: currentStoreInv?.storeCode || (selectedStore !== 'All Stores' && selectedStore !== 'ALL' ? selectedStore : item.store) || 'CENTRAL',
+          qtyOnHand: currentStoreInv?.qtyOnHand !== undefined ? currentStoreInv.qtyOnHand : item.qtyOnHand,
+          reorderPt: currentStoreInv?.reorderPt || item.reorderPt || 5,
+          minStock: item.minStock || 10,
+          costPrice: Number(p.baseCostPrice),
+          transferPrice: Number(p.baseCostPrice),
+          sellingPrice: Number(p.baseSellingPrice),
+          mrp: p.mrp !== null && p.mrp !== undefined ? Number(p.mrp) : (item.mrp || 0),
+          taxRate: Number(p.gstRate) || 18,
+          warrantyMonths: p.warrantyMonths || 12,
+          status: p.status as any,
+          fifoLots: 1,
+          lastMovement: 'Synced',
+          imageUrl: p.imageUrl || undefined,
+          primaryImage: p.imageUrl || undefined,
+          images: p.imageUrl ? [p.imageUrl] : [],
+        });
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch authoritative product for edit:', err);
+    }
+    setEditItem(item);
+  };
+
+  // Consolidate inventory for "All Stores" scope, or filter strictly by selected store
+  const scopedItems = useMemo(() => {
+    if (selectedStore === 'All Stores' || selectedStore === 'ALL') {
+      const map = new Map<string, InventoryItem>();
+      inventory.forEach((item) => {
+        const key = item.productId || item.sku;
+        const existing = map.get(key);
+        if (existing) {
+          existing.qtyOnHand += item.qtyOnHand;
+          const mergedLoc = { ...(existing.locationStock || {}), ...(item.locationStock || {}), [item.store]: item.qtyOnHand };
+          existing.locationStock = mergedLoc;
+        } else {
+          const initialLoc = item.locationStock ? { ...item.locationStock } : { [item.store]: item.qtyOnHand };
+          map.set(key, {
+            ...item,
+            id: item.productId || item.id,
+            store: 'All Locations',
+            locationStock: initialLoc,
+          });
+        }
+      });
+      return Array.from(map.values());
+    } else {
+      return inventory.filter((item) => item.store === selectedStore);
+    }
+  }, [inventory, selectedStore]);
+
   const filtered = useMemo(() => {
-    return inventory.filter((item) => {
+    return scopedItems.filter((item) => {
       const matchSearch =
         search === '' ||
         item.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -89,7 +158,6 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
         (item.barcode && item.barcode.includes(search)) ||
         item.brand.toLowerCase().includes(search.toLowerCase());
 
-      const matchStore = storeFilter === 'All Stores' || item.store === storeFilter;
       const matchCategory = categoryFilter === 'All Categories' || item.category === categoryFilter;
 
       const stockSt = getStockStatus(item);
@@ -100,9 +168,9 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
         (statusFilter === 'Low Stock' && stockSt.variant === 'low-stock') ||
         (statusFilter === 'Out of Stock' && stockSt.variant === 'out-of-stock');
 
-      return matchSearch && matchStore && matchCategory && matchStatus;
+      return matchSearch && matchCategory && matchStatus;
     });
-  }, [inventory, search, storeFilter, categoryFilter, statusFilter]);
+  }, [scopedItems, search, categoryFilter, statusFilter]);
 
   const sorted = useMemo(() => {
     if (sortMode === 'newest') {
@@ -215,8 +283,8 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
 
           {/* Location filter */}
           <select
-            value={storeFilter}
-            onChange={(e) => { setStoreFilter(e.target.value); setPage(1); }}
+            value={selectedStore}
+            onChange={(e) => { setSelectedStore(e.target.value); setPage(1); }}
             disabled={currentUser.role !== 'Super Admin'}
             className="input-field py-2 text-sm w-auto min-w-[200px]"
           >
@@ -377,7 +445,7 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
                     <button onClick={() => setAdjustItem(item)} className="btn-ghost text-3xs py-1 px-2 text-warning">
                       <Icon name="AdjustmentsHorizontalIcon" size={13} /> Adjust Stock
                     </button>
-                    <button onClick={() => setEditItem(item)} className="btn-ghost text-3xs py-1 px-2 text-primary">
+                    <button onClick={() => handleOpenEdit(item)} className="btn-ghost text-3xs py-1 px-2 text-primary">
                       <Icon name="PencilSquareIcon" size={13} /> Edit
                     </button>
                     <button onClick={() => setDeleteItemModal(item)} className="btn-ghost text-3xs py-1 px-2 text-danger">
@@ -544,7 +612,18 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
 
                         if (col.key === 'store') return (
                           <td key={`cell-${item.id}-store`} className="table-cell">
-                            <span className="badge-info text-2xs">{item.store}</span>
+                            {item.store === 'All Locations' ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="badge-info text-2xs font-semibold">All Stores</span>
+                                {item.locationStock && Object.keys(item.locationStock).length > 0 && (
+                                  <span className="text-3xs text-muted-foreground font-mono" title={Object.entries(item.locationStock).map(([s, q]) => `${s}: ${q}`).join(' · ')}>
+                                    {Object.entries(item.locationStock).map(([s, q]) => `${s}: ${q}`).join(' · ')}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="badge-info text-2xs">{item.store}</span>
+                            )}
                           </td>
                         );
 
@@ -592,7 +671,7 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
                             <Icon name="AdjustmentsHorizontalIcon" size={15} />
                           </button>
                           <button
-                            onClick={() => setEditItem(item)}
+                            onClick={() => handleOpenEdit(item)}
                             className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all duration-150"
                             title={`Edit ${item.name}`}
                           >
@@ -698,6 +777,7 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
 
       {/* Add / Edit Modal */}
       <AddItemModal
+        key={editItem ? `edit-${editItem.id}-${editItem.store}` : 'add-modal'}
         open={addModalOpen || !!editItem}
         onClose={() => { setAddModalOpen(false); setEditItem(null); }}
         editItem={editItem}

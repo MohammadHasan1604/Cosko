@@ -17,34 +17,92 @@ interface AddItemModalProps {
 export default function AddItemModal({ open, onClose, editItem }: AddItemModalProps) {
   const { addItem, updateItem, addAuditLog, storesList, categoriesList } = useApp();
 
-  const [images, setImages] = useState<string[]>(editItem?.images || (editItem?.imageUrl ? [editItem.imageUrl] : []));
-  const [primaryImage, setPrimaryImage] = useState<string>(editItem?.primaryImage || editItem?.imageUrl || '');
+  const [images, setImages] = useState<string[]>([]);
+  const [primaryImage, setPrimaryImage] = useState<string>('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [quickCatOpen, setQuickCatOpen] = useState(false);
 
   const activeCategories = categoriesList.filter((c) => c.status === 'Active');
 
-  // Form State - Truly clean with NO pre-filled sample/fake data (Requirements 20, 21, 22, 23, 26)
   const [formData, setFormData] = useState({
-    sku: editItem ? editItem.sku : '',
-    barcode: editItem ? (editItem.barcode || '') : '',
-    name: editItem ? editItem.name : '',
-    brand: editItem ? (editItem.brand || '') : '',
-    model: editItem ? (editItem.model || '') : '',
-    category: editItem ? editItem.category : '',
-    subcategory: editItem ? (editItem.subcategory || '') : '',
-    store: editItem ? editItem.store : 'CENTRAL',
-    qtyOnHand: editItem ? editItem.qtyOnHand : ('' as unknown as number),
-    reorderPt: editItem ? editItem.reorderPt : ('' as unknown as number),
-    minStock: editItem ? (editItem.minStock || 10) : ('' as unknown as number),
-    costPrice: editItem ? editItem.costPrice : ('' as unknown as number),
-    sellingPrice: editItem ? editItem.sellingPrice : ('' as unknown as number),
-    mrp: editItem ? (editItem.mrp || '') : ('' as unknown as number),
-    hsn: editItem ? (editItem.hsn || '') : '',
-    taxRate: editItem ? editItem.taxRate : 18,
-    warrantyMonths: editItem ? (editItem.warrantyMonths || 12) : 12,
-    status: editItem ? editItem.status : ('active' as const),
+    sku: '',
+    barcode: '',
+    name: '',
+    brand: '',
+    model: '',
+    category: '',
+    subcategory: '',
+    description: '',
+    store: 'CENTRAL',
+    qtyOnHand: '' as unknown as number,
+    reorderPt: '' as unknown as number,
+    minStock: 10 as unknown as number,
+    costPrice: '' as unknown as number,
+    sellingPrice: '' as unknown as number,
+    mrp: '' as unknown as number,
+    hsn: '',
+    taxRate: 18,
+    warrantyMonths: 12,
+    status: 'active' as const,
   });
+
+  // Reactive state population on edit or modal open
+  React.useEffect(() => {
+    if (editItem) {
+      setFormData({
+        sku: editItem.sku || '',
+        barcode: editItem.barcode || '',
+        name: editItem.name || '',
+        brand: editItem.brand || '',
+        model: editItem.model || '',
+        category: editItem.category || '',
+        subcategory: editItem.subcategory || '',
+        description: editItem.description || '',
+        store: editItem.store || 'CENTRAL',
+        qtyOnHand: editItem.qtyOnHand !== undefined ? editItem.qtyOnHand : ('' as unknown as number),
+        reorderPt: editItem.reorderPt !== undefined ? editItem.reorderPt : ('' as unknown as number),
+        minStock: editItem.minStock !== undefined ? editItem.minStock : 10,
+        costPrice: editItem.costPrice !== undefined ? editItem.costPrice : ('' as unknown as number),
+        sellingPrice: editItem.sellingPrice !== undefined ? editItem.sellingPrice : ('' as unknown as number),
+        mrp: editItem.mrp !== undefined && editItem.mrp !== 0 ? editItem.mrp : (editItem.sellingPrice || ('' as unknown as number)),
+        hsn: editItem.hsn || '',
+        taxRate: editItem.taxRate !== undefined ? editItem.taxRate : 18,
+        warrantyMonths: editItem.warrantyMonths !== undefined ? editItem.warrantyMonths : 12,
+        status: (editItem.status as any) || 'active',
+      });
+      const existingImages = editItem.images && editItem.images.length > 0
+        ? editItem.images
+        : editItem.imageUrl
+        ? [editItem.imageUrl]
+        : [];
+      setImages(existingImages);
+      setPrimaryImage(editItem.primaryImage || editItem.imageUrl || existingImages[0] || '');
+    } else {
+      setFormData({
+        sku: '',
+        barcode: '',
+        name: '',
+        brand: '',
+        model: '',
+        category: '',
+        subcategory: '',
+        description: '',
+        store: 'CENTRAL',
+        qtyOnHand: '' as unknown as number,
+        reorderPt: '' as unknown as number,
+        minStock: 10,
+        costPrice: '' as unknown as number,
+        sellingPrice: '' as unknown as number,
+        mrp: '' as unknown as number,
+        hsn: '',
+        taxRate: 18,
+        warrantyMonths: 12,
+        status: 'active',
+      });
+      setImages([]);
+      setPrimaryImage('');
+    }
+  }, [editItem, open]);
 
   if (!open) return null;
 
@@ -98,7 +156,7 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
     toast.info('Product image removed.');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
@@ -129,6 +187,9 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
       brand: formData.brand.trim() || 'General',
       model: formData.model.trim() || '',
       category: formData.category,
+      subcategory: formData.subcategory.trim() || '',
+      description: formData.description.trim() || '',
+      store: formData.store || 'CENTRAL',
       qtyOnHand: Number(formData.qtyOnHand) || 0,
       costPrice: Number(formData.costPrice) || 0,
       transferPrice: Math.round(Number(formData.costPrice || formData.sellingPrice || 0) * 1.18),
@@ -136,17 +197,19 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
       mrp: Number(formData.mrp) || Number(formData.sellingPrice) || 0,
       minStock: Number(formData.minStock) || 10,
       reorderPt: Number(formData.reorderPt) || 5,
+      taxRate: Number(formData.taxRate) || 0,
+      warrantyMonths: Number(formData.warrantyMonths) || 0,
       images,
       primaryImage: primaryImage || images[0] || undefined,
       imageUrl: primaryImage || images[0] || undefined,
     };
 
     if (editItem) {
-      updateItem(editItem.id, payload);
+      await updateItem(editItem.id, payload);
       addAuditLog('Inventory', 'Update Product Details', `Updated details for ${formData.sku}`);
       toast.success(`Saved changes for ${formData.name}`);
     } else {
-      addItem({
+      await addItem({
         ...payload,
         fifoLots: 1,
         lastMovement: 'Just now',
@@ -384,6 +447,18 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
                 value={formData.minStock}
                 onChange={(e) => setFormData({ ...formData, minStock: Number(e.target.value) })}
                 className="input-field py-2 text-xs font-tabular"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="md:col-span-3">
+              <label className="text-xs font-bold text-foreground block mb-1">Product Description (Optional)</label>
+              <textarea
+                rows={2}
+                placeholder="Product specifications, features, warranty details..."
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="input-field py-2 text-xs w-full resize-none"
               />
             </div>
           </div>

@@ -142,6 +142,7 @@ model Product {
   gstRate          Decimal  @default(0) @map("gst_rate") @db.Decimal(5, 2)
   warrantyMonths   Int      @default(0) @map("warranty_months")
   imageUrl         String?  @map("image_url") @db.Text
+  description      String?  @db.Text
   status           String   @default("active") @db.VarChar(16)
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")

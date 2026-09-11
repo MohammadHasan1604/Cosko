@@ -5,6 +5,7 @@ import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 /**
  * GET /api/inventory - Retrieve inventory with store filtering (excludes deleted & archived products by default)
+ * Also supports ?id=... or ?sku=... to retrieve a single authoritative product record with all store inventory items.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -15,8 +16,36 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    const sku = searchParams.get('sku');
+
+    // ─── SINGLE PRODUCT FETCH (For Edit Product Form & Details) ─────────────
+    if (id || sku) {
+      const product = await prisma.product.findFirst({
+        where: id ? { OR: [{ id }, { sku: id }] } : { sku: sku! },
+        include: {
+          inventoryItems: true,
+        },
+      });
+
+      if (!product) {
+        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+      }
+
+      return NextResponse.json(
+        { success: true, product },
+        { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
+      );
+    }
+
+    // ─── LIST QUERY WITH STORE FILTERING ────────────────────────────────────
     const store = searchParams.get('store');
     const includeArchived = searchParams.get('includeArchived') === 'true';
+
+    const productWhere: any = {};
+    if (!includeArchived) {
+      productWhere.status = { notIn: ['deleted', 'archived'] };
+    }
 
     const storeWhereClause: any = {};
     if (user.role !== 'Super Admin') {
@@ -27,16 +56,13 @@ export async function GET(req: NextRequest) {
         );
       }
       storeWhereClause.storeCode = user.store;
-    } else if (store && store !== 'All Stores') {
+      productWhere.inventoryItems = { some: { storeCode: user.store } };
+    } else if (store && store !== 'All Stores' && store !== 'ALL') {
       storeWhereClause.storeCode = store;
+      productWhere.inventoryItems = { some: { storeCode: store } };
     }
 
-    const productWhere: any = {};
-    if (!includeArchived) {
-      productWhere.status = { notIn: ['deleted', 'archived'] };
-    }
-
-    const products = await (prisma as any).product.findMany({
+    const products = await prisma.product.findMany({
       where: productWhere,
       include: {
         inventoryItems: {
@@ -44,13 +70,13 @@ export async function GET(req: NextRequest) {
         },
       },
       orderBy: {
-        name: 'asc',
+        createdAt: 'desc',
       },
     });
 
     return NextResponse.json(
       { success: true, products },
-      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
     );
   } catch (error: any) {
     console.error('API /api/inventory GET error:', error);
@@ -60,6 +86,9 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/inventory - Create or update inventory product
+ * Full field persistence: sku, name, brand, model, category, subcategory,
+ * costPrice, sellingPrice, mrp, taxRate, warrantyMonths, imageUrl, description,
+ * status, barcode, store, qtyOnHand, reorderPt.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -79,10 +108,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Product name and SKU are required' }, { status: 400 });
     }
 
+    const cleanSku = body.sku.trim().toUpperCase();
+    const cleanBarcode = body.barcode?.trim() || null;
+
     // Check duplicate barcode if provided
-    if (body.barcode) {
-      const duplicateBarcode = await (prisma as any).product.findFirst({
-        where: { barcode: body.barcode, id: { not: body.id || '' } },
+    if (cleanBarcode) {
+      const duplicateBarcode = await prisma.product.findFirst({
+        where: { barcode: cleanBarcode, sku: { not: cleanSku } },
       });
       if (duplicateBarcode) {
         return NextResponse.json({ error: `Duplicate barcode: Already assigned to "${duplicateBarcode.name}"` }, { status: 409 });
@@ -97,40 +129,55 @@ export async function POST(req: NextRequest) {
     }
 
     const storeCode = body.store || (user.store && user.store !== 'All Stores' && user.store !== 'ALL' ? user.store : 'CENTRAL');
-    const qtyOnHand = typeof body.qtyOnHand === 'number' ? body.qtyOnHand : 0;
+    const qtyOnHand = typeof body.qtyOnHand === 'number' ? body.qtyOnHand : (Number(body.qtyOnHand) || 0);
+    const reorderPt = typeof body.reorderPt === 'number' ? body.reorderPt : (Number(body.reorderPt) || 5);
+    const costPrice = body.costPrice !== undefined ? Number(body.costPrice) : 0;
+    const sellingPrice = body.sellingPrice !== undefined ? Number(body.sellingPrice) : 0;
+    const mrp = body.mrp !== undefined && body.mrp !== null && body.mrp !== '' ? Number(body.mrp) : null;
+    const taxRate = body.taxRate !== undefined ? Number(body.taxRate) : 0;
+    const warrantyMonths = body.warrantyMonths !== undefined ? Number(body.warrantyMonths) : 0;
+    const imageUrl = body.imageUrl || body.primaryImage || (Array.isArray(body.images) && body.images[0]) || null;
+    const description = body.description?.trim() || null;
 
-    const product = await (prisma as any).product.upsert({
-      where: { sku: body.sku },
+    const product = await prisma.product.upsert({
+      where: { sku: cleanSku },
       create: {
-        sku: body.sku,
-        barcode: body.barcode || null,
-        name: body.name,
-        brand: body.brand || null,
-        model: body.model || null,
+        sku: cleanSku,
+        barcode: cleanBarcode,
+        name: body.name.trim(),
+        brand: body.brand?.trim() || null,
+        model: body.model?.trim() || null,
         category: body.category || 'General',
-        subcategory: body.subcategory || null,
-        baseCostPrice: body.costPrice || 0,
-        baseSellingPrice: body.sellingPrice || 0,
-        gstRate: body.taxRate || 0,
-        warrantyMonths: body.warrantyMonths || 0,
+        subcategory: body.subcategory?.trim() || null,
+        description: description,
+        baseCostPrice: costPrice,
+        baseSellingPrice: sellingPrice,
+        mrp: mrp,
+        gstRate: taxRate,
+        warrantyMonths: warrantyMonths,
+        imageUrl: imageUrl,
         status: body.status || 'active',
       },
       update: {
-        name: body.name,
-        barcode: body.barcode || null,
-        brand: body.brand || null,
+        name: body.name.trim(),
+        barcode: cleanBarcode,
+        brand: body.brand?.trim() || null,
+        model: body.model?.trim() || null,
         category: body.category || 'General',
-        subcategory: body.subcategory || null,
-        baseCostPrice: body.costPrice,
-        baseSellingPrice: body.sellingPrice,
-        gstRate: body.taxRate,
-        warrantyMonths: body.warrantyMonths,
+        subcategory: body.subcategory?.trim() || null,
+        description: description,
+        baseCostPrice: costPrice,
+        baseSellingPrice: sellingPrice,
+        mrp: mrp,
+        gstRate: taxRate,
+        warrantyMonths: warrantyMonths,
+        imageUrl: imageUrl,
         status: body.status || 'active',
       },
     });
 
     if (storeCode) {
-      await (prisma as any).inventory.upsert({
+      await prisma.inventory.upsert({
         where: {
           productId_storeCode: {
             productId: product.id,
@@ -141,18 +188,42 @@ export async function POST(req: NextRequest) {
           productId: product.id,
           storeCode: storeCode,
           qtyOnHand: qtyOnHand,
-          reorderPt: body.reorderPt || 5,
+          reorderPt: reorderPt,
         },
         update: {
           qtyOnHand: qtyOnHand,
-          ...(body.reorderPt !== undefined ? { reorderPt: body.reorderPt } : {}),
+          reorderPt: reorderPt,
         },
       });
+
+      if (qtyOnHand > 0) {
+        await prisma.inventoryLedger.create({
+          data: {
+            productId: product.id,
+            storeCode: storeCode,
+            refNo: `INIT-${product.sku}-${Date.now().toString().slice(-6)}`,
+            type: 'PURCHASE',
+            qtyChange: qtyOnHand,
+            costPerUnit: product.baseCostPrice,
+            sellingPricePerUnit: product.baseSellingPrice,
+            balanceAfter: qtyOnHand,
+            notes: `Initial catalog registration for ${product.name} (${product.sku}) at ${storeCode}`,
+            createdBy: user.name || user.email,
+          },
+        }).catch((err) => console.warn('Ledger init logging warning:', err));
+      }
     }
+
+    const savedProduct = await prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        inventoryItems: true,
+      },
+    });
 
     broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode, productId: product.id, sku: product.sku });
 
-    return NextResponse.json({ success: true, product }, { status: 201 });
+    return NextResponse.json({ success: true, product: savedProduct }, { status: 201 });
   } catch (error: any) {
     console.error('API /api/inventory POST error:', error);
     return NextResponse.json({ error: error.message || 'Failed to save product' }, { status: 500 });
@@ -160,7 +231,9 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * PUT /api/inventory - Update an existing product
+ * PUT /api/inventory - Update an existing product and its inventory record
+ * Resolves product by ID, inventory ID, or SKU.
+ * Updates ONLY provided fields without wiping untouched existing data.
  */
 export async function PUT(req: NextRequest) {
   try {
@@ -175,29 +248,134 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    if (!body.id) {
-      return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
+    const targetId = body.productId || body.id;
+
+    if (!targetId && !body.sku) {
+      return NextResponse.json({ error: 'Product ID or SKU is required for update' }, { status: 400 });
     }
 
-    const product = await (prisma as any).product.update({
-      where: { id: body.id },
-      data: {
-        ...(body.name ? { name: body.name } : {}),
-        ...(body.barcode !== undefined ? { barcode: body.barcode || null } : {}),
-        ...(body.brand ? { brand: body.brand } : {}),
-        ...(body.category ? { category: body.category } : {}),
-        ...(body.subcategory ? { subcategory: body.subcategory } : {}),
-        ...(body.costPrice !== undefined ? { baseCostPrice: body.costPrice } : {}),
-        ...(body.sellingPrice !== undefined ? { baseSellingPrice: body.sellingPrice } : {}),
-        ...(body.taxRate !== undefined ? { gstRate: body.taxRate } : {}),
-        ...(body.warrantyMonths !== undefined ? { warrantyMonths: body.warrantyMonths } : {}),
-        ...(body.status ? { status: body.status } : {}),
+    // Resolve product reliably (whether body.id is product.id or inventory.id or sku)
+    let product: any = null;
+    if (targetId) {
+      product = await prisma.product.findUnique({ where: { id: targetId } }).catch(() => null);
+      if (!product) {
+        // Check if targetId is an inventory record ID
+        const inv = await prisma.inventory.findUnique({ where: { id: targetId } }).catch(() => null);
+        if (inv) {
+          product = await prisma.product.findUnique({ where: { id: inv.productId } }).catch(() => null);
+        }
+      }
+    }
+
+    if (!product && body.sku) {
+      product = await prisma.product.findUnique({ where: { sku: body.sku } }).catch(() => null);
+    }
+
+    if (!product) {
+      return NextResponse.json({ error: 'Product record not found in database' }, { status: 404 });
+    }
+
+    // Check duplicate barcode if barcode is being updated
+    if (body.barcode !== undefined && body.barcode !== null && body.barcode.trim() !== '') {
+      const cleanBarcode = body.barcode.trim();
+      const duplicateBarcode = await prisma.product.findFirst({
+        where: { barcode: cleanBarcode, id: { not: product.id } },
+      });
+      if (duplicateBarcode) {
+        return NextResponse.json({ error: `Duplicate barcode: Already assigned to "${duplicateBarcode.name}"` }, { status: 409 });
+      }
+    }
+
+    // Build update payload dynamically so UNTOUCHED fields are preserved
+    const productUpdate: any = {};
+    if (body.name !== undefined && body.name.trim() !== '') productUpdate.name = body.name.trim();
+    if (body.barcode !== undefined) productUpdate.barcode = body.barcode ? body.barcode.trim() : null;
+    if (body.brand !== undefined) productUpdate.brand = body.brand ? body.brand.trim() : null;
+    if (body.model !== undefined) productUpdate.model = body.model ? body.model.trim() : null;
+    if (body.category !== undefined && body.category.trim() !== '') productUpdate.category = body.category.trim();
+    if (body.subcategory !== undefined) productUpdate.subcategory = body.subcategory ? body.subcategory.trim() : null;
+    if (body.description !== undefined) productUpdate.description = body.description ? body.description.trim() : null;
+    if (body.costPrice !== undefined) productUpdate.baseCostPrice = Number(body.costPrice);
+    if (body.sellingPrice !== undefined) productUpdate.baseSellingPrice = Number(body.sellingPrice);
+    if (body.mrp !== undefined) productUpdate.mrp = (body.mrp !== null && body.mrp !== '') ? Number(body.mrp) : null;
+    if (body.taxRate !== undefined) productUpdate.gstRate = Number(body.taxRate);
+    if (body.warrantyMonths !== undefined) productUpdate.warrantyMonths = Number(body.warrantyMonths);
+    if (body.imageUrl !== undefined || body.primaryImage !== undefined || body.images !== undefined) {
+      const img = body.imageUrl || body.primaryImage || (Array.isArray(body.images) ? body.images[0] : null);
+      if (img !== undefined) productUpdate.imageUrl = img || null;
+    }
+    if (body.status !== undefined) productUpdate.status = body.status;
+
+    if (Object.keys(productUpdate).length > 0) {
+      await prisma.product.update({
+        where: { id: product.id },
+        data: productUpdate,
+      });
+    }
+
+    // Update store inventory if store, quantity, or reorder point was provided
+    const storeCode = body.store || body.storeCode;
+    if (storeCode && storeCode !== 'All Stores' && storeCode !== 'ALL') {
+      const invWhere = {
+        productId_storeCode: {
+          productId: product.id,
+          storeCode: storeCode,
+        },
+      };
+
+      const existingInv = await prisma.inventory.findUnique({ where: invWhere }).catch(() => null);
+      const invUpdate: any = {};
+      if (body.qtyOnHand !== undefined) invUpdate.qtyOnHand = Number(body.qtyOnHand);
+      if (body.reorderPt !== undefined) invUpdate.reorderPt = Number(body.reorderPt);
+
+      if (existingInv) {
+        if (Object.keys(invUpdate).length > 0) {
+          await prisma.inventory.update({
+            where: invWhere,
+            data: invUpdate,
+          });
+
+          // If quantity was modified, record an adjustment entry
+          if (body.qtyOnHand !== undefined && body.qtyOnHand !== existingInv.qtyOnHand) {
+            const diff = Number(body.qtyOnHand) - existingInv.qtyOnHand;
+            await prisma.inventoryLedger.create({
+              data: {
+                productId: product.id,
+                storeCode: storeCode,
+                refNo: `ADJ-${product.sku}-${Date.now().toString().slice(-6)}`,
+                type: 'ADJUSTMENT',
+                qtyChange: diff,
+                costPerUnit: productUpdate.baseCostPrice || product.baseCostPrice,
+                sellingPricePerUnit: productUpdate.baseSellingPrice || product.baseSellingPrice,
+                balanceAfter: Number(body.qtyOnHand),
+                notes: `Stock quantity edited via Edit Product (${diff > 0 ? `+${diff}` : diff} units)`,
+                createdBy: user.name || user.email,
+              },
+            }).catch((err) => console.warn('Ledger adjustment logging warning:', err));
+          }
+        }
+      } else if (body.qtyOnHand !== undefined) {
+        await prisma.inventory.create({
+          data: {
+            productId: product.id,
+            storeCode: storeCode,
+            qtyOnHand: Number(body.qtyOnHand) || 0,
+            reorderPt: Number(body.reorderPt) || 5,
+          },
+        });
+      }
+    }
+
+    const updatedProduct = await prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        inventoryItems: true,
       },
     });
 
     broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { productId: product.id, sku: product.sku });
 
-    return NextResponse.json({ success: true, product });
+    return NextResponse.json({ success: true, product: updatedProduct });
   } catch (error: any) {
     console.error('API /api/inventory PUT error:', error);
     return NextResponse.json({ error: error.message || 'Failed to update product' }, { status: 500 });
@@ -228,9 +406,16 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Try finding by id first, then by sku
-    let target = await (prisma as any).product.findUnique({ where: { id } }).catch(() => null);
+    let target = await prisma.product.findUnique({ where: { id } }).catch(() => null);
     if (!target) {
-      target = await (prisma as any).product.findFirst({ where: { sku: id } });
+      target = await prisma.product.findFirst({ where: { sku: id } });
+    }
+    if (!target) {
+      // Check if id is an inventory id
+      const inv = await prisma.inventory.findUnique({ where: { id } }).catch(() => null);
+      if (inv) {
+        target = await prisma.product.findUnique({ where: { id: inv.productId } });
+      }
     }
 
     if (!target) {
@@ -239,17 +424,17 @@ export async function DELETE(req: NextRequest) {
 
     // Check historical dependencies
     const [salesCount, poCount, transferCount, ledgerCount] = await Promise.all([
-      (prisma as any).salesOrderItem.count({ where: { productId: target.id } }),
-      (prisma as any).purchaseOrderItem.count({ where: { productId: target.id } }),
-      (prisma as any).stockTransferItem.count({ where: { productId: target.id } }),
-      (prisma as any).inventoryLedger.count({ where: { productId: target.id } }),
+      prisma.salesOrderItem.count({ where: { productId: target.id } }),
+      prisma.purchaseOrderItem.count({ where: { productId: target.id } }),
+      prisma.stockTransferItem.count({ where: { productId: target.id } }),
+      prisma.inventoryLedger.count({ where: { productId: target.id } }),
     ]);
 
     const hasHistory = (salesCount + poCount + transferCount + ledgerCount) > 0;
 
     // If product has historical records, NEVER hard-delete. Must ARCHIVE.
     if (hasHistory || !permanent || user.role !== 'Super Admin') {
-      const product = await (prisma as any).product.update({
+      const product = await prisma.product.update({
         where: { id: target.id },
         data: { status: 'archived' },
       });
@@ -268,8 +453,8 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Permanent hard-delete for unused products with 0 history by Super Admin
-    await (prisma as any).inventory.deleteMany({ where: { productId: target.id } });
-    await (prisma as any).product.delete({ where: { id: target.id } });
+    await prisma.inventory.deleteMany({ where: { productId: target.id } });
+    await prisma.product.delete({ where: { id: target.id } });
 
     broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { productId: target.id, sku: target.sku, action: 'deleted' });
 
@@ -283,5 +468,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to archive/delete product' }, { status: 500 });
   }
 }
-
-
