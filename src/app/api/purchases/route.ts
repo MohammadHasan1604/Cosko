@@ -1,0 +1,403 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuthUserFromRequest } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
+
+/**
+ * GET /api/purchases - Retrieve purchase orders (excludes Archived/Cancelled by default)
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const user = getAuthUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const includeArchived = searchParams.get('includeArchived') === 'true';
+
+    const whereClause: any = {};
+    if (!includeArchived) {
+      whereClause.status = { notIn: ['Archived', 'Cancelled'] };
+    }
+
+    const purchases = await (prisma as any).purchaseOrder.findMany({
+      where: whereClause,
+      include: {
+        vendor: true,
+        items: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 100,
+    });
+
+    return NextResponse.json(
+      { success: true, purchases },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    );
+  } catch (error: any) {
+    console.error('API /api/purchases GET error:', error);
+    return NextResponse.json({ error: 'Failed to retrieve purchase orders' }, { status: 500 });
+  }
+}
+
+/**
+ * POST /api/purchases - Create purchase order & handle GRN receiving
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const user = getAuthUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (user.securityLevel < 60) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient security level for purchases' }, { status: 403 });
+    }
+
+    const body = await req.json();
+
+    if (!body.vendorName || !body.items || body.items.length === 0) {
+      return NextResponse.json({ error: 'Vendor name and line items are required' }, { status: 400 });
+    }
+
+    const count = await (prisma as any).purchaseOrder.count();
+    const poNo = `PO-2026-${String(count + 1).padStart(4, '0')}`;
+
+    // Resolve or upsert vendor
+    let vendor = await (prisma as any).vendor.findFirst({
+      where: { name: body.vendorName },
+    });
+
+    if (!vendor) {
+      const vCount = await (prisma as any).vendor.count();
+      vendor = await (prisma as any).vendor.create({
+        data: {
+          code: `VEN-${String(vCount + 1).padStart(3, '0')}`,
+          name: body.vendorName,
+          contactPerson: body.vendorContact || 'Account Manager',
+          email: `${body.vendorName.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
+          phone: body.vendorPhone || '+91 98000 00000',
+          city: 'Central',
+          address: 'Vendor Hub',
+          categories: 'General Hardware',
+        },
+      });
+    }
+
+    const po = await (prisma as any).$transaction(async (tx: any) => {
+      let subtotal = 0;
+      for (const it of body.items) {
+        subtotal += it.qty * (it.unitCost || it.costPrice || 0);
+      }
+      const taxAmount = body.taxAmount || 0;
+      const totalCost = subtotal + taxAmount;
+
+      let poNotes = body.notes || '';
+
+      const createdPO = await tx.purchaseOrder.create({
+        data: {
+          poNo,
+          vendorId: vendor.id,
+          storeCode: body.storeCode || 'CENTRAL',
+          status: body.status || 'Pending',
+          paymentStatus: body.paymentStatus || 'Unpaid',
+          totalCost: totalCost,
+          notes: poNotes || null,
+          createdBy: user.name,
+        },
+      });
+
+      for (const it of body.items) {
+        const itemUnitCost = it.unitCost || it.costPrice || 0;
+        const itemLineTotal = it.qty * itemUnitCost;
+
+        // Ensure product exists
+        let prodId = it.productId;
+        if (!prodId) {
+          const matchedProd = await tx.product.findFirst({
+            where: { OR: [{ sku: it.sku || '' }, { name: it.name || '' }] },
+          });
+          if (matchedProd) {
+            prodId = matchedProd.id;
+          } else {
+            const newProd = await tx.product.create({
+              data: {
+                sku: it.sku || `SKU-${Date.now().toString().slice(-6)}`,
+                name: it.name || 'Purchased Item',
+                category: it.category || 'General',
+                baseCostPrice: itemUnitCost,
+                baseSellingPrice: 0,
+                gstRate: 0,
+                status: 'active',
+              },
+            });
+            prodId = newProd.id;
+          }
+        }
+
+        await tx.purchaseOrderItem.create({
+          data: {
+            poId: createdPO.id,
+            productId: prodId,
+            qtyOrdered: it.qty,
+            qtyReceived: body.status === 'Received' ? it.qty : 0,
+            unitCost: itemUnitCost,
+            lineTotal: itemLineTotal,
+          },
+        });
+
+        // If created with status "Received", automatically credit inventory
+        if (body.status === 'Received') {
+          const targetStore = body.storeCode || 'CENTRAL';
+          const centralInv = await tx.inventory.findUnique({
+            where: { productId_storeCode: { productId: prodId, storeCode: targetStore } },
+          });
+          const prevQty = centralInv ? centralInv.qtyOnHand : 0;
+          const newQty = prevQty + it.qty;
+
+          await tx.inventory.upsert({
+            where: { productId_storeCode: { productId: prodId, storeCode: targetStore } },
+            create: { productId: prodId, storeCode: targetStore, qtyOnHand: newQty },
+            update: { qtyOnHand: newQty },
+          });
+
+          await tx.inventoryLedger.create({
+            data: {
+              productId: prodId,
+              storeCode: targetStore,
+              refNo: poNo,
+              type: 'PO GRN In',
+              qtyChange: it.qty,
+              costPerUnit: itemUnitCost,
+              balanceAfter: newQty,
+              notes: `GRN Received from ${body.vendorName} (${poNo})`,
+              createdBy: user.name,
+            },
+          });
+        }
+      }
+
+      if (body.status === 'Received') {
+        const targetStore = body.storeCode || 'CENTRAL';
+        const grnCount = await (tx as any).goodsReceivedNote.count();
+        const grnNo = `GRN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(grnCount + 1).padStart(4, '0')}`;
+        await (tx as any).goodsReceivedNote.create({
+          data: {
+            grnNo,
+            purchaseId: createdPO.id,
+            storeCode: targetStore,
+            receivedBy: user.name || 'Inventory Manager',
+            notes: `Auto-generated GRN upon purchase order creation (${poNo})`,
+          },
+        });
+      }
+
+      return createdPO;
+    });
+
+    broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', { id: po.id, poNo: po.poNo, status: po.status });
+    if (body.status === 'Received') {
+      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: body.storeCode || 'CENTRAL' });
+    }
+
+    return NextResponse.json({ success: true, purchaseOrder: po }, { status: 201 });
+  } catch (error: any) {
+    console.error('API /api/purchases POST error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to create purchase order' }, { status: 500 });
+  }
+}
+
+/**
+ * PUT /api/purchases - Update purchase order status & credit inventory on GRN receiving
+ */
+export async function PUT(req: NextRequest) {
+  try {
+    const user = getAuthUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    if (!body.id) {
+      return NextResponse.json({ error: 'Purchase Order ID is required' }, { status: 400 });
+    }
+
+    const existing = await (prisma as any).purchaseOrder.findUnique({
+      where: { id: body.id },
+      include: { items: true, vendor: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 });
+    }
+
+    const isTransitioningToReceived = body.status === 'Received' && existing.status !== 'Received';
+    const targetStore = existing.storeCode || 'CENTRAL';
+
+    // Build partial payment notes tag if applicable
+    let updatedNotes = body.notes !== undefined ? body.notes : existing.notes;
+    if (body.paymentStatus === 'Partial' || (existing.paymentStatus === 'Partial' && !body.paymentStatus)) {
+      if (body.paidAmount !== undefined || body.remainingAmount !== undefined) {
+        const total = Number(existing.totalCost) || 0;
+        const paid = Number(body.paidAmount) || 0;
+        const rem = body.remainingAmount !== undefined ? Number(body.remainingAmount) : Math.max(0, total - paid);
+        const tag = `[PARTIAL_PAYMENT:paid=${paid},remaining=${rem}]`;
+        const base = (updatedNotes || '').replace(/\[PARTIAL_PAYMENT:[^\]]+\]\s*/g, '').trim();
+        updatedNotes = base ? `${base} ${tag}` : tag;
+      }
+    } else if (body.paymentStatus === 'Paid') {
+      updatedNotes = (updatedNotes || '').replace(/\[PARTIAL_PAYMENT:[^\]]+\]\s*/g, '').trim();
+    }
+
+    // Execute atomic update & stock credit if receiving
+    const updatedPo = await prisma.$transaction(
+      async (tx: any) => {
+        if (isTransitioningToReceived && existing.items && existing.items.length > 0) {
+          for (const it of existing.items) {
+            const currentInv = await tx.inventory.findUnique({
+              where: { productId_storeCode: { productId: it.productId, storeCode: targetStore } },
+            });
+            const prevQty = currentInv ? currentInv.qtyOnHand : 0;
+            const newQty = prevQty + it.qtyOrdered;
+
+            await tx.inventory.upsert({
+              where: { productId_storeCode: { productId: it.productId, storeCode: targetStore } },
+              create: {
+                productId: it.productId,
+                storeCode: targetStore,
+                qtyOnHand: newQty,
+                reorderPt: 5,
+              },
+              update: {
+                qtyOnHand: newQty,
+              },
+            });
+
+            await tx.inventoryLedger.create({
+              data: {
+                productId: it.productId,
+                storeCode: targetStore,
+                refNo: existing.poNo,
+                type: 'PO GRN In',
+                qtyChange: it.qtyOrdered,
+                costPerUnit: it.unitCost,
+                balanceAfter: newQty,
+                notes: `GRN Received from ${existing.vendor?.name || 'Vendor'} (${existing.poNo})`,
+                createdBy: user.name,
+              },
+            });
+
+            await tx.purchaseOrderItem.update({
+              where: { id: it.id },
+              data: { qtyReceived: it.qtyOrdered },
+            });
+          }
+
+          const grnCount = await (tx as any).goodsReceivedNote.count();
+          const grnNo = `GRN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(grnCount + 1).padStart(4, '0')}`;
+          await (tx as any).goodsReceivedNote.create({
+            data: {
+              grnNo,
+              purchaseId: existing.id,
+              storeCode: targetStore,
+              receivedBy: user.name || 'Inventory Manager',
+              notes: body.grnNotes || `Goods received against PO ${existing.poNo}`,
+            },
+          });
+        }
+
+        const po = await tx.purchaseOrder.update({
+          where: { id: body.id },
+          data: {
+            ...(body.status ? { status: body.status } : {}),
+            ...(isTransitioningToReceived ? { receivedDate: new Date() } : {}),
+            ...(body.paymentStatus ? { paymentStatus: body.paymentStatus } : {}),
+            notes: updatedNotes,
+          },
+        });
+
+        return po;
+      },
+      { maxWait: 10000, timeout: 15000 }
+    );
+
+    broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', { id: updatedPo.id, poNo: updatedPo.poNo, status: updatedPo.status });
+    if (isTransitioningToReceived) {
+      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: targetStore });
+    }
+
+    return NextResponse.json({ success: true, purchaseOrder: updatedPo });
+  } catch (error: any) {
+    console.error('API /api/purchases PUT error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to update purchase order' }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/purchases - Delete a draft purchase order or cancel/archive received PO
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = getAuthUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (user.securityLevel < 80) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient security level' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Purchase Order ID is required' }, { status: 400 });
+    }
+
+    const existing = await (prisma as any).purchaseOrder.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ success: true, message: 'Purchase Order already deleted or non-existent' });
+    }
+
+    // Received POs have impacted inventory and financial ledgers; cancel/archive safely instead of destructive delete
+    if (existing.status === 'Received' || existing.status === 'Completed') {
+      const archived = await (prisma as any).purchaseOrder.update({
+        where: { id },
+        data: { status: 'Cancelled' },
+      });
+
+      broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', { id: existing.id, poNo: existing.poNo, action: 'cancelled' });
+
+      return NextResponse.json({
+        success: true,
+        mode: 'archived',
+        purchaseOrder: archived,
+        message: `Completed Purchase Order ${existing.poNo} was cancelled/archived to preserve historical warehouse stock ledgers.`,
+      });
+    }
+
+    // Hard-delete drafts / pending POs
+    await (prisma as any).purchaseOrderItem.deleteMany({ where: { poId: id } });
+    await (prisma as any).purchaseOrder.delete({ where: { id } });
+
+    broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', { id: existing.id, poNo: existing.poNo, action: 'deleted' });
+
+    return NextResponse.json({
+      success: true,
+      mode: 'deleted',
+      message: `Draft Purchase Order ${existing.poNo} permanently deleted.`,
+    });
+  } catch (error: any) {
+    console.error('API /api/purchases DELETE error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to delete purchase order' }, { status: 500 });
+  }
+}
+
+

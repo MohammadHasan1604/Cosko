@@ -1,0 +1,360 @@
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* COSKO PDF Official Brand Tokens */
+  --air-force-blue: #002E86;
+  --blue-cola: #009ADF;
+  --action-blue: #3279F6;
+  --mountain-meadow: #35CE8D;
+  --golden-poppy: #FEC601;
+  --sheen-green: #98CE00;
+  --rich-lavender: #A06CD5;
+  --flesh: #FFEAD0;
+  --alert-red: #FF0A21;
+
+  --background: #FCFCFC; /* Lotion Neutral App Background */
+  --foreground: #000000; /* Black Neutral Text */
+  --primary: #002E86; /* Air Force Blue Primary */
+  --primary-foreground: #FFFFFF;
+  --secondary: #F5F5F5; /* Cultured Neutral Secondary */
+  --secondary-foreground: #002E86;
+  --accent: #009ADF; /* Blue Cola Accent */
+  --accent-foreground: #FFFFFF;
+  --muted: #F5F5F5;
+  --muted-foreground: #64748B;
+  --card: #FFFFFF;
+  --card-foreground: #000000;
+  --border: #DDDDDD; /* Gainsboro Neutral Border */
+  --input: #DDDDDD;
+  --ring: #009ADF;
+  --radius: 0.5rem;
+  --font-sans: 'General Sans', var(--font-plus-jakarta-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  --positive: #35CE8D;
+  --positive-bg: #EDFFF7;
+  --positive-border: #C6FFE7;
+  --warning: #FEC601;
+  --warning-bg: #FFF9E5;
+  --warning-border: #FFEFB8;
+  --danger: #FF0A21;
+  --danger-bg: #FEF2F2;
+  --danger-border: #FECACA;
+  --info: #009ADF;
+  --info-bg: #E7F8FF;
+  --info-border: #BDEBFF;
+
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+  --topbar-height: 60px;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, h4, h5, h6, p {
+    margin: 0;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+@layer utilities {
+  .font-tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  .sidebar-transition {
+    transition: width 300ms ease, transform 300ms ease;
+  }
+
+  .content-transition {
+    transition: margin-left 300ms ease;
+  }
+
+  .fade-in {
+    animation: fadeIn 200ms ease forwards;
+  }
+
+  .slide-up {
+    animation: slideUp 200ms ease forwards;
+  }
+
+  .pulse-highlight {
+    animation: pulseHighlight 600ms ease forwards;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 2px;
+  }
+
+  .text-hero-xl {
+    font-size: clamp(2rem, 4vw, 3.5rem);
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, #1e40af 0%, #0ea5e9 100%);
+  }
+
+  .gradient-card-positive {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  }
+
+  .gradient-card-warning {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  }
+
+  .gradient-card-danger {
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  }
+
+  .gradient-card-info {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  }
+
+  .row-exit {
+    animation: rowExit 300ms ease forwards;
+  }
+
+  .skeleton-wave {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: skeletonWave 1.5s infinite;
+  }
+
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .mb-safe {
+    margin-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .touch-target {
+    min-height: 44px;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseHighlight {
+  0% { background-color: transparent; }
+  30% { background-color: #fef9c3; }
+  100% { background-color: transparent; }
+}
+
+@keyframes rowExit {
+  from { opacity: 1; max-height: 56px; }
+  to { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+}
+
+@keyframes skeletonWave {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold transition-all duration-150 hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-secondary text-secondary-foreground text-sm font-semibold transition-all duration-150 hover:bg-border active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-muted-foreground text-sm font-medium transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-95;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50;
+    background-color: var(--danger);
+    color: #ffffff;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-150;
+  }
+
+  .label-text {
+    @apply block text-sm font-medium text-foreground mb-1.5;
+  }
+
+  .helper-text {
+    @apply text-xs text-muted-foreground mt-1;
+  }
+
+  .error-text {
+    @apply text-xs mt-1;
+    color: var(--danger);
+  }
+
+  .card {
+    @apply bg-card rounded-xl border border-border shadow-sm;
+  }
+
+  .section-header {
+    @apply text-lg font-semibold text-foreground;
+  }
+
+  .metric-value {
+    @apply font-tabular font-bold text-foreground;
+  }
+
+  .badge-active {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    background-color: var(--positive-bg);
+    color: var(--positive);
+    border: 1px solid var(--positive-border);
+  }
+
+  .badge-warning {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    background-color: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning-border);
+  }
+
+  .badge-danger {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    background-color: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger-border);
+  }
+
+  .badge-info {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    background-color: var(--info-bg);
+    color: var(--info);
+    border: 1px solid var(--info-border);
+  }
+
+  .badge-neutral {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground transition-all duration-150 cursor-pointer hover:bg-muted hover:text-foreground;
+  }
+
+  .nav-item-active {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 cursor-pointer;
+    background-color: rgba(30, 64, 175, 0.1);
+    color: var(--primary);
+  }
+
+  .table-header {
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted border-b border-border cursor-pointer select-none hover:text-foreground transition-colors duration-150;
+  }
+
+  .table-cell {
+    @apply px-4 py-3.5 text-sm text-foreground whitespace-nowrap;
+  }
+  .table-row  {
+    @apply border-b border-border transition-colors duration-100;
+  }
+
+  /* Responsive COSKO Typography Hierarchy Scale */
+  .cosko-h1 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: clamp(2.25rem, 5vw, 4rem); /* 64px Desktop Responsive */
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  .cosko-h2 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: clamp(1.75rem, 3.5vw, 2.625rem); /* 42px Desktop Responsive */
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+  }
+
+  .cosko-h3 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 1.5rem; /* 24px */
+    line-height: 1.3;
+  }
+
+  .cosko-h4 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 1.125rem; /* 18px */
+    line-height: 1.4;
+  }
+
+  .cosko-supporting {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 1.125rem; /* 18px */
+    line-height: 1.5;
+  }
+
+  .cosko-body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 1rem; /* 16px */
+    line-height: 1.5;
+  }
+
+  .cosko-button {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 1rem; /* 16px */
+  }
+
+  .cosko-link {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 1rem; /* 16px */
+    color: var(--action-blue);
+  }
+}

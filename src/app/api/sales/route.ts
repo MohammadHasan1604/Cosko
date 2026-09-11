@@ -1,0 +1,90 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuthUserFromRequest } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { executePOSCheckout, CreateSaleInput } from '@/lib/services/salesService';
+
+/**
+ * GET /api/sales - Retrieve sales orders with store isolation
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const user = getAuthUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const requestedStore = searchParams.get('store');
+
+    // Store isolation check
+    let storeFilter: string | undefined = undefined;
+    if (user.role !== 'Super Admin') {
+      storeFilter = user.store;
+    } else if (requestedStore && requestedStore !== 'All Stores') {
+      storeFilter = requestedStore;
+    }
+
+    const whereClause: any = {};
+    if (storeFilter) {
+      whereClause.storeCode = storeFilter;
+    }
+
+    const sales = await prisma.salesOrder.findMany({
+      where: whereClause,
+      include: {
+        items: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 100,
+    });
+
+    return NextResponse.json({ success: true, sales });
+  } catch (error: any) {
+    console.error('API /api/sales GET error:', error);
+    return NextResponse.json({ error: 'Failed to retrieve sales records' }, { status: 500 });
+  }
+}
+
+/**
+ * POST /api/sales - Execute POS Checkout atomically
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const user = getAuthUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body: CreateSaleInput = await req.json();
+
+    if (body.storeCode === 'All Stores' || body.storeCode === 'ALL') {
+      return NextResponse.json(
+        { error: '"All Stores" is a reporting scope only. Sales must be processed under a real store outlet or Central Warehouse.' },
+        { status: 400 }
+      );
+    }
+
+    // Verify cashier store authorization
+    if (user.role !== 'Super Admin' && user.store !== body.storeCode) {
+      return NextResponse.json({ error: 'Store Scope Lock: Cashier cannot execute sales for unauthorized store' }, { status: 403 });
+    }
+
+    if (!body.items || body.items.length === 0) {
+      return NextResponse.json({ error: 'Cart cannot be empty' }, { status: 400 });
+    }
+
+    const sale = await executePOSCheckout({
+      ...body,
+      cashierName: user.name,
+    });
+
+    return NextResponse.json({ success: true, sale }, { status: 201 });
+  } catch (error: any) {
+    console.error('API /api/sales POST error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to process checkout transaction' }, { status: 500 });
+  }
+}
