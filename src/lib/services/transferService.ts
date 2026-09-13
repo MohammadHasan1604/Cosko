@@ -73,9 +73,23 @@ export async function executeStockTransfer(input: CreateTransferInput) {
 
   const grossProfit = totalTransferValue - totalCost;
 
-  // Generate transfer number safely before transaction to reduce query duration inside tx
-  const count = await prisma.stockTransfer.count();
-  const seqNo = String(count + 1).padStart(4, '0');
+  // Generate transfer number safely by finding true maximum sequence number across transfers and ledger
+  const existingTransfers = await prisma.stockTransfer.findMany({
+    select: { transferNo: true },
+  });
+  const existingLedgerRefs = await prisma.financialLedgerEntry.findMany({
+    where: { refType: 'STOCK_TRANSFER' },
+    select: { refNo: true },
+  });
+  let maxSeq = 0;
+  for (const item of [...existingTransfers.map((t) => t.transferNo), ...existingLedgerRefs.map((l) => l.refNo)]) {
+    const match = item?.match(/TRF-2026-(\d+)/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxSeq) maxSeq = num;
+    }
+  }
+  const seqNo = String(maxSeq + 1).padStart(4, '0');
   const transferNo = `TRF-2026-${seqNo}`;
 
   // Execute atomic database changes with serverless-safe 15s timeout
