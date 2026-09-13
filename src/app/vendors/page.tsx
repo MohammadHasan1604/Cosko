@@ -573,14 +573,14 @@ export default function VendorsPage() {
               return (
                 <div
                   key={`vend-${v.id}`}
-                  className={`card p-5 space-y-4 hover:shadow-md transition-all duration-150 relative group border ${
-                    hasOverdue ? 'border-danger/40' : hasPayable ? 'border-border' : 'border-border/60'
+                  className={`card p-5 space-y-4 hover:shadow-card-hover transition-all duration-200 relative group border ${
+                    hasOverdue ? 'border-danger/50' : hasPayable ? 'border-border/90' : 'border-border/60'
                   }`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-2xs font-mono font-bold text-muted-foreground">{v.code}</span>
+                        <span className="text-3xs font-mono font-bold text-muted-foreground">{v.code}</span>
                         {hasOverdue && (
                           <span className="badge-danger text-3xs font-extrabold px-1.5 py-0.2">
                             {v.overdueBillsCount} Overdue
@@ -592,21 +592,21 @@ export default function VendorsPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <span className="badge-warning text-2xs flex items-center gap-1 font-bold">
+                      <span className="badge-warning text-3xs flex items-center gap-1 font-bold">
                         ★ {v.rating || 5.0}
                       </span>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => openEdit(v)} className="p-1 text-muted-foreground hover:text-primary" title="Edit Vendor">
-                          <Icon name="PencilSquareIcon" size={15} />
+                        <button onClick={() => openEdit(v)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit Vendor">
+                          <Icon name="PencilSquareIcon" size={14} />
                         </button>
-                        <button onClick={() => setDeleteVendorModal(v)} className="p-1 text-muted-foreground hover:text-danger" title="Archive / Delete">
-                          <Icon name="TrashIcon" size={15} />
+                        <button onClick={() => setDeleteVendorModal(v)} className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors" title="Archive / Delete">
+                          <Icon name="TrashIcon" size={14} />
                         </button>
                       </div>
                     </div>
                   </div>
 
-                  <div className="text-xs space-y-1.5 text-muted-foreground border-y border-border py-2.5">
+                  <div className="text-xs space-y-1.5 text-muted-foreground border-y border-border/60 py-2.5">
                     {v.contactPerson && (
                       <p className="flex items-center gap-1.5">
                         <Icon name="UserIcon" size={13} className="text-muted-foreground/70" />
@@ -667,11 +667,11 @@ export default function VendorsPage() {
           </div>
         ) : (
           /* Table View */
-          <div className="card overflow-hidden border border-border">
+          <div className="card overflow-hidden border border-border/80">
             <div className="overflow-x-auto scrollbar-thin">
               <table className="w-full text-left min-w-[850px]">
                 <thead>
-                  <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground border-b border-border">
+                  <tr className="table-header">
                     <th className="px-4 py-3">Code / Supplier</th>
                     <th className="px-4 py-3">Category</th>
                     <th className="px-4 py-3">Contact & Phone</th>
@@ -682,11 +682,11 @@ export default function VendorsPage() {
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border text-xs font-tabular">
+                <tbody className="divide-y divide-border/60 text-xs font-tabular">
                   {filteredVendors.map((v) => {
                     const hasPayable = v.outstandingPayable > 0.005;
                     return (
-                      <tr key={`v-row-${v.id}`} className="hover:bg-muted/30 transition-colors">
+                      <tr key={`v-row-${v.id}`} className="table-row">
                         <td className="px-4 py-3">
                           <span className="font-mono text-3xs font-bold text-muted-foreground block">{v.code}</span>
                           <span className="font-bold text-foreground">{v.name}</span>
@@ -695,7 +695,7 @@ export default function VendorsPage() {
                           <span className="badge-neutral text-3xs">{v.category || 'General'}</span>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
-                          <div>{v.contactPerson || '—'}</div>
+                          <div className="font-medium text-foreground">{v.contactPerson || '—'}</div>
                           <div className="font-mono text-3xs">{v.phone}</div>
                         </td>
                         <td className="px-4 py-3 font-mono text-2xs text-primary font-semibold">
@@ -704,7 +704,7 @@ export default function VendorsPage() {
                         <td className="px-4 py-3 text-muted-foreground">
                           {v.paymentTerms || 'Net 30'} ({v.leadTimeDays || 3}d)
                         </td>
-                        <td className="px-4 py-3 text-right font-medium text-foreground">
+                        <td className="px-4 py-3 text-right font-semibold text-foreground">
                           ₹{v.totalBilledAmount.toLocaleString('en-IN')}
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -725,11 +725,11 @@ export default function VendorsPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => openEdit(v)} className="p-1 text-muted-foreground hover:text-primary" title="Edit">
-                              <Icon name="PencilSquareIcon" size={15} />
+                            <button onClick={() => openEdit(v)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit">
+                              <Icon name="PencilSquareIcon" size={14} />
                             </button>
-                            <button onClick={() => setDeleteVendorModal(v)} className="p-1 text-muted-foreground hover:text-danger" title="Archive / Delete">
-                              <Icon name="TrashIcon" size={15} />
+                            <button onClick={() => setDeleteVendorModal(v)} className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors" title="Archive / Delete">
+                              <Icon name="TrashIcon" size={14} />
                             </button>
                           </div>
                         </td>

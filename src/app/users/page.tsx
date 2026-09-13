@@ -371,9 +371,9 @@ export default function UsersPage() {
 
           {/* Desktop User Table (>=md) */}
           <div className="hidden md:block overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left border-collapse min-w-[700px]">
+            <table className="w-full text-left border-collapse min-w-[750px]">
               <thead>
-                <tr className="bg-muted/50 text-2xs uppercase tracking-wider text-muted-foreground font-semibold border-b border-border">
+                <tr className="table-header">
                   <th className="py-3 px-4">User Identity</th>
                   <th className="py-3 px-4">Role & Security Level</th>
                   <th className="py-3 px-4">Store Scope & Access</th>
@@ -381,7 +381,7 @@ export default function UsersPage() {
                   <th className="py-3 px-4 text-right">Security Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border text-xs">
+              <tbody className="divide-y divide-border/60 text-xs">
                 {visibleUsers.map((u) => {
                   const level = u.securityLevel || (u.role === 'Super Admin' ? 100 : u.role === 'Store Manager' ? 80 : u.role === 'Inventory Auditor' ? 60 : 20);
                   const isProtectedSuperAdmin = u.role === 'Super Admin';
@@ -389,7 +389,7 @@ export default function UsersPage() {
                   const allowedStores = u.allowedStores || [u.storeScope];
 
                   return (
-                    <tr key={`usr-row-${u.id}`} className="hover:bg-muted/30 transition-colors">
+                    <tr key={`usr-row-${u.id}`} className="table-row">
                       <td className="py-3 px-4 font-medium text-foreground">
                         <div className="flex items-center gap-2.5">
                           {u.avatarUrl ? (
@@ -401,19 +401,19 @@ export default function UsersPage() {
                           )}
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <p className="font-bold">{u.name}</p>
+                              <p className="font-semibold text-foreground">{u.name}</p>
                               {isProtectedSuperAdmin && (
-                                <span className="text-3xs bg-danger/10 text-danger border border-danger/20 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5">
-                                  <Icon name="LockClosedIcon" size={10} /> Level 100 Protected
+                                <span className="text-3xs bg-danger/10 text-danger border border-danger/20 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5">
+                                  <Icon name="LockClosedIcon" size={10} /> Level 100
                                 </span>
                               )}
                             </div>
-                            <p className="text-2xs text-muted-foreground">{u.email}</p>
+                            <p className="text-3xs text-muted-foreground">{u.email}</p>
                           </div>
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`badge ${level === 100 ? 'badge-danger' : level === 80 ? 'badge-warning' : 'badge-info'} text-2xs`}>
+                        <span className={`badge ${level === 100 ? 'badge-danger' : level === 80 ? 'badge-warning' : 'badge-info'} text-3xs`}>
                           Level {level} · {u.role}
                         </span>
                       </td>
@@ -431,11 +431,11 @@ export default function UsersPage() {
                           value={u.status}
                           disabled={isProtectedSuperAdmin && currentUser.role !== 'Super Admin'}
                           onChange={(e) => toggleUserStatus(u.id, e.target.value as any)}
-                          className={`text-2xs font-bold px-2 py-1 rounded-md border ${
+                          className={`text-3xs font-bold px-2 py-1 rounded-lg border ${
                             u.status === 'Active'
-                              ? 'bg-positive/10 text-positive border-positive/30'
+                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
                               : u.status === 'Suspended'
-                              ? 'bg-danger/10 text-danger border-danger/30'
+                              ? 'bg-rose-500/10 text-rose-600 border-rose-500/30'
                               : 'bg-muted text-muted-foreground border-border'
                           }`}
                         >
@@ -447,7 +447,7 @@ export default function UsersPage() {
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <span className={`text-3xs font-extrabold px-2 py-0.5 rounded-full ${
-                            u.shiftStatus === 'On Shift' ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'
+                            u.shiftStatus === 'On Shift' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground'
                           }`}>
                             {u.shiftStatus}
                           </span>
@@ -459,36 +459,36 @@ export default function UsersPage() {
                             offText="OFF"
                           />
 
-                          {/* Performance Analytics Button */}
                           {fullUserRecord && (
                             <button
                               onClick={() => setPerformanceModalUser(fullUserRecord)}
-                              className="p-1.5 text-muted-foreground hover:text-info rounded-md"
-                              title="View Real User Performance & Activity"
+                              className="btn-secondary h-7 text-3xs py-1 px-2.5 gap-1"
+                              title="Employee Performance Metrics"
                             >
-                              <Icon name="ChartBarIcon" size={15} />
+                              <Icon name="ChartBarIcon" size={12} />
+                              Metrics
                             </button>
                           )}
 
-                          {/* Permissions Matrix Modal Toggle */}
                           {fullUserRecord && (
                             <button
                               onClick={() => setPermissionsModalUser(fullUserRecord)}
-                              className="p-1.5 text-muted-foreground hover:text-primary rounded-md"
-                              title="Manage User Access & Permissions Matrix"
+                              className="btn-primary h-7 text-3xs py-1 px-2.5 gap-1"
+                              title="Config Granular Permissions"
                             >
-                              <Icon name="ShieldCheckIcon" size={15} />
+                              <Icon name="KeyIcon" size={12} />
+                              Access Matrix
                             </button>
                           )}
 
                           {(!isProtectedSuperAdmin || currentUser.role === 'Super Admin') && fullUserRecord && (
                             <>
-                              <button onClick={() => openEdit(fullUserRecord)} className="p-1.5 text-muted-foreground hover:text-primary rounded-md" title="Edit User">
-                                <Icon name="PencilSquareIcon" size={15} />
+                              <button onClick={() => openEdit(fullUserRecord)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit User">
+                                <Icon name="PencilSquareIcon" size={14} />
                               </button>
                               {u.id !== currentUser.id && (
-                                <button onClick={() => handleDeleteClick(fullUserRecord)} className="p-1.5 text-muted-foreground hover:text-danger rounded-md" title="Delete User">
-                                  <Icon name="TrashIcon" size={15} />
+                                <button onClick={() => handleDeleteClick(fullUserRecord)} className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors" title="Delete User">
+                                  <Icon name="TrashIcon" size={14} />
                                 </button>
                               )}
                             </>

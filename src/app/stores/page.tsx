@@ -148,11 +148,11 @@ export default function StoresPage() {
           {storesList.map((s) => {
             const isCentral = s.code === 'CENTRAL';
             return (
-              <div key={`store-card-${s.id}`} className="card p-5 space-y-4 hover:shadow-md transition-all duration-150 relative group">
+              <div key={`store-card-${s.id}`} className="card p-5 space-y-4 hover:shadow-card-hover transition-all duration-200 relative group border border-border/80">
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`text-2xs font-bold px-2 py-0.5 rounded-full ${
+                      <span className={`text-3xs font-mono font-bold px-2 py-0.5 rounded-full ${
                         isCentral
                           ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
                           : 'badge-info'
@@ -165,31 +165,31 @@ export default function StoresPage() {
                         </span>
                       )}
                     </div>
-                    <h3 className="text-base font-bold text-foreground mt-1">{s.name}</h3>
+                    <h3 className="text-base font-bold text-foreground mt-1.5">{s.name}</h3>
                     <p className="text-2xs text-muted-foreground">{s.city}</p>
                   </div>
                   
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => { setSelectedStore(s.code); toast.success(`Switched active store scope to ${s.name}`); }}
-                      className="btn-ghost text-2xs text-primary font-bold hover:underline"
+                      className="btn-ghost text-3xs text-primary font-bold px-2 py-1 hover:bg-primary/10 rounded-lg transition-colors"
                     >
                       Select Scope
                     </button>
 
                     {/* Edit & Delete Controls (SUPER ADMIN ONLY) */}
                     {currentUser.role === 'Super Admin' && (
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => openEdit(s)} className="p-1 text-muted-foreground hover:text-primary" title="Edit store hub">
-                          <Icon name="PencilSquareIcon" size={15} />
+                      <div className="flex items-center gap-0.5">
+                        <button onClick={() => openEdit(s)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit store hub">
+                          <Icon name="PencilSquareIcon" size={14} />
                         </button>
                         {isCentral ? (
-                          <span className="p-1 text-muted-foreground/60 cursor-help" title="The default Central Warehouse & Owner Store is permanent and cannot be deleted">
+                          <span className="p-1.5 text-muted-foreground/60 cursor-help" title="The default Central Warehouse & Owner Store is permanent and cannot be deleted">
                             <Icon name="ShieldCheckIcon" size={16} className="text-primary" />
                           </span>
                         ) : (
-                          <button onClick={() => setDeleteStoreModal(s)} className="p-1 text-muted-foreground hover:text-danger" title="Delete store hub">
-                            <Icon name="TrashIcon" size={15} />
+                          <button onClick={() => setDeleteStoreModal(s)} className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors" title="Delete store hub">
+                            <Icon name="TrashIcon" size={14} />
                           </button>
                         )}
                       </div>
@@ -197,21 +197,21 @@ export default function StoresPage() {
                   </div>
                 </div>
 
-              <div className="text-xs space-y-1 text-muted-foreground border-y border-border py-2.5">
-                <p><strong className="text-foreground">Address:</strong> {s.address}</p>
-                <p><strong className="text-foreground">Store Manager:</strong> {s.manager}</p>
-                <p><strong className="text-foreground">Phone:</strong> {s.phone}</p>
-                <p><strong className="text-foreground">Active Terminals:</strong> {s.registers} POS Registers</p>
+              <div className="text-xs space-y-1 text-muted-foreground border-y border-border/60 py-2.5">
+                <p><strong className="text-foreground font-semibold">Address:</strong> {s.address}</p>
+                <p><strong className="text-foreground font-semibold">Store Manager:</strong> {s.manager}</p>
+                <p><strong className="text-foreground font-semibold">Phone:</strong> {s.phone}</p>
+                <p><strong className="text-foreground font-semibold">Active Terminals:</strong> {s.registers} POS Registers</p>
               </div>
 
               <div className="flex items-center justify-between text-xs pt-1 font-tabular">
                 <div>
-                  <span className="text-2xs text-muted-foreground uppercase block font-semibold">Live SKUs</span>
-                  <span className="font-bold text-foreground">{s.skusCount} Items</span>
+                  <span className="text-3xs text-muted-foreground uppercase block font-bold tracking-wider">Live SKUs</span>
+                  <span className="font-extrabold text-foreground">{s.skusCount} Items</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xs text-muted-foreground uppercase block font-semibold">Monthly Sales</span>
-                  <span className="font-extrabold text-sm text-success">₹{s.monthlyRevenue.toLocaleString('en-IN')}</span>
+                  <span className="text-3xs text-muted-foreground uppercase block font-bold tracking-wider">Monthly Sales</span>
+                  <span className="font-extrabold text-sm text-emerald-600 dark:text-emerald-400">₹{s.monthlyRevenue.toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>

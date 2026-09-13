@@ -306,14 +306,14 @@ export default function AccountingPage() {
           </div>
 
           {/* Action Bar & Controls */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             {/* Store Filter */}
-            <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-xl border border-border">
-              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground pl-2">Store:</span>
+            <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/80">
+              <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground pl-2">Store:</span>
               <select
                 value={selectedStore}
                 onChange={(e) => setSelectedStore(e.target.value)}
-                className="bg-background text-foreground text-xs font-semibold py-1.5 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="select-field text-xs font-semibold py-1 px-3 h-8 w-auto min-w-[170px]"
               >
                 <option value="All Stores">All Stores (Consolidated)</option>
                 {storesList.map((s) => (
@@ -325,12 +325,12 @@ export default function AccountingPage() {
             </div>
 
             {/* Time Period Filter */}
-            <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-xl border border-border">
-              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground pl-2">Period:</span>
+            <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/80">
+              <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground pl-2">Period:</span>
               <select
                 value={datePeriod}
                 onChange={(e) => setDatePeriod(e.target.value)}
-                className="bg-background text-foreground text-xs font-semibold py-1.5 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="select-field text-xs font-semibold py-1 px-3 h-8 w-auto min-w-[150px]"
               >
                 <option value="Today">Today</option>
                 <option value="Yesterday">Yesterday</option>
@@ -346,19 +346,19 @@ export default function AccountingPage() {
 
             {/* Custom Date Pickers */}
             {datePeriod === 'Custom Range' && (
-              <div className="flex items-center gap-2 bg-muted/40 p-1 rounded-xl border border-border">
+              <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-xl border border-border/80">
                 <input
                   type="date"
                   value={startDateInput}
                   onChange={(e) => setStartDateInput(e.target.value)}
-                  className="bg-background text-foreground text-xs py-1 px-2 rounded-lg border border-border"
+                  className="bg-card text-foreground text-xs py-1 px-2 rounded-lg border border-border/80 h-8"
                 />
                 <span className="text-xs text-muted-foreground">→</span>
                 <input
                   type="date"
                   value={endDateInput}
                   onChange={(e) => setEndDateInput(e.target.value)}
-                  className="bg-background text-foreground text-xs py-1 px-2 rounded-lg border border-border"
+                  className="bg-card text-foreground text-xs py-1 px-2 rounded-lg border border-border/80 h-8"
                 />
               </div>
             )}
@@ -366,62 +366,62 @@ export default function AccountingPage() {
             {/* Reconciliation Audit Trigger Button */}
             <button
               onClick={handleRunReconciliationAudit}
-              className="flex items-center gap-2 px-3.5 py-2 bg-success/15 text-success hover:bg-success/20 border border-success/30 rounded-xl text-xs font-bold transition-all shadow-xs"
+              className="h-9 inline-flex items-center gap-2 px-3.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-[0.98]"
             >
-              <Icon name="CheckCircleIcon" size={16} />
+              <Icon name="CheckCircleIcon" size={15} />
               <span>Audit Reconciliation</span>
             </button>
           </div>
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex items-center gap-2 border-b border-border pb-1 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1.5 border-b border-border/80 pb-1.5 overflow-x-auto scrollbar-none">
           <button
             onClick={() => setActiveTab('consolidated')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all duration-150 ${
               activeTab === 'consolidated'
-                ? 'bg-primary text-primary-foreground shadow-sm'
+                ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
-            <Icon name="BuildingOffice2Icon" size={16} />
+            <Icon name="BuildingOffice2Icon" size={15} />
             <span>Consolidated Company P&L</span>
             <span className="text-3xs px-1.5 py-0.5 rounded-full bg-primary-foreground/20 font-mono">Eliminated</span>
           </button>
 
           <button
             onClick={() => setActiveTab('store')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all duration-150 ${
               activeTab === 'store'
-                ? 'bg-primary text-primary-foreground shadow-sm'
+                ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
-            <Icon name="BuildingStorefrontIcon" size={16} />
+            <Icon name="BuildingStorefrontIcon" size={15} />
             <span>Store Operational P&L</span>
           </button>
 
           <button
             onClick={() => setActiveTab('central')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all duration-150 ${
               activeTab === 'central'
-                ? 'bg-primary text-primary-foreground shadow-sm'
+                ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
-            <Icon name="ArrowTrendingUpIcon" size={16} />
+            <Icon name="ArrowTrendingUpIcon" size={15} />
             <span>Central Transfer Profit P&L</span>
           </button>
 
           <button
             onClick={() => setActiveTab('ledger')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all duration-150 ${
               activeTab === 'ledger'
-                ? 'bg-primary text-primary-foreground shadow-sm'
+                ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
-            <Icon name="BookOpenIcon" size={16} />
+            <Icon name="BookOpenIcon" size={15} />
             <span>Financial General Ledger</span>
           </button>
         </div>

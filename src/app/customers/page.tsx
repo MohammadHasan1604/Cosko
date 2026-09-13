@@ -220,16 +220,16 @@ export default function CustomersPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => { resetForm(); setRegisterModal(true); }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm"
+              className="btn-primary gap-2 text-xs sm:text-sm font-semibold shadow-xs"
             >
-              <Icon name="UserPlusIcon" className="w-4 h-4" />
+              <Icon name="UserPlusIcon" size={16} />
               <span>Register Customer</span>
             </button>
           </div>
         </div>
 
         {/* CRM Segment Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
           {crmSegments.map((segment) => {
             const count = segment === 'All Customers'
               ? customers.length
@@ -240,14 +240,14 @@ export default function CustomersPage() {
               <button
                 key={segment}
                 onClick={() => setSelectedSegment(segment)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 border ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 border ${
                   isSelected
-                    ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                    : 'bg-card border-border text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+                    ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                    : 'bg-card border-border/80 text-muted-foreground hover:text-foreground hover:bg-muted/40 hover:border-border'
                 }`}
               >
                 <span>{segment}</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-3xs ${isSelected ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>
+                <span className={`px-1.5 py-0.2 rounded-full text-3xs font-mono font-bold ${isSelected ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                   {count}
                 </span>
               </button>
@@ -256,49 +256,49 @@ export default function CustomersPage() {
         </div>
 
         {/* Deep Search Input */}
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+        <div className="card p-3.5 sm:p-4 shadow-xs">
           <div className="relative">
-            <Icon name="MagnifyingGlassIcon" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Icon name="MagnifyingGlassIcon" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search across customers, mobile (+91 98765 43210), invoices (CS26BLR...), repairs..."
               value={deepSearchQuery}
               onChange={(e) => setDeepSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-secondary/50 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+              className="input-field pl-10 pr-4 text-xs font-medium"
             />
           </div>
         </div>
 
         {/* Customer Directory Table */}
-        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <Icon name="UsersIcon" className="w-5 h-5 text-primary" />
+        <div className="card overflow-hidden">
+          <div className="p-4 sm:p-5 border-b border-border/80 flex items-center justify-between">
+            <h2 className="text-sm sm:text-base font-extrabold text-foreground flex items-center gap-2">
+              <Icon name="UsersIcon" size={18} className="text-primary" />
               <span>Customer Master Directory</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+              <span className="badge-neutral text-3xs font-semibold">
                 {filteredCustomers.length} active
               </span>
             </h2>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-secondary/40 text-muted-foreground text-xs uppercase font-semibold border-b border-border">
-                <tr>
-                  <th className="px-4 py-3.5">Customer Name</th>
-                  <th className="px-4 py-3.5">Mobile Number</th>
-                  <th className="px-4 py-3.5">City / Store</th>
-                  <th className="px-4 py-3.5">CRM Segment</th>
-                  <th className="px-4 py-3.5 text-right font-tabular">Total Spend</th>
-                  <th className="px-4 py-3.5 text-right font-tabular">Credit Balance</th>
-                  <th className="px-4 py-3.5 text-center">Legacy Link</th>
-                  <th className="px-4 py-3.5 text-right">Actions</th>
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full text-left text-xs min-w-[850px]">
+              <thead>
+                <tr className="table-header">
+                  <th className="px-4 py-3">Customer Name</th>
+                  <th className="px-4 py-3">Mobile Number</th>
+                  <th className="px-4 py-3">City / Store</th>
+                  <th className="px-4 py-3">CRM Segment</th>
+                  <th className="px-4 py-3 text-right font-tabular">Total Spend</th>
+                  <th className="px-4 py-3 text-right font-tabular">Credit Balance</th>
+                  <th className="px-4 py-3 text-center">Legacy Link</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-border/60">
                 {filteredCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                       No customer records matched your query.
                     </td>
                   </tr>
@@ -306,44 +306,44 @@ export default function CustomersPage() {
                   filteredCustomers.map((cust) => {
                     const tag = getCustomerSegmentTag(cust);
                     return (
-                      <tr key={cust.id} className="hover:bg-secondary/30 transition-colors">
-                        <td className="px-4 py-3.5">
+                      <tr key={cust.id} className="table-row">
+                        <td className="px-4 py-3">
                           <div className="font-semibold text-foreground">{cust.name}</div>
-                          <div className="text-xs text-muted-foreground">{cust.email}</div>
+                          <div className="text-3xs text-muted-foreground">{cust.email}</div>
                         </td>
-                        <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                           {cust.phone}
                         </td>
-                        <td className="px-4 py-3.5 text-xs text-foreground font-medium">
+                        <td className="px-4 py-3 text-xs text-foreground font-medium">
                           {cust.city}
                         </td>
-                        <td className="px-4 py-3.5">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-3xs font-bold ${
                             tag === 'Repair + Purchase Customer' ? 'bg-primary/10 text-primary border border-primary/20' :
                             tag === 'High Value Customer' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' :
-                            tag === 'Repair Customer' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20' :
-                            'bg-secondary text-secondary-foreground'
+                            tag === 'Repair Customer' ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20' :
+                            'badge-neutral'
                           }`}>
                             {tag}
                           </span>
                         </td>
-                        <td className="px-4 py-3.5 text-right font-tabular font-bold text-foreground">
+                        <td className="px-4 py-3 text-right font-tabular font-extrabold text-foreground">
                           ₹{cust.totalSpend.toLocaleString('en-IN')}
                         </td>
-                        <td className="px-4 py-3.5 text-right font-tabular font-medium text-warning">
+                        <td className="px-4 py-3 text-right font-tabular font-bold text-amber-600 dark:text-amber-400">
                           ₹{cust.creditBalance.toLocaleString('en-IN')}
                         </td>
-                        <td className="px-4 py-3.5 text-center">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                            <Icon name="CheckBadgeIcon" className="w-3 h-3" />
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-3xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            <Icon name="CheckBadgeIcon" size={12} />
                             Connected
                           </span>
                         </td>
-                        <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
+                        <td className="px-4 py-3 text-right space-x-1 whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => setCrmViewCustomer(cust)}
-                            className="inline-flex items-center px-2.5 py-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold transition-colors"
+                            className="btn-secondary text-2xs py-1 px-2.5 h-7"
                             title="Customer 360"
                           >
                             360°
@@ -351,7 +351,7 @@ export default function CustomersPage() {
                           <button
                             type="button"
                             onClick={() => openEdit(cust)}
-                            className="inline-flex items-center p-1.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-secondary text-xs"
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors inline-flex items-center"
                             title="Edit Customer"
                           >
                             <Icon name="PencilSquareIcon" className="w-3.5 h-3.5" />

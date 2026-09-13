@@ -536,22 +536,22 @@ export default function SalesPage() {
     <AppLayout activeRoute="/sales">
       <div className="space-y-4 sm:space-y-6 fade-in">
         {/* Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-card/75 backdrop-blur-md border border-border/80 shadow-xs">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-2xl font-bold text-foreground">POS Sales & Checkout Terminal</h1>
-              <span className="badge-primary text-2xs uppercase tracking-wider font-mono">{effectiveStore} Store</span>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-lg sm:text-xl font-extrabold text-foreground tracking-tight">POS Checkout Terminal</h1>
+              <span className="badge-primary text-3xs font-mono font-bold px-2 py-0.5 rounded-full">{effectiveStore} Store</span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Cashier: <strong className="text-foreground">{activeEmployeeName}</strong> · Auto-Sequential CS26 Invoicing
+              Cashier: <strong className="text-foreground font-semibold">{activeEmployeeName}</strong> · Standard Invoicing Engine (CS26)
             </p>
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto">
-            <div className="flex items-center gap-1.5 bg-muted p-1 rounded-xl">
+            <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60">
               <button
                 onClick={() => setActiveTab('pos')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
                   activeTab === 'pos' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -559,7 +559,7 @@ export default function SalesPage() {
               </button>
               <button
                 onClick={() => setActiveTab('history')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
                   activeTab === 'history' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -576,18 +576,18 @@ export default function SalesPage() {
               <div className="card p-3.5 sm:p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
-                    <Icon name="MagnifyingGlassIcon" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Icon name="MagnifyingGlassIcon" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="text"
                       placeholder="Search product name, SKU, or brand..."
                       value={catalogSearch}
                       onChange={(e) => setCatalogSearch(e.target.value)}
-                      className="input-field pl-9 text-xs"
+                      className="input-field pl-9 text-xs font-medium"
                     />
                   </div>
-                  <button onClick={() => setScannerOpen(true)} className="btn-secondary text-xs px-3 gap-1.5 whitespace-nowrap" title="Barcode Scanner">
-                    <Icon name="QrCodeIcon" size={16} />
-                    Scan
+                  <button onClick={() => setScannerOpen(true)} className="btn-secondary h-[38px] text-xs px-3.5 gap-1.5 whitespace-nowrap shadow-xs" title="Barcode Scanner">
+                    <Icon name="QrCodeIcon" size={15} />
+                    Scan Barcode
                   </button>
                 </div>
 
@@ -597,10 +597,10 @@ export default function SalesPage() {
                     <button
                       key={`cat-pill-${cat}`}
                       onClick={() => setSelectedCategory(cat)}
-                      className={`px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition-colors border ${
+                      className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all border ${
                         selectedCategory === cat
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-card text-muted-foreground border-border hover:bg-muted/40'
+                          ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                          : 'bg-card text-muted-foreground border-border/80 hover:border-border hover:bg-muted/40 hover:text-foreground'
                       }`}
                     >
                       {cat}
@@ -615,38 +615,38 @@ export default function SalesPage() {
                   <div
                     key={`inv-grid-${item.id}`}
                     onClick={() => addToCart(item)}
-                    className="card p-3 flex flex-col justify-between hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group"
+                    className="card p-3 flex flex-col justify-between hover:border-primary/60 hover:shadow-card-hover transition-all duration-200 cursor-pointer group active:scale-[0.99]"
                   >
                     <div>
-                      <div className="aspect-video w-full rounded-lg bg-muted/40 mb-2 overflow-hidden flex items-center justify-center relative">
+                      <div className="aspect-video w-full rounded-xl bg-muted/40 mb-2 overflow-hidden flex items-center justify-center relative border border-border/40">
                         {item.imageUrl ? (
-                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                         ) : (
-                          <Icon name="PhotoIcon" size={24} className="text-muted-foreground/50" />
+                          <Icon name="PhotoIcon" size={24} className="text-muted-foreground/40" />
                         )}
-                        <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-3xs font-mono font-bold bg-black/60 text-white">
+                        <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md text-3xs font-mono font-bold bg-black/70 backdrop-blur-xs text-white">
                           {item.qtyOnHand} in stock
                         </span>
                       </div>
-                      <h4 className="text-xs font-bold text-foreground line-clamp-2">{item.name}</h4>
+                      <h4 className="text-xs font-bold text-foreground line-clamp-2 leading-tight">{item.name}</h4>
                       <p className="text-3xs text-muted-foreground font-mono mt-0.5">{item.sku}</p>
                     </div>
 
-                    <div className="pt-2 mt-2 border-t border-border flex items-center justify-between">
+                    <div className="pt-2 mt-2 border-t border-border/60 flex items-center justify-between">
                       <div>
-                        <span className="text-xs font-extrabold text-primary font-tabular">₹{item.sellingPrice.toLocaleString('en-IN')}</span>
+                        <span className="text-xs font-black text-primary font-tabular">₹{item.sellingPrice.toLocaleString('en-IN')}</span>
                         {canViewCost && (
                           <span className="text-3xs text-muted-foreground block font-mono">Cost: ₹{item.costPrice}</span>
                         )}
                       </div>
-                      <button className="p-1 rounded-md bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      <button className="h-7 w-7 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-150 flex items-center justify-center shadow-2xs">
                         <Icon name="PlusIcon" size={14} />
                       </button>
                     </div>
                   </div>
                 ))}
                 {filteredInventory.length === 0 && (
-                  <div className="col-span-full py-12 text-center text-muted-foreground text-xs">
+                  <div className="col-span-full py-16 text-center text-muted-foreground text-xs">
                     No products found matching filters in {effectiveStore}.
                   </div>
                 )}
@@ -657,28 +657,28 @@ export default function SalesPage() {
             <div className="lg:col-span-5 space-y-4">
               {/* 1. Customer Phone Search & Verification Box */}
               <div className="card p-4 space-y-3">
-                <div className="flex items-center justify-between pb-1 border-b border-border">
+                <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
                   <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
                     <Icon name="UserIcon" size={14} className="text-primary" />
-                    Customer Lookup
+                    Customer Lookup & CRM
                   </span>
                   {selectedCustomerId !== 'walkin' && (
                     <button
                       onClick={() => handleSelectCustomerFromDropdown('walkin')}
-                      className="text-2xs text-muted-foreground hover:text-danger underline"
+                      className="text-2xs font-semibold text-muted-foreground hover:text-danger underline transition-colors"
                     >
                       Reset to Walk-in
                     </button>
                   )}
                 </div>
 
-                {/* +91 Mobile Number Input Field (Requirement 2) */}
+                {/* +91 Mobile Number Input Field */}
                 <div>
-                  <label className="text-2xs font-bold text-muted-foreground block mb-1">
+                  <label className="text-2xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
                     Customer Mobile Number
                   </label>
-                  <div className="flex items-center rounded-lg border border-border bg-card overflow-hidden focus-within:ring-2 focus-within:ring-primary/40">
-                    <span className="px-3 py-2 bg-muted/60 text-xs font-bold text-muted-foreground border-r border-border select-none">
+                  <div className="flex items-center rounded-xl border border-border/80 bg-card overflow-hidden focus-within:ring-2 focus-within:ring-primary/25 focus-within:border-primary transition-all">
+                    <span className="px-3 h-[38px] flex items-center bg-muted/60 text-xs font-bold text-muted-foreground border-r border-border select-none font-mono">
                       +91
                     </span>
                     <input
@@ -687,7 +687,7 @@ export default function SalesPage() {
                       placeholder="98765 43210"
                       value={customerPhoneDigits}
                       onChange={(e) => handlePhoneInput(e.target.value)}
-                      className="flex-1 bg-transparent px-3 py-2 text-xs font-mono font-bold text-foreground focus:outline-none"
+                      className="flex-1 bg-transparent px-3 h-[38px] text-xs font-mono font-bold text-foreground focus:outline-none"
                     />
                     {lookupLoading && (
                       <span className="pr-3 text-2xs text-muted-foreground animate-pulse">Searching...</span>
@@ -695,15 +695,15 @@ export default function SalesPage() {
                   </div>
                 </div>
 
-                {/* Dropdown alternative (Requirement 5) */}
+                {/* Dropdown alternative */}
                 <div>
-                  <label className="text-2xs font-bold text-muted-foreground block mb-1">
+                  <label className="text-2xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
                     Or Select Existing Customer
                   </label>
                   <select
                     value={selectedCustomerId}
                     onChange={(e) => handleSelectCustomerFromDropdown(e.target.value)}
-                    className="input-field text-xs py-1.5"
+                    className="select-field text-xs"
                   >
                     <option value="walkin">Walk-in Customer</option>
                     <option value="__add_new__" className="font-bold text-primary">
@@ -963,24 +963,29 @@ export default function SalesPage() {
                 </div>
 
                 {/* Payment Method Selector */}
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(['UPI', 'Cash', 'Card', 'Credit'] as const).map((m) => (
-                    <button
-                      key={`pm-btn-${m}`}
-                      onClick={() => setPaymentMethod(m)}
-                      className={`py-2 rounded-xl text-xs font-bold border transition-colors ${
-                        paymentMethod === m
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-muted/40 text-muted-foreground border-border hover:text-foreground'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
+                <div>
+                  <label className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
+                    Payment Method
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {(['UPI', 'Cash', 'Card', 'Credit'] as const).map((m) => (
+                      <button
+                        key={`pm-btn-${m}`}
+                        onClick={() => setPaymentMethod(m)}
+                        className={`h-9 rounded-xl text-xs font-bold border transition-all duration-150 flex items-center justify-center ${
+                          paymentMethod === m
+                            ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                            : 'bg-muted/40 text-muted-foreground border-border/80 hover:border-border hover:text-foreground'
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className="grid grid-cols-2 gap-2.5 pt-2">
                   <button
                     onClick={() => {
                       if (heldCart) {
@@ -994,15 +999,16 @@ export default function SalesPage() {
                         toast.info('Cart put on hold');
                       }
                     }}
-                    className="btn-secondary text-xs py-2.5"
+                    className="btn-secondary h-10 text-xs font-semibold shadow-xs"
                   >
                     {heldCart ? 'Resume Held Cart' : 'Hold Cart'}
                   </button>
                   <button
                     onClick={handleCheckout}
                     disabled={cart.length === 0}
-                    className="btn-primary text-xs py-2.5 font-bold"
+                    className="btn-primary h-10 text-xs font-bold shadow-xs flex items-center justify-center gap-1.5"
                   >
+                    <Icon name="CheckIcon" size={15} />
                     Complete Checkout
                   </button>
                 </div>
@@ -1010,9 +1016,9 @@ export default function SalesPage() {
             </div>
           </div>
         ) : (
-          /* Sales History Tab (Requirement 17) */
-          <div className="card p-4 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
+          /* Sales History Tab */
+          <div className="card p-4 sm:p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/80">
               <div>
                 <h3 className="text-sm font-bold text-foreground">Sales Orders & Invoices</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">Authoritative MySQL customer sales transaction ledger</p>
@@ -1020,17 +1026,20 @@ export default function SalesPage() {
 
               {/* History Filters */}
               <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Search invoice, customer, phone..."
-                  value={historySearch}
-                  onChange={(e) => setHistorySearch(e.target.value)}
-                  className="input-field text-xs py-1 w-44"
-                />
+                <div className="relative">
+                  <Icon name="MagnifyingGlassIcon" size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search invoice, customer..."
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    className="input-field pl-8 text-xs py-1.5 w-48"
+                  />
+                </div>
                 <select
                   value={historyStoreFilter}
                   onChange={(e) => setHistoryStoreFilter(e.target.value)}
-                  className="input-field text-xs py-1 w-32"
+                  className="select-field text-xs py-1.5 w-36"
                 >
                   <option value="All">All Stores</option>
                   <option value="CENTRAL">CENTRAL</option>
@@ -1042,48 +1051,48 @@ export default function SalesPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left text-xs border-collapse min-w-[850px]">
                 <thead>
-                  <tr className="border-b border-border text-2xs uppercase tracking-wider text-muted-foreground bg-muted/30">
-                    <th className="px-3 py-2.5">Invoice #</th>
-                    <th className="px-3 py-2.5">Date / Time</th>
-                    <th className="px-3 py-2.5">Store</th>
-                    <th className="px-3 py-2.5">Customer & Mobile</th>
-                    <th className="px-3 py-2.5 text-center">Items</th>
-                    <th className="px-3 py-2.5 text-right">Subtotal</th>
-                    <th className="px-3 py-2.5 text-right">GST</th>
-                    <th className="px-3 py-2.5 text-right">Total</th>
-                    <th className="px-3 py-2.5">Payment</th>
-                    <th className="px-3 py-2.5 text-right">Actions</th>
+                  <tr className="table-header">
+                    <th className="px-4 py-3">Invoice #</th>
+                    <th className="px-4 py-3">Date / Time</th>
+                    <th className="px-4 py-3">Store</th>
+                    <th className="px-4 py-3">Customer & Mobile</th>
+                    <th className="px-4 py-3 text-center">Items</th>
+                    <th className="px-4 py-3 text-right font-tabular">Subtotal</th>
+                    <th className="px-4 py-3 text-right font-tabular">GST</th>
+                    <th className="px-4 py-3 text-right font-tabular">Total</th>
+                    <th className="px-4 py-3">Payment</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border/60">
                   {filteredSalesHistory.map((s) => (
-                    <tr key={`hist-row-${s.id}`} className="hover:bg-muted/40 transition-colors">
-                      <td className="px-3 py-2.5 font-mono font-bold text-primary">{s.orderNo}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{s.createdAt}</td>
-                      <td className="px-3 py-2.5"><span className="badge-info text-2xs">{s.store}</span></td>
-                      <td className="px-3 py-2.5">
-                        <span className="font-bold text-foreground block">{s.customerName}</span>
-                        <span className="text-2xs font-mono text-muted-foreground">{s.customerPhone}</span>
+                    <tr key={`hist-row-${s.id}`} className="table-row">
+                      <td className="px-4 py-3 font-mono font-bold text-primary">{s.orderNo}</td>
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{s.createdAt}</td>
+                      <td className="px-4 py-3"><span className="badge-info text-3xs font-semibold">{s.store}</span></td>
+                      <td className="px-4 py-3">
+                        <span className="font-semibold text-foreground block">{s.customerName}</span>
+                        <span className="text-3xs font-mono text-muted-foreground">{s.customerPhone}</span>
                       </td>
-                      <td className="px-3 py-2.5 text-center font-medium">{s.items?.length || 1}</td>
-                      <td className="px-3 py-2.5 text-right font-tabular">₹{s.subtotal.toLocaleString('en-IN')}</td>
-                      <td className="px-3 py-2.5 text-right font-tabular text-muted-foreground">
+                      <td className="px-4 py-3 text-center font-medium">{s.items?.length || 1}</td>
+                      <td className="px-4 py-3 text-right font-tabular">₹{s.subtotal.toLocaleString('en-IN')}</td>
+                      <td className="px-4 py-3 text-right font-tabular text-muted-foreground">
                         {s.taxTotal > 0 ? `₹${s.taxTotal.toLocaleString('en-IN')}` : '₹0'}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-bold text-foreground font-tabular">
+                      <td className="px-4 py-3 text-right font-bold text-foreground font-tabular">
                         ₹{s.total.toLocaleString('en-IN')}
                       </td>
-                      <td className="px-3 py-2.5">
-                        <span className="badge-neutral text-2xs">{s.paymentMethod}</span>
+                      <td className="px-4 py-3">
+                        <span className="badge-neutral text-3xs">{s.paymentMethod}</span>
                       </td>
-                      <td className="px-3 py-2.5 text-right">
+                      <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => setReceiptModal(s)}
-                            className="btn-secondary text-2xs py-1 px-2"
+                            className="btn-secondary text-2xs py-1 px-2.5 h-7"
                             title="View Invoice"
                           >
                             View

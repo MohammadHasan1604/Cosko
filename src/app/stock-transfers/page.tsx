@@ -217,15 +217,18 @@ export default function StockTransfersPage() {
 
         {/* Transfers Directory Table */}
         <div className="card overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <h3 className="text-sm sm:text-base font-bold text-foreground">Stock Transfer Manifests</h3>
-            <span className="text-xs text-muted-foreground">{filteredTransfers.length} total transfers</span>
+          <div className="p-4 sm:p-5 border-b border-border/80 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm sm:text-base font-extrabold text-foreground">Stock Transfer Manifests</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Authoritative inter-store movement records</p>
+            </div>
+            <span className="badge-neutral text-3xs font-semibold">{filteredTransfers.length} total transfers</span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full text-left border-collapse text-xs min-w-[780px]">
               <thead>
-                <tr className="border-b border-border bg-muted/40 font-bold uppercase text-muted-foreground text-2xs">
+                <tr className="table-header">
                   <th className="px-4 py-3">Transfer #</th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Route (From → To)</th>
@@ -236,7 +239,7 @@ export default function StockTransfersPage() {
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border font-tabular">
+              <tbody className="divide-y divide-border/60 font-tabular">
                 {filteredTransfers.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
@@ -245,23 +248,23 @@ export default function StockTransfersPage() {
                   </tr>
                 ) : (
                   filteredTransfers.map((t: any) => (
-                    <tr key={t.id || t.transferNo} className="hover:bg-muted/30 transition-colors">
+                    <tr key={t.id || t.transferNo} className="table-row">
                       <td className="px-4 py-3 font-mono font-bold text-primary">{t.transferNo}</td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                         {t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN') : 'Recent'}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5 font-bold">
                           <span className="badge-neutral text-3xs">{t.sourceStore}</span>
-                          <Icon name="ArrowRightIcon" size={12} className="text-muted-foreground" />
+                          <Icon name="ArrowRightIcon" size={11} className="text-muted-foreground/70" />
                           <span className="badge-info text-3xs">{t.destStore}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-foreground">{t.totalUnits || t.qty}</td>
-                      <td className="px-4 py-3 text-right font-bold text-foreground">
+                      <td className="px-4 py-3 text-right font-extrabold text-foreground">{t.totalUnits || t.qty}</td>
+                      <td className="px-4 py-3 text-right font-extrabold text-foreground">
                         ₹{(Number(t.totalTransferValue) || (t.transferPrice * t.qty) || 0).toLocaleString('en-IN')}
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-success">
+                      <td className="px-4 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
                         {t.sourceStore === 'CENTRAL' ? `+₹${(Number(t.grossProfit) || t.transferProfit || 0).toLocaleString('en-IN')}` : '₹0.00'}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -273,14 +276,14 @@ export default function StockTransfersPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => setViewModalTransfer(t)}
-                            className="btn-secondary text-2xs py-1 px-2.5"
+                            className="btn-secondary text-2xs py-1 px-2.5 h-7"
                           >
                             View Details
                           </button>
                           {currentUser.role === 'Super Admin' && t.status !== 'Cancelled' && (
                             <button
                               onClick={() => setCancelModalTransfer(t)}
-                              className="btn-danger text-2xs py-1 px-2.5 font-bold"
+                              className="btn-danger text-2xs py-1 px-2.5 h-7 font-bold"
                               title="Cancel Transfer & Reverse Inventory"
                             >
                               Cancel & Reverse

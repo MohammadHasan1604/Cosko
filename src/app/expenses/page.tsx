@@ -103,30 +103,30 @@ export default function ExpensesPage() {
     <AppLayout activeRoute="/expenses">
       <div className="space-y-6 fade-in">
         {/* Page Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Operating Expenses</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Operating Expenses</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Store operating expenses, utility bills, rent, logistics, and approval status.
             </p>
           </div>
 
-          <button onClick={() => setModalOpen(true)} className="btn-primary gap-2 text-sm">
+          <button onClick={() => setModalOpen(true)} className="btn-primary gap-2 text-xs sm:text-sm font-semibold shadow-xs">
             <Icon name="PlusIcon" size={16} />
             Log New Expense
           </button>
         </div>
 
         {/* Expenses Summary Card */}
-        <div className="card p-5 bg-gradient-to-r from-primary/10 via-info/5 to-card flex items-center justify-between">
+        <div className="card p-5 bg-gradient-to-r from-primary/10 via-info/5 to-card flex items-center justify-between border border-border/80">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Logged Expenses</p>
+            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Logged Expenses</p>
             <h2 className="text-2xl font-extrabold text-foreground font-tabular mt-1">₹{totalExpense.toLocaleString('en-IN')}</h2>
-            <p className="text-2xs text-muted-foreground mt-0.5">
+            <p className="text-3xs text-muted-foreground mt-0.5">
               {filteredExpenses.length} approved transactions in active store scope ({selectedStore})
             </p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center font-bold text-lg">
+          <div className="w-11 h-11 rounded-2xl bg-primary text-white flex items-center justify-center font-bold text-base shadow-xs">
             ₹
           </div>
         </div>
@@ -134,51 +134,51 @@ export default function ExpensesPage() {
         {/* Table */}
         <div className="card overflow-hidden">
           <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left min-w-[750px]">
+            <table className="w-full text-left min-w-[750px] text-xs">
               <thead>
-                <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
+                <tr className="table-header">
                   <th className="px-4 py-3">Ref No</th>
                   <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3">Description</th>
                   <th className="px-4 py-3">Store</th>
-                  <th className="px-4 py-3 font-tabular">Amount</th>
+                  <th className="px-4 py-3 font-tabular text-right">Amount</th>
                   <th className="px-4 py-3">Payment Method</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border text-sm">
+              <tbody className="divide-y divide-border/60">
                 {filteredExpenses.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground text-xs">
+                    <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground text-xs">
                       No expense records found for {selectedStore}. Click &quot;Log New Expense&quot; to add one.
                     </td>
                   </tr>
                 ) : (
                   filteredExpenses.map((exp) => (
-                    <tr key={`exp-${exp.id}`} className="hover:bg-muted/40 transition-colors">
-                      <td className="px-4 py-3.5 font-mono text-xs font-bold text-primary">{exp.referenceNo}</td>
-                      <td className="px-4 py-3.5 font-semibold text-foreground">{exp.category}</td>
-                      <td className="px-4 py-3.5 text-xs text-muted-foreground">{exp.description}</td>
-                      <td className="px-4 py-3.5"><span className="badge-info text-2xs">{exp.store}</span></td>
-                      <td className="px-4 py-3.5 font-bold font-tabular text-foreground">₹{exp.amount.toLocaleString('en-IN')}</td>
-                      <td className="px-4 py-3.5 text-2xs text-muted-foreground">{exp.paymentMethod}</td>
-                      <td className="px-4 py-3.5">
-                        <span className="text-2xs bg-positive/10 text-positive px-2 py-0.5 rounded font-semibold">{exp.status}</span>
+                    <tr key={`exp-${exp.id}`} className="table-row">
+                      <td className="px-4 py-3 font-mono text-xs font-bold text-primary">{exp.referenceNo}</td>
+                      <td className="px-4 py-3 font-semibold text-foreground">{exp.category}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{exp.description}</td>
+                      <td className="px-4 py-3"><span className="badge-info text-3xs font-semibold">{exp.store}</span></td>
+                      <td className="px-4 py-3 font-extrabold font-tabular text-foreground text-right">₹{exp.amount.toLocaleString('en-IN')}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{exp.paymentMethod}</td>
+                      <td className="px-4 py-3">
+                        <span className="badge-success text-3xs font-bold">{exp.status}</span>
                       </td>
-                      <td className="px-4 py-3.5 text-2xs text-muted-foreground">{exp.date}</td>
-                      <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{exp.date}</td>
+                      <td className="px-4 py-3 text-right space-x-1 whitespace-nowrap">
                         <button
                           onClick={() => handleOpenEdit(exp)}
-                          className="p-1.5 rounded-lg border border-border hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                           title="Edit Expense"
                         >
                           <Icon name="PencilSquareIcon" size={14} />
                         </button>
                         <button
                           onClick={() => handleOpenDelete(exp)}
-                          className="p-1.5 rounded-lg border border-rose-500/20 hover:bg-rose-500/10 text-rose-500 transition-colors"
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors"
                           title="Delete Expense"
                         >
                           <Icon name="TrashIcon" size={14} />

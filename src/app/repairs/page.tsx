@@ -256,9 +256,9 @@ export default function RepairsPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/customers/existing"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card text-foreground hover:bg-secondary transition-colors text-sm font-medium shadow-sm"
+              className="btn-secondary gap-2 text-xs sm:text-sm font-semibold shadow-xs"
             >
-              <Icon name="UsersIcon" className="w-4 h-4 text-primary" />
+              <Icon name="UsersIcon" size={16} className="text-primary" />
               <span>Existing Customers</span>
             </Link>
             <button
@@ -266,7 +266,7 @@ export default function RepairsPage() {
                 setNewStoreCode(selectedStore === 'All Stores' ? 'CENTRAL' : selectedStore);
                 setCreateModalOpen(true);
               }}
-              className="btn-primary gap-2 text-sm shadow-sm"
+              className="btn-primary gap-2 text-xs sm:text-sm font-semibold shadow-xs"
             >
               <Icon name="PlusIcon" size={16} />
               Log New Repair Ticket
@@ -276,67 +276,67 @@ export default function RepairsPage() {
 
         {/* Top KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Total Enquiries</span>
-            <div className="text-2xl font-bold text-foreground mt-1">{kpis.totalEnquiries}</div>
-            <span className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-              <Icon name="ClipboardDocumentListIcon" className="w-3.5 h-3.5 text-primary" /> All Records
+          <div className="card p-4 flex flex-col justify-between">
+            <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Enquiries</span>
+            <div className="text-2xl font-extrabold text-foreground font-tabular mt-1">{kpis.totalEnquiries}</div>
+            <span className="text-3xs text-muted-foreground mt-1 flex items-center gap-1 font-medium">
+              <Icon name="ClipboardDocumentListIcon" size={12} className="text-primary" /> All Records
             </span>
           </div>
 
-          <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Pending Diagnosis</span>
-            <div className="text-2xl font-bold text-amber-500 mt-1">{kpis.pendingCount}</div>
-            <span className="text-[11px] text-amber-500/80 mt-1 flex items-center gap-1">
-              <Icon name="ClockIcon" className="w-3.5 h-3.5" /> Action Needed
+          <div className="card p-4 flex flex-col justify-between">
+            <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Pending Diagnosis</span>
+            <div className="text-2xl font-extrabold text-amber-500 font-tabular mt-1">{kpis.pendingCount}</div>
+            <span className="text-3xs text-amber-500 mt-1 flex items-center gap-1 font-semibold">
+              <Icon name="ClockIcon" size={12} /> Action Needed
             </span>
           </div>
 
-          <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-            <span className="text-xs font-medium text-muted-foreground">In Progress</span>
-            <div className="text-2xl font-bold text-blue-500 mt-1">{kpis.inProgressCount}</div>
-            <span className="text-[11px] text-blue-500/80 mt-1 flex items-center gap-1">
-              <Icon name="WrenchIcon" className="w-3.5 h-3.5" /> On Workbench
+          <div className="card p-4 flex flex-col justify-between">
+            <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">In Progress</span>
+            <div className="text-2xl font-extrabold text-sky-500 font-tabular mt-1">{kpis.inProgressCount}</div>
+            <span className="text-3xs text-sky-500 mt-1 flex items-center gap-1 font-semibold">
+              <Icon name="WrenchIcon" size={12} /> On Workbench
             </span>
           </div>
 
-          <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Completed</span>
-            <div className="text-2xl font-bold text-emerald-500 mt-1">{kpis.completedCount}</div>
-            <span className="text-[11px] text-emerald-500/80 mt-1 flex items-center gap-1">
-              <Icon name="CheckCircleIcon" className="w-3.5 h-3.5" /> Ready/Delivered
+          <div className="card p-4 flex flex-col justify-between">
+            <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Completed</span>
+            <div className="text-2xl font-extrabold text-emerald-500 font-tabular mt-1">{kpis.completedCount}</div>
+            <span className="text-3xs text-emerald-500 mt-1 flex items-center gap-1 font-semibold">
+              <Icon name="CheckCircleIcon" size={12} /> Ready/Delivered
             </span>
           </div>
 
-          <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Unique Customers</span>
-            <div className="text-2xl font-bold text-purple-500 mt-1">{kpis.customersWithRepairs}</div>
-            <span className="text-[11px] text-purple-500/80 mt-1 flex items-center gap-1">
-              <Icon name="UserGroupIcon" className="w-3.5 h-3.5" /> Distinct Phones
+          <div className="card p-4 flex flex-col justify-between">
+            <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Unique Customers</span>
+            <div className="text-2xl font-extrabold text-purple-500 font-tabular mt-1">{kpis.customersWithRepairs}</div>
+            <span className="text-3xs text-purple-500 mt-1 flex items-center gap-1 font-semibold">
+              <Icon name="UserGroupIcon" size={12} /> Distinct Phones
             </span>
           </div>
 
-          <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Retail Cross-Sale</span>
-            <div className="text-2xl font-bold text-cyan-500 mt-1">{kpis.repairAndPurchaseCount}</div>
-            <span className="text-[11px] text-cyan-500/80 mt-1 flex items-center gap-1">
-              <Icon name="ShoppingBagIcon" className="w-3.5 h-3.5" /> Linked Purchases
+          <div className="card p-4 flex flex-col justify-between">
+            <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Retail Cross-Sale</span>
+            <div className="text-2xl font-extrabold text-cyan-500 font-tabular mt-1">{kpis.repairAndPurchaseCount}</div>
+            <span className="text-3xs text-cyan-500 mt-1 flex items-center gap-1 font-semibold">
+              <Icon name="ShoppingBagIcon" size={12} /> Linked Purchases
             </span>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="card p-3.5 sm:p-4 space-y-3">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             {/* Search Input */}
             <div className="relative flex-1 max-w-md">
-              <Icon name="MagnifyingGlassIcon" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Icon name="MagnifyingGlassIcon" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search ticket, customer name, phone, or device..."
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="input-field pl-9 text-xs font-medium"
               />
             </div>
 
@@ -345,7 +345,7 @@ export default function RepairsPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="select-field text-xs py-1.5 w-auto min-w-[140px]"
               >
                 <option value="All">All Statuses</option>
                 <option value="Pending Diagnosis">Pending Diagnosis</option>
@@ -358,7 +358,7 @@ export default function RepairsPage() {
               <select
                 value={storeFilter}
                 onChange={(e) => setStoreFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="select-field text-xs py-1.5 w-auto min-w-[140px]"
               >
                 <option value="All Stores">All Stores</option>
                 {[...storesList]
@@ -373,7 +373,7 @@ export default function RepairsPage() {
               <select
                 value={deviceFilter}
                 onChange={(e) => setDeviceFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="select-field text-xs py-1.5 w-auto min-w-[140px]"
               >
                 <option value="All">All Devices</option>
                 <option value="Mobile">Mobile</option>
@@ -389,27 +389,27 @@ export default function RepairsPage() {
         </div>
 
         {/* Repairs Table */}
-        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+        <div className="card overflow-hidden">
           <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-secondary/40 text-muted-foreground text-xs uppercase font-medium">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Ticket No</th>
-                  <th className="px-4 py-3 font-semibold">Date</th>
-                  <th className="px-4 py-3 font-semibold">Customer</th>
-                  <th className="px-4 py-3 font-semibold">Device</th>
-                  <th className="px-4 py-3 font-semibold">Reported Issue</th>
-                  <th className="px-4 py-3 font-semibold">Est. Cost</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Store</th>
-                  <th className="px-4 py-3 font-semibold">Linked Sale</th>
-                  <th className="px-4 py-3 font-semibold text-right">Actions</th>
+            <table className="w-full text-left text-xs min-w-[900px]">
+              <thead>
+                <tr className="table-header">
+                  <th className="px-4 py-3">Ticket No</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Device</th>
+                  <th className="px-4 py-3">Reported Issue</th>
+                  <th className="px-4 py-3 text-right font-tabular">Est. Cost</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Store</th>
+                  <th className="px-4 py-3">Linked Sale</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-border/60">
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
                       <div className="inline-flex items-center gap-2">
                         <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                         <span>Querying real-time MySQL repair records...</span>
@@ -418,46 +418,46 @@ export default function RepairsPage() {
                   </tr>
                 ) : repairs.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
                       No repair records matched the selected criteria.
                     </td>
                   </tr>
                 ) : (
                   repairs.map((r) => (
-                    <tr key={r.id} className="hover:bg-secondary/30 transition-colors">
-                      <td className="px-4 py-3.5 font-mono text-xs font-bold text-primary">
+                    <tr key={r.id} className="table-row">
+                      <td className="px-4 py-3 font-mono text-xs font-bold text-primary">
                         {r.ticketNo}
                       </td>
-                      <td className="px-4 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                         {r.enquiryDate}
                       </td>
-                      <td className="px-4 py-3.5">
-                        <div className="font-medium text-foreground text-xs">{r.customerName}</div>
-                        <div className="text-[11px] text-muted-foreground font-mono">{r.customerPhone}</div>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-foreground text-xs">{r.customerName}</div>
+                        <div className="text-3xs text-muted-foreground font-mono">{r.customerPhone}</div>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="p-1 rounded-lg bg-primary/10 text-primary">
-                            <Icon name={getDeviceIcon(r.deviceType)} className="w-4 h-4" />
+                            <Icon name={getDeviceIcon(r.deviceType)} size={14} />
                           </span>
                           <div>
-                            <div className="font-medium text-foreground text-xs">{r.deviceName}</div>
-                            <div className="text-[11px] text-muted-foreground">{r.deviceType}</div>
+                            <div className="font-semibold text-foreground text-xs">{r.deviceName}</div>
+                            <div className="text-3xs text-muted-foreground">{r.deviceType}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3.5 text-xs text-foreground max-w-xs truncate" title={r.issueDescription}>
+                      <td className="px-4 py-3 text-xs text-foreground max-w-xs truncate" title={r.issueDescription}>
                         {r.issueDescription}
                       </td>
-                      <td className="px-4 py-3.5 font-tabular text-xs font-semibold text-foreground whitespace-nowrap">
+                      <td className="px-4 py-3 font-tabular text-xs font-extrabold text-foreground text-right whitespace-nowrap">
                         ₹{(Number(r.estimatedCost) || 0).toLocaleString('en-IN')}
                       </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(r.status)}`}>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-3xs font-bold border ${getStatusBadge(r.status)}`}>
                           {r.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-secondary text-secondary-foreground">
                           {r.storeCode}
                         </span>

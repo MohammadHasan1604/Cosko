@@ -263,7 +263,7 @@ export default function PurchasesPage() {
           <div className="hidden md:block overflow-x-auto scrollbar-thin">
             <table className="w-full text-left min-w-[700px]">
               <thead>
-                <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
+                <tr className="table-header">
                   <th className="px-4 py-3">PO Number</th>
                   <th className="px-4 py-3">Vendor</th>
                   <th className="px-4 py-3">Store</th>
@@ -274,30 +274,30 @@ export default function PurchasesPage() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border text-sm">
+              <tbody className="divide-y divide-border/60 text-xs">
                 {filteredPurchases.map((po) => (
-                  <tr key={`po-row-${po.id}`} className="hover:bg-muted/40 transition-colors">
-                    <td className="px-4 py-3.5 font-mono text-xs font-bold text-primary">{po.poNo}</td>
-                    <td className="px-4 py-3.5 font-semibold text-foreground">{po.vendorName}</td>
-                    <td className="px-4 py-3.5"><span className="badge-info text-2xs">{po.store}</span></td>
-                    <td className="px-4 py-3.5 font-bold font-tabular text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3.5">
-                      <span className={`text-2xs font-semibold px-2 py-0.5 rounded ${po.status === 'Received' ? 'bg-positive/10 text-positive' : 'bg-warning/10 text-warning'}`}>
+                  <tr key={`po-row-${po.id}`} className="table-row">
+                    <td className="px-4 py-3 font-mono text-xs font-bold text-primary">{po.poNo}</td>
+                    <td className="px-4 py-3 font-semibold text-foreground">{po.vendorName}</td>
+                    <td className="px-4 py-3"><span className="badge-info text-3xs font-semibold">{po.store}</span></td>
+                    <td className="px-4 py-3 font-extrabold font-tabular text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-3xs font-bold px-2 py-0.5 rounded-full ${po.status === 'Received' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'}`}>
                         {po.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5">
-                      <span className={`text-2xs font-semibold px-2 py-0.5 rounded ${po.paymentStatus === 'Paid' ? 'bg-positive/10 text-positive' : po.paymentStatus === 'Partial' ? 'bg-info/10 text-info' : 'bg-danger/10 text-danger'}`}>
+                    <td className="px-4 py-3">
+                      <span className={`text-3xs font-bold px-2 py-0.5 rounded-full ${po.paymentStatus === 'Paid' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : po.paymentStatus === 'Partial' ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'}`}>
                         {po.paymentStatus === 'Partial' ? `Partial (Rem: ₹${(po.remainingAmount ?? (po.totalAmount - (po.paidAmount || 0))).toLocaleString('en-IN')})` : po.paymentStatus}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 text-2xs text-muted-foreground">{po.expectedDate}</td>
-                    <td className="px-4 py-3.5 text-right">
+                    <td className="px-4 py-3 text-2xs text-muted-foreground whitespace-nowrap">{po.expectedDate}</td>
+                    <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         {po.paymentStatus !== 'Paid' && (
                           <button
                             onClick={() => openPaymentModal(po)}
-                            className="btn-secondary text-3xs py-1 px-2 gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                            className="btn-secondary h-7 text-3xs py-1 px-2.5 gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 border-emerald-500/30"
                             title="Record Payment against PO"
                           >
                             <Icon name="BanknotesIcon" size={12} />
@@ -307,18 +307,18 @@ export default function PurchasesPage() {
                         {po.status !== 'Received' && (
                           <button
                             onClick={() => updatePurchase(po.id, { status: 'Received' })}
-                            className="btn-primary text-3xs py-1 px-2 gap-1"
+                            className="btn-primary h-7 text-3xs py-1 px-2.5 gap-1"
                             title="Receive Goods Received Note (GRN) & Credit Stock"
                           >
                             <Icon name="CheckIcon" size={12} />
                             Receive GRN
                           </button>
                         )}
-                        <button onClick={() => openEdit(po)} className="p-1 text-muted-foreground hover:text-primary" title="Edit PO">
-                          <Icon name="PencilSquareIcon" size={15} />
+                        <button onClick={() => openEdit(po)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit PO">
+                          <Icon name="PencilSquareIcon" size={14} />
                         </button>
-                        <button onClick={() => setDeletePoModal(po)} className="p-1 text-muted-foreground hover:text-danger" title="Delete PO">
-                          <Icon name="TrashIcon" size={15} />
+                        <button onClick={() => setDeletePoModal(po)} className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors" title="Delete PO">
+                          <Icon name="TrashIcon" size={14} />
                         </button>
                       </div>
                     </td>

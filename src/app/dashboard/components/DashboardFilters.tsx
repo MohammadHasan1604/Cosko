@@ -116,19 +116,19 @@ export default function DashboardFilters() {
       <div className="relative">
         <button
           onClick={() => { setStoreOpen((v) => !v); setRangeOpen(false); }}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:border-ring transition-all duration-150 shadow-card"
+          className="h-9 inline-flex items-center gap-2 px-3 rounded-xl border border-border/80 bg-card/90 hover:bg-muted/50 text-xs font-semibold text-foreground hover:border-primary/40 transition-all duration-150 shadow-xs active:scale-[0.98]"
         >
-          <Icon name="MapPinIcon" size={14} className="text-muted-foreground" />
+          <Icon name="MapPinIcon" size={14} className="text-primary/80 flex-shrink-0" />
           <span className="max-w-[180px] truncate">
             {selectedStore === 'All Stores' ? 'All Stores (Consolidated)' : selectedStore}
           </span>
           {currentUser.role !== 'Super Admin' && (
-            <span className="badge-warning text-2xs px-1.5 py-0.5">Assigned</span>
+            <span className="badge-warning text-3xs px-1.5 py-0.5">Assigned</span>
           )}
-          <Icon name="ChevronDownIcon" size={13} className="text-muted-foreground" />
+          <Icon name="ChevronDownIcon" size={13} className="text-muted-foreground ml-0.5 flex-shrink-0" />
         </button>
         {storeOpen && (
-          <div className="absolute right-0 top-full mt-1.5 w-72 bg-card border border-border rounded-xl shadow-modal z-30 py-2 fade-in">
+          <div className="absolute right-0 top-full mt-1.5 w-72 bg-card/98 backdrop-blur-md border border-border/80 rounded-2xl shadow-dropdown z-30 py-2 fade-in">
             {/* Section 1: Reporting Scope */}
             <div className="px-3 pb-1 pt-0.5">
               <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
@@ -137,7 +137,7 @@ export default function DashboardFilters() {
               <button
                 onClick={() => handleSelectStore('All Stores')}
                 disabled={currentUser.role !== 'Super Admin'}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors duration-100 flex items-center justify-between ${
+                className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-colors duration-100 flex items-center justify-between ${
                   currentUser.role !== 'Super Admin'
                     ? 'text-muted-foreground/50 opacity-60 cursor-not-allowed'
                     : selectedStore === 'All Stores'
@@ -157,7 +157,7 @@ export default function DashboardFilters() {
               </button>
             </div>
 
-            <div className="my-1.5 border-t border-border" />
+            <div className="my-1.5 border-t border-border/60" />
 
             {/* Section 2: Physical Stores */}
             <div className="px-3 pt-0.5">
@@ -176,7 +176,7 @@ export default function DashboardFilters() {
                       key={`store-${st.code}`}
                       onClick={() => handleSelectStore(st.code)}
                       disabled={isLocked}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors duration-100 flex items-center justify-between ${
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-colors duration-100 flex items-center justify-between ${
                         isLocked
                           ? 'text-muted-foreground/50 opacity-60 cursor-not-allowed'
                           : isSelected
@@ -213,22 +213,22 @@ export default function DashboardFilters() {
       <div className="relative">
         <button
           onClick={() => { setRangeOpen((v) => !v); setStoreOpen(false); }}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:border-ring transition-all duration-150 shadow-card"
+          className="h-9 inline-flex items-center gap-2 px-3 rounded-xl border border-border/80 bg-card/90 hover:bg-muted/50 text-xs font-semibold text-foreground hover:border-primary/40 transition-all duration-150 shadow-xs active:scale-[0.98]"
         >
-          <Icon name="CalendarDaysIcon" size={14} className="text-muted-foreground" />
+          <Icon name="CalendarDaysIcon" size={14} className="text-primary/80 flex-shrink-0" />
           <span className="max-w-[210px] truncate">{displayDatePeriod}</span>
-          <Icon name="ChevronDownIcon" size={13} className="text-muted-foreground" />
+          <Icon name="ChevronDownIcon" size={13} className="text-muted-foreground ml-0.5 flex-shrink-0" />
         </button>
         {rangeOpen && (
-          <div className="absolute right-0 top-full mt-1.5 w-52 bg-card border border-border rounded-xl shadow-modal z-30 py-1.5 fade-in">
+          <div className="absolute right-0 top-full mt-1.5 w-52 bg-card/98 backdrop-blur-md border border-border/80 rounded-2xl shadow-dropdown z-30 py-1.5 fade-in">
             {dateRanges.map((r) => {
               const isSelected = datePeriod === r;
               return (
                 <button
                   key={`range-${r}`}
                   onClick={() => handleSelectRange(r)}
-                  className={`w-full text-left px-4 py-2 text-xs transition-colors duration-100 flex items-center justify-between ${
-                    isSelected ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground hover:bg-muted'
+                  className={`w-full text-left px-3.5 py-2 text-xs transition-colors duration-100 flex items-center justify-between rounded-lg mx-1 w-[calc(100%-8px)] ${
+                    isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-foreground hover:bg-muted'
                   }`}
                 >
                   <span>{r}</span>
@@ -241,7 +241,7 @@ export default function DashboardFilters() {
       </div>
 
       {/* Export */}
-      <button onClick={handleExport} className="btn-secondary py-2 px-3 text-sm gap-1.5">
+      <button onClick={handleExport} className="btn-secondary h-9 px-3.5 text-xs font-semibold gap-1.5 shadow-xs">
         <Icon name="ArrowDownTrayIcon" size={14} />
         Export Report
       </button>

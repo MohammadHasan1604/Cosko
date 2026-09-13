@@ -141,20 +141,24 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
         key={item.id}
         href={item.href}
         onClick={onMobileClose}
-        className={isActive ? 'nav-item-active' : 'nav-item'}
+        className={`${isActive ? 'nav-item-active shadow-2xs' : 'nav-item'} group`}
         title={collapsed ? item.label : undefined}
       >
-        <Icon name={item.icon as Parameters<typeof Icon>[0]['name']} size={18} className="flex-shrink-0" />
+        <Icon
+          name={item.icon as Parameters<typeof Icon>[0]['name']}
+          size={17}
+          className={`flex-shrink-0 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}
+        />
         {!collapsed && (
-          <span className="flex-1 truncate">{item.label}</span>
+          <span className="flex-1 truncate tracking-tight">{item.label}</span>
         )}
         {!collapsed && item.badge !== undefined && item.badge > 0 && (
-          <span className={`text-2xs px-1.5 py-0.5 rounded-full font-semibold ${badgeColorMap[item.badgeVariant ?? 'info']}`}>
+          <span className={`text-3xs px-2 py-0.5 rounded-full font-bold shadow-2xs ${badgeColorMap[item.badgeVariant ?? 'info']}`}>
             {item.badge}
           </span>
         )}
         {collapsed && item.badge !== undefined && item.badge > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-warning" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-warning ring-2 ring-card" />
         )}
       </Link>
     );
@@ -163,36 +167,36 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   const renderSidebarContent = (isCollapsed: boolean) => (
     <>
       {/* Logo */}
-      <div className={`flex items-center justify-between gap-2.5 px-3.5 py-4 border-b border-border flex-shrink-0 ${isCollapsed ? 'justify-center' : ''}`}>
+      <div className={`flex items-center justify-between gap-2.5 px-4 py-3.5 border-b border-border/80 flex-shrink-0 ${isCollapsed ? 'justify-center' : ''}`}>
         <Link href="/dashboard" onClick={onMobileClose} className="flex items-center gap-2.5 min-w-0">
-          <CoskoLogo size={28} showText={!isCollapsed} />
+          <CoskoLogo size={26} showText={!isCollapsed} />
         </Link>
         {!isCollapsed && (
           <button
             onClick={onMobileClose}
-            className="lg:hidden text-muted-foreground hover:text-foreground p-1 rounded-md"
+            className="lg:hidden text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted transition-colors cursor-pointer"
             aria-label="Close sidebar"
           >
-            <Icon name="XMarkIcon" size={20} />
+            <Icon name="XMarkIcon" size={18} />
           </button>
         )}
       </div>
 
       {/* Store selector */}
       {!isCollapsed && (
-        <div className="px-3 py-3 border-b border-border flex-shrink-0">
+        <div className="px-2.5 py-2.5 border-b border-border/80 flex-shrink-0">
           <div
             onClick={() => setStoreSelectorOpen(true)}
-            className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted cursor-pointer hover:bg-border transition-colors duration-150"
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-muted/40 border border-border/80 cursor-pointer hover:bg-muted hover:border-slate-300 transition-all duration-150 shadow-2xs group"
           >
-            <div className={`w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center text-white text-2xs font-bold ${
-              selectedStore === 'All Stores' ? 'bg-primary' : selectedStore === 'CENTRAL' ? 'bg-slate-800 dark:bg-slate-200 dark:text-slate-900' : 'gradient-primary'
+            <div className={`w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-3xs font-bold shadow-2xs ${
+              selectedStore === 'All Stores' ? 'bg-primary' : selectedStore === 'CENTRAL' ? 'bg-slate-800' : 'gradient-primary'
             }`}>
-              {selectedStore === 'All Stores' ? 'ALL' : selectedStore}
+              {selectedStore === 'All Stores' ? 'ALL' : selectedStore.slice(0, 3)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground truncate">{branding.appName}</p>
-              <p className="text-2xs text-muted-foreground truncate">
+              <p className="text-xs font-bold text-foreground truncate leading-tight group-hover:text-primary transition-colors">{branding.appName}</p>
+              <p className="text-3xs text-muted-foreground truncate leading-tight mt-0.5">
                 {selectedStore === 'All Stores'
                   ? 'Consolidated View'
                   : selectedStore === 'CENTRAL'
@@ -200,7 +204,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
                   : `${selectedStore} Store`}
               </p>
             </div>
-            <Icon name="ChevronUpDownIcon" size={14} className="text-muted-foreground flex-shrink-0" />
+            <Icon name="ChevronUpDownIcon" size={14} className="text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors" />
           </div>
         </div>
       )}

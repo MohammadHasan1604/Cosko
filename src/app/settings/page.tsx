@@ -356,7 +356,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 border-b border-border pb-2 flex-wrap">
+        <div className="flex items-center gap-1.5 border-b border-border/80 pb-2 flex-wrap">
           {(
             [
               { id: 'branding', label: 'White-Label Branding', icon: 'SparklesIcon' },
@@ -370,10 +370,10 @@ export default function SettingsPage() {
             <button
               key={`tab-set-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-150 ${
                 activeTab === tab.id
-                  ? 'bg-primary text-white shadow-xs'
-                  : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'bg-card border border-border/80 text-muted-foreground hover:text-foreground hover:bg-muted/40 hover:border-border'
               }`}
             >
               <Icon name={tab.icon as any} size={15} />

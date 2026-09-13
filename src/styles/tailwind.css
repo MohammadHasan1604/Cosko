@@ -201,46 +201,102 @@
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold transition-all duration-150 hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+    @apply inline-flex items-center justify-center gap-1.5 h-9 px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs sm:text-sm font-semibold transition-all duration-150 hover:bg-primary/95 hover:shadow-xs active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer shadow-2xs;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-secondary text-secondary-foreground text-sm font-semibold transition-all duration-150 hover:bg-border active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 h-9 px-3.5 py-1.5 rounded-lg bg-secondary text-secondary-foreground text-xs sm:text-sm font-semibold border border-border/80 transition-all duration-150 hover:bg-border/60 hover:text-foreground active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-2xs;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-1.5 h-9 px-3.5 py-1.5 rounded-lg border border-border bg-card text-foreground text-xs sm:text-sm font-semibold transition-all duration-150 hover:bg-muted hover:border-slate-300 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-2xs;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-muted-foreground text-sm font-medium transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-95;
+    @apply inline-flex items-center justify-center gap-1.5 h-9 px-2.5 py-1.5 rounded-lg text-muted-foreground text-xs sm:text-sm font-medium transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-[0.98] disabled:opacity-50 cursor-pointer;
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 h-9 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 hover:opacity-90 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs;
     background-color: var(--danger);
     color: #ffffff;
   }
 
+  .btn-success {
+    @apply inline-flex items-center justify-center gap-1.5 h-9 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-emerald-600 text-white transition-all duration-150 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs;
+  }
+
+  .btn-sm {
+    @apply h-7.5 px-2.5 py-1 text-2xs font-semibold rounded-md !important;
+  }
+
+  .btn-lg {
+    @apply h-10 px-4.5 py-2 text-sm font-semibold rounded-lg !important;
+  }
+
+  .btn-icon {
+    @apply w-9 h-9 p-0 flex items-center justify-center rounded-lg cursor-pointer !important;
+  }
+
+  .btn-icon-sm {
+    @apply w-7.5 h-7.5 p-0 flex items-center justify-center rounded-md cursor-pointer !important;
+  }
+
   .input-field {
-    @apply w-full px-3 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-150;
+    @apply w-full h-[38px] px-3 py-1.5 rounded-lg border border-border bg-card text-foreground text-xs sm:text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-150 shadow-2xs hover:border-slate-300;
+  }
+
+  .select-field {
+    @apply w-full h-[38px] px-3 pr-9 py-1.5 rounded-lg border border-border bg-card text-foreground text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-150 shadow-2xs cursor-pointer hover:border-slate-300;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%2364748B'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 1rem 1rem;
+  }
+
+  select.input-field {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding-right: 2.25rem !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%2364748B'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 1rem 1rem;
+    cursor: pointer;
+  }
+
+  select.input-field:focus,
+  .select-field:focus {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%23002E86'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
   }
 
   .label-text {
-    @apply block text-sm font-medium text-foreground mb-1.5;
+    @apply block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5;
   }
 
   .helper-text {
-    @apply text-xs text-muted-foreground mt-1;
+    @apply text-2xs text-muted-foreground mt-1;
   }
 
   .error-text {
-    @apply text-xs mt-1;
+    @apply text-2xs mt-1 font-medium;
     color: var(--danger);
   }
 
   .card {
-    @apply bg-card rounded-xl border border-border shadow-sm;
+    @apply bg-card rounded-xl border border-border shadow-card transition-shadow duration-150;
+  }
+
+  .card-hover {
+    @apply hover:shadow-card-hover hover:border-slate-300 transition-all duration-150;
   }
 
   .section-header {
-    @apply text-lg font-semibold text-foreground;
+    @apply text-base sm:text-lg font-bold text-foreground;
   }
 
   .metric-value {
@@ -248,56 +304,56 @@
   }
 
   .badge-active {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-semibold;
     background-color: var(--positive-bg);
     color: var(--positive);
     border: 1px solid var(--positive-border);
   }
 
   .badge-warning {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-semibold;
     background-color: var(--warning-bg);
     color: var(--warning);
     border: 1px solid var(--warning-border);
   }
 
   .badge-danger {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-semibold;
     background-color: var(--danger-bg);
     color: var(--danger);
     border: 1px solid var(--danger-border);
   }
 
   .badge-info {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-semibold;
     background-color: var(--info-bg);
     color: var(--info);
     border: 1px solid var(--info-border);
   }
 
   .badge-neutral {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground;
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-semibold bg-muted text-muted-foreground border border-border/60;
   }
 
   .nav-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground transition-all duration-150 cursor-pointer hover:bg-muted hover:text-foreground;
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium text-muted-foreground transition-all duration-150 cursor-pointer hover:bg-muted hover:text-foreground;
   }
 
   .nav-item-active {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 cursor-pointer;
-    background-color: rgba(30, 64, 175, 0.1);
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer;
+    background-color: rgba(0, 46, 134, 0.08);
     color: var(--primary);
   }
 
   .table-header {
-    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted border-b border-border cursor-pointer select-none hover:text-foreground transition-colors duration-150;
+    @apply px-4 py-3 text-left text-2xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/60 border-b border-border select-none;
   }
 
   .table-cell {
-    @apply px-4 py-3.5 text-sm text-foreground whitespace-nowrap;
+    @apply px-4 py-3 text-xs sm:text-sm text-foreground align-middle;
   }
   .table-row  {
-    @apply border-b border-border transition-colors duration-100;
+    @apply border-b border-border/70 transition-colors duration-100 hover:bg-muted/30;
   }
 
   /* Responsive COSKO Typography Hierarchy Scale */

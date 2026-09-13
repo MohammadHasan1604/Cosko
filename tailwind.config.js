@@ -69,13 +69,17 @@ module.exports = {
         sans: ['"General Sans"', 'var(--font-plus-jakarta-sans)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
       fontSize: {
+        '3xs': ['0.5625rem', { lineHeight: '0.75rem' }],
         '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
       },
       boxShadow: {
-        card: '0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.04)',
-        'card-hover': '0 4px 12px 0 rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04)',
-        modal: '0 20px 60px -10px rgba(0,0,0,0.18), 0 8px 20px -4px rgba(0,0,0,0.08)',
-        sidebar: '2px 0 8px 0 rgba(0,0,0,0.04)',
+        '2xs': '0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+        xs: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)',
+        card: '0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.03)',
+        'card-hover': '0 6px 16px -2px rgba(0,0,0,0.08), 0 2px 6px -1px rgba(0,0,0,0.04)',
+        modal: '0 24px 64px -12px rgba(15, 23, 42, 0.22), 0 8px 24px -4px rgba(15, 23, 42, 0.1)',
+        dropdown: '0 12px 32px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06)',
+        sidebar: '2px 0 8px 0 rgba(0,0,0,0.03)',
       },
       animation: {
         'fade-in': 'fadeIn 200ms ease forwards',
