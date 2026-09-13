@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifySessionToken } from '@/lib/auth';
+import { getAuthUserFromRequest } from '@/lib/auth';
 
 /**
  * POST /api/settings/data-connections/discover - Discover tables and schema columns
  */
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('cosko_session')?.value;
-    const user = token ? verifySessionToken(token) : null;
+    const user = getAuthUserFromRequest(req);
 
     if (!user || user.role !== 'Super Admin' || user.securityLevel < 100) {
       return NextResponse.json({ error: 'Unauthorized: Super Admin only' }, { status: 403 });

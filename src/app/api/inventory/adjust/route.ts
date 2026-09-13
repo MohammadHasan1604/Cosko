@@ -62,6 +62,87 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // Financial Ledger entry for stock adjustment
+      const unitCost = Number(product?.baseCostPrice) || 0;
+      const absQty = Math.abs(body.qtyChange);
+      const financialImpact = absQty * unitCost;
+
+      if (financialImpact > 0) {
+        if (body.qtyChange < 0) {
+          await tx.financialLedgerEntry.create({
+            data: {
+              entryNo: `JRN-ADJ-LOSS-${refNo}`,
+              entryDate: new Date(),
+              storeCode: body.storeCode,
+              accountCategory: 'OPERATING_EXPENSE',
+              accountName: 'Inventory Shrinkage & Spoilage Expense',
+              debit: financialImpact,
+              credit: 0,
+              amount: financialImpact,
+              refType: 'INVENTORY_ADJUSTMENT',
+              refId: body.productId,
+              refNo,
+              description: `Stock adjustment loss for ${product?.name || body.productId}: ${body.reason || 'Damage/Shrinkage'}`,
+              createdBy: user.name,
+            },
+          });
+
+          await tx.financialLedgerEntry.create({
+            data: {
+              entryNo: `JRN-ADJ-INVA-${refNo}`,
+              entryDate: new Date(),
+              storeCode: body.storeCode,
+              accountCategory: 'ASSET',
+              accountName: 'Inventory Asset (Shrinkage Write-Down)',
+              debit: 0,
+              credit: financialImpact,
+              amount: -financialImpact,
+              refType: 'INVENTORY_ADJUSTMENT',
+              refId: body.productId,
+              refNo,
+              description: `Stock asset write-down for ${product?.name || body.productId}`,
+              createdBy: user.name,
+            },
+          });
+        } else {
+          await tx.financialLedgerEntry.create({
+            data: {
+              entryNo: `JRN-ADJ-GAIN-${refNo}`,
+              entryDate: new Date(),
+              storeCode: body.storeCode,
+              accountCategory: 'REVENUE',
+              accountName: 'Inventory Count Surplus & Gain',
+              debit: 0,
+              credit: financialImpact,
+              amount: financialImpact,
+              refType: 'INVENTORY_ADJUSTMENT',
+              refId: body.productId,
+              refNo,
+              description: `Stock surplus audit gain for ${product?.name || body.productId}`,
+              createdBy: user.name,
+            },
+          });
+
+          await tx.financialLedgerEntry.create({
+            data: {
+              entryNo: `JRN-ADJ-INVA-${refNo}`,
+              entryDate: new Date(),
+              storeCode: body.storeCode,
+              accountCategory: 'ASSET',
+              accountName: 'Inventory Asset (Surplus Stock In)',
+              debit: financialImpact,
+              credit: 0,
+              amount: financialImpact,
+              refType: 'INVENTORY_ADJUSTMENT',
+              refId: body.productId,
+              refNo,
+              description: `Stock asset write-up for ${product?.name || body.productId}`,
+              createdBy: user.name,
+            },
+          });
+        }
+      }
+
       await tx.auditLog.create({
         data: {
           module: 'Inventory',

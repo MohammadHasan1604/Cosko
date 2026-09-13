@@ -14,10 +14,14 @@ export default function StockTransfersPage() {
     currentUser,
     selectedStore,
     refreshAllData,
+    updateTransferStatus,
+    deleteTransfer,
   } = useApp();
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [viewModalTransfer, setViewModalTransfer] = useState<any | null>(null);
+  const [cancelModalTransfer, setCancelModalTransfer] = useState<any | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [storeFilter, setStoreFilter] = useState('All Stores');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -261,15 +265,28 @@ export default function StockTransfersPage() {
                         {t.sourceStore === 'CENTRAL' ? `+₹${(Number(t.grossProfit) || t.transferProfit || 0).toLocaleString('en-IN')}` : '₹0.00'}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="badge-success text-3xs">{t.status || 'Received'}</span>
+                        <span className={t.status === 'Cancelled' ? 'badge-danger text-3xs font-bold' : 'badge-success text-3xs font-bold'}>
+                          {t.status || 'Received'}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => setViewModalTransfer(t)}
-                          className="btn-secondary text-2xs py-1 px-2.5"
-                        >
-                          View Details
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setViewModalTransfer(t)}
+                            className="btn-secondary text-2xs py-1 px-2.5"
+                          >
+                            View Details
+                          </button>
+                          {currentUser.role === 'Super Admin' && t.status !== 'Cancelled' && (
+                            <button
+                              onClick={() => setCancelModalTransfer(t)}
+                              className="btn-danger text-2xs py-1 px-2.5 font-bold"
+                              title="Cancel Transfer & Reverse Inventory"
+                            >
+                              Cancel & Reverse
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -476,9 +493,77 @@ export default function StockTransfersPage() {
               )}
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-border">
-              <button onClick={() => setViewModalTransfer(null)} className="btn-primary text-xs">
+            <div className="flex items-center justify-between pt-3 border-t border-border">
+              <div>
+                {currentUser.role === 'Super Admin' && viewModalTransfer.status !== 'Cancelled' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCancelModalTransfer(viewModalTransfer);
+                    }}
+                    className="btn-danger text-xs font-bold"
+                  >
+                    Cancel & Reverse Transfer
+                  </button>
+                )}
+              </div>
+              <button onClick={() => setViewModalTransfer(null)} className="btn-secondary text-xs">
                 Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Cancel Transfer Confirmation Modal */}
+      {cancelModalTransfer && (
+        <Modal
+          open={!!cancelModalTransfer}
+          onClose={() => !cancelLoading && setCancelModalTransfer(null)}
+          title={`Cancel Transfer ${cancelModalTransfer.transferNo}?`}
+          subtitle="Automatic stock restoration and inventory ledger reversal"
+          size="sm"
+        >
+          <div className="space-y-4 py-2 text-xs">
+            <div className="p-3.5 rounded-xl bg-danger/10 border border-danger/30 text-foreground space-y-1.5">
+              <div className="flex items-start gap-2">
+                <Icon name="ExclamationTriangleIcon" size={18} className="text-danger shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-sm text-danger">Atomic Stock Reversal</p>
+                  <p className="text-muted-foreground mt-1">
+                    Cancelling this transfer will automatically return <strong>{cancelModalTransfer.totalUnits || cancelModalTransfer.qty} units</strong> back to <strong>{cancelModalTransfer.sourceStore}</strong> and deduct them from <strong>{cancelModalTransfer.destStore}</strong> in the root MySQL database.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-border">
+              <button
+                type="button"
+                disabled={cancelLoading}
+                onClick={() => setCancelModalTransfer(null)}
+                className="btn-secondary text-xs"
+              >
+                Keep Transfer
+              </button>
+              <button
+                type="button"
+                disabled={cancelLoading}
+                onClick={async () => {
+                  setCancelLoading(true);
+                  try {
+                    await updateTransferStatus(cancelModalTransfer.id, 'Cancelled');
+                    setCancelModalTransfer(null);
+                    if (viewModalTransfer?.id === cancelModalTransfer.id) {
+                      setViewModalTransfer(null);
+                    }
+                  } finally {
+                    setCancelLoading(false);
+                  }
+                }}
+                className="btn-danger text-xs font-bold px-4"
+              >
+                {cancelLoading ? 'Reversing Stock...' : 'Confirm Reversal'}
               </button>
             </div>
           </div>

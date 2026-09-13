@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 /**
- * GET /api/purchases - Retrieve purchase orders (excludes Archived/Cancelled by default)
+ * GET /api/purchases - Retrieve purchase orders with authoritative payment reconciliation
  */
 export async function GET(req: NextRequest) {
   try {
@@ -16,10 +16,22 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const includeArchived = searchParams.get('includeArchived') === 'true';
+    const store = searchParams.get('store');
+    const paymentStatus = searchParams.get('paymentStatus');
 
     const whereClause: any = {};
     if (!includeArchived) {
       whereClause.status = { notIn: ['Archived', 'Cancelled'] };
+    }
+    if (store && store !== 'All Stores' && store !== 'ALL') {
+      whereClause.storeCode = store;
+    }
+    if (paymentStatus) {
+      if (paymentStatus.toLowerCase() === 'pending') {
+        whereClause.paymentStatus = { not: 'Paid' };
+      } else {
+        whereClause.paymentStatus = paymentStatus;
+      }
     }
 
     const purchases = await (prisma as any).purchaseOrder.findMany({
@@ -27,6 +39,9 @@ export async function GET(req: NextRequest) {
       include: {
         vendor: true,
         items: true,
+        payments: {
+          orderBy: { paymentDate: 'desc' },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -34,8 +49,24 @@ export async function GET(req: NextRequest) {
       take: 100,
     });
 
+    const purchasesWithFinances = purchases.map((po: any) => {
+      const totalCost = Number(po.totalCost) || 0;
+      const creditAmount = Number(po.creditAmount) || 0;
+      const realPaid = po.payments?.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0) ?? (Number(po.paidAmount) || 0);
+      const remainingAmount = Math.max(0, Math.round((totalCost - realPaid - creditAmount) * 100) / 100);
+
+      return {
+        ...po,
+        totalCost,
+        creditAmount,
+        paidAmount: realPaid,
+        remainingAmount,
+        invoiceNo: po.invoiceNo || po.poNo,
+      };
+    });
+
     return NextResponse.json(
-      { success: true, purchases },
+      { success: true, purchases: purchasesWithFinances },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
     );
   } catch (error: any) {
@@ -67,6 +98,7 @@ export async function POST(req: NextRequest) {
 
     const count = await (prisma as any).purchaseOrder.count();
     const poNo = `PO-2026-${String(count + 1).padStart(4, '0')}`;
+    const invoiceNo = body.invoiceNo?.trim() || `INV-${String(count + 1).padStart(4, '0')}`;
 
     // Resolve or upsert vendor
     let vendor = await (prisma as any).vendor.findFirst({
@@ -89,6 +121,16 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Auto-compute due date from vendor payment terms if omitted
+    let effectiveDueDate = body.dueDate ? new Date(body.dueDate) : null;
+    if (!effectiveDueDate) {
+      const terms = (vendor.paymentTerms || '').toLowerCase();
+      const days = terms.includes('15') ? 15 : terms.includes('60') ? 60 : terms.includes('immediate') || terms.includes('cash') ? 0 : 30;
+      const d = new Date(body.orderDate || Date.now());
+      d.setDate(d.getDate() + days);
+      effectiveDueDate = d;
+    }
+
     const po = await (prisma as any).$transaction(async (tx: any) => {
       let subtotal = 0;
       for (const it of body.items) {
@@ -96,17 +138,22 @@ export async function POST(req: NextRequest) {
       }
       const taxAmount = body.taxAmount || 0;
       const totalCost = subtotal + taxAmount;
+      const creditAmount = body.creditAmount ? Number(body.creditAmount) : 0;
 
       let poNotes = body.notes || '';
 
       const createdPO = await tx.purchaseOrder.create({
         data: {
           poNo,
+          invoiceNo,
           vendorId: vendor.id,
           storeCode: body.storeCode || 'CENTRAL',
           status: body.status || 'Pending',
           paymentStatus: body.paymentStatus || 'Unpaid',
           totalCost: totalCost,
+          creditAmount: creditAmount,
+          dueDate: effectiveDueDate,
+          expectedDate: body.expectedDate ? new Date(body.expectedDate) : effectiveDueDate,
           notes: poNotes || null,
           createdBy: user.name,
         },
@@ -195,7 +242,58 @@ export async function POST(req: NextRequest) {
             notes: `Auto-generated GRN upon purchase order creation (${poNo})`,
           },
         });
+
+        // Record Financial Ledger Entries for GRN Receiving
+        await tx.financialLedgerEntry.create({
+          data: {
+            entryNo: `JRN-GRN-INVA-${poNo}`,
+            entryDate: new Date(),
+            storeCode: targetStore,
+            accountCategory: 'ASSET',
+            accountName: 'Inventory Asset (Procurement)',
+            debit: totalCost,
+            credit: 0,
+            amount: totalCost,
+            refType: 'PURCHASE_GRN',
+            refId: createdPO.id,
+            refNo: poNo,
+            entityName: body.vendorName,
+            description: `Goods Received Note (${grnNo}) against PO ${poNo}`,
+            createdBy: user.name,
+          },
+        });
+
+        await tx.financialLedgerEntry.create({
+          data: {
+            entryNo: `JRN-GRN-AP-${poNo}`,
+            entryDate: new Date(),
+            storeCode: targetStore,
+            accountCategory: 'LIABILITY',
+            accountName: 'Vendor Accounts Payable',
+            debit: 0,
+            credit: totalCost,
+            amount: totalCost,
+            refType: 'PURCHASE_GRN',
+            refId: createdPO.id,
+            refNo: poNo,
+            entityName: body.vendorName,
+            description: `Accounts Payable liability for PO ${poNo} (${body.vendorName})`,
+            createdBy: user.name,
+          },
+        });
       }
+
+      // Record audit log
+      await tx.auditLog.create({
+        data: {
+          module: 'Purchases',
+          action: 'Create Purchase Order',
+          details: `Created Purchase Bill ${poNo} (Invoice #${invoiceNo}) from ${body.vendorName}. Total: ₹${totalCost.toFixed(2)}, Store: ${body.storeCode || 'CENTRAL'}`,
+          userEmail: user.email || user.name,
+          userRole: user.role,
+          storeCode: body.storeCode || 'CENTRAL',
+        },
+      });
 
       return createdPO;
     });
@@ -230,7 +328,7 @@ export async function PUT(req: NextRequest) {
 
     const existing = await (prisma as any).purchaseOrder.findUnique({
       where: { id: body.id },
-      include: { items: true, vendor: true },
+      include: { items: true, vendor: true, payments: true },
     });
 
     if (!existing) {
@@ -239,21 +337,6 @@ export async function PUT(req: NextRequest) {
 
     const isTransitioningToReceived = body.status === 'Received' && existing.status !== 'Received';
     const targetStore = existing.storeCode || 'CENTRAL';
-
-    // Build partial payment notes tag if applicable
-    let updatedNotes = body.notes !== undefined ? body.notes : existing.notes;
-    if (body.paymentStatus === 'Partial' || (existing.paymentStatus === 'Partial' && !body.paymentStatus)) {
-      if (body.paidAmount !== undefined || body.remainingAmount !== undefined) {
-        const total = Number(existing.totalCost) || 0;
-        const paid = Number(body.paidAmount) || 0;
-        const rem = body.remainingAmount !== undefined ? Number(body.remainingAmount) : Math.max(0, total - paid);
-        const tag = `[PARTIAL_PAYMENT:paid=${paid},remaining=${rem}]`;
-        const base = (updatedNotes || '').replace(/\[PARTIAL_PAYMENT:[^\]]+\]\s*/g, '').trim();
-        updatedNotes = base ? `${base} ${tag}` : tag;
-      }
-    } else if (body.paymentStatus === 'Paid') {
-      updatedNotes = (updatedNotes || '').replace(/\[PARTIAL_PAYMENT:[^\]]+\]\s*/g, '').trim();
-    }
 
     // Execute atomic update & stock credit if receiving
     const updatedPo = await prisma.$transaction(
@@ -310,6 +393,46 @@ export async function PUT(req: NextRequest) {
               notes: body.grnNotes || `Goods received against PO ${existing.poNo}`,
             },
           });
+
+          // Record Financial Ledger Entries for GRN Receiving
+          const poTotalCost = Number(existing.totalCost) || 0;
+          await tx.financialLedgerEntry.create({
+            data: {
+              entryNo: `JRN-GRN-INVA-${existing.poNo}`,
+              entryDate: new Date(),
+              storeCode: targetStore,
+              accountCategory: 'ASSET',
+              accountName: 'Inventory Asset (Procurement)',
+              debit: poTotalCost,
+              credit: 0,
+              amount: poTotalCost,
+              refType: 'PURCHASE_GRN',
+              refId: existing.id,
+              refNo: existing.poNo,
+              entityName: existing.vendor?.name || 'Vendor',
+              description: `Goods Received Note (${grnNo}) against PO ${existing.poNo}`,
+              createdBy: user.name,
+            },
+          });
+
+          await tx.financialLedgerEntry.create({
+            data: {
+              entryNo: `JRN-GRN-AP-${existing.poNo}`,
+              entryDate: new Date(),
+              storeCode: targetStore,
+              accountCategory: 'LIABILITY',
+              accountName: 'Vendor Accounts Payable',
+              debit: 0,
+              credit: poTotalCost,
+              amount: poTotalCost,
+              refType: 'PURCHASE_GRN',
+              refId: existing.id,
+              refNo: existing.poNo,
+              entityName: existing.vendor?.name || 'Vendor',
+              description: `Accounts Payable liability for PO ${existing.poNo}`,
+              createdBy: user.name,
+            },
+          });
         }
 
         const po = await tx.purchaseOrder.update({
@@ -318,7 +441,22 @@ export async function PUT(req: NextRequest) {
             ...(body.status ? { status: body.status } : {}),
             ...(isTransitioningToReceived ? { receivedDate: new Date() } : {}),
             ...(body.paymentStatus ? { paymentStatus: body.paymentStatus } : {}),
-            notes: updatedNotes,
+            ...(body.invoiceNo !== undefined ? { invoiceNo: body.invoiceNo?.trim() || null } : {}),
+            ...(body.dueDate ? { dueDate: new Date(body.dueDate) } : {}),
+            ...(body.creditAmount !== undefined ? { creditAmount: Number(body.creditAmount) } : {}),
+            ...(body.notes !== undefined ? { notes: body.notes } : {}),
+          },
+        });
+
+        // Audit log
+        await tx.auditLog.create({
+          data: {
+            module: 'Purchases',
+            action: 'Update Purchase Order',
+            details: `Updated Purchase Bill ${existing.poNo} (${existing.vendor?.name}). Status: ${po.status}, PayStatus: ${po.paymentStatus}`,
+            userEmail: user.email || user.name,
+            userRole: user.role,
+            storeCode: targetStore,
           },
         });
 
@@ -340,7 +478,7 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE /api/purchases - Delete a draft purchase order or cancel/archive received PO
+ * DELETE /api/purchases - Delete a draft purchase order or cancel/archive received/paid PO
  */
 export async function DELETE(req: NextRequest) {
   try {
@@ -361,16 +499,32 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Purchase Order ID is required' }, { status: 400 });
     }
 
-    const existing = await (prisma as any).purchaseOrder.findUnique({ where: { id } });
+    const existing = await (prisma as any).purchaseOrder.findUnique({
+      where: { id },
+      include: { payments: true },
+    });
     if (!existing) {
       return NextResponse.json({ success: true, message: 'Purchase Order already deleted or non-existent' });
     }
 
-    // Received POs have impacted inventory and financial ledgers; cancel/archive safely instead of destructive delete
-    if (existing.status === 'Received' || existing.status === 'Completed') {
+    const paymentCount = existing.payments?.length || 0;
+
+    // Received or paid POs have impacted inventory and financial ledgers; cancel/archive safely instead of destructive delete
+    if (existing.status === 'Received' || existing.status === 'Completed' || paymentCount > 0) {
       const archived = await (prisma as any).purchaseOrder.update({
         where: { id },
         data: { status: 'Cancelled' },
+      });
+
+      await (prisma as any).auditLog.create({
+        data: {
+          module: 'Purchases',
+          action: 'Cancel Purchase Order',
+          details: `Cancelled Purchase Bill ${existing.poNo}. Historical payments recorded: ${paymentCount}. Preserved in DB for ledger accuracy.`,
+          userEmail: user.email || user.name,
+          userRole: user.role,
+          storeCode: existing.storeCode,
+        },
       });
 
       broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', { id: existing.id, poNo: existing.poNo, action: 'cancelled' });
@@ -379,13 +533,24 @@ export async function DELETE(req: NextRequest) {
         success: true,
         mode: 'archived',
         purchaseOrder: archived,
-        message: `Completed Purchase Order ${existing.poNo} was cancelled/archived to preserve historical warehouse stock ledgers.`,
+        message: `Purchase Bill ${existing.poNo} had ${paymentCount} payment(s) or stock receipts and was safely Cancelled/Archived to preserve accounting ledgers.`,
       });
     }
 
-    // Hard-delete drafts / pending POs
+    // Hard-delete draft / pending POs with zero payments and zero stock receipts
     await (prisma as any).purchaseOrderItem.deleteMany({ where: { poId: id } });
     await (prisma as any).purchaseOrder.delete({ where: { id } });
+
+    await (prisma as any).auditLog.create({
+      data: {
+        module: 'Purchases',
+        action: 'Delete Purchase Order',
+        details: `Permanently deleted draft Purchase Order ${existing.poNo}.`,
+        userEmail: user.email || user.name,
+        userRole: user.role,
+        storeCode: existing.storeCode,
+      },
+    });
 
     broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', { id: existing.id, poNo: existing.poNo, action: 'deleted' });
 
@@ -399,5 +564,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to delete purchase order' }, { status: 500 });
   }
 }
-
-

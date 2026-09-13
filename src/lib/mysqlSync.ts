@@ -206,6 +206,15 @@ export const MySQLDataService = {
     return apiCall(`/api/stores?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`, 'DELETE');
   },
 
+  // ─── STOCK TRANSFERS ─────────────────────────────────
+  async cancelTransfer(id: string) {
+    return apiCall('/api/transfers', 'PUT', { id, status: 'Cancelled' });
+  },
+
+  async deleteTransfer(id: string) {
+    return apiCall(`/api/transfers?id=${encodeURIComponent(id)}`, 'DELETE');
+  },
+
   // ─── USER PROFILES ───────────────────────────────────
   async createProfile(user: any) {
     return apiCall('/api/users/create', 'POST', {

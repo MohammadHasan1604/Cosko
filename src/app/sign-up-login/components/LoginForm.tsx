@@ -45,7 +45,7 @@ export default function LoginForm() {
       const result = await res.json().catch(() => null);
 
       if (res.ok && result?.success && result?.user) {
-        setCurrentUser(result.user);
+        setCurrentUser({ ...result.user, token: result.token });
         addAuditLog('Authentication', 'User Login', `Signed in as ${result.user.role} (${result.user.email})`);
         toast.success(`Welcome back, ${result.user.name}! Signed in as ${result.user.role}`);
         router.push('/dashboard');

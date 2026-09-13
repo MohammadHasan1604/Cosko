@@ -184,12 +184,108 @@ export async function executeStockTransfer(input: CreateTransferInput) {
         });
       }
 
-      // 5. Batch create all ledger entries in a single query
+      // 5. Batch create all inventory ledger entries in a single query
       await tx.inventoryLedger.createMany({
         data: ledgerEntries,
       });
 
-      // 6. Record Audit Log Entry
+      // 6. Record Double-Entry Financial Ledger Entries (Flagged isEliminated: true for Consolidated P&L)
+      await tx.financialLedgerEntry.create({
+        data: {
+          entryNo: `JRN-TRF-MKP-${transferNo}`,
+          entryDate: new Date(),
+          storeCode: sourceStore,
+          accountCategory: 'TRANSFER_MARKUP',
+          accountName: 'Central Stock Transfer Markup',
+          debit: 0,
+          credit: grossProfit,
+          amount: grossProfit,
+          refType: 'STOCK_TRANSFER',
+          refId: createdTransfer.id,
+          refNo: transferNo,
+          description: `Internal Transfer Margin from ${sourceStore} to ${destStore} (${transferNo})`,
+          isEliminated: true,
+          createdBy: input.requestedBy,
+        },
+      });
+
+      await tx.financialLedgerEntry.create({
+        data: {
+          entryNo: `JRN-TRF-CLR-${transferNo}`,
+          entryDate: new Date(),
+          storeCode: sourceStore,
+          accountCategory: 'ASSET',
+          accountName: 'Inter-Store Clearing Account',
+          debit: totalTransferValue,
+          credit: 0,
+          amount: totalTransferValue,
+          refType: 'STOCK_TRANSFER',
+          refId: createdTransfer.id,
+          refNo: transferNo,
+          description: `Inter-store transfer clearing to ${destStore} (${transferNo})`,
+          isEliminated: true,
+          createdBy: input.requestedBy,
+        },
+      });
+
+      await tx.financialLedgerEntry.create({
+        data: {
+          entryNo: `JRN-TRF-SRC-${transferNo}`,
+          entryDate: new Date(),
+          storeCode: sourceStore,
+          accountCategory: 'ASSET',
+          accountName: 'Inventory Asset (Inter-Store Dispatch)',
+          debit: 0,
+          credit: totalCost,
+          amount: -totalCost,
+          refType: 'STOCK_TRANSFER',
+          refId: createdTransfer.id,
+          refNo: transferNo,
+          description: `Stock dispatched from ${sourceStore} to ${destStore} (${transferNo})`,
+          isEliminated: true,
+          createdBy: input.requestedBy,
+        },
+      });
+
+      await tx.financialLedgerEntry.create({
+        data: {
+          entryNo: `JRN-TRF-DST-${transferNo}`,
+          entryDate: new Date(),
+          storeCode: destStore,
+          accountCategory: 'ASSET',
+          accountName: 'Inventory Asset (Store Inbound Receipt)',
+          debit: totalTransferValue,
+          credit: 0,
+          amount: totalTransferValue,
+          refType: 'STOCK_TRANSFER',
+          refId: createdTransfer.id,
+          refNo: transferNo,
+          description: `Stock received at ${destStore} from ${sourceStore} at Transfer Price (${transferNo})`,
+          isEliminated: true,
+          createdBy: input.requestedBy,
+        },
+      });
+
+      await tx.financialLedgerEntry.create({
+        data: {
+          entryNo: `JRN-TRF-DST-CLR-${transferNo}`,
+          entryDate: new Date(),
+          storeCode: destStore,
+          accountCategory: 'LIABILITY',
+          accountName: 'Inter-Store Payable Clearing',
+          debit: 0,
+          credit: totalTransferValue,
+          amount: totalTransferValue,
+          refType: 'STOCK_TRANSFER',
+          refId: createdTransfer.id,
+          refNo: transferNo,
+          description: `Inter-store transfer payable clearing for receipt from ${sourceStore} (${transferNo})`,
+          isEliminated: true,
+          createdBy: input.requestedBy,
+        },
+      });
+
+      // 7. Record Audit Log Entry
       await tx.auditLog.create({
         data: {
           module: 'Central Profit',

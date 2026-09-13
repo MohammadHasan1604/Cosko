@@ -1,141 +1,270 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useApp } from '@/context/AppContext';
+import DrilldownModal from './DrilldownModal';
 import { toast } from 'sonner';
 
+type ReportTab = 'overview' | 'suppliers' | 'products' | 'employees';
+type SortField = 'revenue' | 'profit' | 'units';
+
+const DATE_PERIODS = [
+  'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'This Week',
+  'This Month', 'Last Month', 'This Quarter', 'This Year', 'Custom Range',
+];
+
 export default function ReportsPage() {
-  const { inventory, sales, purchases, vendors, usersList, selectedStore } = useApp();
-  const [activeTab, setActiveTab] = useState<'overview' | 'suppliers' | 'products' | 'employees'>('overview');
+  const { storesList, selectedStore, currentUser } = useApp();
 
-  const filteredSales = useMemo(() => {
-    return sales.filter((s) => selectedStore === 'All Stores' || s.store === selectedStore);
-  }, [sales, selectedStore]);
+  // Local report filters (independent of global context for reports-specific control)
+  const [activeTab, setActiveTab] = useState<ReportTab>('overview');
+  const [reportStore, setReportStore] = useState(selectedStore || 'All Stores');
+  const [reportPeriod, setReportPeriod] = useState('This Month');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [exportFormat, setExportFormat] = useState<'csv' | 'excel' | 'pdf'>('csv');
 
-  const filteredPurchases = useMemo(() => {
-    return purchases.filter((p) => selectedStore === 'All Stores' || p.store === selectedStore);
-  }, [purchases, selectedStore]);
+  // Data
+  const [overviewData, setOverviewData] = useState<any>(null);
+  const [supplierData, setSupplierData] = useState<any>(null);
+  const [productData, setProductData] = useState<any>(null);
+  const [employeeData, setEmployeeData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [productSort, setProductSort] = useState<SortField>('revenue');
 
-  const filteredInventory = useMemo(() => {
-    return inventory.filter((i) => selectedStore === 'All Stores' || i.store === selectedStore);
-  }, [inventory, selectedStore]);
+  // Drilldown
+  const [drilldown, setDrilldown] = useState<{
+    isOpen: boolean;
+    title: string;
+    type: 'product-sales' | 'supplier-purchases' | 'employee-sales' | 'overview-sales';
+    id: string;
+  }>({ isOpen: false, title: '', type: 'overview-sales', id: '' });
 
-  const totalInvValue = useMemo(() => filteredInventory.reduce((acc, i) => acc + i.costPrice * i.qtyOnHand, 0), [filteredInventory]);
-  const totalInvSelling = useMemo(() => filteredInventory.reduce((acc, i) => acc + i.sellingPrice * i.qtyOnHand, 0), [filteredInventory]);
-  const totalRevenue = useMemo(() => filteredSales.reduce((acc, s) => acc + s.total, 0), [filteredSales]);
-  
-  const totalGrossProfit = useMemo(() => {
-    return filteredSales.reduce((acc, s) => {
-      const saleCost = s.items.reduce((iAcc, it) => {
-        const inv = inventory.find((i) => i.id === it.itemId || i.name === it.name);
-        const cost = inv ? inv.costPrice : Math.round(it.unitPrice * 0.7);
-        return iAcc + cost * it.qty;
-      }, 0);
-      return acc + (s.subtotal - saleCost);
-    }, 0);
-  }, [filteredSales, inventory]);
-
-  // Supplier analytics breakdown
-  const supplierAnalytics = useMemo(() => {
-    return vendors.map((v) => {
-      const pos = filteredPurchases.filter((p) => p.vendorName === v.name);
-      const totalSpend = pos.reduce((acc, p) => acc + p.totalAmount, 0);
-      const paid = pos.filter((p) => p.paymentStatus === 'Paid').reduce((acc, p) => acc + p.totalAmount, 0);
-      const pending = totalSpend - paid;
-      const totalUnits = pos.reduce((acc, p) => acc + p.items.reduce((iAcc, item) => iAcc + item.qty, 0), 0);
-      const avgUnitPrice = totalUnits > 0 ? totalSpend / totalUnits : 0;
-      return {
-        vendor: v,
-        totalOrders: pos.length,
-        totalUnits,
-        totalSpend,
-        paid,
-        pending,
-        avgUnitPrice,
-      };
-    });
-  }, [vendors, filteredPurchases]);
-
-  // Best-selling products rollup
-  const bestSellingProducts = useMemo(() => {
-    const map = new Map<string, { name: string; sku: string; unitsSold: number; revenue: number; grossProfit: number }>();
-    for (const sale of filteredSales) {
-      for (const it of sale.items) {
-        const key = it.itemId || it.name;
-        const existing = map.get(key) || { name: it.name, sku: it.sku || 'N/A', unitsSold: 0, revenue: 0, grossProfit: 0 };
-        const lineRev = it.unitPrice * it.qty;
-        const invItem = inventory.find((i) => i.id === it.itemId || i.name === it.name);
-        const unitCost = invItem?.costPrice || (it.unitPrice * 0.7);
-        const lineCost = unitCost * it.qty;
-        existing.unitsSold += it.qty;
-        existing.revenue += lineRev;
-        existing.grossProfit += (lineRev - lineCost);
-        map.set(key, existing);
+  // Fetch auth headers
+  const getHeaders = useCallback(() => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    try {
+      const saved = localStorage.getItem('cosko_active_session');
+      if (saved) {
+        const token = JSON.parse(saved).token;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
       }
-    }
-    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  }, [filteredSales, inventory]);
+    } catch {}
+    return headers;
+  }, []);
 
-  // Employee sales performance rollup
-  const employeePerformance = useMemo(() => {
-    const map = new Map<string, { name: string; store: string; invoices: number; revenue: number; grossProfit: number; customers: Set<string> }>();
-    for (const sale of filteredSales) {
-      const empName = (sale as any).cashierName || 'Sales Staff';
-      const saleCost = sale.items.reduce((iAcc, it) => {
-        const inv = inventory.find((i) => i.id === it.itemId || i.name === it.name);
-        const cost = inv ? inv.costPrice : Math.round(it.unitPrice * 0.7);
-        return iAcc + cost * it.qty;
-      }, 0);
-      const saleProfit = sale.subtotal - saleCost;
-      const existing = map.get(empName) || { name: empName, store: sale.store, invoices: 0, revenue: 0, grossProfit: 0, customers: new Set<string>() };
-      existing.invoices += 1;
-      existing.revenue += sale.total;
-      existing.grossProfit += saleProfit;
-      if (sale.customerPhone) existing.customers.add(sale.customerPhone);
-      map.set(empName, existing);
-    }
-    return Array.from(map.values()).map((e) => ({
-      ...e,
-      customerCount: e.customers.size,
-      avgInvoiceValue: e.invoices > 0 ? e.revenue / e.invoices : 0,
-    })).sort((a, b) => b.revenue - a.revenue);
-  }, [filteredSales, inventory]);
+  // Fetch report data
+  const fetchReport = useCallback(async (tab: ReportTab) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        report: tab,
+        store: reportStore,
+        period: reportPeriod,
+      });
+      if (reportPeriod === 'Custom Range') {
+        if (customStart) params.set('startDate', customStart);
+        if (customEnd) params.set('endDate', customEnd);
+      }
 
-  const handleDownload = (reportName: string) => {
-    toast.success(`Generated and downloaded ${reportName} (${selectedStore}) as CSV/PDF`);
+      const res = await fetch(`/api/reports?${params.toString()}`, {
+        credentials: 'include',
+        headers: getHeaders(),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || 'Failed to load report');
+        return;
+      }
+
+      const json = await res.json();
+      if (json.success) {
+        switch (tab) {
+          case 'overview': setOverviewData(json.data); break;
+          case 'suppliers': setSupplierData(json.data); break;
+          case 'products': setProductData(json.data); break;
+          case 'employees': setEmployeeData(json.data); break;
+        }
+      }
+    } catch (err) {
+      console.error('Report fetch error:', err);
+      toast.error('Network error loading report');
+    } finally {
+      setLoading(false);
+    }
+  }, [reportStore, reportPeriod, customStart, customEnd, getHeaders]);
+
+  // Fetch on tab change or filter change
+  useEffect(() => {
+    fetchReport(activeTab);
+  }, [activeTab, reportStore, reportPeriod, customStart, customEnd, fetchReport]);
+
+  // Sorted products
+  const sortedProducts = useMemo(() => {
+    if (!productData?.products) return [];
+    const prods = [...productData.products];
+    switch (productSort) {
+      case 'profit': return prods.sort((a: any, b: any) => b.totalProfit - a.totalProfit);
+      case 'units': return prods.sort((a: any, b: any) => b.unitsSold - a.unitsSold);
+      default: return prods.sort((a: any, b: any) => b.totalRevenue - a.totalRevenue);
+    }
+  }, [productData, productSort]);
+
+  // Export
+  const handleExport = async (reportType: string) => {
+    try {
+      const params = new URLSearchParams({
+        report: reportType,
+        format: exportFormat,
+        store: reportStore,
+        period: reportPeriod,
+      });
+      if (reportPeriod === 'Custom Range') {
+        if (customStart) params.set('startDate', customStart);
+        if (customEnd) params.set('endDate', customEnd);
+      }
+
+      const res = await fetch(`/api/reports/export?${params.toString()}`, {
+        credentials: 'include',
+        headers: getHeaders(),
+      });
+
+      if (!res.ok) {
+        toast.error('Export failed');
+        return;
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+
+      if (contentType.includes('text/html')) {
+        // PDF — open in new tab for print
+        const html = await res.text();
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(html);
+          win.document.close();
+        }
+        toast.success('PDF print view opened');
+        return;
+      }
+
+      // CSV / Excel — download blob
+      const blob = await res.blob();
+      const disposition = res.headers.get('content-disposition') || '';
+      const filenameMatch = disposition.match(/filename="(.+)"/);
+      const filename = filenameMatch?.[1] || `${reportType}_report.${exportFormat === 'excel' ? 'xls' : 'csv'}`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${filename}`);
+    } catch (err) {
+      console.error('Export error:', err);
+      toast.error('Export failed');
+    }
+  };
+
+  const fmt = (v: number | undefined | null) =>
+    (v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const fmtDec = (v: number | undefined | null) =>
+    (v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const openDrilldown = (type: 'product-sales' | 'supplier-purchases' | 'employee-sales' | 'overview-sales', id: string, title: string) => {
+    setDrilldown({ isOpen: true, type, id, title });
   };
 
   return (
     <AppLayout activeRoute="/reports">
       <div className="space-y-6 fade-in">
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Page Header + Filters */}
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-foreground">Executive Analytics & Reports</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Consolidated sales performance, supplier procurement, product profitability, and employee tracking.
+              Consolidated analytics derived from source-of-truth transactions. All figures reconcile with Sales, Purchases & Accounting.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button onClick={() => handleDownload('Executive Summary Report')} className="btn-primary text-xs gap-1.5 py-2">
-              <Icon name="ArrowDownTrayIcon" size={14} /> Export All Reports
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Store Filter */}
+            <select
+              value={reportStore}
+              onChange={(e) => setReportStore(e.target.value)}
+              className="input-field text-xs py-2 px-3"
+            >
+              {currentUser.role === 'Super Admin' && <option value="All Stores">All Stores</option>}
+              {storesList.map((s) => (
+                <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
+              ))}
+            </select>
+
+            {/* Date Filter */}
+            <select
+              value={reportPeriod}
+              onChange={(e) => setReportPeriod(e.target.value)}
+              className="input-field text-xs py-2 px-3"
+            >
+              {DATE_PERIODS.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+
+            {/* Custom Range Inputs */}
+            {reportPeriod === 'Custom Range' && (
+              <>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="input-field text-xs py-2 px-2"
+                />
+                <span className="text-xs text-muted-foreground">to</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="input-field text-xs py-2 px-2"
+                />
+              </>
+            )}
+
+            {/* Export Format */}
+            <select
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value as any)}
+              className="input-field text-xs py-2 px-3 w-20"
+            >
+              <option value="csv">CSV</option>
+              <option value="excel">Excel</option>
+              <option value="pdf">PDF</option>
+            </select>
+
+            {/* Export Buttons */}
+            <button onClick={() => handleExport(activeTab)} className="btn-secondary text-xs gap-1.5 py-2">
+              <Icon name="ArrowDownTrayIcon" size={14} /> Export Report
+            </button>
+            <button onClick={() => handleExport('all')} className="btn-primary text-xs gap-1.5 py-2">
+              <Icon name="ArrowDownTrayIcon" size={14} /> Export All
             </button>
           </div>
         </div>
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-1 border-b border-border pb-1 overflow-x-auto">
-          {[
+          {([
             { id: 'overview', label: 'Executive Overview', icon: 'ChartBarIcon' },
             { id: 'suppliers', label: 'Supplier Procurement', icon: 'TruckIcon' },
             { id: 'products', label: 'Best-Selling Products', icon: 'CubeIcon' },
             { id: 'employees', label: 'Employee Productivity', icon: 'UserGroupIcon' },
-          ].map((tab) => (
+          ] as const).map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'bg-primary text-white shadow-sm'
@@ -148,32 +277,63 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+            <span className="ml-3 text-sm text-muted-foreground">Loading report data...</span>
+          </div>
+        )}
+
+        {/* ═══ OVERVIEW TAB ═══ */}
+        {!loading && activeTab === 'overview' && overviewData && (
           <div className="space-y-6">
+            {/* KPI Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <button onClick={() => openDrilldown('overview-sales', '', 'All Sales — Revenue Breakdown')} className="card p-4 space-y-1 text-left hover:border-primary/30 transition-colors cursor-pointer">
+                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Total Sales Revenue</span>
+                <p className="text-2xl font-extrabold text-foreground font-tabular">₹{fmt(overviewData.totalRevenue)}</p>
+                <span className="badge-success text-3xs">{overviewData.invoiceCount} Invoices</span>
+              </button>
+
+              <button onClick={() => openDrilldown('overview-sales', '', 'All Sales — Profit Breakdown')} className="card p-4 space-y-1 text-left hover:border-primary/30 transition-colors cursor-pointer">
+                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Gross Trading Profit</span>
+                <p className="text-2xl font-extrabold text-success font-tabular">₹{fmt(overviewData.totalGrossProfit)}</p>
+                <span className="text-2xs text-muted-foreground font-tabular">Margin: {overviewData.grossMarginPct}%</span>
+              </button>
+
+              <div className="card p-4 space-y-1">
+                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Cost of Goods Sold</span>
+                <p className="text-2xl font-extrabold text-foreground font-tabular">₹{fmt(overviewData.totalCOGS)}</p>
+                <span className="text-2xs text-muted-foreground font-tabular">Avg Order: ₹{fmtDec(overviewData.avgOrderValue)}</span>
+              </div>
+
+              <div className="card p-4 space-y-1">
+                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Total Purchase Spend</span>
+                <p className="text-2xl font-extrabold text-info font-tabular">₹{fmt(overviewData.totalPurchaseSpend)}</p>
+                <span className="badge-info text-3xs">{overviewData.purchaseOrderCount} Purchase Orders</span>
+              </div>
+            </div>
+
+            {/* Secondary Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="card p-4 space-y-1">
-                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Total Sales Revenue</span>
-                <p className="text-2xl font-extrabold text-foreground font-tabular">₹{totalRevenue.toLocaleString('en-IN')}</p>
-                <span className="badge-success text-3xs">{filteredSales.length} Invoices</span>
+                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Tax Collected</span>
+                <p className="text-lg font-bold text-foreground font-tabular">₹{fmt(overviewData.totalTax)}</p>
               </div>
-
               <div className="card p-4 space-y-1">
-                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Gross Trading Profit</span>
-                <p className="text-2xl font-extrabold text-success font-tabular">₹{totalGrossProfit.toLocaleString('en-IN')}</p>
-                <span className="text-2xs text-muted-foreground font-tabular">Margin: {totalRevenue > 0 ? ((totalGrossProfit / totalRevenue) * 100).toFixed(1) : 0}%</span>
+                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Discounts Given</span>
+                <p className="text-lg font-bold text-warning font-tabular">₹{fmt(overviewData.totalDiscount)}</p>
               </div>
-
               <div className="card p-4 space-y-1">
-                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Inventory Cost (FIFO)</span>
-                <p className="text-2xl font-extrabold text-foreground font-tabular">₹{totalInvValue.toLocaleString('en-IN')}</p>
-                <span className="text-2xs text-muted-foreground">{inventory.length} active SKUs</span>
+                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Inventory Cost Value</span>
+                <p className="text-lg font-bold text-foreground font-tabular">₹{fmt(overviewData.inventoryCostValue)}</p>
+                <span className="text-2xs text-muted-foreground">{overviewData.activeSKUs} active SKUs</span>
               </div>
-
               <div className="card p-4 space-y-1">
-                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Total Retail Value</span>
-                <p className="text-2xl font-extrabold text-info font-tabular">₹{totalInvSelling.toLocaleString('en-IN')}</p>
-                <span className="badge-info text-3xs">Potential: ₹{(totalInvSelling - totalInvValue).toLocaleString('en-IN')}</span>
+                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Inventory Retail Value</span>
+                <p className="text-lg font-bold text-info font-tabular">₹{fmt(overviewData.inventoryRetailValue)}</p>
+                <span className="badge-info text-3xs">Unrealized: ₹{fmt((overviewData.inventoryRetailValue || 0) - (overviewData.inventoryCostValue || 0))}</span>
               </div>
             </div>
 
@@ -185,14 +345,12 @@ export default function ReportsPage() {
                     <Icon name="ChartBarIcon" size={20} />
                   </div>
                   <h3 className="text-base font-bold text-foreground">Sales Performance Report</h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Detailed breakdown of sales transactions by store, payment method, and product category.
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Detailed breakdown of {overviewData.invoiceCount} transactions — revenue, profit, COGS, and margins.</p>
                 </div>
                 <div className="pt-3 border-t border-border flex items-center justify-between">
-                  <span className="text-2xs font-mono text-muted-foreground">{filteredSales.length} transactions</span>
-                  <button onClick={() => handleDownload('Sales Performance Report')} className="btn-primary text-xs gap-1.5 py-1.5">
-                    <Icon name="ArrowDownTrayIcon" size={14} /> Download PDF
+                  <span className="text-2xs font-mono text-muted-foreground">Revenue: ₹{fmt(overviewData.totalRevenue)}</span>
+                  <button onClick={() => handleExport('overview')} className="btn-primary text-xs gap-1.5 py-1.5">
+                    <Icon name="ArrowDownTrayIcon" size={14} /> Download
                   </button>
                 </div>
               </div>
@@ -202,15 +360,15 @@ export default function ReportsPage() {
                   <div className="w-10 h-10 rounded-xl bg-info/10 text-info flex items-center justify-center mb-3">
                     <Icon name="CubeIcon" size={20} />
                   </div>
-                  <h3 className="text-base font-bold text-foreground">Inventory Valuation (FIFO)</h3>
+                  <h3 className="text-base font-bold text-foreground">Inventory Valuation</h3>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Cost value (₹{totalInvValue.toLocaleString('en-IN')}) vs Retail selling value (₹{totalInvSelling.toLocaleString('en-IN')}).
+                    Cost: ₹{fmt(overviewData.inventoryCostValue)} vs Retail: ₹{fmt(overviewData.inventoryRetailValue)}.
                   </p>
                 </div>
                 <div className="pt-3 border-t border-border flex items-center justify-between">
-                  <span className="text-2xs font-mono text-muted-foreground">{inventory.length} SKUs</span>
-                  <button onClick={() => handleDownload('Inventory Valuation Report')} className="btn-primary text-xs gap-1.5 py-1.5">
-                    <Icon name="ArrowDownTrayIcon" size={14} /> Export CSV
+                  <span className="text-2xs font-mono text-muted-foreground">{overviewData.activeSKUs} active SKUs</span>
+                  <button onClick={() => handleExport('overview')} className="btn-primary text-xs gap-1.5 py-1.5">
+                    <Icon name="ArrowDownTrayIcon" size={14} /> Export
                   </button>
                 </div>
               </div>
@@ -218,17 +376,17 @@ export default function ReportsPage() {
               <div className="card p-5 space-y-3 flex flex-col justify-between">
                 <div>
                   <div className="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center mb-3">
-                    <Icon name="ExclamationTriangleIcon" size={20} />
+                    <Icon name="TruckIcon" size={20} />
                   </div>
-                  <h3 className="text-base font-bold text-foreground">ABC & Velocity Analysis</h3>
+                  <h3 className="text-base font-bold text-foreground">Procurement Summary</h3>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Classification of fast-moving Class A high revenue items vs slow-moving Class C stock.
+                    {overviewData.purchaseOrderCount} purchase orders totaling ₹{fmt(overviewData.totalPurchaseSpend)}.
                   </p>
                 </div>
                 <div className="pt-3 border-t border-border flex items-center justify-between">
-                  <span className="text-2xs font-mono text-muted-foreground">Updated Today</span>
-                  <button onClick={() => handleDownload('ABC Inventory Analysis')} className="btn-primary text-xs gap-1.5 py-1.5">
-                    <Icon name="ArrowDownTrayIcon" size={14} /> Download PDF
+                  <span className="text-2xs font-mono text-muted-foreground">Paid: ₹{fmt(overviewData.totalPurchasePaid)}</span>
+                  <button onClick={() => handleExport('suppliers')} className="btn-primary text-xs gap-1.5 py-1.5">
+                    <Icon name="ArrowDownTrayIcon" size={14} /> Export
                   </button>
                 </div>
               </div>
@@ -236,16 +394,18 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {/* Suppliers Tab */}
-        {activeTab === 'suppliers' && (
+        {/* ═══ SUPPLIERS TAB ═══ */}
+        {!loading && activeTab === 'suppliers' && supplierData && (
           <div className="card p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-foreground">Supplier Procurement & Payables Summary</h3>
-                <p className="text-xs text-muted-foreground">Total purchase volumes, average prices, and payable balances per supplier.</p>
+                <p className="text-xs text-muted-foreground">
+                  {supplierData.recordCount} suppliers · Total spend: ₹{fmtDec(supplierData.totals?.totalSpend || 0)} · {reportPeriod}
+                </p>
               </div>
-              <button onClick={() => handleDownload('Supplier Procurement Summary')} className="btn-secondary text-xs gap-1.5 py-1.5">
-                <Icon name="ArrowDownTrayIcon" size={14} /> Export CSV
+              <button onClick={() => handleExport('suppliers')} className="btn-secondary text-xs gap-1.5 py-1.5">
+                <Icon name="ArrowDownTrayIcon" size={14} /> Export {exportFormat.toUpperCase()}
               </button>
             </div>
 
@@ -260,29 +420,49 @@ export default function ReportsPage() {
                     <th className="px-4 py-3 text-right">Avg Unit Price</th>
                     <th className="px-4 py-3 text-right">Total Purchases</th>
                     <th className="px-4 py-3 text-right">Amount Paid</th>
+                    <th className="px-4 py-3 text-right">Credits</th>
                     <th className="px-4 py-3 text-right">Amount Pending</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-xs">
-                  {supplierAnalytics.length === 0 ? (
+                  {supplierData.suppliers?.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
-                        No supplier procurement records found.
+                      <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
+                        No supplier procurement records found for this period.
                       </td>
                     </tr>
                   ) : (
-                    supplierAnalytics.map((s) => (
-                      <tr key={s.vendor.id} className="hover:bg-muted/40 transition-colors">
-                        <td className="px-4 py-3 font-bold text-foreground">{s.vendor.name}</td>
-                        <td className="px-4 py-3 text-muted-foreground font-mono">{s.vendor.phone}</td>
+                    supplierData.suppliers?.map((s: any) => (
+                      <tr
+                        key={s.vendorId}
+                        onClick={() => openDrilldown('supplier-purchases', s.vendorId, `Purchase Orders — ${s.vendorName}`)}
+                        className="hover:bg-muted/40 transition-colors cursor-pointer"
+                      >
+                        <td className="px-4 py-3 font-bold text-foreground">{s.vendorName}</td>
+                        <td className="px-4 py-3 text-muted-foreground font-mono text-2xs">{s.vendorPhone}</td>
                         <td className="px-4 py-3 text-right font-tabular">{s.totalOrders}</td>
                         <td className="px-4 py-3 text-right font-tabular">{s.totalUnits.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-tabular">₹{s.avgUnitPrice.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right font-bold text-foreground font-tabular">₹{s.totalSpend.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-tabular text-success font-semibold">₹{s.paid.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-tabular text-danger font-semibold">₹{s.pending.toLocaleString('en-IN')}</td>
+                        <td className="px-4 py-3 text-right font-tabular">₹{fmtDec(s.avgUnitPrice)}</td>
+                        <td className="px-4 py-3 text-right font-bold text-foreground font-tabular">₹{fmt(s.totalSpend)}</td>
+                        <td className="px-4 py-3 text-right font-tabular text-success font-semibold">₹{fmt(s.totalPaid)}</td>
+                        <td className="px-4 py-3 text-right font-tabular text-muted-foreground">₹{fmt(s.totalCredits)}</td>
+                        <td className="px-4 py-3 text-right font-tabular text-danger font-semibold">₹{fmt(s.totalPending)}</td>
                       </tr>
                     ))
+                  )}
+                  {/* Totals Row */}
+                  {supplierData.totals && supplierData.suppliers?.length > 0 && (
+                    <tr className="border-t-2 border-foreground/20 bg-muted/20 font-bold">
+                      <td className="px-4 py-3 text-foreground">TOTAL ({supplierData.recordCount} suppliers)</td>
+                      <td className="px-4 py-3"></td>
+                      <td className="px-4 py-3 text-right font-tabular">{supplierData.totals.totalOrders}</td>
+                      <td className="px-4 py-3 text-right font-tabular">{supplierData.totals.totalUnits.toLocaleString('en-IN')}</td>
+                      <td className="px-4 py-3 text-right font-tabular"></td>
+                      <td className="px-4 py-3 text-right font-tabular text-foreground">₹{fmt(supplierData.totals.totalSpend)}</td>
+                      <td className="px-4 py-3 text-right font-tabular text-success">₹{fmt(supplierData.totals.totalPaid)}</td>
+                      <td className="px-4 py-3 text-right font-tabular text-muted-foreground">₹{fmt(supplierData.totals.totalCredits)}</td>
+                      <td className="px-4 py-3 text-right font-tabular text-danger">₹{fmt(supplierData.totals.totalPending)}</td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -290,49 +470,87 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {/* Products Tab */}
-        {activeTab === 'products' && (
+        {/* ═══ PRODUCTS TAB ═══ */}
+        {!loading && activeTab === 'products' && productData && (
           <div className="card p-5 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h3 className="text-base font-bold text-foreground">Top-Selling & Most Profitable Products</h3>
-                <p className="text-xs text-muted-foreground">Rankings by total units sold, gross revenue, and gross profit contribution.</p>
+                <p className="text-xs text-muted-foreground">
+                  {productData.recordCount} products · Revenue: ₹{fmt(productData.totals?.totalRevenue || 0)} · Profit: ₹{fmt(productData.totals?.totalProfit || 0)}
+                </p>
               </div>
-              <button onClick={() => handleDownload('Best-Selling Products Report')} className="btn-secondary text-xs gap-1.5 py-1.5">
-                <Icon name="ArrowDownTrayIcon" size={14} /> Export CSV
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex bg-muted/50 rounded-lg p-0.5">
+                  {(['revenue', 'profit', 'units'] as const).map(sf => (
+                    <button
+                      key={sf}
+                      onClick={() => setProductSort(sf)}
+                      className={`px-3 py-1.5 rounded-md text-2xs font-bold transition-colors ${productSort === sf ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      By {sf === 'revenue' ? 'Revenue' : sf === 'profit' ? 'Profit' : 'Units'}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => handleExport('products')} className="btn-secondary text-xs gap-1.5 py-1.5">
+                  <Icon name="ArrowDownTrayIcon" size={14} /> Export {exportFormat.toUpperCase()}
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-border text-2xs uppercase tracking-wider text-muted-foreground bg-muted/30">
+                    <th className="px-4 py-3 w-8">#</th>
                     <th className="px-4 py-3">Product Name</th>
                     <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3 text-right">Units Sold</th>
-                    <th className="px-4 py-3 text-right">Gross Revenue</th>
+                    <th className="px-4 py-3 text-right">Revenue</th>
+                    <th className="px-4 py-3 text-right">Cost (at Sale)</th>
                     <th className="px-4 py-3 text-right">Gross Profit</th>
-                    <th className="px-4 py-3 text-right">Gross Margin</th>
+                    <th className="px-4 py-3 text-right">Margin %</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-xs">
-                  {bestSellingProducts.length === 0 ? (
+                  {sortedProducts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                        No product sales recorded yet.
+                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                        No product sales recorded for this period.
                       </td>
                     </tr>
                   ) : (
-                    bestSellingProducts.map((p, idx) => (
-                      <tr key={`best-prod-${idx}`} className="hover:bg-muted/40 transition-colors">
-                        <td className="px-4 py-3 font-bold text-foreground">{p.name}</td>
+                    sortedProducts.map((p: any, idx: number) => (
+                      <tr
+                        key={p.productId}
+                        onClick={() => openDrilldown('product-sales', p.productId, `Sales — ${p.productName}`)}
+                        className="hover:bg-muted/40 transition-colors cursor-pointer"
+                      >
+                        <td className="px-4 py-3 text-muted-foreground font-mono text-2xs">{idx + 1}</td>
+                        <td className="px-4 py-3 font-bold text-foreground">{p.productName}</td>
                         <td className="px-4 py-3 text-muted-foreground font-mono text-2xs">{p.sku}</td>
                         <td className="px-4 py-3 text-right font-tabular font-bold">{p.unitsSold}</td>
-                        <td className="px-4 py-3 text-right font-tabular font-bold text-foreground">₹{p.revenue.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-tabular font-bold text-success">₹{p.grossProfit.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-tabular text-muted-foreground">{p.revenue > 0 ? ((p.grossProfit / p.revenue) * 100).toFixed(1) : 0}%</td>
+                        <td className="px-4 py-3 text-right font-tabular font-bold text-foreground">₹{fmt(p.totalRevenue)}</td>
+                        <td className="px-4 py-3 text-right font-tabular text-muted-foreground">₹{fmt(p.totalCost)}</td>
+                        <td className="px-4 py-3 text-right font-tabular font-bold text-success">₹{fmt(p.totalProfit)}</td>
+                        <td className="px-4 py-3 text-right font-tabular text-muted-foreground">{p.grossMarginPct}%</td>
                       </tr>
                     ))
+                  )}
+                  {/* Totals Row */}
+                  {productData.totals && sortedProducts.length > 0 && (
+                    <tr className="border-t-2 border-foreground/20 bg-muted/20 font-bold">
+                      <td className="px-4 py-3"></td>
+                      <td className="px-4 py-3 text-foreground">TOTAL ({productData.recordCount} products)</td>
+                      <td className="px-4 py-3"></td>
+                      <td className="px-4 py-3 text-right font-tabular">{productData.totals.unitsSold}</td>
+                      <td className="px-4 py-3 text-right font-tabular text-foreground">₹{fmt(productData.totals.totalRevenue)}</td>
+                      <td className="px-4 py-3 text-right font-tabular text-muted-foreground">₹{fmt(productData.totals.totalCost)}</td>
+                      <td className="px-4 py-3 text-right font-tabular text-success">₹{fmt(productData.totals.totalProfit)}</td>
+                      <td className="px-4 py-3 text-right font-tabular">
+                        {productData.totals.totalRevenue > 0 ? ((productData.totals.totalProfit / productData.totals.totalRevenue) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -340,16 +558,18 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {/* Employees Tab */}
-        {activeTab === 'employees' && (
+        {/* ═══ EMPLOYEES TAB ═══ */}
+        {!loading && activeTab === 'employees' && employeeData && (
           <div className="card p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-foreground">Employee Sales & Productivity Report</h3>
-                <p className="text-xs text-muted-foreground">Performance metrics per employee across stores.</p>
+                <p className="text-xs text-muted-foreground">
+                  {employeeData.recordCount} employees · {employeeData.totals?.invoices || 0} total invoices · {reportPeriod}
+                </p>
               </div>
-              <button onClick={() => handleDownload('Employee Performance Report')} className="btn-secondary text-xs gap-1.5 py-1.5">
-                <Icon name="ArrowDownTrayIcon" size={14} /> Export CSV
+              <button onClick={() => handleExport('employees')} className="btn-secondary text-xs gap-1.5 py-1.5">
+                <Icon name="ArrowDownTrayIcon" size={14} /> Export {exportFormat.toUpperCase()}
               </button>
             </div>
 
@@ -358,33 +578,53 @@ export default function ReportsPage() {
                 <thead>
                   <tr className="border-b border-border text-2xs uppercase tracking-wider text-muted-foreground bg-muted/30">
                     <th className="px-4 py-3">Employee Name</th>
-                    <th className="px-4 py-3">Assigned Store</th>
-                    <th className="px-4 py-3 text-right">Invoices Created</th>
-                    <th className="px-4 py-3 text-right">Customers Served</th>
-                    <th className="px-4 py-3 text-right">Average Order Value</th>
+                    <th className="px-4 py-3">Store(s)</th>
+                    <th className="px-4 py-3 text-right">Invoices</th>
+                    <th className="px-4 py-3 text-right">Unique Customers</th>
+                    <th className="px-4 py-3 text-right">Avg Order Value</th>
                     <th className="px-4 py-3 text-right">Total Revenue</th>
                     <th className="px-4 py-3 text-right">Gross Profit</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-xs">
-                  {employeePerformance.length === 0 ? (
+                  {employeeData.employees?.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                        No employee sales transactions recorded yet.
+                        No employee sales recorded for this period.
                       </td>
                     </tr>
                   ) : (
-                    employeePerformance.map((emp, idx) => (
-                      <tr key={`emp-perf-${idx}`} className="hover:bg-muted/40 transition-colors">
-                        <td className="px-4 py-3 font-bold text-foreground">{emp.name}</td>
-                        <td className="px-4 py-3"><span className="badge-info text-3xs">{emp.store}</span></td>
+                    employeeData.employees?.map((emp: any, idx: number) => (
+                      <tr
+                        key={`emp-${idx}`}
+                        onClick={() => openDrilldown('employee-sales', emp.employeeName, `Sales by ${emp.employeeName}`)}
+                        className="hover:bg-muted/40 transition-colors cursor-pointer"
+                      >
+                        <td className="px-4 py-3 font-bold text-foreground">{emp.employeeName}</td>
+                        <td className="px-4 py-3">
+                          {emp.stores?.map((s: string) => (
+                            <span key={s} className="badge-info text-3xs mr-1">{s}</span>
+                          ))}
+                        </td>
                         <td className="px-4 py-3 text-right font-tabular font-bold">{emp.invoices}</td>
                         <td className="px-4 py-3 text-right font-tabular">{emp.customerCount}</td>
-                        <td className="px-4 py-3 text-right font-tabular">₹{emp.avgInvoiceValue.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right font-tabular font-bold text-foreground">₹{emp.revenue.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-tabular font-bold text-success">₹{emp.grossProfit.toLocaleString('en-IN')}</td>
+                        <td className="px-4 py-3 text-right font-tabular">₹{fmtDec(emp.avgOrderValue)}</td>
+                        <td className="px-4 py-3 text-right font-tabular font-bold text-foreground">₹{fmt(emp.totalRevenue)}</td>
+                        <td className="px-4 py-3 text-right font-tabular font-bold text-success">₹{fmt(emp.totalGrossProfit)}</td>
                       </tr>
                     ))
+                  )}
+                  {/* Totals Row */}
+                  {employeeData.totals && employeeData.employees?.length > 0 && (
+                    <tr className="border-t-2 border-foreground/20 bg-muted/20 font-bold">
+                      <td className="px-4 py-3 text-foreground">TOTAL ({employeeData.recordCount} employees)</td>
+                      <td className="px-4 py-3"></td>
+                      <td className="px-4 py-3 text-right font-tabular">{employeeData.totals.invoices}</td>
+                      <td className="px-4 py-3 text-right font-tabular">{employeeData.totals.customerCount}</td>
+                      <td className="px-4 py-3 text-right font-tabular"></td>
+                      <td className="px-4 py-3 text-right font-tabular text-foreground">₹{fmt(employeeData.totals.totalRevenue)}</td>
+                      <td className="px-4 py-3 text-right font-tabular text-success">₹{fmt(employeeData.totals.totalGrossProfit)}</td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -392,6 +632,19 @@ export default function ReportsPage() {
           </div>
         )}
       </div>
+
+      {/* Drilldown Modal */}
+      <DrilldownModal
+        isOpen={drilldown.isOpen}
+        onClose={() => setDrilldown(d => ({ ...d, isOpen: false }))}
+        title={drilldown.title}
+        type={drilldown.type}
+        id={drilldown.id}
+        store={reportStore}
+        period={reportPeriod}
+        startDate={reportPeriod === 'Custom Range' ? customStart : undefined}
+        endDate={reportPeriod === 'Custom Range' ? customEnd : undefined}
+      />
     </AppLayout>
   );
 }

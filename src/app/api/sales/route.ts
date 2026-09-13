@@ -39,7 +39,6 @@ export async function GET(req: NextRequest) {
       orderBy: {
         createdAt: 'desc',
       },
-      take: 100,
     });
 
     return NextResponse.json(
@@ -177,6 +176,111 @@ export async function PUT(req: NextRequest) {
               },
             });
           }
+        }
+
+        // Record Financial Ledger Reversal Entries
+        const netRev = Number(existing.subtotal) - Number(existing.discountAmount || 0);
+        const taxAmt = Number(existing.taxAmount || 0);
+        const gTotal = Number(existing.grandTotal);
+        const cogsAmt = Number(existing.totalCost);
+
+        await tx.financialLedgerEntry.create({
+          data: {
+            entryNo: `JRN-VOID-REV-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
+            entryDate: new Date(),
+            storeCode: existing.storeCode,
+            accountCategory: 'REVENUE',
+            accountName: 'Sales Returns & Refunds',
+            debit: netRev,
+            credit: 0,
+            amount: -netRev,
+            refType: 'SALE',
+            refId: existing.id,
+            refNo: existing.orderNo,
+            entityName: existing.customerName || 'Customer',
+            description: `Order ${existing.orderNo} ${status} reversal by ${user.name}`,
+            createdBy: user.name,
+          },
+        });
+
+        if (taxAmt > 0) {
+          await tx.financialLedgerEntry.create({
+            data: {
+              entryNo: `JRN-VOID-TAX-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
+              entryDate: new Date(),
+              storeCode: existing.storeCode,
+              accountCategory: 'LIABILITY',
+              accountName: 'GST Output Tax Liability (Reversal)',
+              debit: taxAmt,
+              credit: 0,
+              amount: -taxAmt,
+              refType: 'SALE',
+              refId: existing.id,
+              refNo: existing.orderNo,
+              entityName: existing.customerName || 'Customer',
+              description: `GST Reversal on Order ${existing.orderNo} ${status}`,
+              createdBy: user.name,
+            },
+          });
+        }
+
+        await tx.financialLedgerEntry.create({
+          data: {
+            entryNo: `JRN-VOID-ASST-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
+            entryDate: new Date(),
+            storeCode: existing.storeCode,
+            accountCategory: 'ASSET',
+            accountName: `Cash / Bank Refund (${existing.paymentMethod})`,
+            debit: 0,
+            credit: gTotal,
+            amount: -gTotal,
+            refType: 'SALE',
+            refId: existing.id,
+            refNo: existing.orderNo,
+            entityName: existing.customerName || 'Customer',
+            description: `Refund payout for Order ${existing.orderNo}`,
+            createdBy: user.name,
+          },
+        });
+
+        if (cogsAmt > 0) {
+          await tx.financialLedgerEntry.create({
+            data: {
+              entryNo: `JRN-VOID-COGS-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
+              entryDate: new Date(),
+              storeCode: existing.storeCode,
+              accountCategory: 'COGS',
+              accountName: 'Cost of Goods Sold (Reversal)',
+              debit: 0,
+              credit: cogsAmt,
+              amount: -cogsAmt,
+              refType: 'SALE',
+              refId: existing.id,
+              refNo: existing.orderNo,
+              entityName: existing.customerName || 'Customer',
+              description: `COGS Reversal on Order ${existing.orderNo} ${status}`,
+              createdBy: user.name,
+            },
+          });
+
+          await tx.financialLedgerEntry.create({
+            data: {
+              entryNo: `JRN-VOID-INVR-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
+              entryDate: new Date(),
+              storeCode: existing.storeCode,
+              accountCategory: 'ASSET',
+              accountName: 'Inventory Asset (Restocked)',
+              debit: cogsAmt,
+              credit: 0,
+              amount: cogsAmt,
+              refType: 'SALE',
+              refId: existing.id,
+              refNo: existing.orderNo,
+              entityName: existing.customerName || 'Customer',
+              description: `Stock Restocked for Voided/Refunded Order ${existing.orderNo}`,
+              createdBy: user.name,
+            },
+          });
         }
 
         // Log to Audit Log

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifySessionToken } from '@/lib/auth';
+import { getAuthUserFromRequest } from '@/lib/auth';
 import { searchCustomerWithLegacyBridge } from '@/lib/services/legacyCustomerService';
 
 /**
@@ -8,9 +7,7 @@ import { searchCustomerWithLegacyBridge } from '@/lib/services/legacyCustomerSer
  */
 export async function GET(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('cosko_session')?.value;
-    const user = token ? verifySessionToken(token) : null;
+    const user = getAuthUserFromRequest(req);
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

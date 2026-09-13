@@ -18,7 +18,7 @@ export default function RecentActivityFeed() {
       bg: 'bg-primary/10',
       title: `Invoice #${s.orderNo} raised`,
       meta: `${s.customerName || 'Customer'} · ₹${(s.total || 0).toLocaleString('en-IN')} · ${s.store}`,
-      time: s.createdAt || 'Recent',
+      time: s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Recent',
       badge: { variant: 'active' as const, label: s.paymentMethod || 'Paid' },
     }));
 
@@ -31,7 +31,7 @@ export default function RecentActivityFeed() {
       bg: 'bg-info/10',
       title: `PO #${p.poNo} created`,
       meta: `Vendor: ${p.vendorName || 'Supplier'} · ₹${(p.totalAmount || 0).toLocaleString('en-IN')}`,
-      time: p.createdAt || 'Recent',
+      time: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Recent',
       badge: { variant: p.status === 'Received' ? ('active' as const) : ('pending' as const), label: p.status },
     }));
 
@@ -44,7 +44,7 @@ export default function RecentActivityFeed() {
       bg: 'bg-accent/10',
       title: `Stock transfer #${t.transferNo}`,
       meta: `${t.sourceStore} → ${t.destStore} · ${t.productName} · ${t.qty} units`,
-      time: t.createdAt || 'Recent',
+      time: t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Recent',
       badge: { variant: 'info' as const, label: t.status },
     }));
 

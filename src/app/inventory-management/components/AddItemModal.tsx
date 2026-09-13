@@ -174,12 +174,6 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
       return;
     }
 
-    // Mandatory Product Image for NEW product creation (Requirement 27)
-    if (!editItem && images.length === 0) {
-      toast.error('Product Image is mandatory for new products. Please upload at least one image.');
-      return;
-    }
-
     const payload = {
       ...formData,
       name: formData.name.trim(),
@@ -468,7 +462,7 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                  Product Image {!editItem && <span className="text-danger font-bold">* (Mandatory)</span>}
+                  Product Image <span className="text-muted-foreground font-normal lowercase">(optional)</span>
                 </h4>
                 <p className="text-3xs text-muted-foreground">PNG, JPG, or WebP up to 5MB.</p>
               </div>

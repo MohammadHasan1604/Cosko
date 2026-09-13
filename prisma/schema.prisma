@@ -321,7 +321,7 @@ model Vendor {
   city          String   @db.VarChar(64)
   address       String?  @db.VarChar(255)
   categories    String   @db.VarChar(255)
-  gstin         String   @db.VarChar(32)
+  gstin         String?  @default("") @db.VarChar(32)
   paymentTerms  String   @default("Net 30") @map("payment_terms") @db.VarChar(32)
   leadTimeDays  Int?     @map("lead_time_days")
   rating        Decimal? @db.Decimal(3, 1)
@@ -337,13 +337,16 @@ model Vendor {
 model PurchaseOrder {
   id           String    @id @default(uuid())
   poNo         String    @unique @map("po_no") @db.VarChar(64)
+  invoiceNo    String?   @map("invoice_no") @db.VarChar(64)
   vendorId     String    @map("vendor_id")
   storeCode    String    @map("store_code") @db.VarChar(16)
   orderDate    DateTime  @default(now()) @map("order_date")
   expectedDate DateTime? @map("expected_date")
+  dueDate      DateTime? @map("due_date")
   receivedDate DateTime? @map("received_date")
   totalCost    Decimal   @map("total_cost") @db.Decimal(15, 2)
   paidAmount   Decimal   @default(0) @map("paid_amount") @db.Decimal(15, 2)
+  creditAmount Decimal   @default(0) @map("credit_amount") @db.Decimal(15, 2)
   status       String    @default("Ordered") @db.VarChar(32)
   paymentStatus String   @default("Unpaid") @map("payment_status") @db.VarChar(32)
   createdBy    String    @map("created_by") @db.VarChar(128)
@@ -364,10 +367,12 @@ model PurchaseOrder {
 model PurchasePayment {
   id            String   @id @default(uuid())
   purchaseId    String   @map("purchase_id")
+  voucherNo     String?  @map("voucher_no") @db.VarChar(64)
   amount        Decimal  @db.Decimal(15, 2)
   paymentDate   DateTime @default(now()) @map("payment_date")
   paymentMethod String   @default("Bank Transfer") @map("payment_method") @db.VarChar(32)
   referenceNo   String?  @map("reference_no") @db.VarChar(64)
+  receiptUrl    String?  @map("receipt_url") @db.LongText
   notes         String?  @db.VarChar(255)
   recordedBy    String   @map("recorded_by") @db.VarChar(128)
   createdAt     DateTime @default(now()) @map("created_at")
@@ -508,16 +513,70 @@ model AuditLog {
 
 // 14. BRANDING & SYSTEM SETTINGS
 model BrandingSetting {
-  id           String   @id @default("cosko_branding_config")
-  appName      String   @default("COSKO") @map("app_name") @db.VarChar(128)
-  logoUrl      String?  @map("logo_url") @db.LongText
-  faviconUrl   String?  @map("favicon_url") @db.LongText
-  tagline      String   @default("Multi-Store Enterprise Retail & POS System") @db.VarChar(255)
-  supportEmail String   @default("support@cosko.com") @map("support_email") @db.VarChar(128)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id              String   @id @default("cosko_branding_config")
+  appName         String   @default("COSKO") @map("app_name") @db.VarChar(128)
+  logoUrl         String?  @map("logo_url") @db.LongText
+  faviconUrl      String?  @map("favicon_url") @db.LongText
+  tagline         String   @default("Multi-Store Enterprise Retail & POS System") @db.VarChar(255)
+  supportEmail    String   @default("support@cosko.com") @map("support_email") @db.VarChar(128)
+  supportPhone    String?  @map("support_phone") @db.VarChar(32)
+  businessName    String?  @map("business_name") @db.VarChar(255)
+  businessAddress String?  @map("business_address") @db.Text
+  city            String?  @db.VarChar(64)
+  state           String?  @db.VarChar(64)
+  pincode         String?  @db.VarChar(10)
+  baseCurrency    String   @default("INR (₹)") @map("base_currency") @db.VarChar(32)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("branding_settings")
+}
+
+// 14B. SYSTEM SETTINGS — Tax, Invoice, Security, Alerts (Single-Row Config)
+model SystemSettings {
+  id                    String   @id @default("cosko_system_config")
+  // ─── GST / Tax ───
+  gstin                 String?  @db.VarChar(15)
+  legalBusinessName     String?  @map("legal_business_name") @db.VarChar(255)
+  tradeName             String?  @map("trade_name") @db.VarChar(255)
+  gstState              String?  @map("gst_state") @db.VarChar(64)
+  gstStateCode          String?  @map("gst_state_code") @db.VarChar(2)
+  gstRegistrationType   String   @default("Regular") @map("gst_registration_type") @db.VarChar(32)
+  defaultTaxRate        Decimal  @default(18) @map("default_tax_rate") @db.Decimal(5, 2)
+  hsnMandatory          Boolean  @default(false) @map("hsn_mandatory")
+  enableReverseCharge   Boolean  @default(false) @map("enable_reverse_charge")
+  gstBusinessAddress    String?  @map("gst_business_address") @db.Text
+  // ─── Invoice Template ───
+  invoiceHeader         String   @default("COSKO Retail Enterprise") @map("invoice_header") @db.VarChar(255)
+  invoiceFooter         String   @default("Thank you for shopping with us! Goods once sold cannot be returned without original receipt.") @map("invoice_footer") @db.VarChar(500)
+  invoiceTerms          String?  @map("invoice_terms") @db.Text
+  invoiceAccentColor    String   @default("primary") @map("invoice_accent_color") @db.VarChar(32)
+  watermarkOpacity      Int      @default(5) @map("watermark_opacity")
+  showStoreAddress      Boolean  @default(true) @map("show_store_address")
+  invoiceTemplateUrl    String?  @map("invoice_template_url") @db.LongText
+  invoiceTemplateVersion Int     @default(1) @map("invoice_template_version")
+  invoiceFieldMapping   String?  @map("invoice_field_mapping") @db.Text
+  showPaymentQr         Boolean  @default(false) @map("show_payment_qr")
+  paymentUpiId          String?  @map("payment_upi_id") @db.VarChar(128)
+  paymentBankDetails    String?  @map("payment_bank_details") @db.Text
+  // ─── Security ───
+  sessionTimeoutMins    Int      @default(30) @map("session_timeout_mins")
+  maxLoginAttempts      Int      @default(5) @map("max_login_attempts")
+  enforcePasswordPolicy Boolean  @default(true) @map("enforce_password_policy")
+  sensitiveActionConfirm Boolean @default(true) @map("sensitive_action_confirm")
+  // ─── Alerts ───
+  lowStockAlerts        Boolean  @default(true) @map("low_stock_alerts")
+  lowStockThreshold     Int      @default(5) @map("low_stock_threshold")
+  overduePaymentAlerts  Boolean  @default(true) @map("overdue_payment_alerts")
+  overdueThresholdDays  Int      @default(30) @map("overdue_threshold_days")
+  dailySalesDigest      Boolean  @default(false) @map("daily_sales_digest")
+  securityEventAlerts   Boolean  @default(true) @map("security_event_alerts")
+  alertRecipientEmails  String?  @map("alert_recipient_emails") @db.Text
+
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
 }
 
 // 15. SECURE LEGACY DATA CONNECTIONS
@@ -545,4 +604,33 @@ model LegacyDataSourceConfig {
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
   @@map("legacy_data_source_configs")
+}
+
+// 16. FINANCIAL & GENERAL LEDGER
+model FinancialLedgerEntry {
+  id              String   @id @default(uuid())
+  entryNo         String   @unique @map("entry_no") @db.VarChar(64)
+  entryDate       DateTime @default(now()) @map("entry_date")
+  storeCode       String   @map("store_code") @db.VarChar(16)
+  accountCategory String   @map("account_category") @db.VarChar(32) // REVENUE, COGS, OPERATING_EXPENSE, CENTRAL_EXPENSE, TRANSFER_MARKUP, ASSET, LIABILITY
+  accountName     String   @map("account_name") @db.VarChar(64)
+  debit           Decimal  @default(0.00) @db.Decimal(15, 2)
+  credit          Decimal  @default(0.00) @db.Decimal(15, 2)
+  amount          Decimal  @db.Decimal(15, 2)
+  refType         String   @map("ref_type") @db.VarChar(32) // SALE, PURCHASE_GRN, VENDOR_PAYMENT, EXPENSE, STOCK_TRANSFER, INVENTORY_ADJUSTMENT
+  refId           String?  @map("ref_id") @db.VarChar(64)
+  refNo           String   @map("ref_no") @db.VarChar(64)
+  entityName      String?  @map("entity_name") @db.VarChar(128)
+  description     String   @db.VarChar(255)
+  isEliminated    Boolean  @default(false) @map("is_eliminated")
+  metadataJson    String?  @map("metadata_json") @db.Text
+  createdBy       String   @map("created_by") @db.VarChar(128)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([storeCode])
+  @@index([entryDate])
+  @@index([accountCategory])
+  @@index([refType])
+  @@index([refNo])
+  @@map("financial_ledger")
 }

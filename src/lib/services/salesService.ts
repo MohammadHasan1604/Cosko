@@ -135,7 +135,108 @@ export async function executePOSCheckout(input: CreateSaleInput) {
       },
     });
 
-    // 4. Update Customer Total Spent
+    // 4. Record Double-Entry Financial Ledger Entries
+    const netRevenue = subtotal - discountAmount;
+    await tx.financialLedgerEntry.create({
+      data: {
+        entryNo: `JRN-REV-${orderNo}`,
+        entryDate: new Date(),
+        storeCode,
+        accountCategory: 'REVENUE',
+        accountName: 'Gross Sales Revenue',
+        debit: 0,
+        credit: netRevenue,
+        amount: netRevenue,
+        refType: 'SALE',
+        refId: sale.id,
+        refNo: orderNo,
+        entityName: input.customerName || 'Customer',
+        description: `POS Billed Sales Revenue for Order ${orderNo}`,
+        createdBy: input.cashierName,
+      },
+    });
+
+    if (taxAmount > 0) {
+      await tx.financialLedgerEntry.create({
+        data: {
+          entryNo: `JRN-TAX-${orderNo}`,
+          entryDate: new Date(),
+          storeCode,
+          accountCategory: 'LIABILITY',
+          accountName: 'GST Output Tax Liability',
+          debit: 0,
+          credit: taxAmount,
+          amount: taxAmount,
+          refType: 'SALE',
+          refId: sale.id,
+          refNo: orderNo,
+          entityName: input.customerName || 'Customer',
+          description: `GST Collected on Order ${orderNo}`,
+          createdBy: input.cashierName,
+        },
+      });
+    }
+
+    await tx.financialLedgerEntry.create({
+      data: {
+        entryNo: `JRN-ASST-${orderNo}`,
+        entryDate: new Date(),
+        storeCode,
+        accountCategory: 'ASSET',
+        accountName: input.paymentMethod === 'Credit' ? 'Customer Accounts Receivable' : `Cash / Bank (${input.paymentMethod})`,
+        debit: grandTotal,
+        credit: 0,
+        amount: grandTotal,
+        refType: 'SALE',
+        refId: sale.id,
+        refNo: orderNo,
+        entityName: input.customerName || 'Customer',
+        description: `Payment Receipt via ${input.paymentMethod} for Order ${orderNo}`,
+        createdBy: input.cashierName,
+      },
+    });
+
+    if (totalCost > 0) {
+      await tx.financialLedgerEntry.create({
+        data: {
+          entryNo: `JRN-COGS-${orderNo}`,
+          entryDate: new Date(),
+          storeCode,
+          accountCategory: 'COGS',
+          accountName: 'Cost of Goods Sold',
+          debit: totalCost,
+          credit: 0,
+          amount: totalCost,
+          refType: 'SALE',
+          refId: sale.id,
+          refNo: orderNo,
+          entityName: input.customerName || 'Customer',
+          description: `Inventory Cost of Goods Sold for Order ${orderNo}`,
+          createdBy: input.cashierName,
+        },
+      });
+
+      await tx.financialLedgerEntry.create({
+        data: {
+          entryNo: `JRN-INVD-${orderNo}`,
+          entryDate: new Date(),
+          storeCode,
+          accountCategory: 'ASSET',
+          accountName: 'Inventory Asset (Depletion)',
+          debit: 0,
+          credit: totalCost,
+          amount: -totalCost,
+          refType: 'SALE',
+          refId: sale.id,
+          refNo: orderNo,
+          entityName: input.customerName || 'Customer',
+          description: `Stock Depletion for POS Sale ${orderNo}`,
+          createdBy: input.cashierName,
+        },
+      });
+    }
+
+    // 5. Update Customer Total Spent
     if (input.customerId) {
       await tx.customer.update({
         where: { id: input.customerId },
@@ -146,7 +247,7 @@ export async function executePOSCheckout(input: CreateSaleInput) {
       });
     }
 
-    // 5. Create Audit Log Entry
+    // 6. Create Audit Log Entry
     await tx.auditLog.create({
       data: {
         module: 'Sales',

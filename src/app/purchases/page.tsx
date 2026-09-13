@@ -89,7 +89,7 @@ export default function PurchasesPage() {
     setPaymentModalPo(po);
     const remaining = po.remainingAmount !== undefined
       ? po.remainingAmount
-      : Math.max(0, po.totalAmount - (po.paidAmount || 0));
+      : Math.max(0, po.totalAmount - (po.paidAmount || 0) - (po.creditAmount || 0));
     setPayAmount(remaining > 0 ? remaining : '');
     setPayMethod('Bank Transfer');
     setPayDate(new Date().toISOString().split('T')[0]);

@@ -417,6 +417,17 @@ export async function DELETE(req: NextRequest) {
         target = await prisma.product.findUnique({ where: { id: inv.productId } });
       }
     }
+    if (!target && id.includes('-')) {
+      const parts = id.split('-');
+      // Standard UUID is 5 segments: 8-4-4-4-12. If store or UNASSIGNED was appended, parts.length > 5
+      if (parts.length > 5) {
+        const candidateUuid = parts.slice(0, 5).join('-');
+        target = await prisma.product.findUnique({ where: { id: candidateUuid } }).catch(() => null);
+      }
+      if (!target) {
+        target = await prisma.product.findUnique({ where: { id: parts[0] } }).catch(() => null);
+      }
+    }
 
     if (!target) {
       return NextResponse.json({ success: true, message: 'Product already deleted or non-existent' });

@@ -141,11 +141,13 @@ export interface SalesOrder {
   taxTotal: number;
   discount: number;
   total: number;
+  grossProfit?: number;
+  totalCost?: number;
   taxEnabled: boolean;
   paymentMethod: 'Cash' | 'UPI' | 'Card' | 'Credit';
   status: 'Completed' | 'Refunded' | 'Pending' | 'Cancelled' | 'Voided';
   createdAt: string;
-  period: 'Today' | 'Yesterday' | 'Last 7 Days' | 'This Month' | 'Last Month' | 'This Quarter' | 'This Year';
+  period: 'Today' | 'Yesterday' | 'Last 7 Days' | 'This Month' | 'Last Month' | 'This Quarter' | 'This Year' | 'DB';
   salePhotos?: SalePhoto[];
   warrantyExpiryDate?: string;
 }
@@ -153,18 +155,22 @@ export interface SalesOrder {
 export interface PurchaseOrder {
   id: string;
   poNo: string;
+  invoiceNo?: string;
   vendorName: string;
   vendorId?: string;
   store: string;
   items: { name: string; qty: number; unitCost: number; sku?: string }[];
   totalAmount: number;
   paidAmount?: number;
+  creditAmount?: number;
   remainingAmount?: number;
-  status: 'Draft' | 'Sent' | 'Received' | 'Cancelled';
+  status: 'Draft' | 'Sent' | 'Ordered' | 'Pending' | 'Received' | 'Completed' | 'Cancelled' | 'Archived';
   paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
   expectedDate: string;
+  dueDate?: string;
   createdAt: string;
   notes?: string;
+  payments?: any[];
 }
 
 export interface Customer {
@@ -173,6 +179,8 @@ export interface Customer {
   email: string;
   phone: string;
   city: string;
+  address?: string;
+  status?: string;
   tier: 'VIP' | 'Regular' | 'New';
   totalSpend: number;
   creditBalance: number;
@@ -190,7 +198,14 @@ export interface Vendor {
   city?: string;
   address?: string;
   gstin?: string;
+  paymentTerms?: string;
   outstandingPayable: number;
+  totalBilledAmount?: number;
+  totalPaidAmount?: number;
+  totalCreditsAmount?: number;
+  totalBillsCount?: number;
+  unpaidBillsCount?: number;
+  overdueBillsCount?: number;
   rating: number;
   leadTimeDays: number;
 }
@@ -310,6 +325,8 @@ interface AppContextType {
   setSelectedStore: (store: string) => void;
   datePeriod: string;
   setDatePeriod: (period: string) => void;
+  customDateRange: { start: string; end: string };
+  setCustomDateRange: (range: { start: string; end: string }) => void;
   authStatus: 'AUTH_LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED';
   currentUser: { id: string; name: string; email: string; role: UserAccount['role']; store: string; allowedStores?: string[]; avatar: string; shiftStatus: 'On Shift' | 'On Leave'; avatarUrl?: string; mustChangePassword?: boolean };
   setCurrentUser: (user: any) => void;
@@ -341,7 +358,8 @@ interface AppContextType {
   deleteItem: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   adjustStock: (id: string, qtyChange: number, reason: string) => void;
   transferStock: (fromStore: string, toStore: string, itemId: string, qty: number, customTransferPrice?: number, status?: 'Completed' | 'Draft', notes?: string) => Promise<any>;
-  updateTransferStatus: (id: string, nextStatus: 'Completed' | 'Cancelled') => Promise<void> | void;
+  updateTransferStatus: (id: string, nextStatus: 'Completed' | 'Cancelled') => Promise<any> | void;
+  deleteTransfer: (id: string) => Promise<{ success: boolean; message?: string }>;
   defaultStoreTransferPrices: ProductStoreTransferPrice[];
   setDefaultStoreTransferPrice: (productId: string, storeCode: string, price: number) => void;
   stockTransfers: StockTransferRecord[];
@@ -365,7 +383,8 @@ interface AppContextType {
     paymentDate?: string;
     referenceNo?: string;
     notes?: string;
-  }) => Promise<{ success: boolean; error?: string; payment?: any }>;
+    receiptUrl?: string;
+  }) => Promise<{ success: boolean; error?: string; payment?: any; receiptVoucher?: any; remaining?: number }>;
   customers: Customer[];
   addCustomer: (cust: Omit<Customer, 'id' | 'totalSpend' | 'lastPurchase'>) => Promise<any> | Customer;
   updateCustomer: (id: string, updated: Partial<Customer>) => Promise<any>;
@@ -422,6 +441,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [selectedStore, setSelectedStoreState] = useState<string>('All Stores');
   const [datePeriod, setDatePeriod] = useState<string>('This Month');
+  const [customDateRange, setCustomDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [usersList, setUsersList] = useState<UserAccount[]>(initialUsers);
   
   const [storesList, setStoresList] = useState<StoreHub[]>(initialStoreHubs);
@@ -520,7 +540,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Authoritative persistence: fetch real data from MySQL database
   const refreshAllData = useCallback(async () => {
     try {
-      const headers = { 'Content-Type': 'application/json' };
+      let activeToken = '';
+      if (typeof window !== 'undefined') {
+        try {
+          const saved = localStorage.getItem('cosko_active_session');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            activeToken = parsed.token || '';
+          }
+        } catch {}
+      }
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (activeToken) {
+        headers['Authorization'] = `Bearer ${activeToken}`;
+      }
       const opts: RequestInit = { credentials: 'include', headers };
 
       // Fetch all authoritative data in parallel
@@ -670,15 +704,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           id: s.id, orderNo: s.orderNo,
           customerName: s.customerName, customerPhone: s.customerPhone,
           store: s.storeCode,
+          cashierName: s.cashierName || 'Sales Staff',
           items: s.items?.map((it: any) => ({
             itemId: it.productId, name: it.productName, sku: it.sku,
-            qty: it.qty, unitPrice: Number(it.unitPrice), taxRate: 18,
+            qty: it.qty, unitPrice: Number(it.unitPrice),
+            unitCost: Number(it.unitCost) || 0,
+            lineTotal: Number(it.lineTotal) || 0,
+            lineProfit: Number(it.lineProfit) || 0,
+            taxRate: 18,
           })) || [],
           subtotal: Number(s.subtotal), taxTotal: Number(s.taxAmount),
           discount: Number(s.discountAmount) || 0,
           total: Number(s.grandTotal), taxEnabled: true,
           paymentMethod: s.paymentMethod, status: s.status,
-          createdAt: new Date(s.createdAt).toLocaleDateString('en-IN'),
+          createdAt: s.createdAt,
+          grossProfit: Number(s.grossProfit) || 0,
+          totalCost: Number(s.totalCost) || 0,
           period: 'DB',
         })));
       }
@@ -687,31 +728,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (purchasesData?.success && Array.isArray(purchasesData.purchases)) {
         setPurchases(purchasesData.purchases.map((p: any) => {
           const total = Number(p.totalCost) || 0;
-          let paid = p.paidAmount !== undefined && p.paidAmount !== null ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
-          let remaining = Math.max(0, total - paid);
-          if (p.notes && paid === 0 && p.paymentStatus === 'Partial') {
-            const match = p.notes.match(/\[PARTIAL_PAYMENT:paid=([\d.]+),remaining=([\d.]+)\]/);
-            if (match) {
-              paid = parseFloat(match[1]) || 0;
-              remaining = parseFloat(match[2]) || 0;
-            }
-          }
+          const credit = Number(p.creditAmount) || 0;
+          const realPaid = p.payments?.reduce((sum: number, pay: any) => sum + (Number(pay.amount) || 0), 0) ?? (p.paidAmount !== undefined && p.paidAmount !== null ? Number(p.paidAmount) : 0);
+          const remaining = Math.max(0, Math.round((total - realPaid - credit) * 100) / 100);
+
           return {
-            id: p.id, poNo: p.poNo, vendorName: p.vendor?.name || 'Vendor',
+            id: p.id,
+            poNo: p.poNo,
+            invoiceNo: p.invoiceNo || p.poNo,
+            vendorName: p.vendor?.name || 'Vendor',
             vendorId: p.vendorId,
             store: p.storeCode || 'CENTRAL',
             items: p.items?.map((it: any) => ({
               itemId: it.productId,
-              name: it.productName || 'Item', sku: it.sku || '',
-              qty: it.qtyOrdered, unitCost: Number(it.unitCost),
+              name: it.productName || 'Item',
+              sku: it.sku || '',
+              qty: it.qtyOrdered,
+              unitCost: Number(it.unitCost),
             })) || [],
             totalAmount: total,
-            paidAmount: paid,
+            paidAmount: realPaid,
+            creditAmount: credit,
             remainingAmount: remaining,
-            status: p.status, paymentStatus: p.paymentStatus,
+            status: p.status,
+            paymentStatus: p.paymentStatus,
             notes: p.notes || '',
-            createdAt: new Date(p.createdAt).toLocaleDateString('en-IN'),
-            expectedDate: p.expectedDate ? new Date(p.expectedDate).toLocaleDateString('en-IN') : 'ASAP',
+            createdAt: p.createdAt,
+            expectedDate: p.expectedDate ? p.expectedDate : '',
+            dueDate: p.dueDate ? p.dueDate : (p.expectedDate ? p.expectedDate : ''),
+            payments: p.payments || [],
           };
         }));
       }
@@ -721,6 +766,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCustomers(customersData.customers.filter((c: any) => c.status !== 'Archived').map((c: any) => ({
           id: c.id, name: c.name, phone: c.phone,
           email: c.email || '', city: c.city || '',
+          address: c.address || '',
+          status: c.status || 'Active',
           tier: Number(c.totalSpent) > 50000 ? 'VIP' : 'Regular',
           totalSpend: Number(c.totalSpent) || 0,
           creditBalance: Number(c.creditBalance) || 0,
@@ -731,12 +778,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const vendorsData = await safeJson(vendorsRes);
       if (vendorsData?.success && Array.isArray(vendorsData.vendors)) {
         setVendors(vendorsData.vendors.filter((v: any) => v.status !== 'Archived').map((v: any) => ({
-          id: v.id, code: v.code, name: v.name,
-          contactPerson: v.contactPerson, email: v.email,
-          phone: v.phone, city: v.city, address: v.address || '',
+          id: v.id,
+          code: v.code,
+          name: v.name,
+          contactPerson: v.contactPerson,
+          email: v.email,
+          phone: v.phone,
+          city: v.city,
+          address: v.address || '',
           category: v.categories || 'General',
           gstin: v.gstin || '',
-          outstandingPayable: Number(v.outstandingPayable) || 0, rating: Number(v.rating) || 0, leadTimeDays: Number(v.leadTimeDays) || 0,
+          paymentTerms: v.paymentTerms || 'Net 30',
+          outstandingPayable: Number(v.outstandingPayable) || 0,
+          totalBilledAmount: Number(v.totalBilledAmount) || 0,
+          totalPaidAmount: Number(v.totalPaidAmount) || 0,
+          totalCreditsAmount: Number(v.totalCreditsAmount) || 0,
+          totalBillsCount: Number(v.totalBillsCount) || 0,
+          unpaidBillsCount: Number(v.unpaidBillsCount) || 0,
+          overdueBillsCount: Number(v.overdueBillsCount) || 0,
+          rating: Number(v.rating) || 5.0,
+          leadTimeDays: Number(v.leadTimeDays) || 3,
         })));
       }
 
@@ -747,7 +808,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           category: e.category, amount: Number(e.amount),
           store: e.storeCode, description: e.description,
           paymentMethod: e.paymentMethod, status: 'Approved',
-          date: new Date(e.date).toLocaleDateString('en-IN'),
+          date: e.date || e.createdAt,
         })));
       }
 
@@ -1519,11 +1580,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteItem = async (id: string, permanent = false) => {
-    const itemToDelete = inventory.find((i) => i.id === id || i.sku === id);
+    const itemToDelete = inventory.find((i) => i.id === id || i.sku === id || (i as any).productId === id);
+    const targetProductId = (itemToDelete as any)?.productId || (id.includes('-') && id.split('-').length > 5 ? id.split('-').slice(0, 5).join('-') : id);
     try {
-      const res = await MySQLDataService.deleteProduct(id, permanent);
+      const res = await MySQLDataService.deleteProduct(targetProductId, permanent);
       if (res?.success) {
-        setInventory((prev) => prev.filter((i) => i.id !== id && i.sku !== id));
+        setInventory((prev) => prev.filter((i) => i.id !== id && i.sku !== (itemToDelete?.sku || id) && (i as any).productId !== targetProductId));
         if (itemToDelete) {
           addAuditLog('Inventory', res?.mode === 'archived' ? 'Archive Product' : 'Delete Product', res?.message || `Removed item "${itemToDelete.name}" (${itemToDelete.sku})`);
         }
@@ -1662,8 +1724,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const target = stockTransfers.find((t) => t.id === id);
     if (!target) return;
 
-    if (target.status === 'Completed' && nextStatus === 'Cancelled') {
-      toast.warning('Completed transfers cannot be directly cancelled. Corrective transfer required.');
+    if (target.status === 'Completed' && nextStatus === 'Cancelled' && currentUser?.role !== 'Super Admin') {
+      toast.warning('Only Super Admin can cancel completed transfers with automatic inventory reversal.');
       return;
     }
 
@@ -1685,9 +1747,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       toast.success(`Transfer ${target.transferNo} ${nextStatus === 'Cancelled' ? 'cancelled with inventory reversal' : 'completed'}!`);
       await refreshAllData();
+      return { success: true };
     } catch (err: any) {
       console.error('[COSKO] updateTransferStatus error:', err);
       toast.error(err.message || 'Failed to update transfer status');
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteTransfer = async (id: string) => {
+    try {
+      const res = await fetch(`/api/transfers?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to cancel/reverse transfer');
+      }
+      toast.success(data.message || 'Stock transfer reversed successfully');
+      await refreshAllData();
+      return { success: true, message: data.message };
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to cancel transfer');
+      return { success: false, message: err.message };
     }
   };
 
@@ -1756,7 +1839,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         orderNo: dbSale.orderNo,
         items: saleItemsWithWarranty,
         taxEnabled: saleData.taxEnabled !== undefined ? saleData.taxEnabled : true,
-        createdAt: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        createdAt: dbSale.createdAt || new Date().toISOString(),
+        grossProfit: Number(dbSale.grossProfit) || (Number(dbSale.grandTotal) - Number(dbSale.totalCost)),
+        totalCost: Number(dbSale.totalCost) || 0,
         period: 'Today',
       };
 
@@ -1819,11 +1904,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const newPO: PurchaseOrder = {
           id: p.id,
           poNo: p.poNo,
+          invoiceNo: p.invoiceNo || p.poNo,
           vendorName: poData.vendorName,
           vendorId: p.vendorId,
           store: p.storeCode || 'CENTRAL',
           items: poData.items,
           totalAmount: Number(p.totalCost),
+          paidAmount: 0,
+          creditAmount: 0,
+          remainingAmount: Number(p.totalCost),
           status: p.status,
           paymentStatus: p.paymentStatus,
           createdAt: new Date(p.createdAt).toLocaleDateString('en-IN'),
@@ -1895,6 +1984,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     paymentDate?: string;
     referenceNo?: string;
     notes?: string;
+    receiptUrl?: string;
   }) => {
     try {
       const res = await fetch('/api/purchases/payments', {
@@ -1912,7 +2002,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       toast.success(`Payment of ₹${paymentData.amount.toLocaleString('en-IN')} recorded successfully!`);
       await refreshAllData();
-      return { success: true, payment: data.payment };
+      return {
+        success: true,
+        payment: data.payment,
+        receiptVoucher: data.receiptVoucher,
+        purchaseOrder: data.purchaseOrder,
+        remaining: data.remaining,
+      };
     } catch (err: any) {
       toast.error(err.message || 'Error recording purchase payment');
       return { success: false, error: err.message };
@@ -1929,7 +2025,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           name: c.name,
           phone: c.phone,
           email: c.email || '',
-          city: c.city || '',
+          city: c.city || custData.city || '',
+          address: c.address || custData.address || '',
+          status: c.status || custData.status || 'Active',
           tier: 'Regular',
           totalSpend: Number(c.totalSpent) || 0,
           creditBalance: Number(c.creditBalance) || 0,
@@ -2243,6 +2341,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSelectedStore,
         datePeriod,
         setDatePeriod,
+        customDateRange,
+        setCustomDateRange,
         authStatus,
         currentUser,
         setCurrentUser,
@@ -2275,6 +2375,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         adjustStock,
         transferStock,
         updateTransferStatus,
+        deleteTransfer,
         defaultStoreTransferPrices,
         setDefaultStoreTransferPrice,
         stockTransfers,

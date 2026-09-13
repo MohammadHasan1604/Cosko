@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 /**
- * GET /api/vendors - Retrieve all vendors (excludes Archived by default)
+ * GET /api/vendors - Retrieve all vendors with authoritative, reconciled financial payables
  */
 export async function GET(req: NextRequest) {
   try {
@@ -16,9 +16,12 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const includeArchived = searchParams.get('includeArchived') === 'true';
+    const vendorId = searchParams.get('id');
 
     const whereClause: any = {};
-    if (!includeArchived) {
+    if (vendorId) {
+      whereClause.id = vendorId;
+    } else if (!includeArchived) {
       whereClause.status = { not: 'Archived' };
     }
 
@@ -27,20 +30,73 @@ export async function GET(req: NextRequest) {
       orderBy: { name: 'asc' },
       include: {
         purchases: {
-          select: { totalCost: true, paidAmount: true, paymentStatus: true },
-          where: { paymentStatus: { not: 'Paid' } },
+          where: {
+            status: { notIn: ['Cancelled', 'Archived'] },
+          },
+          select: {
+            id: true,
+            poNo: true,
+            invoiceNo: true,
+            totalCost: true,
+            paidAmount: true,
+            creditAmount: true,
+            paymentStatus: true,
+            status: true,
+            orderDate: true,
+            expectedDate: true,
+            dueDate: true,
+          },
         },
       },
     });
 
-    // Calculate outstanding payable per vendor from unpaid purchase orders
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    // Reconcile financial figures exactly: Total Bill - Valid Payments - Credits = Outstanding Balance
     const vendorsWithPayable = vendors.map((v: any) => {
-      const outstandingPayable = v.purchases?.reduce((sum: number, po: any) => {
-        return sum + Math.max(0, Number(po.totalCost) - (Number(po.paidAmount) || 0));
-      }, 0) || 0;
-      
+      let totalBilledAmount = 0;
+      let totalPaidAmount = 0;
+      let totalCreditsAmount = 0;
+      let outstandingPayable = 0;
+      let unpaidBillsCount = 0;
+      let overdueBillsCount = 0;
+
+      v.purchases?.forEach((po: any) => {
+        const cost = Number(po.totalCost) || 0;
+        const paid = Number(po.paidAmount) || 0;
+        const credit = Number(po.creditAmount) || 0;
+        const remaining = Math.max(0, cost - paid - credit);
+
+        totalBilledAmount += cost;
+        totalPaidAmount += paid;
+        totalCreditsAmount += credit;
+        outstandingPayable += remaining;
+
+        if (remaining > 0.005) {
+          unpaidBillsCount++;
+          const effDue = po.dueDate || po.expectedDate;
+          if (effDue) {
+            const dueD = new Date(effDue);
+            const dueMidnight = new Date(dueD.getFullYear(), dueD.getMonth(), dueD.getDate()).getTime();
+            if (todayMidnight > dueMidnight) {
+              overdueBillsCount++;
+            }
+          }
+        }
+      });
+
       const { purchases: _, ...vendorData } = v;
-      return { ...vendorData, outstandingPayable };
+      return {
+        ...vendorData,
+        totalBilledAmount: Math.round(totalBilledAmount * 100) / 100,
+        totalPaidAmount: Math.round(totalPaidAmount * 100) / 100,
+        totalCreditsAmount: Math.round(totalCreditsAmount * 100) / 100,
+        outstandingPayable: Math.round(outstandingPayable * 100) / 100,
+        totalBillsCount: v.purchases?.length || 0,
+        unpaidBillsCount,
+        overdueBillsCount,
+      };
     });
 
     return NextResponse.json(
@@ -65,20 +121,20 @@ export async function POST(req: NextRequest) {
     }
 
     if (user.securityLevel < 60) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient security level' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden: Insufficient security level to create vendor' }, { status: 403 });
     }
 
     const body = await req.json();
 
-    if (!body.name) {
+    if (!body.name || !body.name.trim()) {
       return NextResponse.json({ error: 'Vendor name is required' }, { status: 400 });
     }
 
     const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
     const cleanGstin = (body.gstin || '').trim().toUpperCase();
-    if (!cleanGstin || !gstinRegex.test(cleanGstin)) {
+    if (cleanGstin && cleanGstin !== 'PENDING' && !gstinRegex.test(cleanGstin)) {
       return NextResponse.json({ 
-        error: 'Valid 15-character Indian GSTIN is required (e.g. 29ABCDE1234F1Z5)' 
+        error: 'Invalid Indian GSTIN format. If provided, it must be 15 alphanumeric characters (e.g. 29ABCDE1234F1Z5)' 
       }, { status: 400 });
     }
 
@@ -90,31 +146,43 @@ export async function POST(req: NextRequest) {
       create: {
         code,
         name: body.name.trim(),
-        contactPerson: body.contactPerson || 'Account Manager',
-        email: body.email || `${body.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@vendor.com`,
-        phone: body.phone || '+91 00000 00000',
-        city: body.city || 'Central',
-        address: body.address || null,
-        categories: body.categories || body.category || 'General',
+        contactPerson: body.contactPerson?.trim() || 'Account Manager',
+        email: body.email?.trim() || `${body.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@vendor.com`,
+        phone: body.phone?.trim() || '+91 00000 00000',
+        city: body.city?.trim() || 'Central',
+        address: body.address?.trim() || null,
+        categories: body.categories?.trim() || body.category?.trim() || 'General',
         gstin: cleanGstin,
         leadTimeDays: body.leadTimeDays ? Number(body.leadTimeDays) : 3,
         rating: body.rating ? Number(body.rating) : 5.0,
-        paymentTerms: body.paymentTerms || 'Net 30',
+        paymentTerms: body.paymentTerms?.trim() || 'Net 30',
         status: body.status || 'Active',
       },
       update: {
         name: body.name.trim(),
-        ...(body.contactPerson ? { contactPerson: body.contactPerson } : {}),
-        ...(body.email ? { email: body.email } : {}),
-        ...(body.phone ? { phone: body.phone } : {}),
-        ...(body.city ? { city: body.city } : {}),
-        ...(body.address !== undefined ? { address: body.address } : {}),
-        ...(body.categories || body.category ? { categories: body.categories || body.category } : {}),
+        ...(body.contactPerson ? { contactPerson: body.contactPerson.trim() } : {}),
+        ...(body.email ? { email: body.email.trim() } : {}),
+        ...(body.phone ? { phone: body.phone.trim() } : {}),
+        ...(body.city ? { city: body.city.trim() } : {}),
+        ...(body.address !== undefined ? { address: body.address?.trim() || null } : {}),
+        ...(body.categories || body.category ? { categories: (body.categories || body.category).trim() } : {}),
         gstin: cleanGstin,
         ...(body.leadTimeDays !== undefined ? { leadTimeDays: Number(body.leadTimeDays) } : {}),
         ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
-        ...(body.paymentTerms ? { paymentTerms: body.paymentTerms } : {}),
+        ...(body.paymentTerms ? { paymentTerms: body.paymentTerms.trim() } : {}),
         ...(body.status ? { status: body.status } : {}),
+      },
+    });
+
+    // Write audit log
+    await (prisma as any).auditLog.create({
+      data: {
+        module: 'Vendors',
+        action: 'Onboard Vendor',
+        details: `Onboarded vendor "${vendor.name}" (${vendor.code}). GSTIN: ${cleanGstin || 'None'}, Terms: ${vendor.paymentTerms}`,
+        userEmail: user.email || user.name,
+        userRole: user.role,
+        storeCode: 'CENTRAL',
       },
     });
 
@@ -138,17 +206,21 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    if (user.securityLevel < 60) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient security level to update vendor' }, { status: 403 });
+    }
+
     const body = await req.json();
     if (!body.id) {
       return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 });
     }
 
     const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-    if (body.gstin !== undefined) {
+    if (body.gstin !== undefined && body.gstin !== null) {
       const cleanGstin = String(body.gstin).trim().toUpperCase();
-      if (!cleanGstin || !gstinRegex.test(cleanGstin)) {
+      if (cleanGstin && cleanGstin !== 'PENDING' && !gstinRegex.test(cleanGstin)) {
         return NextResponse.json({ 
-          error: 'Valid 15-character Indian GSTIN is required (e.g. 29ABCDE1234F1Z5)' 
+          error: 'Invalid Indian GSTIN format. If provided, it must be 15 alphanumeric characters (e.g. 29ABCDE1234F1Z5)' 
         }, { status: 400 });
       }
       body.gstin = cleanGstin;
@@ -158,17 +230,29 @@ export async function PUT(req: NextRequest) {
       where: { id: body.id },
       data: {
         ...(body.name ? { name: body.name.trim() } : {}),
-        ...(body.contactPerson ? { contactPerson: body.contactPerson } : {}),
-        ...(body.email ? { email: body.email } : {}),
-        ...(body.phone ? { phone: body.phone } : {}),
-        ...(body.city ? { city: body.city } : {}),
-        ...(body.address !== undefined ? { address: body.address } : {}),
-        ...(body.categories || body.category ? { categories: body.categories || body.category } : {}),
+        ...(body.contactPerson ? { contactPerson: body.contactPerson.trim() } : {}),
+        ...(body.email ? { email: body.email.trim() } : {}),
+        ...(body.phone ? { phone: body.phone.trim() } : {}),
+        ...(body.city ? { city: body.city.trim() } : {}),
+        ...(body.address !== undefined ? { address: body.address?.trim() || null } : {}),
+        ...(body.categories || body.category ? { categories: (body.categories || body.category).trim() } : {}),
         ...(body.gstin !== undefined ? { gstin: body.gstin } : {}),
         ...(body.leadTimeDays !== undefined ? { leadTimeDays: Number(body.leadTimeDays) } : {}),
         ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
-        ...(body.paymentTerms ? { paymentTerms: body.paymentTerms } : {}),
+        ...(body.paymentTerms ? { paymentTerms: body.paymentTerms.trim() } : {}),
         ...(body.status ? { status: body.status } : {}),
+      },
+    });
+
+    // Write audit log
+    await (prisma as any).auditLog.create({
+      data: {
+        module: 'Vendors',
+        action: 'Update Vendor',
+        details: `Updated vendor details for "${vendor.name}" (${vendor.code}).`,
+        userEmail: user.email || user.name,
+        userRole: user.role,
+        storeCode: 'CENTRAL',
       },
     });
 
@@ -193,7 +277,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient security level' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden: Insufficient security level to archive/delete vendor' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -213,13 +297,24 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Vendor already deleted or non-existent' });
     }
 
-    // Check linked purchase orders
+    // Check linked purchase orders and financial records
     const poCount = await (prisma as any).purchaseOrder.count({ where: { vendorId: target.id } });
 
     if (poCount > 0 || !permanent || user.role !== 'Super Admin') {
       const vendor = await (prisma as any).vendor.update({
         where: { id: target.id },
         data: { status: 'Archived' },
+      });
+
+      await (prisma as any).auditLog.create({
+        data: {
+          module: 'Vendors',
+          action: 'Archive Vendor',
+          details: `Archived vendor "${target.name}" (${target.code}). Historical purchase orders linked: ${poCount}`,
+          userEmail: user.email || user.name,
+          userRole: user.role,
+          storeCode: 'CENTRAL',
+        },
       });
 
       broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: target.id, code: target.code, name: target.name, action: 'archived' });
@@ -230,13 +325,24 @@ export async function DELETE(req: NextRequest) {
         vendor,
         hasHistory: poCount > 0,
         message: poCount > 0
-          ? `Vendor "${target.name}" has ${poCount} historical purchase orders and was archived safely.`
+          ? `Vendor "${target.name}" has ${poCount} linked purchase orders and was safely Archived to protect financial records.`
           : `Vendor "${target.name}" archived successfully.`,
       });
     }
 
-    // Hard delete unused vendor
+    // Hard delete unused vendor (Super Admin only, zero POs)
     await (prisma as any).vendor.delete({ where: { id: target.id } });
+
+    await (prisma as any).auditLog.create({
+      data: {
+        module: 'Vendors',
+        action: 'Permanent Delete Vendor',
+        details: `Permanently removed unused vendor "${target.name}" (${target.code}).`,
+        userEmail: user.email || user.name,
+        userRole: user.role,
+        storeCode: 'CENTRAL',
+      },
+    });
 
     broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: target.id, code: target.code, name: target.name, action: 'deleted' });
 
@@ -250,5 +356,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to archive/delete vendor' }, { status: 500 });
   }
 }
-
-

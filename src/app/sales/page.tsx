@@ -280,6 +280,7 @@ export default function SalesPage() {
       phone: formattedPhone,
       email: newCustEmail.trim() || '',
       city: 'Bengaluru',
+      address: newCustAddress.trim() || '',
       tier: 'Regular',
       creditBalance: 0,
     });

@@ -79,6 +79,47 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Record Double-Entry Financial Ledger Entries for Expense
+    const expenseStore = body.storeCode || body.store || user.store || 'CENTRAL';
+    const expenseAmt = Number(body.amount);
+    const isCentral = expenseStore === 'CENTRAL' || body.category.toLowerCase().includes('freight') || (body.description && body.description.toLowerCase().includes('central'));
+
+    await (prisma as any).financialLedgerEntry.create({
+      data: {
+        entryNo: `JRN-EXP-${expenseNo}`,
+        entryDate: body.date ? new Date(body.date) : new Date(),
+        storeCode: expenseStore,
+        accountCategory: isCentral ? 'CENTRAL_EXPENSE' : 'OPERATING_EXPENSE',
+        accountName: `Operating Expense: ${body.category}`,
+        debit: expenseAmt,
+        credit: 0,
+        amount: expenseAmt,
+        refType: 'EXPENSE',
+        refId: expense.id,
+        refNo: expenseNo,
+        description: `${body.category} Expense: ${body.description || 'General Operational Expense'}`,
+        createdBy: user.name,
+      },
+    });
+
+    await (prisma as any).financialLedgerEntry.create({
+      data: {
+        entryNo: `JRN-EXP-BANK-${expenseNo}`,
+        entryDate: body.date ? new Date(body.date) : new Date(),
+        storeCode: expenseStore,
+        accountCategory: 'ASSET',
+        accountName: `Cash / Bank (${body.paymentMethod || 'Bank Transfer'})`,
+        debit: 0,
+        credit: expenseAmt,
+        amount: -expenseAmt,
+        refType: 'EXPENSE',
+        refId: expense.id,
+        refNo: expenseNo,
+        description: `Disbursement for ${body.category} (${expenseNo})`,
+        createdBy: user.name,
+      },
+    });
+
     broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id: expense.id, expenseNo: expense.expenseNo, storeCode: expense.storeCode, action: 'saved' });
 
     return NextResponse.json({
@@ -183,6 +224,12 @@ export async function DELETE(req: NextRequest) {
     }
 
     await (prisma as any).expense.delete({ where: { id: target.id } });
+    await (prisma as any).financialLedgerEntry.deleteMany({
+      where: {
+        refType: 'EXPENSE',
+        refNo: target.expenseNo,
+      },
+    }).catch((err: any) => console.warn('Non-fatal ledger clean on expense delete:', err));
 
     broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id: target.id, action: 'deleted' });
 

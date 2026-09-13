@@ -1,7 +1,9 @@
 'use client';
+
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApp } from '@/context/AppContext';
+import { isWithinDatePeriod } from '@/lib/dateUtils';
 
 const COLORS = ['var(--primary)', 'var(--positive)', 'var(--accent)', 'var(--warning)', 'var(--muted-foreground)'];
 
@@ -22,9 +24,14 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 };
 
 export default function PaymentMethodsChart() {
-  const { sales, selectedStore } = useApp();
+  const { sales, selectedStore, datePeriod, customDateRange } = useApp();
 
-  const filteredSales = sales.filter((s) => selectedStore === 'All Stores' || s.store === selectedStore);
+  const filteredSales = sales.filter((s) => {
+    const isStore = selectedStore === 'All Stores' || s.store === selectedStore;
+    const isDate = isWithinDatePeriod(s.createdAt, datePeriod, customDateRange);
+    const isValid = s.status !== 'Refunded' && s.status !== 'Cancelled' && s.status !== 'Voided';
+    return isStore && isDate && isValid;
+  });
 
   const methodTotals: Record<string, number> = { UPI: 0, Cash: 0, Card: 0, Credit: 0 };
   let grandTotal = 0;
@@ -35,16 +42,27 @@ export default function PaymentMethodsChart() {
     grandTotal += s.total || 0;
   });
 
-  const data = Object.keys(methodTotals).map((method) => {
-    const amountVal = methodTotals[method];
-    const pct = grandTotal > 0 ? Math.round((amountVal / grandTotal) * 100) : 0;
-    return {
-      method,
-      value: grandTotal > 0 ? pct : 25, // default equal slices if empty
-      displayPct: pct,
-      amount: `₹${amountVal.toLocaleString('en-IN')}`,
-    };
-  });
+  const data = Object.keys(methodTotals)
+    .filter((method) => grandTotal === 0 || methodTotals[method] > 0)
+    .map((method) => {
+      const amountVal = methodTotals[method];
+      const pct = grandTotal > 0 ? Math.round((amountVal / grandTotal) * 100) : 0;
+      return {
+        method,
+        value: grandTotal > 0 ? pct : 0,
+        displayPct: pct,
+        amount: `₹${Math.round(amountVal).toLocaleString('en-IN')}`,
+      };
+    });
+
+  if (grandTotal === 0) {
+    return (
+      <div className="py-6 text-center text-xs text-muted-foreground">
+        No sales recorded for {selectedStore} in {datePeriod}
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-4">
       <ResponsiveContainer width={100} height={100}>

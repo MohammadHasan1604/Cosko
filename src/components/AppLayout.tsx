@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
@@ -10,6 +10,7 @@ import StoreSelectorModal from './StoreSelectorModal';
 import UserProfileModal from './UserProfileModal';
 import ForcePasswordChangeModal from './ForcePasswordChangeModal';
 import AppErrorBoundary from './AppErrorBoundary';
+import ScrollManager from './ScrollManager';
 import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
 import CoskoLogo from '@/components/ui/CoskoLogo';
@@ -142,7 +143,10 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
         />
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-12">
+        <main id="main-scroll-area" className="flex-1 overflow-y-auto p-4 lg:p-6 pb-12">
+          <Suspense fallback={null}>
+            <ScrollManager />
+          </Suspense>
           {isAuthorized ? (
             <AppErrorBoundary>
               {children}

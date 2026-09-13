@@ -3,79 +3,35 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import Icon from '@/components/ui/AppIcon';
-
-type DateFilterType = 'Today' | 'Yesterday' | 'Week' | 'Month' | 'Financial Year' | 'Custom';
+import { isWithinDatePeriod } from '@/lib/dateUtils';
 
 export default function StoreSalesRanking() {
-  const { sales, storesList, customers } = useApp();
+  const {
+    sales,
+    storesList,
+    customers,
+    selectedStore,
+    datePeriod,
+    setDatePeriod,
+    customDateRange,
+    setCustomDateRange,
+  } = useApp();
+
   const [activeTab, setActiveTab] = useState<'stores' | 'customers'>('stores');
-  const [dateFilter, setDateFilter] = useState<DateFilterType>('Month');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
+  const [customStartDate, setCustomStartDate] = useState(customDateRange?.start || '');
+  const [customEndDate, setCustomEndDate] = useState(customDateRange?.end || '');
 
-  // Authoritative date range calculation
+  // Authoritative date range calculation from single source of truth
   const filteredSales = useMemo(() => {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
-    const weekStart = todayStart - 7 * 24 * 60 * 60 * 1000;
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-
-    // Indian Financial Year: April 1 to March 31
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth(); // 0-indexed (3 = April)
-    const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
-    const fyStart = new Date(fyStartYear, 3, 1).getTime();
-
     return sales.filter((sale) => {
       // Exclude refunded or non-completed sales
-      if (sale.status === 'Refunded') return false;
-
-      // Parse sale creation date
-      let saleTime = 0;
-      if (sale.createdAt) {
-        // Try parsing either ISO string or Indian formatted date
-        const parsed = Date.parse(sale.createdAt);
-        if (!isNaN(parsed)) {
-          saleTime = parsed;
-        } else {
-          // e.g. "07/09/2026" or "07/09/2026, 17:30"
-          const parts = sale.createdAt.split(/[,\s]+/)[0].split(/[\/-]/);
-          if (parts.length === 3) {
-            const d = parseInt(parts[0], 10);
-            const m = parseInt(parts[1], 10) - 1;
-            const y = parseInt(parts[2], 10);
-            saleTime = new Date(y, m, d).getTime();
-          }
-        }
-      }
-      if (!saleTime) saleTime = now.getTime(); // fallback safe
-
-      switch (dateFilter) {
-        case 'Today':
-          return saleTime >= todayStart;
-        case 'Yesterday':
-          return saleTime >= yesterdayStart && saleTime < todayStart;
-        case 'Week':
-          return saleTime >= weekStart;
-        case 'Month':
-          return saleTime >= monthStart;
-        case 'Financial Year':
-          return saleTime >= fyStart;
-        case 'Custom':
-          if (!customStartDate && !customEndDate) return true;
-          const start = customStartDate ? new Date(customStartDate).getTime() : 0;
-          const end = customEndDate ? new Date(customEndDate).getTime() + 24 * 60 * 60 * 1000 - 1 : Infinity;
-          return saleTime >= start && saleTime <= end;
-        default:
-          return true;
-      }
+      if (sale.status === 'Refunded' || sale.status === 'Cancelled') return false;
+      return isWithinDatePeriod(sale.createdAt, datePeriod, customDateRange);
     });
-  }, [sales, dateFilter, customStartDate, customEndDate]);
+  }, [sales, datePeriod, customDateRange]);
 
   // Aggregate Store Sales Ranking
   const storeRankings = useMemo(() => {
-    // Exclude 'CENTRAL' warehouse from retail store ranking if Central has registers = 0
     const storeMap: Record<
       string,
       {
@@ -85,26 +41,26 @@ export default function StoreSalesRanking() {
         grossProfit: number;
         invoiceCount: number;
         totalUnits: number;
+        isSelected: boolean;
       }
     > = {};
 
-    // Initialize with existing known retail stores
+    // Initialize with existing known stores
     storesList.forEach((st) => {
-      if (st.code !== 'CENTRAL') {
-        storeMap[st.code] = {
-          storeCode: st.code,
-          storeName: st.name,
-          revenue: 0,
-          grossProfit: 0,
-          invoiceCount: 0,
-          totalUnits: 0,
-        };
-      }
+      storeMap[st.code] = {
+        storeCode: st.code,
+        storeName: st.name,
+        revenue: 0,
+        grossProfit: 0,
+        invoiceCount: 0,
+        totalUnits: 0,
+        isSelected: selectedStore === st.code,
+      };
     });
 
     // Aggregate from external customer sales
     filteredSales.forEach((sale) => {
-      const code = sale.store || 'BLR';
+      const code = sale.store || 'CENTRAL';
       if (!storeMap[code]) {
         const found = storesList.find((s) => s.code === code);
         storeMap[code] = {
@@ -114,14 +70,16 @@ export default function StoreSalesRanking() {
           grossProfit: 0,
           invoiceCount: 0,
           totalUnits: 0,
+          isSelected: selectedStore === code,
         };
       }
 
       const rev = Number(sale.total) || 0;
       const subtotal = Number(sale.subtotal) || rev;
-      // Estimate or calculate gross profit: roughly subtotal - estimated cost (or 25% margin default if no cost snapshot)
-      const costEstimate = sale.items?.reduce((acc, it) => acc + ((it as any).unitCost || (it.unitPrice * 0.7)) * it.qty, 0) || (subtotal * 0.7);
-      const gp = Math.max(0, subtotal - costEstimate);
+      const gp =
+        sale.grossProfit !== undefined && sale.grossProfit !== null && !isNaN(Number(sale.grossProfit))
+          ? Number(sale.grossProfit)
+          : Math.max(0, subtotal * 0.25);
       const units = sale.items?.reduce((acc, it) => acc + (it.qty || 1), 0) || 1;
 
       storeMap[code].revenue += rev;
@@ -140,7 +98,7 @@ export default function StoreSalesRanking() {
 
     // Sort by revenue descending
     return list.sort((a, b) => b.revenue - a.revenue);
-  }, [filteredSales, storesList]);
+  }, [filteredSales, storesList, selectedStore]);
 
   // Aggregate Customer Sales Analytics
   const customerAnalytics = useMemo(() => {
@@ -168,25 +126,47 @@ export default function StoreSalesRanking() {
           totalSpend: 0,
           totalPurchases: 0,
           invoiceCount: 0,
-          lastPurchase: sale.createdAt || 'Recent',
+          lastPurchase: sale.createdAt ? new Date(sale.createdAt).toLocaleDateString('en-IN') : 'N/A',
         };
       }
 
-      const rev = Number(sale.total) || 0;
-      const units = sale.items?.reduce((acc, it) => acc + (it.qty || 1), 0) || 1;
-
-      custMap[key].totalSpend += rev;
-      custMap[key].totalPurchases += units;
+      custMap[key].totalSpend += Number(sale.total) || 0;
+      custMap[key].totalPurchases += sale.items?.reduce((acc, it) => acc + (it.qty || 1), 0) || 1;
       custMap[key].invoiceCount += 1;
     });
 
-    return Object.values(custMap)
-      .filter((c) => c.totalSpend > 0)
-      .sort((a, b) => b.totalSpend - a.totalSpend)
-      .slice(0, 10);
+    return Object.values(custMap).sort((a, b) => b.totalSpend - a.totalSpend);
   }, [filteredSales, customers]);
 
-  const maxStoreRevenue = Math.max(...storeRankings.map((s) => s.revenue), 1);
+  const quickFilters = [
+    'Today',
+    'Yesterday',
+    'Last 7 Days',
+    'This Week',
+    'This Month',
+    'This Quarter',
+    'This Year',
+    'Custom Range',
+  ];
+
+  const handleQuickFilter = (f: string) => {
+    if (f === 'Custom Range') {
+      setDatePeriod('Custom Range');
+      if (customStartDate && customEndDate) {
+        setCustomDateRange({ start: customStartDate, end: customEndDate });
+      }
+      return;
+    }
+    setDatePeriod(f);
+  };
+
+  const handleCustomSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (customStartDate && customEndDate) {
+      setCustomDateRange({ start: customStartDate, end: customEndDate });
+      setDatePeriod('Custom Range');
+    }
+  };
 
   return (
     <div className="card p-5 space-y-4">
@@ -198,13 +178,13 @@ export default function StoreSalesRanking() {
               {activeTab === 'stores' ? 'Store Sales Ranking' : 'Customer Sales Analytics'}
             </h2>
             <span className="badge-primary text-2xs px-2 py-0.5 rounded-full font-bold">
-              {activeTab === 'stores' ? `${storeRankings.length} Stores` : `${customerAnalytics.length} Top Customers`}
+              {activeTab === 'stores' ? `${storeRankings.length} Stores` : `${customerAnalytics.length} Active Customers`}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             {activeTab === 'stores'
-              ? 'Ranked using authoritative external customer sales (transfers excluded)'
-              : 'Top retail customer purchase frequency & lifetime spend'}
+              ? `Ranked by verified POS sales in ${datePeriod}`
+              : `Top retail customers in ${datePeriod}`}
           </p>
         </div>
 
@@ -233,14 +213,14 @@ export default function StoreSalesRanking() {
         </div>
       </div>
 
-      {/* Date Filters */}
+      {/* Date Filter Badges */}
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        {(['Today', 'Yesterday', 'Week', 'Month', 'Financial Year', 'Custom'] as DateFilterType[]).map((f) => (
+        {quickFilters.map((f) => (
           <button
             key={f}
-            onClick={() => setDateFilter(f)}
+            onClick={() => handleQuickFilter(f)}
             className={`px-2.5 py-1 rounded-md text-2xs font-semibold border transition-all ${
-              dateFilter === f
+              datePeriod === f
                 ? 'bg-primary text-primary-foreground border-primary'
                 : 'bg-card text-muted-foreground border-border hover:bg-muted/40'
             }`}
@@ -249,8 +229,8 @@ export default function StoreSalesRanking() {
           </button>
         ))}
 
-        {dateFilter === 'Custom' && (
-          <div className="flex items-center gap-2 mt-1 sm:mt-0">
+        {datePeriod === 'Custom Range' && (
+          <form onSubmit={handleCustomSubmit} className="flex items-center gap-2 mt-1 sm:mt-0">
             <input
               type="date"
               value={customStartDate}
@@ -264,127 +244,104 @@ export default function StoreSalesRanking() {
               onChange={(e) => setCustomEndDate(e.target.value)}
               className="input-field text-2xs py-0.5 px-1.5 h-7"
             />
-          </div>
+            <button type="submit" className="btn-secondary text-2xs px-2 py-0.5 h-7">
+              Apply
+            </button>
+          </form>
         )}
       </div>
 
-      {/* Tab 1: Store Sales Ranking */}
-      {activeTab === 'stores' && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead>
-              <tr className="border-b border-border text-muted-foreground font-semibold text-2xs uppercase tracking-wider">
-                <th className="py-2 px-2 text-center w-8">#</th>
-                <th className="py-2 px-2">Store</th>
-                <th className="py-2 px-2 text-right">Invoices</th>
-                <th className="py-2 px-2 text-right">Revenue</th>
-                <th className="py-2 px-2 text-right hidden sm:table-cell">Gross Profit</th>
-                <th className="py-2 px-2 text-right hidden sm:table-cell">Avg Invoice</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/50">
-              {storeRankings.map((st, idx) => {
-                const pct = Math.round((st.revenue / maxStoreRevenue) * 100);
-                return (
-                  <tr key={st.storeCode} className="hover:bg-muted/30 transition-colors">
-                    <td className="py-2.5 px-2 text-center font-bold text-muted-foreground">
-                      {idx === 0 ? (
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/20 text-amber-600 font-bold text-2xs">
-                          1
-                        </span>
-                      ) : (
-                        idx + 1
-                      )}
-                    </td>
-                    <td className="py-2.5 px-2">
-                      <div className="font-bold text-foreground flex items-center gap-1.5">
-                        <span>{st.storeName}</span>
-                        <span className="text-2xs font-mono font-medium text-muted-foreground">({st.storeCode})</span>
-                      </div>
-                      <div className="w-full bg-muted/60 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-300"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: idx === 0 ? 'var(--primary)' : 'var(--positive, #10b981)',
-                          }}
-                        />
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-2 text-right font-medium text-foreground">
-                      {st.invoiceCount}
-                    </td>
-                    <td className="py-2.5 px-2 text-right font-bold text-foreground font-tabular">
-                      ₹{st.revenue.toLocaleString('en-IN')}
-                    </td>
-                    <td className="py-2.5 px-2 text-right text-emerald-600 font-semibold font-tabular hidden sm:table-cell">
-                      ₹{st.grossProfit.toLocaleString('en-IN')}
-                    </td>
-                    <td className="py-2.5 px-2 text-right text-muted-foreground font-medium font-tabular hidden sm:table-cell">
-                      ₹{st.avgInvoiceValue.toLocaleString('en-IN')}
-                    </td>
-                  </tr>
-                );
-              })}
-              {storeRankings.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-6 text-center text-muted-foreground text-xs">
-                    No sales recorded for the selected date period.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Content */}
+      {activeTab === 'stores' ? (
+        <div className="space-y-2 max-h-72 overflow-y-auto pr-1 scrollbar-thin">
+          {storeRankings.length === 0 ? (
+            <div className="p-6 text-center text-xs text-muted-foreground">No store sales in this period</div>
+          ) : (
+            storeRankings.map((st, idx) => {
+              const isLead = idx === 0 && st.revenue > 0;
+              const isSelected = selectedStore === st.storeCode;
 
-      {/* Tab 2: Customer Sales Analytics */}
-      {activeTab === 'customers' && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead>
-              <tr className="border-b border-border text-muted-foreground font-semibold text-2xs uppercase tracking-wider">
-                <th className="py-2 px-2 text-center w-8">#</th>
-                <th className="py-2 px-2">Customer</th>
-                <th className="py-2 px-2 text-right">Purchases</th>
-                <th className="py-2 px-2 text-right">Invoices</th>
-                <th className="py-2 px-2 text-right">Total Spend</th>
-                <th className="py-2 px-2 text-right hidden sm:table-cell">Last Purchase</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/50">
-              {customerAnalytics.map((cust, idx) => (
-                <tr key={`${cust.id}-${idx}`} className="hover:bg-muted/30 transition-colors">
-                  <td className="py-2.5 px-2 text-center font-bold text-muted-foreground">
+              return (
+                <div
+                  key={st.storeCode}
+                  className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                    isSelected
+                      ? 'border-primary bg-primary/5 shadow-xs'
+                      : 'border-border bg-card/50 hover:bg-muted/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                        isLead
+                          ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                          : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      {idx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-xs text-foreground truncate">{st.storeCode}</span>
+                        <span className="text-3xs text-muted-foreground truncate">· {st.storeName}</span>
+                        {isSelected && (
+                          <span className="text-3xs bg-primary/20 text-primary px-1.5 py-0.2 rounded font-bold">
+                            Current Scope
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-3xs text-muted-foreground mt-0.5">
+                        {st.invoiceCount} invoices · {st.totalUnits} units · Avg ticket ₹{st.avgInvoiceValue.toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs font-bold text-foreground font-tabular">
+                      ₹{st.revenue.toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-3xs text-positive font-medium font-tabular mt-0.5">
+                      GP: ₹{Math.round(st.grossProfit).toLocaleString('en-IN')}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-72 overflow-y-auto pr-1 scrollbar-thin">
+          {customerAnalytics.length === 0 ? (
+            <div className="p-6 text-center text-xs text-muted-foreground">No customer sales recorded in this period</div>
+          ) : (
+            customerAnalytics.map((c, idx) => (
+              <div
+                key={c.id}
+                className="p-3 rounded-xl border border-border bg-card/50 hover:bg-muted/30 transition-all flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-6 h-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
                     {idx + 1}
-                  </td>
-                  <td className="py-2.5 px-2">
-                    <p className="font-bold text-foreground">{cust.name}</p>
-                    {cust.phone && <p className="text-2xs font-mono text-muted-foreground">{cust.phone}</p>}
-                  </td>
-                  <td className="py-2.5 px-2 text-right font-medium text-foreground font-tabular">
-                    {cust.totalPurchases} units
-                  </td>
-                  <td className="py-2.5 px-2 text-right font-medium text-foreground">
-                    {cust.invoiceCount}
-                  </td>
-                  <td className="py-2.5 px-2 text-right font-bold text-foreground font-tabular">
-                    ₹{cust.totalSpend.toLocaleString('en-IN')}
-                  </td>
-                  <td className="py-2.5 px-2 text-right text-muted-foreground text-2xs hidden sm:table-cell">
-                    {cust.lastPurchase}
-                  </td>
-                </tr>
-              ))}
-              {customerAnalytics.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-6 text-center text-muted-foreground text-xs">
-                    No customer purchases recorded for the selected date period.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-xs text-foreground truncate">{c.name}</p>
+                    <p className="text-3xs text-muted-foreground mt-0.5">
+                      {c.phone || 'No phone'} · {c.invoiceCount} orders ({c.totalPurchases} units)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right flex-shrink-0">
+                  <p className="text-xs font-bold text-foreground font-tabular">
+                    ₹{c.totalSpend.toLocaleString('en-IN')}
+                  </p>
+                  <p className="text-3xs text-muted-foreground mt-0.5">
+                    Last: {c.lastPurchase}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>

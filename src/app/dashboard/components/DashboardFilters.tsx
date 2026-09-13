@@ -1,23 +1,48 @@
 'use client';
 import React, { useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
+import Modal from '@/components/ui/Modal';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
 
-const dateRanges = ['Today', 'Yesterday', 'Last 7 Days', 'This Month', 'Last Month', 'This Quarter', 'This Year'];
+const dateRanges = [
+  'Today',
+  'Yesterday',
+  'Last 7 Days',
+  'This Week',
+  'This Month',
+  'Last Month',
+  'This Quarter',
+  'This Year',
+  'Custom Range',
+];
 
 export default function DashboardFilters() {
-  const { selectedStore, setSelectedStore, datePeriod, setDatePeriod, currentUser, storesList } = useApp();
+  const {
+    selectedStore,
+    setSelectedStore,
+    datePeriod,
+    setDatePeriod,
+    customDateRange,
+    setCustomDateRange,
+    currentUser,
+    storesList,
+  } = useApp();
+
   const [storeOpen, setStoreOpen] = useState(false);
   const [rangeOpen, setRangeOpen] = useState(false);
 
-  const storeChoices = [
-    { code: 'All Stores', label: 'All Stores' },
-    ...storesList.map((st) => ({ code: st.code, label: `${st.code} — ${st.name}` })),
-  ];
+  // Custom Range Modal state
+  const [customModalOpen, setCustomModalOpen] = useState(false);
+  const [startDate, setStartDate] = useState(customDateRange?.start || '');
+  const [endDate, setEndDate] = useState(customDateRange?.end || '');
 
   const handleExport = () => {
-    toast.success(`Executive dashboard analytics report exported for ${selectedStore} (${datePeriod})`);
+    const periodLabel =
+      datePeriod === 'Custom Range' && customDateRange?.start && customDateRange?.end
+        ? `${customDateRange.start} to ${customDateRange.end}`
+        : datePeriod;
+    toast.success(`Executive dashboard analytics report exported for ${selectedStore} (${periodLabel})`);
   };
 
   const handleSelectStore = (storeCode: string) => {
@@ -38,11 +63,52 @@ export default function DashboardFilters() {
     setStoreOpen(false);
   };
 
+  const handleSelectRange = (range: string) => {
+    setRangeOpen(false);
+    if (range === 'Custom Range') {
+      const now = new Date();
+      if (!startDate) {
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400 * 1000);
+        setStartDate(thirtyDaysAgo.toISOString().split('T')[0]);
+      }
+      if (!endDate) {
+        setEndDate(now.toISOString().split('T')[0]);
+      }
+      setCustomModalOpen(true);
+      return;
+    }
+
+    setDatePeriod(range);
+    toast.info(`Filtered dashboard view to ${range}`);
+  };
+
+  const handleApplyCustomRange = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!startDate || !endDate) {
+      toast.error('Please select both Start Date and End Date');
+      return;
+    }
+    if (new Date(startDate) > new Date(endDate)) {
+      toast.error('Start date cannot be after End date');
+      return;
+    }
+
+    setCustomDateRange({ start: startDate, end: endDate });
+    setDatePeriod('Custom Range');
+    setCustomModalOpen(false);
+    toast.info(`Filtered dashboard to custom range: ${startDate} to ${endDate}`);
+  };
+
   const sortedStores = [...storesList].sort((a, b) => {
     if (a.code === 'CENTRAL') return -1;
     if (b.code === 'CENTRAL') return 1;
     return a.code.localeCompare(b.code);
   });
+
+  const displayDatePeriod =
+    datePeriod === 'Custom Range' && customDateRange?.start && customDateRange?.end
+      ? `${customDateRange.start} → ${customDateRange.end}`
+      : datePeriod;
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -150,20 +216,26 @@ export default function DashboardFilters() {
           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:border-ring transition-all duration-150 shadow-card"
         >
           <Icon name="CalendarDaysIcon" size={14} className="text-muted-foreground" />
-          <span>{datePeriod}</span>
+          <span className="max-w-[210px] truncate">{displayDatePeriod}</span>
           <Icon name="ChevronDownIcon" size={13} className="text-muted-foreground" />
         </button>
         {rangeOpen && (
-          <div className="absolute right-0 top-full mt-1.5 w-44 bg-card border border-border rounded-xl shadow-modal z-30 py-1 fade-in">
-            {dateRanges.map((r) => (
-              <button
-                key={`range-${r}`}
-                onClick={() => { setDatePeriod(r); setRangeOpen(false); toast.info(`Filtered dashboard view to ${r}`); }}
-                className={`w-full text-left px-4 py-2.5 text-sm transition-colors duration-100 ${datePeriod === r ? 'bg-primary/5 text-primary font-semibold' : 'text-foreground hover:bg-muted'}`}
-              >
-                {r}
-              </button>
-            ))}
+          <div className="absolute right-0 top-full mt-1.5 w-52 bg-card border border-border rounded-xl shadow-modal z-30 py-1.5 fade-in">
+            {dateRanges.map((r) => {
+              const isSelected = datePeriod === r;
+              return (
+                <button
+                  key={`range-${r}`}
+                  onClick={() => handleSelectRange(r)}
+                  className={`w-full text-left px-4 py-2 text-xs transition-colors duration-100 flex items-center justify-between ${
+                    isSelected ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <span>{r}</span>
+                  {isSelected && <Icon name="CheckIcon" size={14} className="text-primary" />}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -173,6 +245,67 @@ export default function DashboardFilters() {
         <Icon name="ArrowDownTrayIcon" size={14} />
         Export Report
       </button>
+
+      {/* Custom Date Range Modal */}
+      <Modal
+        open={customModalOpen}
+        onClose={() => setCustomModalOpen(false)}
+        title="Select Custom Date Range"
+        subtitle="Filter all dashboard KPIs, charts, and metrics for a specific time window"
+        size="sm"
+      >
+        <form onSubmit={handleApplyCustomRange} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1.5">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+                className="input-field w-full text-xs font-medium"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1.5">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                required
+                className="input-field w-full text-xs font-medium"
+              />
+            </div>
+          </div>
+
+          <div className="p-3 bg-muted/40 rounded-xl border border-border/50 text-2xs text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground">Active Filter Scope</p>
+            <p>Store Scope: <span className="font-semibold text-primary">{selectedStore}</span></p>
+            <p>Changing date window immediately recalculates all revenue, profit, payables, and ranking analytics.</p>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+            <button
+              type="button"
+              onClick={() => setCustomModalOpen(false)}
+              className="btn-secondary text-xs px-3 py-1.5"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary text-xs px-4 py-1.5 gap-1.5"
+            >
+              <Icon name="CheckIcon" size={13} />
+              Apply Custom Filter
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
