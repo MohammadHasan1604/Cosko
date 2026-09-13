@@ -107,18 +107,24 @@ export default function KpiCard({
       }`}
     >
       {/* Top row */}
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <div className="flex items-center gap-1.5">
-            <p className={`text-xs font-semibold uppercase tracking-wider mb-0.5 ${isPrimary ? 'text-blue-200' : 'text-muted-foreground'}`}>
-              {label}
-            </p>
-            {isClickable && (
-              <span className="text-3xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                {drillDownLabel || 'Drill down'}
-              </span>
-            )}
-          </div>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0 flex-1">
+          <p className={`text-xs font-semibold uppercase tracking-wider mb-1.5 truncate ${isPrimary ? 'text-blue-200' : 'text-muted-foreground'}`}>
+            {label}
+          </p>
+          {isClickable && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClick?.();
+              }}
+              className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 hover:bg-primary/20 active:bg-primary/30 px-2 py-0.5 rounded-full border border-primary/25 transition-all shadow-2xs group cursor-pointer"
+            >
+              <span>{drillDownLabel || 'Drill down'}</span>
+              <Icon name="ArrowRightIcon" size={10} className="stroke-[2.5] group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          )}
         </div>
         <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${cfg.iconBg} ${isClickable ? 'group-hover:scale-110 transition-transform' : ''}`}>
           <Icon name={icon as Parameters<typeof Icon>[0]['name']} size={18} className={cfg.iconColor} />
@@ -127,16 +133,9 @@ export default function KpiCard({
 
       {/* Value */}
       <div className="min-w-0">
-        <div className="flex items-baseline justify-between gap-2">
-          <p className={`metric-value ${isHero ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'} ${isPrimary ? 'text-white' : 'text-foreground'} truncate tracking-tight`}>
-            {value}
-          </p>
-          {isClickable && (
-            <span className="text-2xs text-muted-foreground hover:text-primary flex items-center gap-0.5 opacity-80">
-              View bills <Icon name="ArrowRightIcon" size={11} />
-            </span>
-          )}
-        </div>
+        <p className={`metric-value ${isHero ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'} ${isPrimary ? 'text-white' : 'text-foreground'} truncate tracking-tight`}>
+          {value}
+        </p>
 
         {/* Change row */}
         <div className="flex items-center gap-1.5 mt-2">

@@ -201,7 +201,7 @@ export default function KpiBentoGrid() {
       variant: 'normal' as const,
       color: 'neutral' as const,
       clickable: true,
-      drillDownLabel: 'Click to drill down',
+      drillDownLabel: 'Drill down',
       onClick: () => setVendorModalOpen(true),
     },
     {

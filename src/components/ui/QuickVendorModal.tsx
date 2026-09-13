@@ -4,6 +4,7 @@ import Modal from '@/components/ui/Modal';
 import Icon from '@/components/ui/AppIcon';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
+import { validateAndNormalizeGstin } from '@/lib/gstUtils';
 
 interface QuickVendorModalProps {
   open: boolean;
@@ -31,6 +32,12 @@ export default function QuickVendorModal({ open, onClose, onSuccess }: QuickVend
       return;
     }
 
+    const gstinCheck = validateAndNormalizeGstin(gstin);
+    if (!gstinCheck.isValid) {
+      toast.error(gstinCheck.error || 'Invalid GSTIN format');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const created = await addVendor({
@@ -38,7 +45,7 @@ export default function QuickVendorModal({ open, onClose, onSuccess }: QuickVend
         contactPerson: contactPerson.trim() || 'Account Manager',
         email: email.trim() || `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
         phone: phone.trim() || '+91 98000 00000',
-        gstin: gstin.trim() ? gstin.trim().toUpperCase() : undefined,
+        gstin: gstinCheck.normalized || undefined,
         category: category.trim() || 'General Hardware',
         leadTimeDays: Number(leadTimeDays) || 3,
         outstandingPayable: 0,

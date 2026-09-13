@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { validateAndNormalizeGstin } from '@/lib/gstUtils';
 
 /**
  * GET /api/vendors - Retrieve all vendors with authoritative, reconciled financial payables
@@ -130,16 +131,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vendor name is required' }, { status: 400 });
     }
 
-    const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-    const cleanGstin = (body.gstin || '').trim().toUpperCase();
-    if (cleanGstin && cleanGstin !== 'PENDING' && !gstinRegex.test(cleanGstin)) {
+    const gstinValidation = validateAndNormalizeGstin(body.gstin);
+    if (!gstinValidation.isValid) {
       return NextResponse.json({ 
-        error: 'Invalid Indian GSTIN format. If provided, it must be 15 alphanumeric characters (e.g. 29ABCDE1234F1Z5)' 
+        error: gstinValidation.error || 'Invalid Indian GSTIN format.' 
       }, { status: 400 });
     }
+    const cleanGstin = gstinValidation.normalized;
 
-    const count = await (prisma as any).vendor.count();
-    const code = body.code || `VND-${String(count + 1).padStart(4, '0')}`;
+    let code = body.code?.trim();
+    if (!code) {
+      const allVendors = await (prisma as any).vendor.findMany({ select: { code: true } });
+      let maxNum = 0;
+      for (const v of allVendors) {
+        const match = v.code.match(/^VND-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+      code = `VND-${String(maxNum + 1).padStart(4, '0')}`;
+    }
 
     const vendor = await (prisma as any).vendor.upsert({
       where: { code },
@@ -215,15 +227,14 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 });
     }
 
-    const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
     if (body.gstin !== undefined && body.gstin !== null) {
-      const cleanGstin = String(body.gstin).trim().toUpperCase();
-      if (cleanGstin && cleanGstin !== 'PENDING' && !gstinRegex.test(cleanGstin)) {
+      const gstinValidation = validateAndNormalizeGstin(body.gstin);
+      if (!gstinValidation.isValid) {
         return NextResponse.json({ 
-          error: 'Invalid Indian GSTIN format. If provided, it must be 15 alphanumeric characters (e.g. 29ABCDE1234F1Z5)' 
+          error: gstinValidation.error || 'Invalid Indian GSTIN format.' 
         }, { status: 400 });
       }
-      body.gstin = cleanGstin;
+      body.gstin = gstinValidation.normalized;
     }
 
     const vendor = await (prisma as any).vendor.update({

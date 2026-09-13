@@ -6,6 +6,7 @@ import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
 import { useApp, Vendor, PurchaseOrder } from '@/context/AppContext';
 import { toast } from 'sonner';
+import { validateAndNormalizeGstin } from '@/lib/gstUtils';
 
 export default function VendorsPage() {
   const { vendors, addVendor, updateVendor, deleteVendor, purchases, recordPurchasePayment, refreshAllData, currentUser } = useApp();
@@ -261,12 +262,12 @@ export default function VendorsPage() {
       toast.error('Vendor name is required');
       return;
     }
-    const cleanGstin = gstin.trim().toUpperCase();
-    const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-    if (cleanGstin && cleanGstin !== 'PENDING' && !gstinRegex.test(cleanGstin)) {
-      toast.error('Invalid GSTIN format (must be 15 characters e.g. 29ABCDE1234F1Z5)');
+    const gstinCheck = validateAndNormalizeGstin(gstin);
+    if (!gstinCheck.isValid) {
+      toast.error(gstinCheck.error || 'Invalid GSTIN format');
       return;
     }
+    const cleanGstin = gstinCheck.normalized;
 
     try {
       await addVendor({
@@ -293,12 +294,12 @@ export default function VendorsPage() {
   const handleUpdateVendorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editVendorModal) return;
-    const cleanGstin = gstin.trim().toUpperCase();
-    const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-    if (cleanGstin && cleanGstin !== 'PENDING' && !gstinRegex.test(cleanGstin)) {
-      toast.error('Invalid GSTIN format (must be 15 characters e.g. 29ABCDE1234F1Z5)');
+    const gstinCheck = validateAndNormalizeGstin(gstin);
+    if (!gstinCheck.isValid) {
+      toast.error(gstinCheck.error || 'Invalid GSTIN format');
       return;
     }
+    const cleanGstin = gstinCheck.normalized;
 
     try {
       await updateVendor(editVendorModal.id, {
@@ -1425,11 +1426,11 @@ export default function VendorsPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">GSTIN (15 Alphanumeric)</label>
+                <label className="text-xs font-bold text-foreground block mb-1">GSTIN (Optional / 15-char)</label>
                 <input
                   type="text"
-                  maxLength={15}
-                  placeholder="29ABCDE1234F1Z5"
+                  maxLength={18}
+                  placeholder="e.g. 29AABCS1429B1ZB or URP"
                   value={gstin}
                   onChange={(e) => setGstin(e.target.value.toUpperCase())}
                   className="input-field text-xs font-mono"
@@ -1553,10 +1554,11 @@ export default function VendorsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">GSTIN</label>
+                  <label className="text-xs font-bold text-foreground block mb-1">GSTIN (Optional / 15-char)</label>
                   <input
                     type="text"
-                    maxLength={15}
+                    maxLength={18}
+                    placeholder="e.g. 29AABCS1429B1ZB or URP"
                     value={gstin}
                     onChange={(e) => setGstin(e.target.value.toUpperCase())}
                     className="input-field text-xs font-mono"
