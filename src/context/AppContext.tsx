@@ -12,7 +12,50 @@ export interface AppBranding {
   faviconUrl: string | null;
   tagline: string;
   supportEmail: string;
+  supportPhone?: string;
+  businessName?: string;
+  businessAddress?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  baseCurrency?: string;
   taxNumber?: string;
+}
+
+export interface SystemSettings {
+  gstin: string | null;
+  legalBusinessName: string | null;
+  tradeName: string | null;
+  gstState: string | null;
+  gstStateCode: string | null;
+  gstRegistrationType: string;
+  defaultTaxRate: number;
+  hsnMandatory: boolean;
+  enableReverseCharge: boolean;
+  gstBusinessAddress: string | null;
+  invoiceHeader: string;
+  invoiceFooter: string;
+  invoiceTerms: string | null;
+  invoiceAccentColor: string;
+  watermarkOpacity: number;
+  showStoreAddress: boolean;
+  invoiceTemplateUrl: string | null;
+  invoiceTemplateVersion: number;
+  invoiceFieldMapping: string | null;
+  showPaymentQr: boolean;
+  paymentUpiId: string | null;
+  paymentBankDetails: string | null;
+  sessionTimeoutMins: number;
+  maxLoginAttempts: number;
+  enforcePasswordPolicy: boolean;
+  sensitiveActionConfirm: boolean;
+  lowStockAlerts: boolean;
+  lowStockThreshold: number;
+  overduePaymentAlerts: boolean;
+  overdueThresholdDays: number;
+  dailySalesDigest: boolean;
+  securityEventAlerts: boolean;
+  alertRecipientEmails: string | null;
 }
 
 export interface InventoryItem {
@@ -286,7 +329,50 @@ const defaultBranding: AppBranding = {
   faviconUrl: null,
   tagline: 'Multi-Store Enterprise Retail & POS System',
   supportEmail: 'support@cosko.com',
-  taxNumber: '29AABCC1234F1Z5',
+  supportPhone: '+91 80 4000 8800',
+  businessName: 'COSKO Retail Enterprise',
+  businessAddress: '100 Feet Ring Road, Indiranagar',
+  city: 'Bengaluru',
+  state: 'Karnataka',
+  pincode: '560038',
+  baseCurrency: 'INR (₹)',
+  taxNumber: '29AABCU9603R1ZM',
+};
+
+export const defaultSystemSettings: SystemSettings = {
+  gstin: '29AABCU9603R1ZM',
+  legalBusinessName: 'COSKO Retail Enterprise Private Limited',
+  tradeName: 'COSKO Stores',
+  gstState: 'Karnataka',
+  gstStateCode: '29',
+  gstRegistrationType: 'Regular',
+  defaultTaxRate: 18,
+  hsnMandatory: true,
+  enableReverseCharge: false,
+  gstBusinessAddress: '100 Feet Ring Road, Indiranagar, Bengaluru, Karnataka - 560038',
+  invoiceHeader: 'COSKO Retail Enterprise',
+  invoiceFooter: 'Thank you for shopping with COSKO! Goods once sold cannot be returned without original receipt.',
+  invoiceTerms: '1. Standard 12-month warranty on manufacturing defects.\n2. Retain this invoice for warranty & service support.\n3. Physical and liquid damage are excluded.',
+  invoiceAccentColor: 'primary',
+  watermarkOpacity: 5,
+  showStoreAddress: true,
+  invoiceTemplateUrl: null,
+  invoiceTemplateVersion: 1,
+  invoiceFieldMapping: null,
+  showPaymentQr: false,
+  paymentUpiId: 'cosko@icici',
+  paymentBankDetails: 'HDFC Bank · A/C 50200012345678 · IFSC HDFC0001234',
+  sessionTimeoutMins: 30,
+  maxLoginAttempts: 5,
+  enforcePasswordPolicy: true,
+  sensitiveActionConfirm: true,
+  lowStockAlerts: true,
+  lowStockThreshold: 5,
+  overduePaymentAlerts: true,
+  overdueThresholdDays: 30,
+  dailySalesDigest: false,
+  securityEventAlerts: true,
+  alertRecipientEmails: 'alerts@cosko.com',
 };
 
 const initialStoreHubs: StoreHub[] = [];
@@ -321,6 +407,9 @@ interface AppContextType {
   branding: AppBranding;
   updateBranding: (updated: Partial<AppBranding>) => void;
   resetBranding: () => void;
+  systemSettings: SystemSettings;
+  updateSystemSettings: (section: 'branding' | 'profile' | 'tax' | 'invoice' | 'security' | 'alerts', data: any) => Promise<{ success: boolean; message?: string; error?: string }>;
+  reloadSettings: () => Promise<void>;
   selectedStore: string;
   setSelectedStore: (store: string) => void;
   datePeriod: string;
@@ -420,18 +509,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('cosko_branding');
-        if (saved) return JSON.parse(saved);
+        if (saved) return { ...defaultBranding, ...JSON.parse(saved) };
       } catch {}
     }
     return defaultBranding;
   });
 
-  // Cross-tab live synchronization for white-label branding updates
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('cosko_system_settings');
+        if (saved) return { ...defaultSystemSettings, ...JSON.parse(saved) };
+      } catch {}
+    }
+    return defaultSystemSettings;
+  });
+
+  // Cross-tab live synchronization for white-label branding & system settings updates
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'cosko_branding' && e.newValue) {
         try {
           setBranding(JSON.parse(e.newValue));
+        } catch {}
+      }
+      if (e.key === 'cosko_system_settings' && e.newValue) {
+        try {
+          setSystemSettings(JSON.parse(e.newValue));
         } catch {}
       }
     };
@@ -845,16 +949,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       const settingsData = await safeJson(settingsRes);
-      if (settingsData?.success && settingsData.branding) {
-        setBranding((prev) => ({
-          ...prev,
-          appName: settingsData.branding.appName || prev.appName,
-          logoUrl: settingsData.branding.logoUrl !== undefined ? settingsData.branding.logoUrl : prev.logoUrl,
-          faviconUrl: settingsData.branding.faviconUrl !== undefined ? settingsData.branding.faviconUrl : prev.faviconUrl,
-          tagline: settingsData.branding.tagline || prev.tagline,
-          supportEmail: settingsData.branding.supportEmail || prev.supportEmail,
-          taxNumber: settingsData.branding.taxNumber || prev.taxNumber,
-        }));
+      if (settingsData?.success) {
+        if (settingsData.branding) {
+          setBranding((prev) => {
+            const updated = {
+              ...prev,
+              ...settingsData.branding,
+              taxNumber: settingsData.systemSettings?.gstin || settingsData.branding.taxNumber || prev.taxNumber,
+            };
+            try {
+              localStorage.setItem('cosko_branding', JSON.stringify(updated));
+            } catch {}
+            return updated;
+          });
+        }
+        if (settingsData.systemSettings) {
+          setSystemSettings((prev) => {
+            const updated = {
+              ...prev,
+              ...settingsData.systemSettings,
+              defaultTaxRate: Number(settingsData.systemSettings.defaultTaxRate) || prev.defaultTaxRate,
+            };
+            try {
+              localStorage.setItem('cosko_system_settings', JSON.stringify(updated));
+            } catch {}
+            return updated;
+          });
+        }
       }
 
       const transfersData = await safeJson(transfersRes);
@@ -1039,6 +1160,75 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     addAuditLog('Settings', 'Update White-Label Branding', `Updated app branding logo & details`);
     toast.success('Application branding updated successfully across the entire system!');
+  };
+
+  const updateSystemSettings = async (section: 'branding' | 'profile' | 'tax' | 'invoice' | 'security' | 'alerts', data: any): Promise<{ success: boolean; message?: string; error?: string }> => {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ section, data }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        const errMsg = result.error || 'Failed to update settings';
+        toast.error(errMsg);
+        return { success: false, error: errMsg };
+      }
+
+      if (section === 'branding' && result.branding) {
+        setBranding((prev) => {
+          const updated = { ...prev, ...result.branding };
+          try {
+            localStorage.setItem('cosko_branding', JSON.stringify(updated));
+            window.dispatchEvent(new StorageEvent('storage', { key: 'cosko_branding', newValue: JSON.stringify(updated) }));
+          } catch {}
+          return updated;
+        });
+      } else if (section === 'profile' && result.branding) {
+        setBranding((prev) => {
+          const updated = { ...prev, ...result.branding };
+          try {
+            localStorage.setItem('cosko_branding', JSON.stringify(updated));
+            window.dispatchEvent(new StorageEvent('storage', { key: 'cosko_branding', newValue: JSON.stringify(updated) }));
+          } catch {}
+          return updated;
+        });
+      } else if (result.systemSettings) {
+        setSystemSettings((prev) => {
+          const updated = { ...prev, ...result.systemSettings, defaultTaxRate: Number(result.systemSettings.defaultTaxRate) || prev.defaultTaxRate };
+          try {
+            localStorage.setItem('cosko_system_settings', JSON.stringify(updated));
+            window.dispatchEvent(new StorageEvent('storage', { key: 'cosko_system_settings', newValue: JSON.stringify(updated) }));
+          } catch {}
+          return updated;
+        });
+        if (result.systemSettings.gstin) {
+          setBranding((prev) => ({ ...prev, taxNumber: result.systemSettings.gstin }));
+        }
+      }
+
+      addAuditLog('Settings', `Update ${section.toUpperCase()} Settings`, `Updated ${section} settings in system`);
+      toast.success(result.message || `${section.toUpperCase()} settings saved successfully`);
+      return { success: true, message: result.message };
+    } catch (err: any) {
+      toast.error(err.message || 'Network error updating settings');
+      return { success: false, error: err.message };
+    }
+  };
+
+  const reloadSettings = async () => {
+    try {
+      const res = await fetch('/api/settings', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.branding) setBranding(prev => ({ ...prev, ...data.branding }));
+        if (data.systemSettings) setSystemSettings(prev => ({ ...prev, ...data.systemSettings }));
+      }
+    } catch (err) {
+      console.warn('Failed to reload settings:', err);
+    }
   };
 
   const resetBranding = () => {
@@ -2337,6 +2527,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         branding,
         updateBranding,
         resetBranding,
+        systemSettings,
+        updateSystemSettings,
+        reloadSettings,
         selectedStore,
         setSelectedStore,
         datePeriod,

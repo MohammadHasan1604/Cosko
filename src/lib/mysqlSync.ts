@@ -411,8 +411,16 @@ export const MySQLDataService = {
     return apiCall('/api/settings', 'GET');
   },
 
+  async fetchSettings() {
+    return apiCall('/api/settings', 'GET');
+  },
+
   async updateBrandingSettings(branding: any) {
-    return apiCall('/api/settings', 'POST', branding);
+    return apiCall('/api/settings', 'POST', { section: 'branding', data: branding });
+  },
+
+  async saveSettings(section: string, data: any) {
+    return apiCall('/api/settings', 'POST', { section, data });
   },
 
   // ─── CATEGORIES ──────────────────────────────────────

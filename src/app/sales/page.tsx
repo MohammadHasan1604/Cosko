@@ -35,6 +35,7 @@ export default function SalesPage() {
     addCustomer,
     selectedStore,
     branding,
+    systemSettings,
     currentUser,
     addAuditLog,
   } = useApp();
@@ -1215,8 +1216,19 @@ export default function SalesPage() {
           size="md"
         >
           <div className="relative space-y-4 py-2 text-xs overflow-hidden">
-            {/* SVG Watermark Overlay: COSKO LOGO ONLY (No text inside watermark) */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none z-0">
+            {/* Canva / Custom Template Background if configured */}
+            {systemSettings?.invoiceTemplateUrl && (
+              <div
+                className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none z-0"
+                style={{ backgroundImage: `url(${systemSettings.invoiceTemplateUrl})` }}
+              />
+            )}
+
+            {/* SVG Watermark Overlay: COSKO LOGO ONLY (Strictly configured opacity) */}
+            <div
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-0"
+              style={{ opacity: (systemSettings?.watermarkOpacity ?? 5) / 100 }}
+            >
               <svg width="220" height="220" viewBox="0 0 100 100" fill="currentColor" className="text-foreground">
                 <rect x="15" y="15" width="70" height="70" rx="18" />
                 <circle cx="50" cy="50" r="22" fill="white" />
@@ -1227,13 +1239,23 @@ export default function SalesPage() {
               {/* Header */}
               <div className="p-4 rounded-xl bg-muted/40 border border-border text-center">
                 <div className="flex items-center justify-center gap-2 mb-1">
-                  <CoskoLogo size={28} showText variant="default" />
+                  {branding.logoUrl ? (
+                    <img src={branding.logoUrl} alt="Logo" className="h-8 object-contain" />
+                  ) : (
+                    <CoskoLogo size={28} showText variant="default" />
+                  )}
                 </div>
+                <h4 className="font-extrabold text-foreground text-sm">{systemSettings?.invoiceHeader || branding.appName || 'COSKO Retail Enterprise'}</h4>
                 <p className="text-2xs text-muted-foreground">
                   Invoice #: <strong className="font-mono text-foreground">{receiptModal.orderNo}</strong> · Store: {receiptModal.store}
                 </p>
+                {systemSettings?.showStoreAddress && (
+                  <p className="text-3xs text-muted-foreground mt-0.5">
+                    {branding.businessAddress || '100 Feet Ring Road, Indiranagar'}, {branding.city || 'Bengaluru'} · Phone: {branding.supportPhone || '+91 80 4000 8800'}
+                  </p>
+                )}
                 <p className="text-3xs font-mono text-muted-foreground mt-0.5">
-                  COSKO GSTIN: <strong>{receiptModal.coskoGstin || branding.taxNumber || '29AABCC1234F1Z5'}</strong>
+                  COSKO GSTIN: <strong>{receiptModal.coskoGstin || systemSettings?.gstin || branding.taxNumber || '29AABCU9603R1ZM'}</strong>
                 </p>
               </div>
 
@@ -1274,12 +1296,41 @@ export default function SalesPage() {
               <div className="space-y-1 font-tabular text-right text-muted-foreground pt-1">
                 <p>Taxable Subtotal: ₹{receiptModal.subtotal.toLocaleString('en-IN')}</p>
                 {receiptModal.taxEnabled ? (
-                  <p>GST Tax (18%): ₹{receiptModal.taxTotal.toLocaleString('en-IN')}</p>
+                  <p>GST Tax ({systemSettings?.defaultTaxRate ?? 18}%): ₹{receiptModal.taxTotal.toLocaleString('en-IN')}</p>
                 ) : (
                   <p>GST Tax: ₹0 (Non-GST)</p>
                 )}
                 <p className="text-base font-extrabold text-foreground pt-1">
                   Total Paid ({receiptModal.paymentMethod}): ₹{receiptModal.total.toLocaleString('en-IN')}
+                </p>
+              </div>
+
+              {/* UPI Payment QR if enabled */}
+              {systemSettings?.showPaymentQr && (
+                <div className="p-3 rounded-xl bg-muted/40 border border-border flex items-center gap-3">
+                  <div className="w-12 h-12 bg-white p-1 rounded-lg border border-border flex items-center justify-center shrink-0">
+                    <Icon name="QrCodeIcon" size={36} className="text-slate-900" />
+                  </div>
+                  <div className="text-3xs space-y-0.5">
+                    <p className="font-bold text-foreground">Scan to Pay / Verify UPI</p>
+                    <p className="font-mono text-primary font-bold">{systemSettings.paymentUpiId || 'cosko@icici'}</p>
+                    {systemSettings.paymentBankDetails && (
+                      <p className="text-muted-foreground">{systemSettings.paymentBankDetails}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Terms & Footer Note */}
+              <div className="text-3xs space-y-1 pt-2 border-t border-border/60 text-muted-foreground">
+                {systemSettings?.invoiceTerms && (
+                  <>
+                    <p className="font-semibold text-foreground">Terms & Conditions:</p>
+                    <p className="whitespace-pre-line leading-relaxed">{systemSettings.invoiceTerms}</p>
+                  </>
+                )}
+                <p className="italic text-center pt-2 text-foreground font-medium border-t border-border/40">
+                  {systemSettings?.invoiceFooter || 'Thank you for shopping with us! Goods once sold cannot be returned without original receipt.'}
                 </p>
               </div>
 
