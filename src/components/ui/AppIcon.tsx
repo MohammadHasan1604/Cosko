@@ -4,10 +4,11 @@ import React from 'react';
 import * as HeroIcons from '@heroicons/react/24/outline';
 import * as HeroIconsSolid from '@heroicons/react/24/solid';
 import { QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
+import WhatsAppIcon from './WhatsAppIcon';
 
-type IconVariant = 'outline' | 'solid';
+export type IconVariant = 'outline' | 'solid' | 'brand';
 
-interface IconProps {
+export interface IconProps {
     name: string; // Changed to string to accept dynamic values
     variant?: IconVariant;
     size?: number;
@@ -26,6 +27,20 @@ function Icon({
     disabled = false,
     ...props
 }: IconProps) {
+    const lowerName = (name || '').toLowerCase();
+    if (lowerName === 'whatsapp' || lowerName === 'whatsappicon' || lowerName === 'brandwhatsapp') {
+        return (
+            <WhatsAppIcon
+                size={size}
+                variant={variant as 'outline' | 'solid' | 'brand'}
+                className={className}
+                onClick={onClick}
+                disabled={disabled}
+                {...props}
+            />
+        );
+    }
+
     const iconSet = variant === 'solid' ? HeroIconsSolid : HeroIcons;
     const IconComponent = iconSet[name as keyof typeof iconSet] as React.ComponentType<any>;
 
@@ -52,4 +67,5 @@ function Icon({
     );
 }
 
+export { WhatsAppIcon };
 export default Icon; 

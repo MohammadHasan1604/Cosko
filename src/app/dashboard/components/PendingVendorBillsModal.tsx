@@ -6,6 +6,7 @@ import Icon from '@/components/ui/AppIcon';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Link from 'next/link';
 import { useApp, PurchaseOrder } from '@/context/AppContext';
+import SupplierPaymentModal from '@/components/forms/SupplierPaymentModal';
 import { toast } from 'sonner';
 
 interface PendingVendorBillsModalProps {
@@ -23,13 +24,8 @@ export default function PendingVendorBillsModal({ open, onClose }: PendingVendor
     }
   }, [open, refreshAllData]);
 
-  // Payment dialog state
+  // Payment dialog state (Master Single Source of Truth SupplierPaymentModal)
   const [selectedPoForPay, setSelectedPoForPay] = useState<PurchaseOrder | null>(null);
-  const [payAmount, setPayAmount] = useState<number | ''>('');
-  const [payMethod, setPayMethod] = useState('Bank Transfer');
-  const [payRef, setPayRef] = useState('');
-  const [payNotes, setPayNotes] = useState('');
-  const [isSubmittingPay, setIsSubmittingPay] = useState(false);
 
   // Authoritative pending bills in current store scope
   const pendingBills = purchases.filter((p) => {
@@ -47,40 +43,6 @@ export default function PendingVendorBillsModal({ open, onClose }: PendingVendor
 
   const openPayDialog = (po: PurchaseOrder) => {
     setSelectedPoForPay(po);
-    const rem = po.remainingAmount !== undefined ? po.remainingAmount : Math.max(0, po.totalAmount - (po.paidAmount || 0) - (po.creditAmount || 0));
-    setPayAmount(rem);
-    setPayRef('');
-    setPayNotes(`Payment against ${po.invoiceNo || po.poNo}`);
-  };
-
-  const handleRecordPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPoForPay || !payAmount || Number(payAmount) <= 0) {
-      toast.error('Please enter a valid payment amount');
-      return;
-    }
-
-    setIsSubmittingPay(true);
-    try {
-      const res = await recordPurchasePayment({
-        purchaseId: selectedPoForPay.id,
-        amount: Number(payAmount),
-        paymentMethod: payMethod,
-        referenceNo: payRef.trim() || undefined,
-        notes: payNotes.trim() || undefined,
-      });
-
-      if (res.success) {
-        toast.success(`Payment of ₹${Number(payAmount).toLocaleString('en-IN')} recorded for ${selectedPoForPay.poNo}`);
-        setSelectedPoForPay(null);
-      } else {
-        toast.error(res.error || 'Failed to record payment');
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Error recording vendor payment');
-    } finally {
-      setIsSubmittingPay(false);
-    }
   };
 
   return (
@@ -214,113 +176,17 @@ export default function PendingVendorBillsModal({ open, onClose }: PendingVendor
         </div>
       </Modal>
 
-      {/* Record Payment Sub-Dialog */}
-      {selectedPoForPay && (
-        <Modal
-          open={Boolean(selectedPoForPay)}
-          onClose={() => setSelectedPoForPay(null)}
-          title={`Record Bill Payment: ${selectedPoForPay.poNo}`}
-          subtitle={`Vendor: ${selectedPoForPay.vendorName} · Store: ${selectedPoForPay.store}`}
-          size="sm"
-        >
-          <form onSubmit={handleRecordPayment} className="space-y-4">
-            <div className="p-3 bg-muted/40 rounded-xl border border-border text-xs space-y-1">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Bill Cost:</span>
-                <span className="font-semibold font-tabular">₹{selectedPoForPay.totalAmount.toLocaleString('en-IN')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Paid so far:</span>
-                <span className="font-semibold text-positive font-tabular">₹{(selectedPoForPay.paidAmount || 0).toLocaleString('en-IN')}</span>
-              </div>
-              <div className="flex justify-between font-bold pt-1 border-t border-border">
-                <span>Remaining Due:</span>
-                <span className="text-danger font-tabular">
-                  ₹{(selectedPoForPay.remainingAmount !== undefined ? selectedPoForPay.remainingAmount : Math.max(0, selectedPoForPay.totalAmount - (selectedPoForPay.paidAmount || 0))).toLocaleString('en-IN')}
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">
-                Payment Amount (₹) *
-              </label>
-              <input
-                type="number"
-                min="1"
-                max={selectedPoForPay.remainingAmount !== undefined ? selectedPoForPay.remainingAmount : selectedPoForPay.totalAmount}
-                step="0.01"
-                value={payAmount}
-                onChange={(e) => setPayAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                required
-                className="input-field w-full text-sm font-semibold font-tabular"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground block mb-1">
-                  Payment Method
-                </label>
-                <select
-                  value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value)}
-                  className="input-field w-full text-xs"
-                >
-                  <option value="Bank Transfer">Bank Transfer (NEFT/RTGS)</option>
-                  <option value="UPI">UPI</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="Cash">Cash</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground block mb-1">
-                  Reference / UTR No.
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. UTR-98765432"
-                  value={payRef}
-                  onChange={(e) => setPayRef(e.target.value)}
-                  className="input-field w-full text-xs"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">
-                Notes
-              </label>
-              <input
-                type="text"
-                placeholder="Optional payment notes"
-                value={payNotes}
-                onChange={(e) => setPayNotes(e.target.value)}
-                className="input-field w-full text-xs"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-              <button
-                type="button"
-                onClick={() => setSelectedPoForPay(null)}
-                disabled={isSubmittingPay}
-                className="btn-secondary text-xs px-3 py-1.5"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmittingPay || !payAmount}
-                className="btn-primary text-xs px-4 py-1.5 gap-1.5"
-              >
-                <Icon name="CheckIcon" size={13} />
-                {isSubmittingPay ? 'Recording...' : 'Confirm Payment'}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      {/* Master Single Source of Truth Supplier Payment Modal */}
+      <SupplierPaymentModal
+        open={Boolean(selectedPoForPay)}
+        onClose={() => setSelectedPoForPay(null)}
+        purchase={selectedPoForPay}
+        onSuccess={() => {
+          setSelectedPoForPay(null);
+          refreshAllData();
+        }}
+        zIndex={110}
+      />
     </>
   );
 }

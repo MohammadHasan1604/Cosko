@@ -4,30 +4,15 @@ import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
+import RepairFormModal, { RepairItem } from '@/components/forms/RepairFormModal';
 import { useApp } from '@/context/AppContext';
-
-interface RepairItem {
-  id: string;
-  ticketNo: string;
-  customerId: string;
-  customerName: string;
-  customerPhone: string;
-  normalizedPhone: string;
-  deviceType: string;
-  deviceName: string;
-  issueDescription: string;
-  status: string;
-  estimatedCost?: number;
-  storeCode: string;
-  enquiryDate: string;
-  technicianNotes?: string | null;
-  assignedTech?: string | null;
-  linkedCoskoSaleNo?: string | null;
-}
+import { toast } from 'sonner';
 
 export default function RepairsPage() {
-  const { selectedStore, storesList, addRepairEnquiry, updateRepairEnquiry, deleteRepairEnquiry } = useApp();
+  const { customers, storesList, currentUser, selectedStore, deleteRepairEnquiry } = useApp();
+
   const [repairs, setRepairs] = useState<RepairItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState({
     totalEnquiries: 0,
     pendingCount: 0,
@@ -36,37 +21,16 @@ export default function RepairsPage() {
     customersWithRepairs: 0,
     repairAndPurchaseCount: 0,
   });
-  const [loading, setLoading] = useState(true);
+
+  // Filters
   const [statusFilter, setStatusFilter] = useState('All');
   const [storeFilter, setStoreFilter] = useState('All Stores');
   const [deviceFilter, setDeviceFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Create Modal State
+  // Master Modal State
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [newCustomerName, setNewCustomerName] = useState('');
-  const [newCustomerPhone, setNewCustomerPhone] = useState('');
-  const [newDeviceType, setNewDeviceType] = useState('Mobile');
-  const [newDeviceName, setNewDeviceName] = useState('');
-  const [newIssueDescription, setNewIssueDescription] = useState('');
-  const [newEstimatedCost, setNewEstimatedCost] = useState<number>(1500);
-  const [newStoreCode, setNewStoreCode] = useState(selectedStore === 'All Stores' ? 'CENTRAL' : selectedStore);
-  const [newAssignedTech, setNewAssignedTech] = useState('');
-  const [newTechnicianNotes, setNewTechnicianNotes] = useState('');
-  const [newStatus, setNewStatus] = useState('Pending Diagnosis');
-  const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
-
-  // Edit Modal State
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingRepair, setEditingRepair] = useState<RepairItem | null>(null);
-  const [editStatus, setEditStatus] = useState('Pending Diagnosis');
-  const [editDeviceName, setEditDeviceName] = useState('');
-  const [editIssueDescription, setEditIssueDescription] = useState('');
-  const [editEstimatedCost, setEditEstimatedCost] = useState<number>(0);
-  const [editStoreCode, setEditStoreCode] = useState('CENTRAL');
-  const [editAssignedTech, setEditAssignedTech] = useState('');
-  const [editTechnicianNotes, setEditTechnicianNotes] = useState('');
-  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Delete Modal State
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -75,10 +39,12 @@ export default function RepairsPage() {
 
   // Keep store filter in sync with global store if changed
   useEffect(() => {
-    if (selectedStore !== 'All Stores') {
+    if (currentUser.role !== 'Super Admin') {
+      setStoreFilter(currentUser.store || 'BLR');
+    } else if (selectedStore !== 'All Stores') {
       setStoreFilter(selectedStore);
     }
-  }, [selectedStore]);
+  }, [selectedStore, currentUser.role, currentUser.store]);
 
   const fetchRepairs = useCallback(async () => {
     try {
@@ -113,75 +79,8 @@ export default function RepairsPage() {
     fetchRepairs();
   }, [fetchRepairs]);
 
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setIsSubmittingCreate(true);
-      const res = await addRepairEnquiry({
-        customerName: newCustomerName,
-        customerPhone: newCustomerPhone,
-        deviceType: newDeviceType,
-        deviceName: newDeviceName,
-        issueDescription: newIssueDescription,
-        estimatedCost: newEstimatedCost,
-        storeCode: newStoreCode,
-        assignedTech: newAssignedTech,
-        technicianNotes: newTechnicianNotes,
-        status: newStatus,
-      });
-
-      if (res?.success) {
-        setCreateModalOpen(false);
-        // Reset form
-        setNewCustomerName('');
-        setNewCustomerPhone('');
-        setNewDeviceName('');
-        setNewIssueDescription('');
-        setNewEstimatedCost(1500);
-        setNewTechnicianNotes('');
-        setNewAssignedTech('');
-        await fetchRepairs();
-      }
-    } finally {
-      setIsSubmittingCreate(false);
-    }
-  };
-
   const handleOpenEdit = (repair: RepairItem) => {
     setEditingRepair(repair);
-    setEditStatus(repair.status);
-    setEditDeviceName(repair.deviceName);
-    setEditIssueDescription(repair.issueDescription);
-    setEditEstimatedCost(repair.estimatedCost || 0);
-    setEditStoreCode(repair.storeCode);
-    setEditAssignedTech(repair.assignedTech || '');
-    setEditTechnicianNotes(repair.technicianNotes || '');
-    setEditModalOpen(true);
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingRepair) return;
-    try {
-      setIsSubmittingEdit(true);
-      const res = await updateRepairEnquiry(editingRepair.id, {
-        status: editStatus,
-        deviceName: editDeviceName,
-        issueDescription: editIssueDescription,
-        estimatedCost: editEstimatedCost,
-        storeCode: editStoreCode,
-        assignedTech: editAssignedTech,
-        technicianNotes: editTechnicianNotes,
-      });
-
-      if (res?.success) {
-        setEditModalOpen(false);
-        setEditingRepair(null);
-        await fetchRepairs();
-      }
-    } finally {
-      setIsSubmittingEdit(false);
-    }
   };
 
   const handleOpenDelete = (repair: RepairItem) => {
@@ -263,7 +162,7 @@ export default function RepairsPage() {
             </Link>
             <button
               onClick={() => {
-                setNewStoreCode(selectedStore === 'All Stores' ? 'CENTRAL' : selectedStore);
+                setEditingRepair(null);
                 setCreateModalOpen(true);
               }}
               className="btn-primary gap-2 text-xs sm:text-sm font-semibold shadow-xs"
@@ -355,20 +254,22 @@ export default function RepairsPage() {
                 <option value="Cancelled">Cancelled</option>
               </select>
 
-              <select
-                value={storeFilter}
-                onChange={(e) => setStoreFilter(e.target.value)}
-                className="select-field text-xs py-1.5 w-auto min-w-[140px]"
-              >
-                <option value="All Stores">All Stores</option>
-                {[...storesList]
-                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
-                  .map((st) => (
-                    <option key={`filter-store-${st.code}`} value={st.code}>
-                      {st.code} — {st.name}
-                    </option>
-                  ))}
-              </select>
+              {currentUser.role === 'Super Admin' && (
+                <select
+                  value={storeFilter}
+                  onChange={(e) => setStoreFilter(e.target.value)}
+                  className="select-field text-xs py-1.5 w-auto min-w-[140px]"
+                >
+                  <option value="All Stores">All Stores</option>
+                  {[...storesList]
+                    .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
+                    .map((st) => (
+                      <option key={`filter-store-${st.code}`} value={st.code}>
+                        {st.code} — {st.name}
+                      </option>
+                    ))}
+                </select>
+              )}
 
               <select
                 value={deviceFilter}
@@ -511,235 +412,20 @@ export default function RepairsPage() {
         </div>
       </div>
 
-      {/* Log New Repair Ticket Modal */}
-      <Modal open={createModalOpen} onClose={() => setCreateModalOpen(false)} title="Log New Repair Ticket" size="lg">
-        <form onSubmit={handleCreateSubmit} className="space-y-4 py-2 text-sm">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Customer Name *</label>
-              <input
-                required
-                type="text"
-                value={newCustomerName}
-                onChange={(e) => setNewCustomerName(e.target.value)}
-                className="input-field py-2"
-                placeholder="e.g. Priya Sharma"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Customer Phone *</label>
-              <input
-                required
-                type="tel"
-                value={newCustomerPhone}
-                onChange={(e) => setNewCustomerPhone(e.target.value)}
-                className="input-field py-2 font-mono"
-                placeholder="e.g. +91 98450 11223"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Device Type</label>
-              <select value={newDeviceType} onChange={(e) => setNewDeviceType(e.target.value)} className="input-field py-2">
-                {['Mobile', 'Tablet', 'Laptop', 'Smartwatch', 'EV', 'AC', 'TV', 'Washing Machine', 'Refrigerator', 'Other'].map((dt) => (
-                  <option key={`dt-${dt}`} value={dt}>{dt}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Device Name / Model *</label>
-              <input
-                required
-                type="text"
-                value={newDeviceName}
-                onChange={(e) => setNewDeviceName(e.target.value)}
-                className="input-field py-2"
-                placeholder="e.g. iPhone 14 Pro"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Store / Service Hub *</label>
-              <select value={newStoreCode} onChange={(e) => setNewStoreCode(e.target.value)} className="input-field py-2 font-medium">
-                {[...storesList]
-                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
-                  .map((st) => (
-                    <option key={`rep-store-${st.code}`} value={st.code}>
-                      {st.code} — {st.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Issue Description *</label>
-            <textarea
-              required
-              rows={2}
-              value={newIssueDescription}
-              onChange={(e) => setNewIssueDescription(e.target.value)}
-              className="input-field py-2 text-sm"
-              placeholder="Describe the defect, damage, or symptoms..."
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Estimated Cost (₹)</label>
-              <input
-                type="number"
-                min="0"
-                value={newEstimatedCost}
-                onChange={(e) => setNewEstimatedCost(Number(e.target.value))}
-                className="input-field py-2 font-tabular"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Initial Status</label>
-              <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="input-field py-2">
-                <option value="Pending Diagnosis">Pending Diagnosis</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned Technician</label>
-              <input
-                type="text"
-                value={newAssignedTech}
-                onChange={(e) => setNewAssignedTech(e.target.value)}
-                className="input-field py-2"
-                placeholder="e.g. Ramesh Babu"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Technician Notes</label>
-            <textarea
-              rows={2}
-              value={newTechnicianNotes}
-              onChange={(e) => setNewTechnicianNotes(e.target.value)}
-              className="input-field py-2 text-sm"
-              placeholder="Preliminary inspection observations..."
-            />
-          </div>
-
-          <div className="pt-2 border-t border-border flex justify-end gap-2">
-            <button type="button" onClick={() => setCreateModalOpen(false)} className="btn-ghost" disabled={isSubmittingCreate}>
-              Cancel
-            </button>
-            <button type="submit" className="btn-primary" disabled={isSubmittingCreate}>
-              {isSubmittingCreate ? 'Saving...' : 'Generate Ticket'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Edit Repair Ticket Modal */}
-      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)} title={`Edit Ticket (${editingRepair?.ticketNo || ''})`} size="lg">
-        <form onSubmit={handleEditSubmit} className="space-y-4 py-2 text-sm">
-          <div className="p-3 bg-secondary/30 rounded-xl border border-border/50 text-xs flex justify-between items-center">
-            <div>
-              <span className="font-semibold text-foreground">{editingRepair?.customerName}</span>
-              <span className="text-muted-foreground ml-2 font-mono">({editingRepair?.customerPhone})</span>
-            </div>
-            <span className="font-mono font-bold text-primary">{editingRepair?.ticketNo}</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Status</label>
-              <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="input-field py-2 font-medium">
-                <option value="Pending Diagnosis">Pending Diagnosis</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-                <option value="Ready for Delivery">Ready for Delivery</option>
-                <option value="Delivered">Delivered</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Store / Hub</label>
-              <select value={editStoreCode} onChange={(e) => setEditStoreCode(e.target.value)} className="input-field py-2">
-                {[...storesList]
-                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
-                  .map((st) => (
-                    <option key={`edit-store-${st.code}`} value={st.code}>
-                      {st.code} — {st.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Estimated Cost (₹)</label>
-              <input
-                type="number"
-                min="0"
-                value={editEstimatedCost}
-                onChange={(e) => setEditEstimatedCost(Number(e.target.value))}
-                className="input-field py-2 font-tabular"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Device Name / Model</label>
-              <input
-                required
-                type="text"
-                value={editDeviceName}
-                onChange={(e) => setEditDeviceName(e.target.value)}
-                className="input-field py-2"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned Technician</label>
-              <input
-                type="text"
-                value={editAssignedTech}
-                onChange={(e) => setEditAssignedTech(e.target.value)}
-                className="input-field py-2"
-                placeholder="e.g. Ramesh Babu"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Issue Description</label>
-            <textarea
-              required
-              rows={2}
-              value={editIssueDescription}
-              onChange={(e) => setEditIssueDescription(e.target.value)}
-              className="input-field py-2 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Technician Notes & Progress</label>
-            <textarea
-              rows={3}
-              value={editTechnicianNotes}
-              onChange={(e) => setEditTechnicianNotes(e.target.value)}
-              className="input-field py-2 text-sm"
-              placeholder="Record repairs done, parts swapped, or testing results..."
-            />
-          </div>
-
-          <div className="pt-2 border-t border-border flex justify-end gap-2">
-            <button type="button" onClick={() => setEditModalOpen(false)} className="btn-ghost" disabled={isSubmittingEdit}>
-              Cancel
-            </button>
-            <button type="submit" className="btn-primary" disabled={isSubmittingEdit}>
-              {isSubmittingEdit ? 'Updating...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </Modal>
+      {/* Master Single Source of Truth Repair Form Modal */}
+      <RepairFormModal
+        open={createModalOpen || Boolean(editingRepair)}
+        onClose={() => {
+          setCreateModalOpen(false);
+          setEditingRepair(null);
+        }}
+        repair={editingRepair}
+        onSuccess={() => {
+          setCreateModalOpen(false);
+          setEditingRepair(null);
+          fetchRepairs();
+        }}
+      />
 
       {/* Delete Repair Ticket Modal */}
       <Modal open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Delete Repair Ticket" size="sm">
@@ -760,6 +446,8 @@ export default function RepairsPage() {
           </div>
         </div>
       </Modal>
+
+
     </AppLayout>
   );
 }

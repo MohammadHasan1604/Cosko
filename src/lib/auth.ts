@@ -38,7 +38,7 @@ export const verifyPassword = comparePassword;
  * Signs a JWT session token for authenticated user
  */
 export function signSessionToken(user: SessionUser): string {
-  return jwt.sign({ user }, AUTH_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ user }, AUTH_SECRET, { expiresIn: '30d' });
 }
 
 export function createSession(userId: string, storeScope: string, securityLevel: number) {
@@ -53,7 +53,7 @@ export function createSession(userId: string, storeScope: string, securityLevel:
     shiftStatus: 'On Shift',
     mustChangePassword: false,
   };
-  const token = jwt.sign({ user, nonce: Math.random() + '_' + Date.now() }, AUTH_SECRET, { expiresIn: '7d' });
+  const token = jwt.sign({ user, nonce: Math.random() + '_' + Date.now() }, AUTH_SECRET, { expiresIn: '30d' });
   return { token, userId, storeScope, securityLevel };
 }
 

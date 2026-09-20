@@ -6,6 +6,7 @@ import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
+import ProofViewerModal, { PaymentProofData } from '@/components/ui/ProofViewerModal';
 
 interface ConsolidatedPnLData {
   netExternalRevenue: number;
@@ -87,6 +88,9 @@ interface LedgerEntry {
   description: string;
   isEliminated: boolean;
   createdBy: string;
+  proofUrl?: string | null;
+  referenceNo?: string | null;
+  paymentMethod?: string | null;
 }
 
 interface DrillDownRecord {
@@ -108,10 +112,12 @@ interface DrillDownRecord {
 }
 
 export default function AccountingPage() {
-  const { storesList, selectedStore, setSelectedStore, datePeriod, setDatePeriod, customDateRange } = useApp();
+  const { storesList, selectedStore, setSelectedStore, datePeriod, setDatePeriod, customDateRange, currentUser } = useApp();
 
-  // Active view tab
-  const [activeTab, setActiveTab] = useState<'consolidated' | 'store' | 'central' | 'ledger'>('consolidated');
+  // Active view tab (Consolidated is Super Admin only; normal managers default to store view)
+  const [activeTab, setActiveTab] = useState<'consolidated' | 'store' | 'central' | 'ledger'>(
+    currentUser?.role === 'Super Admin' ? 'consolidated' : 'store'
+  );
   const [loading, setLoading] = useState(true);
 
   // Accounting data states
@@ -127,6 +133,7 @@ export default function AccountingPage() {
   const [ledgerCategoryFilter, setLedgerCategoryFilter] = useState('ALL');
   const [ledgerSearch, setLedgerSearch] = useState('');
   const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [selectedProof, setSelectedProof] = useState<PaymentProofData | null>(null);
 
   // Drill-Down Modal State
   const [drillDownModalOpen, setDrillDownModalOpen] = useState(false);
@@ -307,22 +314,24 @@ export default function AccountingPage() {
 
           {/* Action Bar & Controls */}
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Store Filter */}
-            <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/80">
-              <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground pl-2">Store:</span>
-              <select
-                value={selectedStore}
-                onChange={(e) => setSelectedStore(e.target.value)}
-                className="select-field text-xs font-semibold py-1 px-3 h-8 w-auto min-w-[170px]"
-              >
-                <option value="All Stores">All Stores (Consolidated)</option>
-                {storesList.map((s) => (
-                  <option key={`opt-${s.code}`} value={s.code}>
-                    {s.code} · {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Store Filter (SUPER ADMIN ONLY) */}
+            {currentUser.role === 'Super Admin' && (
+              <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/80">
+                <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground pl-2">Store:</span>
+                <select
+                  value={selectedStore}
+                  onChange={(e) => setSelectedStore(e.target.value)}
+                  className="select-field text-xs font-semibold py-1 px-3 h-8 w-auto min-w-[170px]"
+                >
+                  <option value="All Stores">All Stores (Consolidated)</option>
+                  {storesList.map((s) => (
+                    <option key={`opt-${s.code}`} value={s.code}>
+                      {s.code} · {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Time Period Filter */}
             <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/80">
@@ -376,18 +385,20 @@ export default function AccountingPage() {
 
         {/* View Switcher Tabs */}
         <div className="flex items-center gap-1.5 border-b border-border/80 pb-1.5 overflow-x-auto scrollbar-none">
-          <button
-            onClick={() => setActiveTab('consolidated')}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all duration-150 ${
-              activeTab === 'consolidated'
-                ? 'bg-primary text-primary-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-            }`}
-          >
-            <Icon name="BuildingOffice2Icon" size={15} />
-            <span>Consolidated Company P&L</span>
-            <span className="text-3xs px-1.5 py-0.5 rounded-full bg-primary-foreground/20 font-mono">Eliminated</span>
-          </button>
+          {currentUser.role === 'Super Admin' && (
+            <button
+              onClick={() => setActiveTab('consolidated')}
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all duration-150 ${
+                activeTab === 'consolidated'
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              <Icon name="BuildingOffice2Icon" size={15} />
+              <span>Consolidated Company P&L</span>
+              <span className="text-3xs px-1.5 py-0.5 rounded-full bg-primary-foreground/20 font-mono">Eliminated</span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('store')}
@@ -401,17 +412,19 @@ export default function AccountingPage() {
             <span>Store Operational P&L</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('central')}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all duration-150 ${
-              activeTab === 'central'
-                ? 'bg-primary text-primary-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-            }`}
-          >
-            <Icon name="ArrowTrendingUpIcon" size={15} />
-            <span>Central Transfer Profit P&L</span>
-          </button>
+          {currentUser.role === 'Super Admin' && (
+            <button
+              onClick={() => setActiveTab('central')}
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all duration-150 ${
+                activeTab === 'central'
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              <Icon name="ArrowTrendingUpIcon" size={15} />
+              <span>Central Transfer Profit P&L</span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('ledger')}
@@ -896,6 +909,7 @@ export default function AccountingPage() {
                         <th className="px-4 py-3">Entity / Narration</th>
                         <th className="px-4 py-3 text-right font-tabular">Debit</th>
                         <th className="px-4 py-3 text-right font-tabular">Credit</th>
+                        <th className="px-4 py-3 text-center">Payment Proof</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border text-xs font-tabular">
@@ -919,6 +933,30 @@ export default function AccountingPage() {
                           </td>
                           <td className="px-4 py-3 text-right font-bold text-foreground">
                             {le.credit > 0 ? `₹${le.credit.toLocaleString('en-IN')}` : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {le.proofUrl ? (
+                              <button
+                                onClick={() => setSelectedProof({
+                                  url: le.proofUrl!,
+                                  referenceNo: le.referenceNo || le.refNo || le.entryNo,
+                                  amount: le.debit > 0 ? le.debit : le.credit,
+                                  paymentMethod: le.paymentMethod || 'Journal Voucher',
+                                  paymentDate: le.entryDate,
+                                  payeeOrPayer: le.entityName || le.accountName,
+                                  recordedBy: le.createdBy || 'Finance Dept',
+                                  timestamp: le.entryDate,
+                                  notes: le.description,
+                                })}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-3xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors shadow-2xs"
+                                title="View Attached Payment Proof"
+                              >
+                                <Icon name="DocumentCheckIcon" size={13} />
+                                View Proof
+                              </button>
+                            ) : (
+                              <span className="text-3xs text-muted-foreground italic">-</span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1108,6 +1146,12 @@ export default function AccountingPage() {
             </div>
           ) : null}
         </Modal>
+
+        {/* Full-Screen Payment Proof Viewer */}
+        <ProofViewerModal
+          proof={selectedProof}
+          onClose={() => setSelectedProof(null)}
+        />
       </div>
     </AppLayout>
   );

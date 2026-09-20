@@ -36,12 +36,12 @@ export interface RateLimitResult {
   retryAfterSeconds?: number;
 }
 
-export function checkRateLimit(key: string): RateLimitResult {
+export function checkRateLimit(key: string, maxAttempts = 5): RateLimitResult {
   const now = Date.now();
   const record = rateLimitStore.get(key);
 
   if (!record) {
-    return { allowed: true, remainingAttempts: MAX_FAILED_ATTEMPTS };
+    return { allowed: true, remainingAttempts: maxAttempts };
   }
 
   // Check if currently blocked
@@ -57,10 +57,10 @@ export function checkRateLimit(key: string): RateLimitResult {
   // Check if window has expired
   if (now - record.firstAttemptTime > WINDOW_DURATION_MS) {
     rateLimitStore.delete(key);
-    return { allowed: true, remainingAttempts: MAX_FAILED_ATTEMPTS };
+    return { allowed: true, remainingAttempts: maxAttempts };
   }
 
-  if (record.attempts >= MAX_FAILED_ATTEMPTS) {
+  if (record.attempts >= maxAttempts) {
     record.blockedUntil = now + BLOCK_DURATION_MS;
     const retryAfterSeconds = Math.ceil(BLOCK_DURATION_MS / 1000);
     return {
@@ -72,11 +72,11 @@ export function checkRateLimit(key: string): RateLimitResult {
 
   return {
     allowed: true,
-    remainingAttempts: Math.max(0, MAX_FAILED_ATTEMPTS - record.attempts),
+    remainingAttempts: Math.max(0, maxAttempts - record.attempts),
   };
 }
 
-export function recordFailedAttempt(key: string): RateLimitResult {
+export function recordFailedAttempt(key: string, maxAttempts = 5): RateLimitResult {
   const now = Date.now();
   let record = rateLimitStore.get(key);
 
@@ -87,14 +87,14 @@ export function recordFailedAttempt(key: string): RateLimitResult {
     };
   } else {
     record.attempts += 1;
-    if (record.attempts >= MAX_FAILED_ATTEMPTS) {
+    if (record.attempts >= maxAttempts) {
       record.blockedUntil = now + BLOCK_DURATION_MS;
     }
   }
 
   rateLimitStore.set(key, record);
 
-  if (record.attempts >= MAX_FAILED_ATTEMPTS) {
+  if (record.attempts >= maxAttempts) {
     return {
       allowed: false,
       remainingAttempts: 0,
@@ -104,7 +104,7 @@ export function recordFailedAttempt(key: string): RateLimitResult {
 
   return {
     allowed: true,
-    remainingAttempts: Math.max(0, MAX_FAILED_ATTEMPTS - record.attempts),
+    remainingAttempts: Math.max(0, maxAttempts - record.attempts),
   };
 }
 

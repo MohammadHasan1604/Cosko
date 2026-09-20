@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import CoskoLogo from '@/components/ui/CoskoLogo';
 import { useApp } from '@/context/AppContext';
@@ -20,7 +20,7 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
         {/* Mobile menu */}
         <button
           onClick={onMobileMenuOpen}
-          className="btn-ghost lg:hidden w-8 h-8 p-0 flex items-center justify-center flex-shrink-0 rounded-lg"
+          className="btn-ghost lg:hidden w-8.5 h-8.5 p-0 flex items-center justify-center flex-shrink-0 rounded-lg"
           aria-label="Open navigation menu"
         >
           <Icon name="Bars3Icon" size={18} />
@@ -29,7 +29,7 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
         {/* Sidebar toggle (desktop) */}
         <button
           onClick={onToggleSidebar}
-          className="btn-ghost hidden lg:flex w-8 h-8 p-0 items-center justify-center flex-shrink-0 rounded-lg"
+          className="btn-ghost hidden lg:flex w-8.5 h-8.5 p-0 items-center justify-center flex-shrink-0 rounded-lg"
           aria-label="Toggle sidebar"
         >
           <Icon name="Bars3Icon" size={16} />
@@ -39,7 +39,9 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
         <div className="flex lg:hidden items-center gap-1.5 min-w-0">
           <CoskoLogo size={20} showText />
           <span className="text-3xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold truncate max-w-[120px]">
-            {selectedStore === 'All Stores' ? 'Consolidated' : selectedStore === 'CENTRAL' ? 'Central' : selectedStore}
+            {currentUser.role !== 'Super Admin'
+              ? (currentUser.store || 'Store')
+              : selectedStore === 'All Stores' ? 'Consolidated' : selectedStore === 'CENTRAL' ? 'Central' : selectedStore}
           </span>
         </div>
 
@@ -49,7 +51,9 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
           <Icon name="ChevronRightIcon" size={12} className="text-muted-foreground/60" />
           <span className="font-medium text-2xs uppercase tracking-wider text-muted-foreground">Scope</span>
           <span className="text-2xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full font-semibold shadow-2xs">
-            {selectedStore === 'All Stores'
+            {currentUser.role !== 'Super Admin'
+              ? `${currentUser.store || selectedStore} Store Hub`
+              : selectedStore === 'All Stores'
               ? 'All Stores (Consolidated View)'
               : selectedStore === 'CENTRAL'
               ? 'COSKO Central Warehouse (CENTRAL)'
@@ -75,6 +79,15 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
 
       {/* Actions */}
       <div className="flex items-center gap-1.5">
+        <Link
+          href="/work-activity"
+          className="btn-ghost w-8.5 h-8.5 p-0 flex items-center justify-center rounded-lg relative cursor-pointer text-muted-foreground hover:text-primary transition-colors"
+          title="Work Activity & Time Tracking"
+          aria-label="Work Activity"
+        >
+          <Icon name="ClockIcon" size={18} />
+        </Link>
+
         <button
           onClick={() => setNotificationsOpen(true)}
           className="btn-ghost w-8.5 h-8.5 p-0 flex items-center justify-center rounded-lg relative cursor-pointer"

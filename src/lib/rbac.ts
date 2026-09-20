@@ -59,10 +59,13 @@ export function evaluateAuthorization({
     return { authorized: false, reason: `Deny Access: User Security Level (${user.securityLevel}) is below required Level (${requiredMinLevel})` };
   }
 
-  // 6. Store Scope Lock Check
-  if (targetStoreCode && targetStoreCode !== 'All Stores' && targetStoreCode !== 'CENTRAL') {
+  // 6. Store Scope Lock Check: User must only access stores explicitly assigned to them
+  if (targetStoreCode) {
+    if (targetStoreCode === 'All Stores') {
+      return { authorized: false, reason: 'Deny Access: Non-Super-Admin accounts cannot access enterprise "All Stores" scope' };
+    }
     const userAllowedStores = user.allowedStores || [user.store];
-    if (user.store !== 'All Stores' && !userAllowedStores.includes(targetStoreCode)) {
+    if (!userAllowedStores.includes(targetStoreCode)) {
       return { authorized: false, reason: `Deny Access: Store Scope Lock prevents access to ${targetStoreCode}` };
     }
   }

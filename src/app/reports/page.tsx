@@ -19,10 +19,19 @@ export default function ReportsPage() {
 
   // Local report filters (independent of global context for reports-specific control)
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
-  const [reportStore, setReportStore] = useState(selectedStore || 'All Stores');
+  const effectiveReportStore = currentUser.role === 'Super Admin' ? (selectedStore || 'All Stores') : (currentUser.store || 'BLR');
+  const [reportStore, setReportStore] = useState(effectiveReportStore);
   const [reportPeriod, setReportPeriod] = useState('This Month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+
+  useEffect(() => {
+    if (currentUser.role !== 'Super Admin') {
+      setReportStore(currentUser.store || 'BLR');
+    } else {
+      setReportStore(selectedStore || 'All Stores');
+    }
+  }, [currentUser.role, currentUser.store, selectedStore]);
   const [exportFormat, setExportFormat] = useState<'csv' | 'excel' | 'pdf'>('csv');
 
   // Data
@@ -191,17 +200,19 @@ export default function ReportsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Store Filter */}
-            <select
-              value={reportStore}
-              onChange={(e) => setReportStore(e.target.value)}
-              className="input-field text-xs py-2 px-3"
-            >
-              {currentUser.role === 'Super Admin' && <option value="All Stores">All Stores</option>}
-              {storesList.map((s) => (
-                <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
-              ))}
-            </select>
+            {/* Store Filter (SUPER ADMIN ONLY) */}
+            {currentUser.role === 'Super Admin' && (
+              <select
+                value={reportStore}
+                onChange={(e) => setReportStore(e.target.value)}
+                className="input-field text-xs py-2 px-3"
+              >
+                <option value="All Stores">All Stores (Consolidated View)</option>
+                {storesList.map((s) => (
+                  <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
+                ))}
+              </select>
+            )}
 
             {/* Date Filter */}
             <select

@@ -26,6 +26,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'User already removed or non-existent' });
     }
 
+    // 🔒 STRICT SUPER ADMIN SINGLETON: Protected account cannot be deleted or deactivated
+    if (target.role === 'Super Admin') {
+      return NextResponse.json({
+        success: false,
+        error: 'Forbidden: The protected Super Admin root account cannot be deleted or deactivated.',
+      }, { status: 403 });
+    }
+
     if (target.email === session.email) {
       return NextResponse.json({ success: false, error: 'You cannot delete or deactivate your own logged-in account' }, { status: 400 });
     }
@@ -57,8 +65,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Hard-delete if 0 history
-    await prisma.userStoreAssignment.deleteMany({ where: { userId: target.id } });
-    await prisma.userAccount.delete({ where: { id: target.id } });
+    await prisma.$transaction(async (tx: any) => {
+      await tx.userStoreAssignment.deleteMany({ where: { userId: target.id } });
+      await tx.userAccount.delete({ where: { id: target.id } });
+    }, { maxWait: 15000, timeout: 45000 });
 
     // Broadcast SSE realtime event
     broadcastRealtimeEvent('users', 'USER_UPDATED', { userId: target.id, email: target.email, action: 'deleted' });

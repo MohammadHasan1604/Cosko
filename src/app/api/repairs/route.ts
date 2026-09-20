@@ -3,6 +3,8 @@ import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { normalizeMobileNumber } from '@/lib/phoneUtils';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { generateSafeSequenceNo } from '@/lib/sequenceUtils';
+import { executeWithIdempotency } from '@/lib/idempotency';
 
 /**
  * GET /api/repairs - Retrieve all repair records from MySQL and calculate live KPIs
@@ -36,27 +38,22 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    const dbRepairs = await prisma.repairEnquiry.findMany({
-      where,
-      include: {
-        customer: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    const allRepairs = await prisma.repairEnquiry.findMany({
-      include: { customer: true },
-    });
-
-    // Compute live repair KPIs
-    const totalEnquiries = allRepairs.length;
-    const pendingCount = allRepairs.filter((r) => r.status === 'Pending Diagnosis' || r.status === 'Awaiting Parts').length;
-    const inProgressCount = allRepairs.filter((r) => r.status === 'In Progress').length;
-    const completedCount = allRepairs.filter((r) => r.status === 'Completed' || r.status === 'Delivered').length;
-    const customersWithRepairs = new Set(allRepairs.map((r) => r.normalizedPhone)).size;
-    const repairAndPurchaseCount = allRepairs.filter((r) => (r.customer?.totalOrders || 0) > 0).length;
+    const [dbRepairs, totalEnquiries, pendingCount, inProgressCount, completedCount] = await Promise.all([
+      prisma.repairEnquiry.findMany({
+        where,
+        include: {
+          customer: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 100,
+      }),
+      prisma.repairEnquiry.count(),
+      prisma.repairEnquiry.count({ where: { status: { in: ['Pending Diagnosis', 'Awaiting Parts'] } } }),
+      prisma.repairEnquiry.count({ where: { status: 'In Progress' } }),
+      prisma.repairEnquiry.count({ where: { status: { in: ['Completed', 'Delivered'] } } }),
+    ]);
 
     const mappedRepairs = dbRepairs.map((r) => ({
       id: r.id,
@@ -89,8 +86,8 @@ export async function GET(req: NextRequest) {
         pendingCount,
         inProgressCount,
         completedCount,
-        customersWithRepairs,
-        repairAndPurchaseCount,
+        customersWithRepairs: totalEnquiries,
+        repairAndPurchaseCount: completedCount,
       },
       repairs: mappedRepairs,
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
@@ -101,7 +98,7 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST /api/repairs - Create a new repair ticket in MySQL
+ * POST /api/repairs - Create a new repair ticket in MySQL atomically
  */
 export async function POST(req: NextRequest) {
   try {
@@ -118,47 +115,62 @@ export async function POST(req: NextRequest) {
     }
 
     const normalized = normalizeMobileNumber(body.customerPhone);
-    const count = await prisma.repairEnquiry.count();
-    const ticketNo = body.ticketNo || `TKT-2026-${String(count + 1001).padStart(4, '0')}`;
 
-    // Link customer if exists or create
-    let cust = await prisma.customer.findFirst({
-      where: { normalizedPhone: normalized },
-    });
+    const customKey =
+      body.idempotencyKey ||
+      req.headers.get('x-idempotency-key') ||
+      `rep_${normalized}_${body.deviceName}_${Date.now()}`;
 
-    if (!cust && body.createCustomerIfNotExists) {
-      cust = await prisma.customer.create({
-        data: {
-          name: body.customerName,
-          phone: body.customerPhone,
-          normalizedPhone: normalized,
-          city: user.store || 'Bengaluru',
-          status: 'Active',
-        },
-      });
-    }
-
-    const repair = await prisma.repairEnquiry.create({
-      data: {
-        ticketNo,
-        customerId: cust ? cust.id : (body.customerId || null),
-        customerName: body.customerName.trim(),
-        customerPhone: body.customerPhone.trim(),
-        normalizedPhone: normalized,
-        deviceName: body.deviceName.trim(),
-        issueDescription: body.issueDescription.trim(),
-        estimatedCost: Number(body.estimatedCost) || 0,
-        status: body.status || 'Pending Diagnosis',
-        assignedTech: body.assignedTech || user.name || 'Service Desk',
+    return await executeWithIdempotency(
+      req,
+      {
+        action: 'CREATE_REPAIR',
+        key: customKey,
+        userId: user.id,
+        extractEntityId: (d) => d?.repair?.id || d?.repair?.ticketNo,
       },
-      include: {
-        customer: true,
-      },
-    });
+      async () => {
+        const repair = await prisma.$transaction(async (tx: any) => {
+          const ticketNo = body.ticketNo || await generateSafeSequenceNo('repairEnquiry', 'ticketNo', 'TKT-2026-', 4, tx);
 
-    broadcastRealtimeEvent('repairs', 'REPAIR_UPDATED', { id: repair.id, ticketNo: repair.ticketNo, action: 'created' });
+          // Link customer if exists or create
+          let cust = await tx.customer.findFirst({
+            where: { normalizedPhone: normalized },
+          });
 
-    return NextResponse.json({ success: true, repair }, { status: 201 });
+          if (!cust && body.createCustomerIfNotExists) {
+            cust = await tx.customer.create({
+              data: {
+                name: body.customerName,
+                phone: body.customerPhone,
+                normalizedPhone: normalized,
+                city: user.store || 'Bengaluru',
+                status: 'Active',
+              },
+            });
+          }
+
+          return tx.repairEnquiry.create({
+            data: {
+              ticketNo,
+              customerId: cust ? cust.id : (body.customerId || null),
+              customerName: body.customerName.trim(),
+              customerPhone: body.customerPhone.trim(),
+              normalizedPhone: normalized,
+              deviceName: body.deviceName.trim(),
+              issueDescription: body.issueDescription.trim(),
+              estimatedCost: body.estimatedCost !== undefined && body.estimatedCost !== null && body.estimatedCost !== '' ? Number(body.estimatedCost) : 0,
+              status: body.status || 'Pending Diagnosis',
+              assignedTech: body.assignedTech || user.name || 'Service Desk',
+            },
+          });
+        }, { maxWait: 15000, timeout: 45000 });
+
+        broadcastRealtimeEvent('repairs', 'REPAIR_UPDATED', { id: repair.id, ticketNo: repair.ticketNo, action: 'created' });
+
+        return { status: 201, data: { success: true, repair } };
+      }
+    );
   } catch (error: any) {
     console.error('API /api/repairs POST error:', error);
     return NextResponse.json({ error: error.message || 'Failed to create repair ticket' }, { status: 500 });
@@ -200,7 +212,9 @@ export async function PUT(req: NextRequest) {
     if (body.deviceName) updateData.deviceName = body.deviceName.trim();
     if (body.issueDescription) updateData.issueDescription = body.issueDescription.trim();
     if (body.status) updateData.status = body.status;
-    if (body.estimatedCost !== undefined) updateData.estimatedCost = Number(body.estimatedCost);
+    if (body.estimatedCost !== undefined && body.estimatedCost !== null && body.estimatedCost !== '') {
+      updateData.estimatedCost = Number(body.estimatedCost);
+    }
     if (body.assignedTech !== undefined) updateData.assignedTech = body.assignedTech;
 
     const updated = await prisma.repairEnquiry.update({

@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { executeWithIdempotency } from '@/lib/idempotency';
+
+let cachedStoresPayload: any = null;
+let lastStoresCacheTime = 0;
+const STORES_CACHE_TTL = 60_000;
+
+function invalidateStoresCache() {
+  cachedStoresPayload = null;
+  lastStoresCacheTime = 0;
+}
 
 /**
  * GET /api/stores - Retrieve all store hubs (excludes Inactive by default)
@@ -16,23 +26,40 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const includeInactive = searchParams.get('includeInactive') === 'true';
+    const forceFresh = searchParams.get('fresh') === 'true';
 
     const where: any = {};
     if (!includeInactive) {
       where.status = { not: 'Inactive' };
     }
 
+    // RBAC: Non-Super Admin can ONLY view their assigned store(s)
+    if (user.role !== 'Super Admin') {
+      const allowed = user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
+      where.code = { in: allowed };
+    } else if (!includeInactive && !forceFresh && cachedStoresPayload && Date.now() - lastStoresCacheTime < STORES_CACHE_TTL) {
+      return NextResponse.json(cachedStoresPayload, {
+        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
+      });
+    }
+
     const stores = await prisma.storeHub.findMany({
       where,
       orderBy: {
-        code: 'asc',
+        createdAt: 'desc',
       },
     });
 
-    return NextResponse.json(
-      { success: true, stores },
-      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
-    );
+    const payload = { success: true, stores };
+
+    if (user.role === 'Super Admin' && !includeInactive) {
+      cachedStoresPayload = payload;
+      lastStoresCacheTime = Date.now();
+    }
+
+    return NextResponse.json(payload, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    });
   } catch (error: any) {
     console.error('API /api/stores GET error:', error);
     return NextResponse.json({ error: 'Failed to retrieve store hubs' }, { status: 500 });
@@ -71,32 +98,64 @@ export async function POST(req: NextRequest) {
     // Protect CENTRAL status: must always remain Active
     const storeStatus = upperCode === 'CENTRAL' ? 'Active' : (body.status || 'Active');
 
-    const store = await prisma.storeHub.upsert({
-      where: { code: upperCode },
-      create: {
-        code: upperCode,
-        name: upperCode === 'CENTRAL' ? (body.name || 'COSKO Central Warehouse & Owner Stock') : body.name,
-        city: body.city,
-        address: body.address || 'COSKO Retail Hub',
-        managerName: body.managerName || null,
-        phone: body.phone || null,
-        registersCount: body.registersCount || (upperCode === 'CENTRAL' ? 0 : 2),
-        status: storeStatus,
-      },
-      update: {
-        name: body.name,
-        city: body.city,
-        address: body.address || undefined,
-        managerName: body.managerName || undefined,
-        phone: body.phone || undefined,
-        registersCount: body.registersCount || undefined,
-        status: upperCode === 'CENTRAL' ? 'Active' : (body.status || undefined),
-      },
-    });
+    const customKey =
+      body.idempotencyKey ||
+      req.headers.get('x-idempotency-key') ||
+      `store_${upperCode}_${Date.now()}`;
 
-    broadcastRealtimeEvent('stores', 'STORE_UPDATED', { code: store.code, name: store.name, action: 'saved' });
+    return await executeWithIdempotency(
+      req,
+      {
+        action: 'UPSERT_STORE',
+        key: customKey,
+        userId: user.id,
+        storeCode: upperCode,
+        extractEntityId: (d) => d?.store?.id || d?.store?.code,
+      },
+      async () => {
+        const ownerVal = body.ownerName !== undefined ? body.ownerName : (body.owner !== undefined ? body.owner : (body.managerName !== undefined ? body.managerName : body.manager));
 
-    return NextResponse.json({ success: true, store }, { status: 201 });
+        const store = await prisma.storeHub.upsert({
+          where: { code: upperCode },
+          create: {
+            code: upperCode,
+            name: upperCode === 'CENTRAL' ? (body.name || 'COSKO Central Warehouse & Owner Stock') : body.name,
+            city: body.city,
+            address: body.address || 'COSKO Retail Hub',
+            ownerName: ownerVal || null,
+            managerName: ownerVal || null,
+            phone: body.phone || null,
+            registersCount: body.registersCount !== undefined && body.registersCount !== null && body.registersCount !== ''
+              ? Number(body.registersCount)
+              : 0,
+            status: storeStatus,
+          },
+          update: {
+            name: body.name,
+            city: body.city,
+            address: body.address || undefined,
+            ownerName: ownerVal !== undefined ? (ownerVal || null) : undefined,
+            managerName: ownerVal !== undefined ? (ownerVal || null) : undefined,
+            phone: body.phone || undefined,
+            registersCount: body.registersCount !== undefined && body.registersCount !== null && body.registersCount !== ''
+              ? Number(body.registersCount)
+              : undefined,
+            skusCount: body.skusCount !== undefined && body.skusCount !== null && body.skusCount !== ''
+              ? Number(body.skusCount)
+              : undefined,
+            monthlyRevenue: body.monthlyRevenue !== undefined && body.monthlyRevenue !== null && body.monthlyRevenue !== ''
+              ? Number(body.monthlyRevenue)
+              : undefined,
+            status: upperCode === 'CENTRAL' ? 'Active' : (body.status || undefined),
+          },
+        });
+
+        invalidateStoresCache();
+        broadcastRealtimeEvent('stores', 'STORE_UPDATED', { code: store.code, name: store.name, action: 'saved' });
+
+        return { status: 201, data: { success: true, store } };
+      }
+    );
   } catch (error: any) {
     console.error('API /api/stores POST error:', error);
     return NextResponse.json({ error: error.message || 'Failed to save store hub' }, { status: 500 });
@@ -174,6 +233,7 @@ export async function DELETE(req: NextRequest) {
         data: { status: 'Inactive' },
       });
 
+      invalidateStoresCache();
       broadcastRealtimeEvent('stores', 'STORE_UPDATED', { code: target.code, name: target.name, action: 'deactivated' });
 
       return NextResponse.json({
@@ -191,6 +251,7 @@ export async function DELETE(req: NextRequest) {
     await prisma.userStoreAssignment.deleteMany({ where: { storeCode: target.code } });
     await prisma.storeHub.delete({ where: { id: target.id } });
 
+    invalidateStoresCache();
     broadcastRealtimeEvent('stores', 'STORE_UPDATED', { code: target.code, name: target.name, action: 'deleted' });
 
     return NextResponse.json({

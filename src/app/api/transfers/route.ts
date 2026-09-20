@@ -3,6 +3,8 @@ import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { executeStockTransfer, CreateTransferInput } from '@/lib/services/transferService';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { validateTransferHeader, validateTransferItem } from '@/lib/stockTransferCalculations';
+import { executeWithIdempotency } from '@/lib/idempotency';
 
 /**
  * GET /api/transfers - Retrieve stock transfers with store isolation
@@ -21,10 +23,30 @@ export async function GET(req: NextRequest) {
     const where: any = {};
 
     if (user.role !== 'Super Admin') {
-      where.OR = [
-        { sourceStore: user.store },
-        { destStore: user.store },
-      ];
+      const allowed = user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
+      if (store === 'All Stores' || store === 'ALL') {
+        return NextResponse.json(
+          { error: 'Forbidden: Consolidated view across all stores is restricted to Super Admin only' },
+          { status: 403 }
+        );
+      }
+      if (store && !allowed.includes(store)) {
+        return NextResponse.json(
+          { error: 'Forbidden: You do not have permission to view transfers for another store' },
+          { status: 403 }
+        );
+      }
+      if (store) {
+        where.OR = [
+          { sourceStore: store },
+          { destStore: store },
+        ];
+      } else {
+        where.OR = [
+          { sourceStore: { in: allowed } },
+          { destStore: { in: allowed } },
+        ];
+      }
     } else if (store && store !== 'All Stores' && store !== 'ALL') {
       where.OR = [
         { sourceStore: store },
@@ -83,24 +105,25 @@ export async function POST(req: NextRequest) {
 
     const body: CreateTransferInput = await req.json();
 
-    if (!body.sourceStore || !body.destStore) {
-      return NextResponse.json({ error: 'Source store and destination store are required' }, { status: 400 });
+    const headerValidation = validateTransferHeader({
+      sourceStore: body.sourceStore,
+      destStore: body.destStore,
+      itemsCount: body.items ? body.items.length : 0,
+    });
+    if (!headerValidation.isValid) {
+      return NextResponse.json({ error: headerValidation.error }, { status: 400 });
     }
 
-    if (
-      body.sourceStore === 'All Stores' ||
-      body.sourceStore === 'ALL' ||
-      body.destStore === 'All Stores' ||
-      body.destStore === 'ALL'
-    ) {
-      return NextResponse.json(
-        { error: '"All Stores" is a reporting scope only, not an inventory-owning physical store. Transfers must be between physical locations (e.g. CENTRAL, BLR, MUM).' },
-        { status: 400 }
-      );
-    }
-
-    if (!body.items || body.items.length === 0) {
-      return NextResponse.json({ error: 'Transfer items cannot be empty' }, { status: 400 });
+    for (const item of body.items) {
+      const itemValidation = validateTransferItem({
+        productId: item.productId,
+        qty: item.qty,
+        costPerUnit: item.costPerUnit,
+        transferPricePerUnit: item.transferPricePerUnit,
+      });
+      if (!itemValidation.isValid) {
+        return NextResponse.json({ error: itemValidation.error }, { status: 400 });
+      }
     }
 
     // Store isolation check for Store Managers
@@ -113,12 +136,29 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const transfer = await executeStockTransfer({
-      ...body,
-      requestedBy: user.name,
-    });
+    const customKey =
+      (body as any).idempotencyKey ||
+      req.headers.get('x-idempotency-key') ||
+      `transfer_${body.sourceStore}_${body.destStore}_${Date.now()}`;
 
-    return NextResponse.json({ success: true, transfer }, { status: 201 });
+    return await executeWithIdempotency(
+      req,
+      {
+        action: 'STOCK_TRANSFER',
+        key: customKey,
+        userId: user.id,
+        storeCode: body.sourceStore,
+        extractEntityId: (d) => d?.transfer?.id || d?.transfer?.transferNo,
+      },
+      async () => {
+        const transfer = await executeStockTransfer({
+          ...body,
+          requestedBy: user.name,
+        });
+
+        return { status: 201, data: { success: true, transfer } };
+      }
+    );
   } catch (error: any) {
     console.error('API /api/transfers POST error:', error);
     const msg = error?.message || '';
@@ -167,63 +207,73 @@ export async function PUT(req: NextRequest) {
     const updatedTransfer = await prisma.$transaction(async (tx: any) => {
       if (isCancelling && existing.items && existing.items.length > 0) {
         // Reverse inventory: Return to sourceStore, Deduct from destStore
+        const productIds = existing.items.map((it: any) => it.productId);
+        const [sourceInventories, destInventories] = await Promise.all([
+          tx.inventory.findMany({
+            where: { storeCode: existing.sourceStore, productId: { in: productIds } },
+          }),
+          tx.inventory.findMany({
+            where: { storeCode: existing.destStore, productId: { in: productIds } },
+          }),
+        ]);
+        const srcInvMap = new Map<string, any>(sourceInventories.map((i: any) => [i.productId, i]));
+        const dstInvMap = new Map<string, any>(destInventories.map((i: any) => [i.productId, i]));
+
+        const inventoryOps: Promise<any>[] = [];
+        const ledgerEntries: any[] = [];
+
         for (const it of existing.items) {
-          // 1. Return to sourceStore
-          const srcInv = await tx.inventory.findUnique({
-            where: { productId_storeCode: { productId: it.productId, storeCode: existing.sourceStore } },
-          });
-          const srcPrevQty = srcInv ? srcInv.qtyOnHand : 0;
+          const srcPrevQty = srcInvMap.get(it.productId)?.qtyOnHand || 0;
           const srcNewQty = srcPrevQty + it.qty;
 
-          await tx.inventory.upsert({
-            where: { productId_storeCode: { productId: it.productId, storeCode: existing.sourceStore } },
-            create: { productId: it.productId, storeCode: existing.sourceStore, qtyOnHand: srcNewQty, reorderPt: 5 },
-            update: { qtyOnHand: srcNewQty },
+          inventoryOps.push(
+            tx.inventory.upsert({
+              where: { productId_storeCode: { productId: it.productId, storeCode: existing.sourceStore } },
+              create: { productId: it.productId, storeCode: existing.sourceStore, qtyOnHand: srcNewQty, reorderPt: 5 },
+              update: { qtyOnHand: { increment: it.qty } },
+            })
+          );
+
+          ledgerEntries.push({
+            productId: it.productId,
+            storeCode: existing.sourceStore,
+            refNo: existing.transferNo,
+            type: 'TRANSFER_CANCEL_RETURN',
+            qtyChange: it.qty,
+            costPerUnit: it.costPerUnit,
+            sellingPricePerUnit: it.transferPricePerUnit,
+            balanceAfter: srcNewQty,
+            notes: `Transfer ${existing.transferNo} cancelled. Restocked to ${existing.sourceStore}`,
+            createdBy: user.name,
           });
 
-          await tx.inventoryLedger.create({
-            data: {
-              productId: it.productId,
-              storeCode: existing.sourceStore,
-              refNo: existing.transferNo,
-              type: 'TRANSFER_CANCEL_RETURN',
-              qtyChange: it.qty,
-              costPerUnit: it.costPerUnit,
-              sellingPricePerUnit: it.transferPricePerUnit,
-              balanceAfter: srcNewQty,
-              notes: `Transfer ${existing.transferNo} cancelled. Restocked to ${existing.sourceStore}`,
-              createdBy: user.name,
-            },
-          });
-
-          // 2. Deduct from destStore
-          const dstInv = await tx.inventory.findUnique({
-            where: { productId_storeCode: { productId: it.productId, storeCode: existing.destStore } },
-          });
-          const dstPrevQty = dstInv ? dstInv.qtyOnHand : 0;
+          const dstPrevQty = dstInvMap.get(it.productId)?.qtyOnHand || 0;
           const dstNewQty = Math.max(0, dstPrevQty - it.qty);
 
-          await tx.inventory.upsert({
-            where: { productId_storeCode: { productId: it.productId, storeCode: existing.destStore } },
-            create: { productId: it.productId, storeCode: existing.destStore, qtyOnHand: dstNewQty, reorderPt: 5 },
-            update: { qtyOnHand: dstNewQty },
-          });
+          inventoryOps.push(
+            tx.inventory.upsert({
+              where: { productId_storeCode: { productId: it.productId, storeCode: existing.destStore } },
+              create: { productId: it.productId, storeCode: existing.destStore, qtyOnHand: dstNewQty, reorderPt: 5 },
+              update: { qtyOnHand: dstNewQty },
+            })
+          );
 
-          await tx.inventoryLedger.create({
-            data: {
-              productId: it.productId,
-              storeCode: existing.destStore,
-              refNo: existing.transferNo,
-              type: 'TRANSFER_CANCEL_REVERSAL',
-              qtyChange: -it.qty,
-              costPerUnit: it.costPerUnit,
-              sellingPricePerUnit: it.transferPricePerUnit,
-              balanceAfter: dstNewQty,
-              notes: `Transfer ${existing.transferNo} cancelled. Reversed from ${existing.destStore}`,
-              createdBy: user.name,
-            },
+          ledgerEntries.push({
+            productId: it.productId,
+            storeCode: existing.destStore,
+            refNo: existing.transferNo,
+            type: 'TRANSFER_CANCEL_REVERSAL',
+            qtyChange: -it.qty,
+            costPerUnit: it.costPerUnit,
+            sellingPricePerUnit: it.transferPricePerUnit,
+            balanceAfter: dstNewQty,
+            notes: `Transfer ${existing.transferNo} cancelled. Reversed from ${existing.destStore}`,
+            createdBy: user.name,
           });
         }
+
+        await Promise.all(inventoryOps);
+        await tx.inventoryLedger.createMany({ data: ledgerEntries });
 
         await tx.auditLog.create({
           data: {
@@ -246,7 +296,7 @@ export async function PUT(req: NextRequest) {
       });
 
       return updated;
-    });
+    }, { maxWait: 15000, timeout: 45000 });
 
     broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', { transferNo: existing.transferNo, action: 'status_updated' });
     if (isCancelling) {
@@ -299,61 +349,73 @@ export async function DELETE(req: NextRequest) {
     // Safe cancel and reverse inventory
     const cancelled = await prisma.$transaction(async (tx: any) => {
       if ((existing.status === 'Received' || existing.status === 'Completed' || existing.status === 'In Transit') && existing.items && existing.items.length > 0) {
+        const productIds = existing.items.map((it: any) => it.productId);
+        const [sourceInventories, destInventories] = await Promise.all([
+          tx.inventory.findMany({
+            where: { storeCode: existing.sourceStore, productId: { in: productIds } },
+          }),
+          tx.inventory.findMany({
+            where: { storeCode: existing.destStore, productId: { in: productIds } },
+          }),
+        ]);
+        const srcInvMap = new Map<string, any>(sourceInventories.map((i: any) => [i.productId, i]));
+        const dstInvMap = new Map<string, any>(destInventories.map((i: any) => [i.productId, i]));
+
+        const inventoryOps: Promise<any>[] = [];
+        const ledgerEntries: any[] = [];
+
         for (const it of existing.items) {
-          const srcInv = await tx.inventory.findUnique({
-            where: { productId_storeCode: { productId: it.productId, storeCode: existing.sourceStore } },
-          });
-          const srcPrevQty = srcInv ? srcInv.qtyOnHand : 0;
+          const srcPrevQty = srcInvMap.get(it.productId)?.qtyOnHand || 0;
           const srcNewQty = srcPrevQty + it.qty;
 
-          await tx.inventory.upsert({
-            where: { productId_storeCode: { productId: it.productId, storeCode: existing.sourceStore } },
-            create: { productId: it.productId, storeCode: existing.sourceStore, qtyOnHand: srcNewQty, reorderPt: 5 },
-            update: { qtyOnHand: srcNewQty },
+          inventoryOps.push(
+            tx.inventory.upsert({
+              where: { productId_storeCode: { productId: it.productId, storeCode: existing.sourceStore } },
+              create: { productId: it.productId, storeCode: existing.sourceStore, qtyOnHand: srcNewQty, reorderPt: 5 },
+              update: { qtyOnHand: { increment: it.qty } },
+            })
+          );
+
+          ledgerEntries.push({
+            productId: it.productId,
+            storeCode: existing.sourceStore,
+            refNo: existing.transferNo,
+            type: 'TRANSFER_CANCEL_RETURN',
+            qtyChange: it.qty,
+            costPerUnit: it.costPerUnit,
+            sellingPricePerUnit: it.transferPricePerUnit,
+            balanceAfter: srcNewQty,
+            notes: `Transfer ${existing.transferNo} cancelled. Restocked to ${existing.sourceStore}`,
+            createdBy: user.name,
           });
 
-          await tx.inventoryLedger.create({
-            data: {
-              productId: it.productId,
-              storeCode: existing.sourceStore,
-              refNo: existing.transferNo,
-              type: 'TRANSFER_CANCEL_RETURN',
-              qtyChange: it.qty,
-              costPerUnit: it.costPerUnit,
-              sellingPricePerUnit: it.transferPricePerUnit,
-              balanceAfter: srcNewQty,
-              notes: `Transfer ${existing.transferNo} cancelled. Restocked to ${existing.sourceStore}`,
-              createdBy: user.name,
-            },
-          });
-
-          const dstInv = await tx.inventory.findUnique({
-            where: { productId_storeCode: { productId: it.productId, storeCode: existing.destStore } },
-          });
-          const dstPrevQty = dstInv ? dstInv.qtyOnHand : 0;
+          const dstPrevQty = dstInvMap.get(it.productId)?.qtyOnHand || 0;
           const dstNewQty = Math.max(0, dstPrevQty - it.qty);
 
-          await tx.inventory.upsert({
-            where: { productId_storeCode: { productId: it.productId, storeCode: existing.destStore } },
-            create: { productId: it.productId, storeCode: existing.destStore, qtyOnHand: dstNewQty, reorderPt: 5 },
-            update: { qtyOnHand: dstNewQty },
-          });
+          inventoryOps.push(
+            tx.inventory.upsert({
+              where: { productId_storeCode: { productId: it.productId, storeCode: existing.destStore } },
+              create: { productId: it.productId, storeCode: existing.destStore, qtyOnHand: dstNewQty, reorderPt: 5 },
+              update: { qtyOnHand: dstNewQty },
+            })
+          );
 
-          await tx.inventoryLedger.create({
-            data: {
-              productId: it.productId,
-              storeCode: existing.destStore,
-              refNo: existing.transferNo,
-              type: 'TRANSFER_CANCEL_REVERSAL',
-              qtyChange: -it.qty,
-              costPerUnit: it.costPerUnit,
-              sellingPricePerUnit: it.transferPricePerUnit,
-              balanceAfter: dstNewQty,
-              notes: `Transfer ${existing.transferNo} cancelled. Reversed from ${existing.destStore}`,
-              createdBy: user.name,
-            },
+          ledgerEntries.push({
+            productId: it.productId,
+            storeCode: existing.destStore,
+            refNo: existing.transferNo,
+            type: 'TRANSFER_CANCEL_REVERSAL',
+            qtyChange: -it.qty,
+            costPerUnit: it.costPerUnit,
+            sellingPricePerUnit: it.transferPricePerUnit,
+            balanceAfter: dstNewQty,
+            notes: `Transfer ${existing.transferNo} cancelled. Reversed from ${existing.destStore}`,
+            createdBy: user.name,
           });
         }
+
+        await Promise.all(inventoryOps);
+        await tx.inventoryLedger.createMany({ data: ledgerEntries });
       }
 
       const updated = await tx.stockTransfer.update({
@@ -373,7 +435,7 @@ export async function DELETE(req: NextRequest) {
       });
 
       return updated;
-    });
+    }, { maxWait: 15000, timeout: 45000 });
 
     broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', { transferNo: existing.transferNo, action: 'cancelled' });
     broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.sourceStore });

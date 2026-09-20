@@ -22,13 +22,23 @@ export async function GET(req: NextRequest) {
       whereClause.status = { notIn: ['Inactive', 'Suspended'] };
     }
 
+    if (user.role !== 'Super Admin') {
+      const userAllowed = user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
+      whereClause.OR = [
+        { storeScope: { in: userAllowed } },
+        { storeAssignments: { some: { storeCode: { in: userAllowed } } } },
+      ];
+      whereClause.role = { not: 'Super Admin' };
+    }
+
     const users = await prisma.userAccount.findMany({
       where: whereClause,
       include: {
         storeAssignments: true,
+        permissionOverrides: true,
       },
       orderBy: {
-        name: 'asc',
+        createdAt: 'desc',
       },
     });
 
@@ -38,9 +48,16 @@ export async function GET(req: NextRequest) {
       email: u.email,
       role: u.role,
       securityLevel: u.securityLevel,
-      store: u.storeAssignments?.[0]?.storeCode || (u.role === 'Super Admin' ? 'All Stores' : 'CENTRAL'),
+      store: u.storeScope || u.storeAssignments?.[0]?.storeCode || (u.role === 'Super Admin' ? 'All Stores' : 'CENTRAL'),
       status: u.status,
-      assignedStores: u.storeAssignments.map((a: any) => a.storeCode),
+      shiftStatus: u.shiftStatus || 'On Shift',
+      assignedStores: u.storeAssignments?.map((a: any) => a.storeCode) || [],
+      allowedStores: u.storeAssignments?.map((a: any) => a.storeCode) || [u.storeScope || 'CENTRAL'],
+      overrides: u.permissionOverrides?.map((o: any) => ({
+        permissionCode: o.permissionCode,
+        overrideType: o.overrideType,
+      })) || [],
+      avatarUrl: u.avatarUrl,
       createdAt: u.createdAt,
       lastLoginAt: u.lastLoginAt,
     }));
@@ -76,8 +93,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Password is required to provision a new account' }, { status: 400 });
     }
 
+    // 🔒 STRICT SUPER ADMIN SINGLETON: No user can create another Super Admin
+    if (role === 'Super Admin' || Number(securityLevel) === 100) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: System enforces exactly ONE protected Super Admin. Creating additional Super Admin accounts is prohibited.' },
+        { status: 403 }
+      );
+    }
+
     const cleanEmail = email.toLowerCase().trim();
-    const level = securityLevel || (role === 'Super Admin' ? 100 : role === 'Store Manager' ? 80 : role === 'Inventory Auditor' ? 60 : role === 'Sales Executive' ? 40 : 20);
+    const level = securityLevel || (role === 'Store Manager' ? 80 : role === 'Inventory Auditor' ? 60 : role === 'Sales Executive' ? 40 : 20);
 
     const existing = await prisma.userAccount.findUnique({
       where: { email: cleanEmail },
@@ -87,8 +112,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'User with this email already exists' }, { status: 400 });
     }
 
+    // Assigned stores resolution (single source of truth)
+    const rawStores: string[] = Array.isArray(body.assignedStores) && body.assignedStores.length > 0
+      ? body.assignedStores
+      : Array.isArray(body.allowedStores) && body.allowedStores.length > 0
+      ? body.allowedStores
+      : [store || 'BLR'];
+
+    const validHubs = await prisma.storeHub.findMany({ select: { code: true } });
+    const validCodes = new Set(validHubs.map((s) => s.code));
+    const targetAssignedStores = rawStores.filter((c: string) => validCodes.has(c));
+
+    if (targetAssignedStores.length === 0) {
+      return NextResponse.json({ success: false, error: 'User must be assigned to at least one valid store' }, { status: 400 });
+    }
+
+    // Non-Super-Admin callers can only assign stores they have access to
+    if (authUser.role !== 'Super Admin') {
+      const callerAllowed = authUser.allowedStores && authUser.allowedStores.length > 0 ? authUser.allowedStores : [authUser.store];
+      const hasInvalidAssignment = targetAssignedStores.some((s) => !callerAllowed.includes(s));
+      if (hasInvalidAssignment) {
+        return NextResponse.json({ success: false, error: 'Forbidden: You can only assign users to stores you are authorized for' }, { status: 403 });
+      }
+    }
+
     const hashedPassword = await hashPassword(password);
-    const storeCode = (store && store !== 'All Stores' && store !== 'ALL') ? store : 'CENTRAL';
+    const primaryStore = targetAssignedStores[0];
 
     const newUser = await prisma.$transaction(async (tx) => {
       const user = await (tx.userAccount as any).create({
@@ -99,19 +148,21 @@ export async function POST(req: NextRequest) {
           phone: phone || null,
           role: role || 'Store Manager',
           securityLevel: level,
-          storeScope: storeCode,
+          storeScope: primaryStore,
           status: status || 'Active',
           shiftStatus: 'On Shift',
           mustChangePassword: true,
         } as any,
       });
 
-      await tx.userStoreAssignment.create({
-        data: {
-          userId: user.id,
-          storeCode: storeCode,
-        },
-      });
+      for (const sCode of targetAssignedStores) {
+        await tx.userStoreAssignment.create({
+          data: {
+            userId: user.id,
+            storeCode: sCode,
+          },
+        });
+      }
 
       return user;
     });
@@ -124,13 +175,14 @@ export async function POST(req: NextRequest) {
       securityLevel: newUser.securityLevel,
       store: newUser.storeScope,
       status: newUser.status,
-      assignedStores: [storeCode],
+      assignedStores: targetAssignedStores,
+      allowedStores: targetAssignedStores,
       createdAt: newUser.createdAt,
       shiftStatus: newUser.shiftStatus,
       mustChangePassword: true,
     };
 
-    broadcastRealtimeEvent('users', 'USER_CREATED', { userId: newUser.id, email: newUser.email, store: storeCode });
+    broadcastRealtimeEvent('users', 'USER_CREATED', { userId: newUser.id, email: newUser.email, stores: targetAssignedStores });
 
     return NextResponse.json({
       success: true,
@@ -155,35 +207,123 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, email, name, role, store, status, securityLevel, password, shiftStatus } = body;
+    const {
+      id,
+      email,
+      name,
+      role,
+      store,
+      status,
+      securityLevel,
+      password,
+      shiftStatus,
+      allowedStores,
+      assignedStores,
+      overrides,
+    } = body;
 
-    if (!id && !email) {
-      return NextResponse.json({ success: false, error: 'User ID or Email is required' }, { status: 400 });
+    const targetUser = await prisma.userAccount.findFirst({
+      where: id ? { id } : { email: email.toLowerCase().trim() },
+    });
+
+    if (!targetUser) {
+      return NextResponse.json({ success: false, error: 'User account not found' }, { status: 404 });
+    }
+
+    // 🔒 STRICT SUPER ADMIN SINGLETON: Cannot promote any user to Super Admin
+    if (targetUser.role !== 'Super Admin' && (role === 'Super Admin' || Number(securityLevel) === 100)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Forbidden: System enforces exactly ONE protected Super Admin. Promoting accounts to Super Admin is prohibited.',
+      }, { status: 403 });
+    }
+
+    if (authUser.role !== 'Super Admin') {
+      if (targetUser.role === 'Super Admin') {
+        return NextResponse.json({ success: false, error: 'Forbidden: Only Super Admin can modify Super Admin accounts' }, { status: 403 });
+      }
+      const callerAllowed = authUser.allowedStores && authUser.allowedStores.length > 0 ? authUser.allowedStores : [authUser.store];
+      if (targetUser.storeScope && !callerAllowed.includes(targetUser.storeScope)) {
+        return NextResponse.json({ success: false, error: 'Forbidden: You cannot modify users outside your assigned stores' }, { status: 403 });
+      }
     }
 
     const updateData: any = {};
     if (name) updateData.name = name.trim();
-    if (role) updateData.role = role;
-    if (store) updateData.storeScope = store;
+    if (role && targetUser.role !== 'Super Admin') updateData.role = role;
     if (status) updateData.status = status;
-    if (securityLevel !== undefined) updateData.securityLevel = Number(securityLevel);
+    if (securityLevel !== undefined && targetUser.role !== 'Super Admin') updateData.securityLevel = Number(securityLevel);
     if (shiftStatus) updateData.shiftStatus = shiftStatus;
+
+    // 🔒 Protected Super Admin preserves role and All Stores scope unconditionally
+    if (targetUser.role === 'Super Admin') {
+      updateData.role = 'Super Admin';
+      updateData.securityLevel = 100;
+      updateData.storeScope = 'All Stores';
+    }
 
     if (password) {
       updateData.passwordHash = await hashPassword(password);
     }
 
-    const updatedUser = id
-      ? await prisma.userAccount.update({ where: { id }, data: updateData })
-      : await prisma.userAccount.update({ where: { email: email.toLowerCase().trim() }, data: updateData });
+    const isSuperAdmin = targetUser.role === 'Super Admin';
 
-    if (store && updatedUser.id) {
-      await prisma.userStoreAssignment.upsert({
-        where: { userId_storeCode: { userId: updatedUser.id, storeCode: store } },
-        create: { userId: updatedUser.id, storeCode: store },
-        update: {},
-      });
+    // Resolve assigned stores
+    const rawStoresToSync: string[] | null = Array.isArray(assignedStores)
+      ? assignedStores
+      : Array.isArray(allowedStores)
+      ? allowedStores
+      : store
+      ? [store]
+      : null;
+
+    let targetStores: string[] | null = null;
+    if (rawStoresToSync && !isSuperAdmin) {
+      const validHubs = await prisma.storeHub.findMany({ select: { code: true } });
+      const validCodes = new Set(validHubs.map((s) => s.code));
+      targetStores = rawStoresToSync.filter((c: string) => validCodes.has(c));
+      if (targetStores.length > 0) {
+        updateData.storeScope = targetStores[0];
+      }
     }
+
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const user = id
+        ? await tx.userAccount.update({ where: { id }, data: updateData })
+        : await tx.userAccount.update({ where: { email: email.toLowerCase().trim() }, data: updateData });
+
+      if (targetStores && targetStores.length > 0 && !isSuperAdmin) {
+        await tx.userStoreAssignment.deleteMany({
+          where: { userId: user.id, storeCode: { notIn: targetStores } },
+        });
+        for (const sCode of targetStores) {
+          await tx.userStoreAssignment.upsert({
+            where: { userId_storeCode: { userId: user.id, storeCode: sCode } },
+            create: { userId: user.id, storeCode: sCode },
+            update: {},
+          });
+        }
+      }
+
+      if (Array.isArray(overrides) && !isSuperAdmin) {
+        await tx.userPermissionOverride.deleteMany({
+          where: { userId: user.id },
+        });
+        for (const ov of overrides) {
+          if (ov.permissionCode && (ov.overrideType === 'ALLOW' || ov.overrideType === 'DENY')) {
+            await tx.userPermissionOverride.create({
+              data: {
+                userId: user.id,
+                permissionCode: ov.permissionCode,
+                overrideType: ov.overrideType,
+              },
+            });
+          }
+        }
+      }
+
+      return user;
+    });
 
     broadcastRealtimeEvent('users', 'USER_UPDATED', { userId: updatedUser.id, email: updatedUser.email, action: 'updated' });
 
@@ -233,6 +373,14 @@ export async function DELETE(req: NextRequest) {
 
     if (!target) {
       return NextResponse.json({ success: true, message: 'User already removed or non-existent' });
+    }
+
+    // 🔒 STRICT SUPER ADMIN SINGLETON: Protected account cannot be deleted or deactivated
+    if (target.role === 'Super Admin') {
+      return NextResponse.json({
+        success: false,
+        error: 'Forbidden: The protected Super Admin root account cannot be deleted or deactivated.',
+      }, { status: 403 });
     }
 
     if (target.email === session.email) {

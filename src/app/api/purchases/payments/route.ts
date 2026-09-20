@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { generateDateSequenceNo } from '@/lib/sequenceUtils';
 
 /**
  * Helper to compute overdue days and status
@@ -200,8 +201,10 @@ export async function GET(req: NextRequest) {
   }
 }
 
+import { executeWithIdempotency } from '@/lib/idempotency';
+
 /**
- * POST /api/purchases/payments - Record a payment against a purchase order atomically
+ * POST /api/purchases/payments - Record a payment against a purchase order atomically with idempotency
  */
 export async function POST(req: NextRequest) {
   try {
@@ -221,11 +224,56 @@ export async function POST(req: NextRequest) {
     }
 
     const paymentAmount = Math.round(Number(body.amount) * 100) / 100;
-    if (isNaN(paymentAmount) || paymentAmount <= 0) {
-      return NextResponse.json({ error: 'Payment amount must be a positive number' }, { status: 400 });
+    if (isNaN(paymentAmount) || paymentAmount <= 0.005) {
+      return NextResponse.json({ error: 'Payment amount must be a positive number greater than ₹0' }, { status: 400 });
     }
 
-    const result = await prisma.$transaction(async (tx: any) => {
+    // MANDATORY PROOF & UTR VALIDATION (ROOT FIX)
+    const proofUrl = body.receiptUrl || body.proofUrl;
+    if (!proofUrl || !String(proofUrl).trim()) {
+      return NextResponse.json(
+        { error: 'Payment proof is mandatory! Please upload a receipt/screenshot before recording payment.' },
+        { status: 400 }
+      );
+    }
+
+    const cleanRef = body.referenceNo ? String(body.referenceNo).trim() : '';
+    if (!cleanRef) {
+      return NextResponse.json(
+        { error: 'Payment Reference / UTR / Cheque number is mandatory.' },
+        { status: 400 }
+      );
+    }
+
+    const paymentDate = body.paymentDate ? new Date(body.paymentDate) : new Date();
+    const paymentMethod = body.paymentMethod ? String(body.paymentMethod).trim() : 'Bank Transfer';
+
+    const pmRecord = await prisma.paymentMethod.findFirst({
+      where: { name: paymentMethod },
+    });
+    if (pmRecord && pmRecord.status === 'Inactive') {
+      return NextResponse.json(
+        { error: `Payment method "${paymentMethod}" is currently deactivated. Please select an active payment method.` },
+        { status: 400 }
+      );
+    }
+
+    const customKey =
+      body.idempotencyKey ||
+      req.headers.get('x-idempotency-key') ||
+      `pay_${body.purchaseId}_${cleanRef}_${paymentAmount}`;
+
+    return await executeWithIdempotency(
+      req,
+      {
+        action: 'RECORD_SUPPLIER_PAYMENT',
+        key: customKey,
+        userId: user.id,
+        extractEntityId: (d) => d?.receiptVoucher?.voucherNo,
+      },
+      async () => {
+        const result = await prisma.$transaction(async (tx: any) => {
+
       // 1. Lock & fetch PO with payments directly from DB
       const po = await tx.purchaseOrder.findUnique({
         where: { id: body.purchaseId },
@@ -247,7 +295,7 @@ export async function POST(req: NextRequest) {
       const totalCost = Number(po.totalCost) || 0;
       const creditAmount = Number(po.creditAmount) || 0;
       const currentPaid = po.payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-      const remainingBeforePayment = Math.max(0, totalCost - currentPaid - creditAmount);
+      const remainingBeforePayment = Math.max(0, Math.round((totalCost - currentPaid - creditAmount) * 100) / 100);
 
       // 3. Prevent overpayment & negative balance
       if (remainingBeforePayment <= 0.005) {
@@ -260,80 +308,85 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 4. Prevent accidental duplicate payment (same PO, same amount, same ref within 60 seconds)
-      if (body.referenceNo && String(body.referenceNo).trim()) {
-        const cleanRef = String(body.referenceNo).trim();
-        const recentDuplicate = await tx.purchasePayment.findFirst({
-          where: {
-            purchaseId: body.purchaseId,
-            referenceNo: cleanRef,
-            amount: paymentAmount,
-            createdAt: { gte: new Date(Date.now() - 60000) },
-          },
-        });
-        if (recentDuplicate) {
-          throw new Error(`A payment with reference "${cleanRef}" of ₹${paymentAmount} was already recorded within the last minute.`);
-        }
+      // 4. Prevent accidental duplicate payment
+      const recentDuplicate = await tx.purchasePayment.findFirst({
+        where: {
+          purchaseId: body.purchaseId,
+          referenceNo: cleanRef,
+          amount: paymentAmount,
+          createdAt: { gte: new Date(Date.now() - 60000) },
+        },
+      });
+      if (recentDuplicate) {
+        throw new Error(`A payment with reference "${cleanRef}" of ₹${paymentAmount} was already recorded within the last minute.`);
       }
 
-      // 5. Generate Payment Voucher Number
-      const payCount = await tx.purchasePayment.count();
-      const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const voucherNo = `PV-${datePart}-${String(payCount + 1).padStart(4, '0')}`;
+      // 5. Generate Collision-Proof Payment Voucher Number
+      const voucherNo = await generateDateSequenceNo('purchasePayment', 'voucherNo', 'PV', paymentDate, 4, tx);
 
-      // 6. Record payment
-      const paymentDate = body.paymentDate ? new Date(body.paymentDate) : new Date();
+      // 6. Record payment with mandatory proof and reference
       const payment = await tx.purchasePayment.create({
         data: {
           purchaseId: body.purchaseId,
           voucherNo,
           amount: paymentAmount,
           paymentDate,
-          paymentMethod: body.paymentMethod || 'Bank Transfer',
-          referenceNo: body.referenceNo ? String(body.referenceNo).trim() : null,
-          receiptUrl: body.receiptUrl || null,
+          paymentMethod,
+          referenceNo: cleanRef,
+          receiptUrl: proofUrl,
           notes: body.notes ? String(body.notes).trim() : null,
           recordedBy: user.name || user.email || 'Authorized Staff',
         },
       });
 
-      // Record Double-Entry Financial Ledger Entries for Payment
-      await tx.financialLedgerEntry.create({
-        data: {
-          entryNo: `JRN-PAY-AP-${voucherNo}`,
-          entryDate: paymentDate,
-          storeCode: po.storeCode || 'CENTRAL',
-          accountCategory: 'LIABILITY',
-          accountName: 'Vendor Accounts Payable (Settlement)',
-          debit: paymentAmount,
-          credit: 0,
-          amount: -paymentAmount,
-          refType: 'VENDOR_PAYMENT',
-          refId: payment.id,
-          refNo: voucherNo,
-          entityName: po.vendor?.name || 'Vendor',
-          description: `Vendor bill payment for Bill #${po.invoiceNo || po.poNo} via ${body.paymentMethod || 'Bank Transfer'}`,
-          createdBy: user.name || user.email || 'Authorized Staff',
-        },
+      const ledgerMetadata = JSON.stringify({
+        proofUrl,
+        referenceNo: cleanRef,
+        paymentMethod,
+        voucherNo,
+        billNo: po.invoiceNo || po.poNo,
+        recordedBy: user.name || user.email || 'Authorized Staff',
+        timestamp: new Date().toISOString(),
       });
 
-      await tx.financialLedgerEntry.create({
-        data: {
-          entryNo: `JRN-PAY-BANK-${voucherNo}`,
-          entryDate: paymentDate,
-          storeCode: po.storeCode || 'CENTRAL',
-          accountCategory: 'ASSET',
-          accountName: `Cash / Bank (${body.paymentMethod || 'Bank Transfer'})`,
-          debit: 0,
-          credit: paymentAmount,
-          amount: -paymentAmount,
-          refType: 'VENDOR_PAYMENT',
-          refId: payment.id,
-          refNo: voucherNo,
-          entityName: po.vendor?.name || 'Vendor',
-          description: `Bank disbursement for Vendor Bill #${po.invoiceNo || po.poNo} (Voucher ${voucherNo})`,
-          createdBy: user.name || user.email || 'Authorized Staff',
-        },
+      // Record Double-Entry Financial Ledger Entries atomically in a single batched query
+      await tx.financialLedgerEntry.createMany({
+        data: [
+          {
+            entryNo: `JRN-PAY-AP-${voucherNo}`,
+            entryDate: paymentDate,
+            storeCode: po.storeCode || 'CENTRAL',
+            accountCategory: 'LIABILITY',
+            accountName: 'Vendor Accounts Payable (Settlement)',
+            debit: paymentAmount,
+            credit: 0,
+            amount: -paymentAmount,
+            refType: 'VENDOR_PAYMENT',
+            refId: payment.id,
+            refNo: voucherNo,
+            entityName: po.vendor?.name || 'Vendor',
+            description: `Vendor bill payment for Bill #${po.invoiceNo || po.poNo} via ${paymentMethod} (Ref: ${cleanRef})`,
+            metadataJson: ledgerMetadata,
+            createdBy: user.name || user.email || 'Authorized Staff',
+          },
+          {
+            entryNo: `JRN-PAY-BANK-${voucherNo}`,
+            entryDate: paymentDate,
+            storeCode: po.storeCode || 'CENTRAL',
+            accountCategory: 'ASSET',
+            accountName: `Cash / Bank (${paymentMethod})`,
+            debit: 0,
+            credit: paymentAmount,
+            amount: -paymentAmount,
+            refType: 'VENDOR_PAYMENT',
+            refId: payment.id,
+            refNo: voucherNo,
+            entityName: po.vendor?.name || 'Vendor',
+            description: `Bank disbursement for Vendor Bill #${po.invoiceNo || po.poNo} (Voucher ${voucherNo}, Ref: ${cleanRef})`,
+            metadataJson: ledgerMetadata,
+            createdBy: user.name || user.email || 'Authorized Staff',
+          },
+        ],
       });
 
       // 7. Update PO paidAmount and paymentStatus atomically
@@ -362,7 +415,7 @@ export async function POST(req: NextRequest) {
         data: {
           module: 'Vendors / Payables',
           action: 'Record Vendor Payment',
-          details: `Recorded ₹${paymentAmount.toFixed(2)} payment via ${body.paymentMethod || 'Bank Transfer'} for Bill #${po.invoiceNo || po.poNo} (${po.vendor?.name || 'Vendor'}). Voucher: ${voucherNo}, Ref: ${body.referenceNo || 'N/A'}, Remaining: ₹${remainingAfterPayment.toFixed(2)}, Status: ${newPaymentStatus}`,
+          details: `Recorded ₹${paymentAmount.toFixed(2)} payment via ${paymentMethod} for Bill #${po.invoiceNo || po.poNo} (${po.vendor?.name || 'Vendor'}). Voucher: ${voucherNo}, Ref: ${cleanRef}, Proof: ${proofUrl}, Remaining: ₹${remainingAfterPayment.toFixed(2)}, Status: ${newPaymentStatus}`,
           userEmail: user.email || user.name,
           userRole: user.role,
           storeCode: po.storeCode || 'CENTRAL',
@@ -380,7 +433,7 @@ export async function POST(req: NextRequest) {
         remaining: remainingAfterPayment,
         newPaymentStatus,
       };
-    });
+    }, { maxWait: 15000, timeout: 45000 });
 
     // Broadcast realtime event for multi-tab sync
     broadcastRealtimeEvent('purchases', 'PAYMENT_RECORDED', {
@@ -395,33 +448,38 @@ export async function POST(req: NextRequest) {
       action: 'payment_recorded',
     });
 
-    return NextResponse.json({
-      success: true,
-      payment: result.payment,
-      purchaseOrder: result.updatedPO,
-      receiptVoucher: {
-        voucherNo: result.voucherNo,
-        paymentDate: result.payment.paymentDate,
-        amount: paymentAmount,
-        paymentMethod: result.payment.paymentMethod,
-        referenceNo: result.payment.referenceNo,
-        receiptUrl: result.payment.receiptUrl,
-        notes: result.payment.notes,
-        recordedBy: result.payment.recordedBy,
-        vendorName: result.vendor?.name,
-        vendorGstin: result.vendor?.gstin,
-        vendorPhone: result.vendor?.phone,
-        vendorAddress: result.vendor?.address,
-        billNo: result.updatedPO.invoiceNo || result.updatedPO.poNo,
-        poNo: result.updatedPO.poNo,
-        totalCost: result.totalCost,
-        totalPaid: result.totalPaid,
-        remainingBalance: result.remaining,
-        paymentStatus: result.newPaymentStatus,
-      },
-      remaining: result.remaining,
-      paymentStatus: result.newPaymentStatus,
-    }, { status: 201 });
+        return {
+          status: 201,
+          data: {
+            success: true,
+            payment: result.payment,
+            purchaseOrder: result.updatedPO,
+            receiptVoucher: {
+              voucherNo: result.voucherNo,
+              paymentDate: result.payment.paymentDate,
+              amount: paymentAmount,
+              paymentMethod: result.payment.paymentMethod,
+              referenceNo: result.payment.referenceNo,
+              receiptUrl: result.payment.receiptUrl,
+              notes: result.payment.notes,
+              recordedBy: result.payment.recordedBy,
+              vendorName: result.vendor?.name,
+              vendorGstin: result.vendor?.gstin,
+              vendorPhone: result.vendor?.phone,
+              vendorAddress: result.vendor?.address,
+              billNo: result.updatedPO.invoiceNo || result.updatedPO.poNo,
+              poNo: result.updatedPO.poNo,
+              totalCost: result.totalCost,
+              totalPaid: result.totalPaid,
+              remainingBalance: result.remaining,
+              paymentStatus: result.newPaymentStatus,
+            },
+            remaining: result.remaining,
+            paymentStatus: result.newPaymentStatus,
+          },
+        };
+      }
+    );
   } catch (error: any) {
     console.error('API /api/purchases/payments POST error:', error);
     return NextResponse.json({ error: error.message || 'Failed to record payment' }, { status: 400 });

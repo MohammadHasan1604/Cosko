@@ -3,6 +3,15 @@ import { prisma } from '@/lib/db';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 
+let cachedCategoriesPayload: any = null;
+let lastCategoriesCacheTime = 0;
+const CATEGORIES_CACHE_TTL = 60_000;
+
+function invalidateCategoriesCache() {
+  cachedCategoriesPayload = null;
+  lastCategoriesCacheTime = 0;
+}
+
 /**
  * GET /api/categories
  * Returns full list of categories ordered by sort_order and name (excludes Archived by default)
@@ -11,10 +20,50 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const includeArchived = searchParams.get('includeArchived') === 'true';
+    const forceFresh = searchParams.get('fresh') === 'true';
+
+    if (!includeArchived && !forceFresh && cachedCategoriesPayload && Date.now() - lastCategoriesCacheTime < CATEGORIES_CACHE_TTL) {
+      return NextResponse.json(cachedCategoriesPayload, {
+        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
+      });
+    }
 
     const where: any = {};
     if (!includeArchived) {
       where.status = { not: 'Archived' };
+    }
+
+    // Auto-seed default expense categories if none exist with categoryType = 'Expense'
+    const expenseCatCount = await (prisma as any).category.count({ where: { categoryType: 'Expense' } });
+    if (expenseCatCount === 0) {
+      const DEFAULT_EXPENSE_CATEGORIES = [
+        'Store Rent',
+        'Utilities & Power',
+        'Logistics & Freight',
+        'Staff Salaries',
+        'Maintenance & Repairs',
+        'Marketing',
+        'Office Supplies',
+        'Legal & Professional',
+        'Taxes & Licenses',
+      ];
+      for (let i = 0; i < DEFAULT_EXPENSE_CATEGORIES.length; i++) {
+        const catName = DEFAULT_EXPENSE_CATEGORIES[i];
+        const slug = catName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        await (prisma as any).category.upsert({
+          where: { slug },
+          update: { categoryType: 'Expense' },
+          create: {
+            name: catName,
+            slug,
+            categoryType: 'Expense',
+            description: `Standard operational expense category: ${catName}`,
+            status: 'Active',
+            sortOrder: i + 1,
+            createdBy: 'System Seed',
+          },
+        });
+      }
     }
 
     const categories = await (prisma as any).category.findMany({
@@ -22,19 +71,24 @@ export async function GET(req: NextRequest) {
       include: {
         parent: true,
       },
-      orderBy: [
-        { sortOrder: 'asc' },
-        { name: 'asc' },
-      ],
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-        categories,
-      },
-      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
-    );
+    const payload = {
+      success: true,
+      categories,
+    };
+
+    if (!includeArchived) {
+      cachedCategoriesPayload = payload;
+      lastCategoriesCacheTime = Date.now();
+    }
+
+    return NextResponse.json(payload, {
+      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
+    });
   } catch (error: any) {
     console.error('Error fetching categories:', error);
     return NextResponse.json(
@@ -84,7 +138,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Broadcast SSE realtime event
+    invalidateCategoriesCache();
     broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: newCategory.id, name: newCategory.name, action: 'created' });
 
     return NextResponse.json({
@@ -137,7 +191,7 @@ export async function PUT(req: NextRequest) {
       },
     });
 
-    // Broadcast SSE realtime event
+    invalidateCategoriesCache();
     broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: updated.id, name: updated.name, action: 'updated' });
 
     return NextResponse.json({
@@ -212,6 +266,7 @@ export async function DELETE(req: NextRequest) {
         data: { status: 'Archived' },
       });
 
+      invalidateCategoriesCache();
       broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: target.id, name: target.name, action: 'archived' });
 
       return NextResponse.json({
@@ -228,6 +283,7 @@ export async function DELETE(req: NextRequest) {
     // Hard-delete if safe & requested by Super Admin
     await (prisma as any).category.delete({ where: { id: target.id } });
 
+    invalidateCategoriesCache();
     broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: target.id, name: target.name, action: 'deleted' });
 
     return NextResponse.json({

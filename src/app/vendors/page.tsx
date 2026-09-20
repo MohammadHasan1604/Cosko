@@ -5,6 +5,9 @@ import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
 import { useApp, Vendor, PurchaseOrder } from '@/context/AppContext';
+import VendorFormModal from '@/components/forms/VendorFormModal';
+import SupplierPaymentModal from '@/components/forms/SupplierPaymentModal';
+import ProofViewerModal, { ProofViewerData } from '@/components/ui/ProofViewerModal';
 import { toast } from 'sonner';
 import { validateAndNormalizeGstin } from '@/lib/gstUtils';
 
@@ -22,37 +25,17 @@ export default function VendorsPage() {
   const [editVendorModal, setEditVendorModal] = useState<Vendor | null>(null);
   const [deleteVendorModal, setDeleteVendorModal] = useState<Vendor | null>(null);
 
-  // Vendor Form Fields
-  const [name, setName] = useState('');
-  const [contactPerson, setContactPerson] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [category, setCategory] = useState('');
-  const [gstin, setGstin] = useState('');
-  const [address, setAddress] = useState('');
-  const [paymentTerms, setPaymentTerms] = useState('Net 30');
-  const [leadTimeDays, setLeadTimeDays] = useState<number | ''>('');
-
   // Drill-Down: Vendor Payables & Bills Drawer/Modal
   const [selectedVendorForBills, setSelectedVendorForBills] = useState<Vendor | null>(null);
   const [billsFilter, setBillsFilter] = useState<'pending' | 'all' | 'overdue'>('pending');
   const [expandedPaymentPoId, setExpandedPaymentPoId] = useState<string | null>(null);
 
-  // Pay Now Modal State
+  // Pay Now Modal State (Master Single Source of Truth SupplierPaymentModal)
   const [payModalPo, setPayModalPo] = useState<any | null>(null);
-  const [payAmount, setPayAmount] = useState<number | ''>('');
-  const [payMethod, setPayMethod] = useState('Bank Transfer');
-  const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
-  const [payRef, setPayRef] = useState('');
-  const [payNotes, setPayNotes] = useState('');
-  const [receiptProof, setReceiptProof] = useState<string | null>(null);
-  const [isSubmittingPay, setIsSubmittingPay] = useState(false);
 
-  // Pre-Payment Confirmation Guard
-  const [confirmPaymentModal, setConfirmPaymentModal] = useState(false);
-
-  // Printable Receipt Voucher State
+  // Printable Receipt Voucher State & Proof Viewer
   const [receiptVoucherModal, setReceiptVoucherModal] = useState<any | null>(null);
+  const [proofViewerData, setProofViewerData] = useState<ProofViewerData | null>(null);
 
   // Synchronize authoritative vendor payables directly from DB records
   // Formula: Outstanding Balance = Total Bill - Valid Payments - Credits
@@ -229,170 +212,13 @@ export default function VendorsPage() {
     return bills;
   }, [selectedVendorForBills, enrichedVendors, billsFilter]);
 
-  // Handle Form Resets
-  const resetForm = () => {
-    setName('');
-    setContactPerson('');
-    setEmail('');
-    setPhone('');
-    setCategory('');
-    setGstin('');
-    setAddress('');
-    setPaymentTerms('Net 30');
-    setLeadTimeDays('');
-  };
-
   const openEdit = (v: Vendor) => {
     setEditVendorModal(v);
-    setName(v.name || '');
-    setContactPerson(v.contactPerson || '');
-    setEmail(v.email || '');
-    setPhone(v.phone || '');
-    setCategory(v.category || '');
-    setGstin(v.gstin || '');
-    setAddress(v.address || '');
-    setPaymentTerms(v.paymentTerms || 'Net 30');
-    setLeadTimeDays(v.leadTimeDays || 3);
-  };
-
-  // Onboard Submit
-  const handleOnboardSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      toast.error('Vendor name is required');
-      return;
-    }
-    const gstinCheck = validateAndNormalizeGstin(gstin);
-    if (!gstinCheck.isValid) {
-      toast.error(gstinCheck.error || 'Invalid GSTIN format');
-      return;
-    }
-    const cleanGstin = gstinCheck.normalized;
-
-    try {
-      await addVendor({
-        name: name.trim(),
-        contactPerson: contactPerson.trim() || 'Account Manager',
-        email: email.trim() || `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
-        phone: phone.trim() || '+91 00000 00000',
-        category: category.trim() || 'General',
-        gstin: cleanGstin || undefined,
-        address: address.trim() || undefined,
-        paymentTerms: paymentTerms.trim() || 'Net 30',
-        leadTimeDays: Number(leadTimeDays) || 3,
-        outstandingPayable: 0,
-        rating: 5.0,
-      });
-      setOnboardModal(false);
-      resetForm();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to onboard supplier');
-    }
-  };
-
-  // Update Submit
-  const handleUpdateVendorSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editVendorModal) return;
-    const gstinCheck = validateAndNormalizeGstin(gstin);
-    if (!gstinCheck.isValid) {
-      toast.error(gstinCheck.error || 'Invalid GSTIN format');
-      return;
-    }
-    const cleanGstin = gstinCheck.normalized;
-
-    try {
-      await updateVendor(editVendorModal.id, {
-        name: name.trim(),
-        contactPerson: contactPerson.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        category: category.trim() || 'General',
-        gstin: cleanGstin,
-        address: address.trim() || undefined,
-        paymentTerms: paymentTerms.trim() || 'Net 30',
-        leadTimeDays: Number(leadTimeDays) || 3,
-      });
-      setEditVendorModal(null);
-      resetForm();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update supplier');
-    }
   };
 
   // Open Pay Now Modal
   const openPayNow = (bill: any) => {
     setPayModalPo(bill);
-    setPayAmount(bill.balance > 0 ? bill.balance : '');
-    setPayMethod('Bank Transfer');
-    setPayDate(new Date().toISOString().split('T')[0]);
-    setPayRef('');
-    setPayNotes(`Payment for Bill #${bill.invoiceNo || bill.poNo}`);
-    setReceiptProof(null);
-  };
-
-  // Handle proof upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size must be under 5MB');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setReceiptProof(reader.result as string);
-      toast.success(`Attached receipt: ${file.name}`);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Trigger Confirmation Step
-  const handlePrePaymentSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!payModalPo || !payAmount || Number(payAmount) <= 0) {
-      toast.error('Please enter a valid payment amount');
-      return;
-    }
-    const amt = Number(payAmount);
-    if (amt > payModalPo.balance + 0.01) {
-      toast.error(`Payment amount cannot exceed remaining balance (₹${payModalPo.balance.toLocaleString('en-IN')})`);
-      return;
-    }
-
-    // Open pre-payment confirmation dialog
-    setConfirmPaymentModal(true);
-  };
-
-  // Execute Payment
-  const executePayment = async () => {
-    if (!payModalPo || !payAmount || Number(payAmount) <= 0) return;
-    setIsSubmittingPay(true);
-    try {
-      const res = await recordPurchasePayment({
-        purchaseId: payModalPo.id,
-        amount: Number(payAmount),
-        paymentMethod: payMethod,
-        paymentDate: payDate,
-        referenceNo: payRef.trim() || undefined,
-        notes: payNotes.trim() || undefined,
-        receiptUrl: receiptProof || undefined,
-      });
-
-      if (res.success) {
-        setConfirmPaymentModal(false);
-        setPayModalPo(null);
-        // Open printable receipt voucher modal
-        if (res.receiptVoucher) {
-          setReceiptVoucherModal(res.receiptVoucher);
-        }
-        await refreshAllData();
-      }
-    } finally {
-      setIsSubmittingPay(false);
-    }
   };
 
   // Print voucher
@@ -413,10 +239,7 @@ export default function VendorsPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                resetForm();
-                setOnboardModal(true);
-              }}
+              onClick={() => setOnboardModal(true)}
               className="btn-primary gap-2 text-xs sm:text-sm font-semibold shadow-xs"
             >
               <Icon name="PlusIcon" size={18} />
@@ -963,6 +786,7 @@ export default function VendorsPage() {
                                       <th className="px-2.5 py-1.5 font-tabular text-right">Amount</th>
                                       <th className="px-2.5 py-1.5">Method</th>
                                       <th className="px-2.5 py-1.5">Reference / UTR</th>
+                                      <th className="px-2.5 py-1.5">Remarks</th>
                                       <th className="px-2.5 py-1.5">Recorded By</th>
                                       <th className="px-2.5 py-1.5 text-center">Receipt</th>
                                     </tr>
@@ -983,17 +807,30 @@ export default function VendorsPage() {
                                         <td className="px-2.5 py-1.5 font-mono text-muted-foreground">
                                           {p.referenceNo || 'N/A'}
                                         </td>
+                                        <td className="px-2.5 py-1.5 text-muted-foreground max-w-[160px] truncate" title={p.notes || ''}>
+                                          {p.notes || '—'}
+                                        </td>
                                         <td className="px-2.5 py-1.5 text-muted-foreground">{p.recordedBy}</td>
                                         <td className="px-2.5 py-1.5 text-center">
                                           {p.receiptUrl ? (
-                                            <a
-                                              href={p.receiptUrl}
-                                              target="_blank"
-                                              rel="noreferrer"
+                                            <button
+                                              type="button"
+                                              onClick={() => setProofViewerData({
+                                                proofUrl: p.receiptUrl,
+                                                title: `Payment Proof — Voucher #${p.voucherNo || 'PV'}`,
+                                                amount: Number(p.amount),
+                                                paymentMethod: p.paymentMethod,
+                                                referenceNo: p.referenceNo,
+                                                paymentDate: p.paymentDate,
+                                                recordedBy: p.recordedBy,
+                                                entityName: selectedVendorForBills?.name,
+                                                billNo: bill.invoiceNo || bill.poNo,
+                                                notes: p.notes,
+                                              })}
                                               className="text-primary hover:underline font-bold inline-flex items-center gap-0.5"
                                             >
-                                              <Icon name="DocumentIcon" size={11} /> Proof
-                                            </a>
+                                              <Icon name="DocumentIcon" size={11} /> View Proof
+                                            </button>
                                           ) : (
                                             <span className="text-muted-foreground/50">—</span>
                                           )}
@@ -1021,243 +858,19 @@ export default function VendorsPage() {
           </Modal>
         )}
 
-        {/* ------------------------------------------------------------- */}
-        {/* PAY NOW / RECORD PAYMENT MODAL                                */}
-        {/* ------------------------------------------------------------- */}
-        {payModalPo && (
-          <Modal
-            open={!!payModalPo}
-            onClose={() => setPayModalPo(null)}
-            title="Record Supplier Payment"
-            subtitle={`Bill #${payModalPo.invoiceNo || payModalPo.poNo} — ${selectedVendorForBills?.name || payModalPo.vendorName}`}
-            size="md"
-          >
-            <form onSubmit={handlePrePaymentSubmit} className="space-y-4 py-2 text-xs">
-              {/* Bill Details Summary Card */}
-              <div className="p-3.5 bg-muted/40 border border-border rounded-xl space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Vendor Name:</span>
-                  <span className="font-bold text-foreground">{selectedVendorForBills?.name || payModalPo.vendorName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Bill Cost:</span>
-                  <span className="font-bold text-foreground">₹{payModalPo.totalCost.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Previously Paid:</span>
-                  <span className="font-semibold text-emerald-600">₹{(payModalPo.paidAmount || 0).toLocaleString('en-IN')}</span>
-                </div>
-                {Number(payModalPo.creditAmount) > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Credits Applied:</span>
-                    <span className="font-semibold text-info">-₹{Number(payModalPo.creditAmount).toLocaleString('en-IN')}</span>
-                  </div>
-                )}
-                <div className="flex justify-between pt-1 border-t border-border font-bold">
-                  <span className="text-foreground">Remaining Balance Due:</span>
-                  <span className="text-danger font-tabular text-sm">
-                    ₹{payModalPo.balance.toLocaleString('en-IN')}
-                  </span>
-                </div>
-              </div>
-
-              {/* Quick Amount Selector */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPayAmount(payModalPo.balance)}
-                  className="btn-secondary text-2xs py-1 px-2.5 font-bold flex-1"
-                >
-                  Pay Full Balance (₹{payModalPo.balance.toLocaleString('en-IN')})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPayAmount(Math.round((payModalPo.balance / 2) * 100) / 100)}
-                  className="btn-secondary text-2xs py-1 px-2.5 font-semibold"
-                >
-                  Pay 50%
-                </button>
-              </div>
-
-              {/* Amount & Method */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Payment Amount (₹) *</label>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    max={payModalPo.balance}
-                    required
-                    placeholder="Enter amount"
-                    value={payAmount}
-                    onChange={(e) => setPayAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="input-field text-xs font-bold text-emerald-600"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Payment Method *</label>
-                  <select
-                    value={payMethod}
-                    onChange={(e) => setPayMethod(e.target.value)}
-                    className="input-field text-xs font-medium"
-                  >
-                    <option value="Bank Transfer">Bank Transfer (NEFT/RTGS/IMPS)</option>
-                    <option value="UPI">UPI / QR Code</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Credit Card">Credit Card</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Date & Reference */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Payment Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={payDate}
-                    onChange={(e) => setPayDate(e.target.value)}
-                    className="input-field text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">UTR / Ref / Cheque #</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. UTR9283741829"
-                    value={payRef}
-                    onChange={(e) => setPayRef(e.target.value)}
-                    className="input-field text-xs font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Remarks */}
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Payment Remarks / Notes</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Cleared invoice batch 1"
-                  value={payNotes}
-                  onChange={(e) => setPayNotes(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-
-              {/* Receipt / Proof Attachment Upload */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground block">Receipt / Proof Upload (Optional)</label>
-                <div className="flex items-center gap-3">
-                  <label className="btn-secondary text-2xs py-1.5 px-3 cursor-pointer inline-flex items-center gap-1.5">
-                    <Icon name="ArrowUpTrayIcon" size={13} />
-                    <span>Attach Payment Screenshot / Receipt</span>
-                    <input type="file" accept="image/*,.pdf" onChange={handleFileUpload} className="hidden" />
-                  </label>
-                  {receiptProof && (
-                    <div className="flex items-center gap-1.5 text-2xs text-positive font-bold">
-                      <Icon name="CheckCircleIcon" size={14} />
-                      <span>Proof Attached</span>
-                      <button
-                        type="button"
-                        onClick={() => setReceiptProof(null)}
-                        className="text-danger hover:underline ml-1 font-normal"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Modal Actions */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
-                <button type="button" onClick={() => setPayModalPo(null)} className="btn-secondary text-xs">
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary text-xs gap-1.5 font-bold">
-                  <Icon name="ShieldCheckIcon" size={14} />
-                  Proceed to Review & Confirm
-                </button>
-              </div>
-            </form>
-          </Modal>
-        )}
-
-        {/* ------------------------------------------------------------- */}
-        {/* PRE-PAYMENT CONFIRMATION MODAL                                */}
-        {/* ------------------------------------------------------------- */}
-        {confirmPaymentModal && payModalPo && (
-          <Modal
-            open={confirmPaymentModal}
-            onClose={() => setConfirmPaymentModal(false)}
-            title="Confirm Payment Disbursement"
-            subtitle="Please review the transaction details carefully before finalizing"
-            size="sm"
-          >
-            <div className="space-y-4 py-2 text-xs">
-              <div className="p-4 rounded-xl border border-warning/30 bg-warning/10 text-foreground space-y-2">
-                <div className="flex items-center gap-2 text-warning font-bold text-sm">
-                  <Icon name="ExclamationTriangleIcon" size={18} />
-                  <span>Financial Authorization Required</span>
-                </div>
-                <p className="text-muted-foreground">
-                  You are recording an irrevocable vendor disbursement. This will update the vendor balance, deduct from
-                  accounts payable, and generate an audit log entry.
-                </p>
-              </div>
-
-              <div className="p-3.5 bg-muted/40 rounded-xl border border-border space-y-1.5 font-tabular text-2xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Recipient:</span>
-                  <span className="font-bold text-foreground">{selectedVendorForBills?.name || payModalPo.vendorName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Bill Ref:</span>
-                  <span className="font-mono text-primary font-bold">{payModalPo.invoiceNo || payModalPo.poNo}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Disbursement Method:</span>
-                  <span className="font-medium text-foreground">{payMethod}</span>
-                </div>
-                {payRef && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Transaction UTR:</span>
-                    <span className="font-mono text-foreground font-bold">{payRef}</span>
-                  </div>
-                )}
-                <div className="flex justify-between pt-1.5 border-t border-border text-xs font-bold">
-                  <span>Amount to Pay:</span>
-                  <span className="text-emerald-600 font-extrabold text-sm">
-                    ₹{Number(payAmount).toLocaleString('en-IN')}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-                <button
-                  type="button"
-                  disabled={isSubmittingPay}
-                  onClick={() => setConfirmPaymentModal(false)}
-                  className="btn-secondary text-xs"
-                >
-                  Back & Edit
-                </button>
-                <button
-                  type="button"
-                  disabled={isSubmittingPay}
-                  onClick={executePayment}
-                  className="btn-primary text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  <Icon name="CheckCircleIcon" size={14} />
-                  {isSubmittingPay ? 'Recording...' : 'Confirm & Authorize Payment'}
-                </button>
-              </div>
-            </div>
-          </Modal>
-        )}
+        {/* Master Single Source of Truth Supplier Payment Modal */}
+        <SupplierPaymentModal
+          open={Boolean(payModalPo)}
+          onClose={() => setPayModalPo(null)}
+          purchase={payModalPo}
+          onSuccess={async (_, receiptVoucher) => {
+            setPayModalPo(null);
+            if (receiptVoucher) {
+              setReceiptVoucherModal(receiptVoucher);
+            }
+            await refreshAllData();
+          }}
+        />
 
         {/* ------------------------------------------------------------- */}
         {/* PRINTABLE PAYMENT RECEIPT VOUCHER MODAL                       */}
@@ -1332,6 +945,36 @@ export default function VendorsPage() {
                   </div>
                 </div>
 
+                {receiptVoucherModal.receiptUrl && (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300">
+                    <div className="flex items-center gap-2">
+                      <Icon name="DocumentCheckIcon" size={16} className="text-emerald-600 shrink-0" />
+                      <div>
+                        <span className="font-bold text-2xs block">Payment Proof Attached</span>
+                        <span className="text-4xs text-muted-foreground font-mono">Permanently stored in database ledger</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setProofViewerData({
+                        proofUrl: receiptVoucherModal.receiptUrl,
+                        title: `Payment Proof — Voucher #${receiptVoucherModal.voucherNo}`,
+                        amount: Number(receiptVoucherModal.amount),
+                        paymentMethod: receiptVoucherModal.paymentMethod,
+                        referenceNo: receiptVoucherModal.referenceNo,
+                        paymentDate: receiptVoucherModal.paymentDate,
+                        recordedBy: receiptVoucherModal.recordedBy,
+                        entityName: receiptVoucherModal.vendorName,
+                        billNo: receiptVoucherModal.billNo,
+                      })}
+                      className="btn-secondary text-2xs py-1 px-2.5 gap-1 font-bold shadow-2xs"
+                    >
+                      <Icon name="EyeIcon" size={12} />
+                      View Proof
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between text-3xs text-muted-foreground pt-2 border-t border-border">
                   <span>Authorized by: <strong>{receiptVoucherModal.recordedBy || currentUser?.name}</strong></span>
                   <span>Digitally Recorded via COSKO StoreCommand</span>
@@ -1355,264 +998,15 @@ export default function VendorsPage() {
           </Modal>
         )}
 
-        {/* ------------------------------------------------------------- */}
-        {/* ONBOARD SUPPLIER MODAL                                        */}
-        {/* ------------------------------------------------------------- */}
-        <Modal
-          open={onboardModal}
-          onClose={() => setOnboardModal(false)}
-          title="Onboard New Supplier"
-          subtitle="Register verified supplier into procurement and payables directory"
-          size="md"
-        >
-          <form onSubmit={handleOnboardSubmit} className="space-y-4 py-2">
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Company / Supplier Name *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Havells India Limited"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="input-field text-xs"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Contact Person</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Suresh Menon"
-                  value={contactPerson}
-                  onChange={(e) => setContactPerson(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Category</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Electronics, Hardware"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Phone Number</label>
-                <input
-                  type="text"
-                  placeholder="e.g. +91 98765 43210"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Email</label>
-                <input
-                  type="email"
-                  placeholder="e.g. orders@supplier.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">GSTIN (Optional / 15-char)</label>
-                <input
-                  type="text"
-                  maxLength={18}
-                  placeholder="e.g. 29AABCS1429B1ZB or URP"
-                  value={gstin}
-                  onChange={(e) => setGstin(e.target.value.toUpperCase())}
-                  className="input-field text-xs font-mono"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Payment Terms</label>
-                <select
-                  value={paymentTerms}
-                  onChange={(e) => setPaymentTerms(e.target.value)}
-                  className="input-field text-xs"
-                >
-                  <option value="Net 30">Net 30 Days</option>
-                  <option value="Net 15">Net 15 Days</option>
-                  <option value="Net 60">Net 60 Days</option>
-                  <option value="Immediate">Immediate / Cash on Delivery</option>
-                  <option value="Advance">100% Advance</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Lead Time (Days)</label>
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="3"
-                  value={leadTimeDays}
-                  onChange={(e) => setLeadTimeDays(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="input-field text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Address (City / Hub)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Electronic City, Bengaluru"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-border">
-              <button type="button" onClick={() => setOnboardModal(false)} className="btn-secondary text-xs">
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary text-xs font-bold">
-                Onboard Supplier
-              </button>
-            </div>
-          </form>
-        </Modal>
-
-        {/* ------------------------------------------------------------- */}
-        {/* EDIT SUPPLIER MODAL                                           */}
-        {/* ------------------------------------------------------------- */}
-        {editVendorModal && (
-          <Modal
-            open={!!editVendorModal}
-            onClose={() => setEditVendorModal(null)}
-            title={`Edit Supplier — ${editVendorModal.name}`}
-            subtitle={`Supplier Code: ${editVendorModal.code}`}
-            size="md"
-          >
-            <form onSubmit={handleUpdateVendorSubmit} className="space-y-4 py-2">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Supplier Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Contact Person</label>
-                  <input
-                    type="text"
-                    value={contactPerson}
-                    onChange={(e) => setContactPerson(e.target.value)}
-                    className="input-field text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Category</label>
-                  <input
-                    type="text"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="input-field text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Phone</label>
-                  <input
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="input-field text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="input-field text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">GSTIN (Optional / 15-char)</label>
-                  <input
-                    type="text"
-                    maxLength={18}
-                    placeholder="e.g. 29AABCS1429B1ZB or URP"
-                    value={gstin}
-                    onChange={(e) => setGstin(e.target.value.toUpperCase())}
-                    className="input-field text-xs font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Payment Terms</label>
-                  <select
-                    value={paymentTerms}
-                    onChange={(e) => setPaymentTerms(e.target.value)}
-                    className="input-field text-xs"
-                  >
-                    <option value="Net 30">Net 30 Days</option>
-                    <option value="Net 15">Net 15 Days</option>
-                    <option value="Net 60">Net 60 Days</option>
-                    <option value="Immediate">Immediate / Cash on Delivery</option>
-                    <option value="Advance">100% Advance</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Lead Time (Days)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={leadTimeDays}
-                    onChange={(e) => setLeadTimeDays(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="input-field text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Address</label>
-                  <input
-                    type="text"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    className="input-field text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-border">
-                <button type="button" onClick={() => setEditVendorModal(null)} className="btn-secondary text-xs">
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary text-xs font-bold">
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </Modal>
-        )}
+        {/* Reusable Single-Source-of-Truth Vendor Form Modal */}
+        <VendorFormModal
+          open={onboardModal || !!editVendorModal}
+          onClose={() => {
+            setOnboardModal(false);
+            setEditVendorModal(null);
+          }}
+          vendor={editVendorModal}
+        />
 
         {/* ------------------------------------------------------------- */}
         {/* DELETE / ARCHIVE CONFIRMATION MODAL                           */}
@@ -1689,6 +1083,12 @@ export default function VendorsPage() {
             </div>
           </Modal>
         )}
+        {/* Reusable Proof Viewer Modal */}
+        <ProofViewerModal
+          open={!!proofViewerData}
+          onClose={() => setProofViewerData(null)}
+          data={proofViewerData}
+        />
       </div>
     </AppLayout>
   );

@@ -1,5 +1,13 @@
 import { prisma } from '../db';
 import { broadcastRealtimeEvent } from '../realtime';
+import { generateSafeSequenceNo } from '../sequenceUtils';
+import {
+  calculateTransferTotals,
+  validateTransferHeader,
+  validateTransferItem,
+  round2,
+  formatTransferINR,
+} from '../stockTransferCalculations';
 
 export interface CreateTransferInput {
   sourceStore: string;
@@ -19,80 +27,56 @@ export interface CreateTransferInput {
  * and gross Central Profit without inflating consolidated company profit.
  */
 export async function executeStockTransfer(input: CreateTransferInput) {
-  const sourceStore = input.sourceStore.trim().toUpperCase();
-  const destStore = input.destStore.trim().toUpperCase();
+  const sourceStore = input.sourceStore ? input.sourceStore.trim().toUpperCase() : '';
+  const destStore = input.destStore ? input.destStore.trim().toUpperCase() : '';
 
-  if (sourceStore === destStore) {
-    throw new Error('Source location and destination location cannot be identical.');
+  const headerValidation = validateTransferHeader({
+    sourceStore,
+    destStore,
+    itemsCount: input.items ? input.items.length : 0,
+  });
+  if (!headerValidation.isValid) {
+    throw new Error(headerValidation.error);
   }
 
-  if (!input.items || input.items.length === 0) {
-    throw new Error('Transfer items list cannot be empty.');
-  }
-
-  // Pre-calculate line totals and prepare items outside interactive transaction
-  let totalUnits = 0;
-  let totalCost = 0;
-  let totalTransferValue = 0;
-  const productIds: string[] = [];
-
-  const preparedItems: Array<{
-    productId: string;
-    qty: number;
-    costPerUnit: number;
-    transferPricePerUnit: number;
-    lineTotalCost: number;
-    lineTotalValue: number;
-    lineProfit: number;
-  }> = [];
+  // Pre-validate all items before transaction
   for (const item of input.items) {
-    if (!item.qty || item.qty <= 0) {
-      throw new Error(`Transfer quantity must be greater than 0 for product ID ${item.productId}`);
+    if (!item.productId) {
+      throw new Error('Product ID is required for all transfer line items.');
     }
-    const cost = Number(item.costPerUnit) || 0;
-    const transferPrice = Number(item.transferPricePerUnit) || 0;
-    const lineCost = item.qty * cost;
-    const lineValue = item.qty * transferPrice;
-    const lineProfit = lineValue - lineCost;
-
-    totalUnits += item.qty;
-    totalCost += lineCost;
-    totalTransferValue += lineValue;
-    productIds.push(item.productId);
-
-    preparedItems.push({
+    const itemValidation = validateTransferItem({
       productId: item.productId,
       qty: item.qty,
-      costPerUnit: cost,
-      transferPricePerUnit: transferPrice,
-      lineTotalCost: lineCost,
-      lineTotalValue: lineValue,
-      lineProfit,
+      costPerUnit: item.costPerUnit,
+      transferPricePerUnit: item.transferPricePerUnit,
     });
-  }
-
-  const grossProfit = totalTransferValue - totalCost;
-
-  // Generate transfer number safely by finding true maximum sequence number across transfers and ledger
-  const existingTransfers = await prisma.stockTransfer.findMany({
-    select: { transferNo: true },
-  });
-  const existingLedgerRefs = await prisma.financialLedgerEntry.findMany({
-    where: { refType: 'STOCK_TRANSFER' },
-    select: { refNo: true },
-  });
-  let maxSeq = 0;
-  for (const item of [...existingTransfers.map((t) => t.transferNo), ...existingLedgerRefs.map((l) => l.refNo)]) {
-    const match = item?.match(/TRF-2026-(\d+)/);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxSeq) maxSeq = num;
+    if (!itemValidation.isValid) {
+      throw new Error(`Product ${item.productId}: ${itemValidation.error}`);
     }
   }
-  const seqNo = String(maxSeq + 1).padStart(4, '0');
-  const transferNo = `TRF-2026-${seqNo}`;
 
-  // Execute atomic database changes with serverless-safe 15s timeout
+  // Authoritative centralized calculations
+  const totals = calculateTransferTotals(input.items);
+  const totalUnits = totals.totalUnits;
+  const totalCost = totals.totalCost;
+  const totalTransferValue = totals.totalTransferValue;
+  const grossProfit = totals.grossProfit;
+
+  const productIds = input.items.map((item) => item.productId);
+  const preparedItems = totals.items.map((calc, idx) => ({
+    productId: input.items[idx].productId,
+    qty: calc.qty,
+    costPerUnit: calc.costPerUnit,
+    transferPricePerUnit: calc.transferPricePerUnit,
+    lineTotalCost: calc.lineTotalCost,
+    lineTotalValue: calc.lineTotalValue,
+    lineProfit: calc.lineProfit,
+  }));
+
+  // Generate transfer number safely using collision-proof sequence generator
+  const transferNo = await generateSafeSequenceNo('stockTransfer', 'transferNo', 'TRF-2026-', 4);
+
+  // Execute atomic database changes with serverless-safe 45s timeout
   const transfer = await prisma.$transaction(
     async (tx: any) => {
       // 1. Batch fetch all source and destination inventory rows in parallel
@@ -148,18 +132,21 @@ export async function executeStockTransfer(input: CreateTransferInput) {
         },
       });
 
-      // 4. Update Source & Destination Inventory rows
+      // 4. Update Source & Destination Inventory rows concurrently
       const ledgerEntries: any[] = [];
+      const inventoryUpdates: Promise<any>[] = [];
 
       for (const item of preparedItems) {
         const sourceInv = sourceInvMap.get(item.productId);
         const currentSourceQty = sourceInv ? sourceInv.qtyOnHand : 0;
         const newSourceQty = currentSourceQty - item.qty;
 
-        await tx.inventory.update({
-          where: { productId_storeCode: { productId: item.productId, storeCode: sourceStore } },
-          data: { qtyOnHand: newSourceQty },
-        });
+        inventoryUpdates.push(
+          tx.inventory.update({
+            where: { productId_storeCode: { productId: item.productId, storeCode: sourceStore } },
+            data: { qtyOnHand: newSourceQty },
+          })
+        );
 
         ledgerEntries.push({
           productId: item.productId,
@@ -178,11 +165,13 @@ export async function executeStockTransfer(input: CreateTransferInput) {
         const currentDestQty = destInv ? destInv.qtyOnHand : 0;
         const newDestQty = currentDestQty + item.qty;
 
-        await tx.inventory.upsert({
-          where: { productId_storeCode: { productId: item.productId, storeCode: destStore } },
-          create: { productId: item.productId, storeCode: destStore, qtyOnHand: newDestQty, reorderPt: 5 },
-          update: { qtyOnHand: newDestQty },
-        });
+        inventoryUpdates.push(
+          tx.inventory.upsert({
+            where: { productId_storeCode: { productId: item.productId, storeCode: destStore } },
+            create: { productId: item.productId, storeCode: destStore, qtyOnHand: newDestQty, reorderPt: 5 },
+            update: { qtyOnHand: newDestQty },
+          })
+        );
 
         ledgerEntries.push({
           productId: item.productId,
@@ -198,105 +187,97 @@ export async function executeStockTransfer(input: CreateTransferInput) {
         });
       }
 
+      await Promise.all(inventoryUpdates);
+
       // 5. Batch create all inventory ledger entries in a single query
       await tx.inventoryLedger.createMany({
         data: ledgerEntries,
       });
 
-      // 6. Record Double-Entry Financial Ledger Entries (Flagged isEliminated: true for Consolidated P&L)
-      await tx.financialLedgerEntry.create({
-        data: {
-          entryNo: `JRN-TRF-MKP-${transferNo}`,
-          entryDate: new Date(),
-          storeCode: sourceStore,
-          accountCategory: 'TRANSFER_MARKUP',
-          accountName: 'Central Stock Transfer Markup',
-          debit: 0,
-          credit: grossProfit,
-          amount: grossProfit,
-          refType: 'STOCK_TRANSFER',
-          refId: createdTransfer.id,
-          refNo: transferNo,
-          description: `Internal Transfer Margin from ${sourceStore} to ${destStore} (${transferNo})`,
-          isEliminated: true,
-          createdBy: input.requestedBy,
-        },
-      });
-
-      await tx.financialLedgerEntry.create({
-        data: {
-          entryNo: `JRN-TRF-CLR-${transferNo}`,
-          entryDate: new Date(),
-          storeCode: sourceStore,
-          accountCategory: 'ASSET',
-          accountName: 'Inter-Store Clearing Account',
-          debit: totalTransferValue,
-          credit: 0,
-          amount: totalTransferValue,
-          refType: 'STOCK_TRANSFER',
-          refId: createdTransfer.id,
-          refNo: transferNo,
-          description: `Inter-store transfer clearing to ${destStore} (${transferNo})`,
-          isEliminated: true,
-          createdBy: input.requestedBy,
-        },
-      });
-
-      await tx.financialLedgerEntry.create({
-        data: {
-          entryNo: `JRN-TRF-SRC-${transferNo}`,
-          entryDate: new Date(),
-          storeCode: sourceStore,
-          accountCategory: 'ASSET',
-          accountName: 'Inventory Asset (Inter-Store Dispatch)',
-          debit: 0,
-          credit: totalCost,
-          amount: -totalCost,
-          refType: 'STOCK_TRANSFER',
-          refId: createdTransfer.id,
-          refNo: transferNo,
-          description: `Stock dispatched from ${sourceStore} to ${destStore} (${transferNo})`,
-          isEliminated: true,
-          createdBy: input.requestedBy,
-        },
-      });
-
-      await tx.financialLedgerEntry.create({
-        data: {
-          entryNo: `JRN-TRF-DST-${transferNo}`,
-          entryDate: new Date(),
-          storeCode: destStore,
-          accountCategory: 'ASSET',
-          accountName: 'Inventory Asset (Store Inbound Receipt)',
-          debit: totalTransferValue,
-          credit: 0,
-          amount: totalTransferValue,
-          refType: 'STOCK_TRANSFER',
-          refId: createdTransfer.id,
-          refNo: transferNo,
-          description: `Stock received at ${destStore} from ${sourceStore} at Transfer Price (${transferNo})`,
-          isEliminated: true,
-          createdBy: input.requestedBy,
-        },
-      });
-
-      await tx.financialLedgerEntry.create({
-        data: {
-          entryNo: `JRN-TRF-DST-CLR-${transferNo}`,
-          entryDate: new Date(),
-          storeCode: destStore,
-          accountCategory: 'LIABILITY',
-          accountName: 'Inter-Store Payable Clearing',
-          debit: 0,
-          credit: totalTransferValue,
-          amount: totalTransferValue,
-          refType: 'STOCK_TRANSFER',
-          refId: createdTransfer.id,
-          refNo: transferNo,
-          description: `Inter-store transfer payable clearing for receipt from ${sourceStore} (${transferNo})`,
-          isEliminated: true,
-          createdBy: input.requestedBy,
-        },
+      // 6. Record Double-Entry Financial Ledger Entries atomically in a single batched query
+      await tx.financialLedgerEntry.createMany({
+        data: [
+          {
+            entryNo: `JRN-TRF-MKP-${transferNo}`,
+            entryDate: new Date(),
+            storeCode: sourceStore,
+            accountCategory: 'TRANSFER_MARKUP',
+            accountName: 'Central Stock Transfer Markup',
+            debit: grossProfit < 0 ? Math.abs(grossProfit) : 0,
+            credit: grossProfit >= 0 ? grossProfit : 0,
+            amount: grossProfit,
+            refType: 'STOCK_TRANSFER',
+            refId: createdTransfer.id,
+            refNo: transferNo,
+            description: `Internal Transfer Margin from ${sourceStore} to ${destStore} (${transferNo})`,
+            isEliminated: true,
+            createdBy: input.requestedBy,
+          },
+          {
+            entryNo: `JRN-TRF-CLR-${transferNo}`,
+            entryDate: new Date(),
+            storeCode: sourceStore,
+            accountCategory: 'ASSET',
+            accountName: 'Inter-Store Clearing Account',
+            debit: totalTransferValue,
+            credit: 0,
+            amount: totalTransferValue,
+            refType: 'STOCK_TRANSFER',
+            refId: createdTransfer.id,
+            refNo: transferNo,
+            description: `Inter-store transfer clearing to ${destStore} (${transferNo})`,
+            isEliminated: true,
+            createdBy: input.requestedBy,
+          },
+          {
+            entryNo: `JRN-TRF-SRC-${transferNo}`,
+            entryDate: new Date(),
+            storeCode: sourceStore,
+            accountCategory: 'ASSET',
+            accountName: 'Inventory Asset (Inter-Store Dispatch)',
+            debit: 0,
+            credit: totalCost,
+            amount: -totalCost,
+            refType: 'STOCK_TRANSFER',
+            refId: createdTransfer.id,
+            refNo: transferNo,
+            description: `Stock dispatched from ${sourceStore} to ${destStore} (${transferNo})`,
+            isEliminated: true,
+            createdBy: input.requestedBy,
+          },
+          {
+            entryNo: `JRN-TRF-DST-${transferNo}`,
+            entryDate: new Date(),
+            storeCode: destStore,
+            accountCategory: 'ASSET',
+            accountName: 'Inventory Asset (Store Inbound Receipt)',
+            debit: totalTransferValue,
+            credit: 0,
+            amount: totalTransferValue,
+            refType: 'STOCK_TRANSFER',
+            refId: createdTransfer.id,
+            refNo: transferNo,
+            description: `Stock received at ${destStore} from ${sourceStore} at Transfer Price (${transferNo})`,
+            isEliminated: true,
+            createdBy: input.requestedBy,
+          },
+          {
+            entryNo: `JRN-TRF-DST-CLR-${transferNo}`,
+            entryDate: new Date(),
+            storeCode: destStore,
+            accountCategory: 'LIABILITY',
+            accountName: 'Inter-Store Payable Clearing',
+            debit: 0,
+            credit: totalTransferValue,
+            amount: totalTransferValue,
+            refType: 'STOCK_TRANSFER',
+            refId: createdTransfer.id,
+            refNo: transferNo,
+            description: `Inter-store transfer payable clearing for receipt from ${sourceStore} (${transferNo})`,
+            isEliminated: true,
+            createdBy: input.requestedBy,
+          },
+        ],
       });
 
       // 7. Record Audit Log Entry
@@ -304,7 +285,7 @@ export async function executeStockTransfer(input: CreateTransferInput) {
         data: {
           module: 'Central Profit',
           action: 'Execute Stock Transfer',
-          details: `Dispatched ${totalUnits} units from ${sourceStore} to ${destStore} (Transfer Value: ₹${totalTransferValue.toFixed(2)}, Central Profit: ₹${grossProfit.toFixed(2)})`,
+          details: `Dispatched ${totalUnits} units from ${sourceStore} to ${destStore} (Transfer Value: ${formatTransferINR(totalTransferValue)}, Central Profit: ${formatTransferINR(grossProfit, { showPositiveSign: true })})`,
           userEmail: input.requestedBy,
           userRole: 'Super Admin',
           storeCode: sourceStore,
@@ -314,8 +295,8 @@ export async function executeStockTransfer(input: CreateTransferInput) {
       return createdTransfer;
     },
     {
-      maxWait: 10000, // 10s wait for connection pool
-      timeout: 15000, // 15s interactive timeout safe for remote cloud MySQL SSL
+      maxWait: 15000,
+      timeout: 45000,
     }
   );
 

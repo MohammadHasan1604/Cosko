@@ -4,10 +4,13 @@ import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
+import CategoryFormModal from '@/components/forms/CategoryFormModal';
+import CategoryTypeModal from '@/components/forms/CategoryTypeModal';
+import CategoryTypeManagerModal from '@/components/forms/CategoryTypeManagerModal';
 import { useApp, CategoryItem } from '@/context/AppContext';
 
 export default function CategoriesPage() {
-  const { categoriesList, addCategory, updateCategory, toggleCategoryStatus, deleteCategory, inventory, branding, currentUser } = useApp();
+  const { categoriesList, categoryTypes, toggleCategoryStatus, deleteCategory, inventory, branding, currentUser } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('All');
@@ -15,20 +18,14 @@ export default function CategoriesPage() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
 
-  // Form State
-  const [formName, setFormName] = useState('');
-  const [formParentId, setFormParentId] = useState<string>('');
-  const [formType, setFormType] = useState<CategoryItem['categoryType']>('Spare Part');
-  const [formDescription, setFormDescription] = useState('');
-  const [formSortOrder, setFormSortOrder] = useState<number>(0);
-  const [formActive, setFormActive] = useState<boolean>(true);
+  // Category Types child modals
+  const [createTypeOpen, setCreateTypeOpen] = useState(false);
+  const [manageTypesOpen, setManageTypesOpen] = useState(false);
 
-  const categoryTypes = ['All', 'Device', 'Spare Part', 'Accessory', 'Service', 'EV', 'Home Appliance', 'Product'];
-
-  // Top-level parent categories for dropdown
-  const topLevelCategories = useMemo(() => {
-    return categoriesList.filter((c) => !c.parentCategoryId && c.status !== 'Archived');
-  }, [categoriesList]);
+  // Dynamic category types list from root database
+  const dynamicCategoryTypes = useMemo(() => {
+    return ['All', ...categoryTypes.map((t) => t.name)];
+  }, [categoryTypes]);
 
   // Filtered categories
   const filteredCategories = useMemo(() => {
@@ -64,55 +61,12 @@ export default function CategoriesPage() {
 
   const handleOpenAddModal = () => {
     setEditingCategory(null);
-    setFormName('');
-    setFormParentId('');
-    setFormType('Spare Part');
-    setFormDescription('');
-    setFormSortOrder(categoriesList.length + 1);
-    setFormActive(true);
     setAddModalOpen(true);
   };
 
   const handleOpenEditModal = (cat: CategoryItem) => {
     setEditingCategory(cat);
-    setFormName(cat.name);
-    setFormParentId(cat.parentCategoryId || '');
-    setFormType(cat.categoryType);
-    setFormDescription(cat.description || '');
-    setFormSortOrder(cat.sortOrder);
-    setFormActive(cat.status === 'Active');
     setAddModalOpen(true);
-  };
-
-  const handleSubmitForm = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formName.trim()) return;
-
-    const baseSlug = formName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-    const slug = `${baseSlug}-${Date.now().toString(36).substring(0, 4)}`;
-
-    if (editingCategory) {
-      updateCategory(editingCategory.id, {
-        name: formName.trim(),
-        parentCategoryId: formParentId || null,
-        categoryType: formType,
-        description: formDescription.trim() || undefined,
-        sortOrder: Number(formSortOrder) || 0,
-        status: formActive ? 'Active' : 'Inactive',
-      });
-    } else {
-      addCategory({
-        name: formName.trim(),
-        slug,
-        parentCategoryId: formParentId || null,
-        categoryType: formType,
-        description: formDescription.trim() || undefined,
-        sortOrder: Number(formSortOrder) || 0,
-        status: formActive ? 'Active' : 'Inactive',
-        createdBy: currentUser.email || currentUser.name,
-      });
-    }
-    setAddModalOpen(false);
   };
 
   const [confirmDeleteCat, setConfirmDeleteCat] = useState<CategoryItem | null>(null);
@@ -147,6 +101,22 @@ export default function CategoriesPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setCreateTypeOpen(true)}
+              className="btn-secondary gap-1.5 text-xs font-semibold py-2"
+            >
+              <Icon name="PlusCircleIcon" size={14} className="text-primary" />
+              + Add New Type
+            </button>
+            <button
+              type="button"
+              onClick={() => setManageTypesOpen(true)}
+              className="btn-secondary gap-1.5 text-xs font-semibold py-2"
+            >
+              <Icon name="Cog6ToothIcon" size={14} />
+              Manage Types
+            </button>
             <button onClick={handleOpenAddModal} className="btn-primary gap-1.5 text-xs sm:text-sm font-bold">
               <Icon name="PlusIcon" size={15} />
               Add Category
@@ -203,7 +173,7 @@ export default function CategoriesPage() {
               onChange={(e) => setSelectedType(e.target.value)}
               className="input-field py-2 text-xs"
             >
-              {categoryTypes.map((t) => (
+              {dynamicCategoryTypes.map((t) => (
                 <option key={`type-${t}`} value={t}>{t === 'All' ? 'All Types' : t}</option>
               ))}
             </select>
@@ -338,98 +308,27 @@ export default function CategoriesPage() {
           </div>
         </div>
 
-        {/* Add / Edit Category Modal */}
-        {addModalOpen && (
-          <Modal
-            open={addModalOpen}
-            onClose={() => setAddModalOpen(false)}
-            title={editingCategory ? 'Edit Category' : 'Create New Category'}
-            subtitle="Category will synchronize across Catalog, POS, Inventory, and Purchase orders."
-            size="md"
-          >
-            <form onSubmit={handleSubmitForm} className="space-y-4 py-2">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Category Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Mobile Accessories, EV Battery, Screen / Display"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="input-field text-xs font-bold"
-                  autoFocus
-                />
-              </div>
+        {/* Unified Single-Source-of-Truth Category Modal */}
+        <CategoryFormModal
+          open={addModalOpen}
+          onClose={() => {
+            setAddModalOpen(false);
+            setEditingCategory(null);
+          }}
+          category={editingCategory}
+        />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Parent Category Group (Optional)</label>
-                  <select
-                    value={formParentId}
-                    onChange={(e) => setFormParentId(e.target.value)}
-                    className="input-field text-xs"
-                  >
-                    <option value="">None (Top-Level Root Group)</option>
-                    {topLevelCategories.map((c) => (
-                      <option key={`parent-opt-${c.id}`} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
+        {/* Dynamic Category Type Modals */}
+        <CategoryTypeModal
+          open={createTypeOpen}
+          onClose={() => setCreateTypeOpen(false)}
+        />
 
-                <div>
-                  <label className="text-xs font-bold text-foreground block mb-1">Category Type *</label>
-                  <select
-                    value={formType}
-                    onChange={(e: any) => setFormType(e.target.value)}
-                    className="input-field text-xs"
-                  >
-                    <option value="Spare Part">Spare Part / Repair</option>
-                    <option value="Device">Device / Hardware</option>
-                    <option value="Accessory">Accessory</option>
-                    <option value="EV">EV / Electric Vehicle</option>
-                    <option value="Home Appliance">Home Appliance</option>
-                    <option value="Service">Service</option>
-                    <option value="Product">General Product</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Description (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Replacement parts and accessories for mobile smartphones"
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border">
-                <div>
-                  <p className="text-xs font-bold text-foreground">Active Status</p>
-                  <p className="text-3xs text-muted-foreground">Inactive categories are hidden from new product entries</p>
-                </div>
-                <ToggleSwitch
-                  checked={formActive}
-                  onChange={setFormActive}
-                  size="md"
-                  onText="ACTIVE"
-                  offText="INACTIVE"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-border">
-                <button type="button" onClick={() => setAddModalOpen(false)} className="btn-secondary text-xs">
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary text-xs font-bold px-5">
-                  {editingCategory ? 'Save Changes' : 'Create Category'}
-                </button>
-              </div>
-            </form>
-          </Modal>
-        )}
+        <CategoryTypeManagerModal
+          open={manageTypesOpen}
+          onClose={() => setManageTypesOpen(false)}
+          onOpenCreateNew={() => setCreateTypeOpen(true)}
+        />
 
         {/* Safe Delete / Archive Confirmation Dialog */}
         {confirmDeleteCat && (

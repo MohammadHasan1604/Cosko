@@ -42,7 +42,20 @@ export async function GET(req: NextRequest) {
     // Store isolation
     let storeFilter: string | undefined;
     if (user.role !== 'Super Admin') {
-      storeFilter = user.store;
+      const allowed = user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
+      if (requestedStore === 'All Stores' || requestedStore === 'ALL') {
+        return NextResponse.json(
+          { error: 'Forbidden: Consolidated reporting across all stores is restricted to Super Admin only' },
+          { status: 403 }
+        );
+      }
+      if (requestedStore && !allowed.includes(requestedStore)) {
+        return NextResponse.json(
+          { error: `Forbidden: Cross-store and consolidated reporting is restricted to Super Admin only` },
+          { status: 403 }
+        );
+      }
+      storeFilter = requestedStore || allowed[0];
     } else if (requestedStore && requestedStore !== 'All Stores' && requestedStore !== 'ALL') {
       storeFilter = requestedStore;
     }
@@ -73,19 +86,17 @@ export async function GET(req: NextRequest) {
         break;
     }
 
-    // Audit log
-    try {
-      await prisma.auditLog.create({
-        data: {
-          module: 'Reports',
-          action: `VIEW_REPORT_${report.toUpperCase()}`,
-          details: `Generated ${report} report: ${period}, Store: ${storeFilter || 'All Stores'}`,
-          userEmail: user.email,
-          userRole: user.role,
-          storeCode: storeFilter || 'ALL',
-        },
-      });
-    } catch {}
+    // Non-blocking Audit Log
+    prisma.auditLog.create({
+      data: {
+        module: 'Reports',
+        action: `VIEW_REPORT_${report.toUpperCase()}`,
+        details: `Generated ${report} report: ${period}, Store: ${storeFilter || 'All Stores'}`,
+        userEmail: user.email,
+        userRole: user.role,
+        storeCode: storeFilter || 'ALL',
+      },
+    }).catch(() => {});
 
     return NextResponse.json(
       { success: true, data, meta },

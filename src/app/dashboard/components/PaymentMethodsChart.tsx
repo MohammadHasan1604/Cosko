@@ -24,7 +24,7 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 };
 
 export default function PaymentMethodsChart() {
-  const { sales, selectedStore, datePeriod, customDateRange } = useApp();
+  const { sales, selectedStore, datePeriod, customDateRange, paymentMethods } = useApp();
 
   const filteredSales = sales.filter((s) => {
     const isStore = selectedStore === 'All Stores' || s.store === selectedStore;
@@ -33,7 +33,14 @@ export default function PaymentMethodsChart() {
     return isStore && isDate && isValid;
   });
 
-  const methodTotals: Record<string, number> = { UPI: 0, Cash: 0, Card: 0, Credit: 0 };
+  // Dynamically initialize from master payment methods list
+  const methodTotals: Record<string, number> = {};
+  paymentMethods.forEach((pm) => {
+    if (pm.status === 'Active') {
+      methodTotals[pm.name] = 0;
+    }
+  });
+
   let grandTotal = 0;
 
   filteredSales.forEach((s) => {

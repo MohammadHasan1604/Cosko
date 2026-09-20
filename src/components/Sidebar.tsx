@@ -45,25 +45,25 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
     'Super Admin': [
       '/dashboard', '/sales', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/customers',
       '/vendors', '/expenses', '/accounting', '/central-profit',
-      '/reports', '/employees', '/stores', '/users', '/audit-logs', '/settings'
+      '/reports', '/employees', '/stores', '/users', '/work-activity', '/audit-logs', '/settings'
     ],
     'Store Manager': [
       '/dashboard', '/sales', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/customers',
       '/vendors', '/expenses', '/accounting', '/central-profit',
-      '/reports', '/employees'
+      '/reports', '/employees', '/work-activity'
     ],
     'Inventory Auditor': [
-      '/dashboard', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/vendors', '/reports'
+      '/dashboard', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/vendors', '/reports', '/work-activity'
     ],
     'POS Cashier': [
-      '/sales', '/customers'
+      '/sales', '/customers', '/work-activity'
     ],
     'Sales Executive': [
-      '/sales', '/customers'
+      '/sales', '/customers', '/work-activity'
     ],
   };
 
-  const allowedHrefs = roleAllowedHrefs[currentUser.role] || ['/sales'];
+  const allowedHrefs = roleAllowedHrefs[currentUser.role] || ['/sales', '/work-activity'];
 
   const rawNavGroups: NavGroup[] = [
     {
@@ -103,6 +103,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
         { id: 'nav-employees', label: 'Employees', icon: 'UserGroupIcon', href: '/employees' },
         { id: 'nav-stores', label: 'Stores', icon: 'MapPinIcon', href: '/stores' },
         { id: 'nav-users', label: 'Users & Roles', icon: 'ShieldCheckIcon', href: '/users' },
+        { id: 'nav-work-activity', label: 'Work Activity', icon: 'ClockIcon', href: '/work-activity' },
       ],
     },
     {
@@ -118,7 +119,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   const navGroups = rawNavGroups
     .map((g) => ({
       ...g,
-      items: g.items.filter((item) => allowedHrefs.includes(item.href)),
+      items: currentUser.role === 'Super Admin' ? g.items : g.items.filter((item) => allowedHrefs.includes(item.href)),
     }))
     .filter((g) => g.items.length > 0);
 
@@ -182,32 +183,65 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
         )}
       </div>
 
-      {/* Store selector */}
-      {!isCollapsed && (
-        <div className="px-2.5 py-2.5 border-b border-border/80 flex-shrink-0">
-          <div
-            onClick={() => setStoreSelectorOpen(true)}
-            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-muted/40 border border-border/80 cursor-pointer hover:bg-muted hover:border-slate-300 transition-all duration-150 shadow-2xs group"
-          >
-            <div className={`w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-3xs font-bold shadow-2xs ${
-              selectedStore === 'All Stores' ? 'bg-primary' : selectedStore === 'CENTRAL' ? 'bg-slate-800' : 'gradient-primary'
-            }`}>
-              {selectedStore === 'All Stores' ? 'ALL' : selectedStore.slice(0, 3)}
+      {/* Store selector: Super Admin interactive switcher vs Multi-Store Team Member vs Single-Store */}
+      {!isCollapsed && (() => {
+        const isSuperAdmin = currentUser.role === 'Super Admin';
+        const userAllowed = currentUser.allowedStores && currentUser.allowedStores.length > 0
+          ? currentUser.allowedStores
+          : (currentUser.store && currentUser.store !== 'All Stores' ? [currentUser.store] : ['BLR']);
+        const canSwitch = isSuperAdmin || userAllowed.length > 1;
+
+        if (canSwitch) {
+          return (
+            <div className="px-2.5 py-2.5 border-b border-border/80 flex-shrink-0">
+              <div
+                onClick={() => setStoreSelectorOpen(true)}
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-muted/40 border border-border/80 cursor-pointer hover:bg-muted hover:border-slate-300 transition-all duration-150 shadow-2xs group"
+                title={isSuperAdmin ? "Super Admin: Click to switch active store scope" : "Click to switch between your assigned stores"}
+              >
+                <div className={`w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-3xs font-bold shadow-2xs ${
+                  selectedStore === 'All Stores' ? 'bg-primary' : selectedStore === 'CENTRAL' ? 'bg-slate-800' : 'gradient-primary'
+                }`}>
+                  {selectedStore === 'All Stores' ? 'ALL' : selectedStore.slice(0, 3)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-foreground truncate leading-tight group-hover:text-primary transition-colors">{branding.appName}</p>
+                  <p className="text-3xs text-muted-foreground truncate leading-tight mt-0.5">
+                    {selectedStore === 'All Stores'
+                      ? 'Consolidated View'
+                      : selectedStore === 'CENTRAL'
+                      ? 'Central Warehouse'
+                      : `${selectedStore} Store`}
+                  </p>
+                </div>
+                <Icon name="ChevronUpDownIcon" size={14} className="text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors" />
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-foreground truncate leading-tight group-hover:text-primary transition-colors">{branding.appName}</p>
-              <p className="text-3xs text-muted-foreground truncate leading-tight mt-0.5">
-                {selectedStore === 'All Stores'
-                  ? 'Consolidated View'
-                  : selectedStore === 'CENTRAL'
-                  ? 'Central Warehouse'
-                  : `${selectedStore} Store`}
-              </p>
+          );
+        }
+
+        return (
+          <div className="px-2.5 py-2.5 border-b border-border/80 flex-shrink-0">
+            <div
+              className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-muted/20 border border-border/60 shadow-2xs select-none"
+              title={`Store Scope: Assigned to ${userAllowed[0] || currentUser.store || selectedStore}`}
+            >
+              <div className="w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-3xs font-bold shadow-2xs gradient-primary">
+                {(userAllowed[0] || currentUser.store || selectedStore || 'BLR').slice(0, 3)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-foreground truncate leading-tight">{branding.appName}</p>
+                <p className="text-3xs text-muted-foreground truncate leading-tight mt-0.5">
+                  {userAllowed[0] || currentUser.store || selectedStore} Store Hub
+                </p>
+              </div>
+              <span className="text-3xs font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/60">
+                Assigned
+              </span>
             </div>
-            <Icon name="ChevronUpDownIcon" size={14} className="text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors" />
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Nav groups */}
       <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 py-3 space-y-5">

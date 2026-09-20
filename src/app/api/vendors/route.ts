@@ -3,6 +3,7 @@ import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 import { validateAndNormalizeGstin } from '@/lib/gstUtils';
+import { executeWithIdempotency } from '@/lib/idempotency';
 
 /**
  * GET /api/vendors - Retrieve all vendors with authoritative, reconciled financial payables
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
 
     const vendors = await (prisma as any).vendor.findMany({
       where: whereClause,
-      orderBy: { name: 'asc' },
+      orderBy: { createdAt: 'desc' },
       include: {
         purchases: {
           where: {
@@ -36,16 +37,16 @@ export async function GET(req: NextRequest) {
           },
           select: {
             id: true,
-            poNo: true,
-            invoiceNo: true,
             totalCost: true,
             paidAmount: true,
             creditAmount: true,
-            paymentStatus: true,
-            status: true,
-            orderDate: true,
-            expectedDate: true,
             dueDate: true,
+            expectedDate: true,
+            payments: {
+              select: {
+                amount: true,
+              },
+            },
           },
         },
       },
@@ -65,9 +66,9 @@ export async function GET(req: NextRequest) {
 
       v.purchases?.forEach((po: any) => {
         const cost = Number(po.totalCost) || 0;
-        const paid = Number(po.paidAmount) || 0;
+        const paid = po.payments?.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0) ?? (Number(po.paidAmount) || 0);
         const credit = Number(po.creditAmount) || 0;
-        const remaining = Math.max(0, cost - paid - credit);
+        const remaining = Math.max(0, Math.round((cost - paid - credit) * 100) / 100);
 
         totalBilledAmount += cost;
         totalPaidAmount += paid;
@@ -139,68 +140,84 @@ export async function POST(req: NextRequest) {
     }
     const cleanGstin = gstinValidation.normalized;
 
-    let code = body.code?.trim();
-    if (!code) {
-      const allVendors = await (prisma as any).vendor.findMany({ select: { code: true } });
-      let maxNum = 0;
-      for (const v of allVendors) {
-        const match = v.code.match(/^VND-(\d+)$/);
-        if (match) {
-          const num = parseInt(match[1], 10);
-          if (num > maxNum) maxNum = num;
+    const customKey =
+      body.idempotencyKey ||
+      req.headers.get('x-idempotency-key') ||
+      `vnd_${body.name.trim()}_${cleanGstin || 'nogst'}_${Date.now()}`;
+
+    return await executeWithIdempotency(
+      req,
+      {
+        action: 'CREATE_VENDOR',
+        key: customKey,
+        userId: user.id,
+        extractEntityId: (d) => d?.vendor?.id || d?.vendor?.code,
+      },
+      async () => {
+        let code = body.code?.trim();
+        if (!code) {
+          const allVendors = await (prisma as any).vendor.findMany({ select: { code: true } });
+          let maxNum = 0;
+          for (const v of allVendors) {
+            const match = v.code.match(/^VND-(\d+)$/);
+            if (match) {
+              const num = parseInt(match[1], 10);
+              if (num > maxNum) maxNum = num;
+            }
+          }
+          code = `VND-${String(maxNum + 1).padStart(4, '0')}`;
         }
+
+        const vendor = await (prisma as any).vendor.upsert({
+          where: { code },
+          create: {
+            code,
+            name: body.name.trim(),
+            contactPerson: body.contactPerson?.trim() || 'Account Manager',
+            email: body.email?.trim() || `${body.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@vendor.com`,
+            phone: body.phone?.trim() || '+91 00000 00000',
+            city: body.city?.trim() || 'Central',
+            address: body.address?.trim() || null,
+            categories: body.categories?.trim() || body.category?.trim() || 'General',
+            gstin: cleanGstin,
+            leadTimeDays: body.leadTimeDays !== undefined && body.leadTimeDays !== null && body.leadTimeDays !== '' ? Number(body.leadTimeDays) : null,
+            rating: body.rating ? Number(body.rating) : 5.0,
+            paymentTerms: body.paymentTerms?.trim() || 'Net 30',
+            status: body.status || 'Active',
+          },
+          update: {
+            name: body.name.trim(),
+            ...(body.contactPerson ? { contactPerson: body.contactPerson.trim() } : {}),
+            ...(body.email ? { email: body.email.trim() } : {}),
+            ...(body.phone ? { phone: body.phone.trim() } : {}),
+            ...(body.city ? { city: body.city.trim() } : {}),
+            ...(body.address !== undefined ? { address: body.address?.trim() || null } : {}),
+            ...(body.categories || body.category ? { categories: (body.categories || body.category).trim() } : {}),
+            gstin: cleanGstin,
+            ...(body.leadTimeDays !== undefined ? { leadTimeDays: (body.leadTimeDays !== null && body.leadTimeDays !== '') ? Number(body.leadTimeDays) : null } : {}),
+            ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
+            ...(body.paymentTerms ? { paymentTerms: body.paymentTerms.trim() } : {}),
+            ...(body.status ? { status: body.status } : {}),
+          },
+        });
+
+        // Write audit log
+        await (prisma as any).auditLog.create({
+          data: {
+            module: 'Vendors',
+            action: 'Onboard Vendor',
+            details: `Onboarded vendor "${vendor.name}" (${vendor.code}). GSTIN: ${cleanGstin || 'None'}, Terms: ${vendor.paymentTerms}`,
+            userEmail: user.email || user.name,
+            userRole: user.role,
+            storeCode: 'CENTRAL',
+          },
+        });
+
+        broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: vendor.id, code: vendor.code, name: vendor.name, action: 'saved' });
+
+        return { status: 201, data: { success: true, vendor } };
       }
-      code = `VND-${String(maxNum + 1).padStart(4, '0')}`;
-    }
-
-    const vendor = await (prisma as any).vendor.upsert({
-      where: { code },
-      create: {
-        code,
-        name: body.name.trim(),
-        contactPerson: body.contactPerson?.trim() || 'Account Manager',
-        email: body.email?.trim() || `${body.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@vendor.com`,
-        phone: body.phone?.trim() || '+91 00000 00000',
-        city: body.city?.trim() || 'Central',
-        address: body.address?.trim() || null,
-        categories: body.categories?.trim() || body.category?.trim() || 'General',
-        gstin: cleanGstin,
-        leadTimeDays: body.leadTimeDays ? Number(body.leadTimeDays) : 3,
-        rating: body.rating ? Number(body.rating) : 5.0,
-        paymentTerms: body.paymentTerms?.trim() || 'Net 30',
-        status: body.status || 'Active',
-      },
-      update: {
-        name: body.name.trim(),
-        ...(body.contactPerson ? { contactPerson: body.contactPerson.trim() } : {}),
-        ...(body.email ? { email: body.email.trim() } : {}),
-        ...(body.phone ? { phone: body.phone.trim() } : {}),
-        ...(body.city ? { city: body.city.trim() } : {}),
-        ...(body.address !== undefined ? { address: body.address?.trim() || null } : {}),
-        ...(body.categories || body.category ? { categories: (body.categories || body.category).trim() } : {}),
-        gstin: cleanGstin,
-        ...(body.leadTimeDays !== undefined ? { leadTimeDays: Number(body.leadTimeDays) } : {}),
-        ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
-        ...(body.paymentTerms ? { paymentTerms: body.paymentTerms.trim() } : {}),
-        ...(body.status ? { status: body.status } : {}),
-      },
-    });
-
-    // Write audit log
-    await (prisma as any).auditLog.create({
-      data: {
-        module: 'Vendors',
-        action: 'Onboard Vendor',
-        details: `Onboarded vendor "${vendor.name}" (${vendor.code}). GSTIN: ${cleanGstin || 'None'}, Terms: ${vendor.paymentTerms}`,
-        userEmail: user.email || user.name,
-        userRole: user.role,
-        storeCode: 'CENTRAL',
-      },
-    });
-
-    broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: vendor.id, code: vendor.code, name: vendor.name, action: 'saved' });
-
-    return NextResponse.json({ success: true, vendor }, { status: 201 });
+    );
   } catch (error: any) {
     console.error('API /api/vendors POST error:', error);
     return NextResponse.json({ error: error.message || 'Failed to save vendor' }, { status: 500 });

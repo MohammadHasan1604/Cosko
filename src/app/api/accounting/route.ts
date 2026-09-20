@@ -26,9 +26,21 @@ export async function GET(req: NextRequest) {
     const endDateParam = searchParams.get('endDate');
     const view = searchParams.get('view') || 'all';
 
-    // Store isolation check for non-Super Admin
+    // Store isolation check: Super Admin Only for cross-store or consolidated accounting
     let effectiveStore: string = requestedStore;
     if (user.role !== 'Super Admin') {
+      if (requestedStore && requestedStore !== 'All Stores' && requestedStore !== user.store) {
+        return NextResponse.json(
+          { error: 'Forbidden: You do not have permission to access another store\'s accounting records.' },
+          { status: 403 }
+        );
+      }
+      if (requestedStore === 'All Stores' || view === 'consolidated' || view === 'central') {
+        return NextResponse.json(
+          { error: 'Forbidden: Consolidated and central views across stores are restricted to Super Admin only.' },
+          { status: 403 }
+        );
+      }
       effectiveStore = user.store;
     }
 
@@ -56,11 +68,12 @@ export async function GET(req: NextRequest) {
       endDate,
     };
 
-    // Parallel fetch required statements
+    // Parallel fetch required statements (non-Super Admin never gets consolidated or central statements)
+    const isSuperAdmin = user.role === 'Super Admin';
     const [consolidated, storePnL, centralPnL] = await Promise.all([
-      view === 'all' || view === 'consolidated' ? getConsolidatedPnL(filter) : null,
+      isSuperAdmin && (view === 'all' || view === 'consolidated') ? getConsolidatedPnL(filter) : null,
       view === 'all' || view === 'store' ? getStoreOperationalPnL(filter) : null,
-      view === 'all' || view === 'central' ? getCentralTransferPnL({ startDate, endDate }) : null,
+      isSuperAdmin && (view === 'all' || view === 'central') ? getCentralTransferPnL({ startDate, endDate }) : null,
     ]);
 
     return NextResponse.json(

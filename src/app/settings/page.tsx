@@ -5,8 +5,10 @@ import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
 import CoskoLogo from '@/components/ui/CoskoLogo';
-import { useApp } from '@/context/AppContext';
+import { useApp, PaymentMethodItem } from '@/context/AppContext';
 import { toast } from 'sonner';
+import ToggleSwitch from '@/components/ui/ToggleSwitch';
+import PaymentMethodModal from '@/components/forms/PaymentMethodModal';
 
 // GSTIN Regex: 2 digit state code + 10-char PAN + 1 entity code + Z + 1 checksum
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -25,9 +27,27 @@ const INDIAN_STATES: Record<string, string> = {
 };
 
 export default function SettingsPage() {
-  const { branding, updateBranding, resetBranding, systemSettings, updateSystemSettings, reloadSettings, currentUser } = useApp();
-  const [activeTab, setActiveTab] = useState<'branding' | 'profile' | 'tax' | 'invoice' | 'security' | 'alerts'>('branding');
+  const {
+    branding,
+    updateBranding,
+    resetBranding,
+    systemSettings,
+    updateSystemSettings,
+    reloadSettings,
+    currentUser,
+    paymentMethods,
+    updatePaymentMethod,
+    deletePaymentMethod,
+    confirmAction,
+  } = useApp();
+  const [activeTab, setActiveTab] = useState<'branding' | 'profile' | 'tax' | 'invoice' | 'security' | 'alerts' | 'payment-methods'>('branding');
   const [isSaving, setIsSaving] = useState(false);
+
+  // ─── Tab 7: Payment Methods Master State ───
+  const [pmSearch, setPmSearch] = useState('');
+  const [pmStatusFilter, setPmStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
+  const [selectedPmForEdit, setSelectedPmForEdit] = useState<PaymentMethodItem | null>(null);
+  const [pmModalOpen, setPmModalOpen] = useState(false);
 
   const isSuperAdmin = currentUser?.role === 'Super Admin';
 
@@ -73,7 +93,7 @@ export default function SettingsPage() {
   const [paymentBankDetails, setPaymentBankDetails] = useState(systemSettings.paymentBankDetails || 'HDFC Bank · A/C 50200012345678 · IFSC HDFC0001234');
 
   // ─── Tab 5: Security State ───
-  const [sessionTimeoutMins, setSessionTimeoutMins] = useState(systemSettings.sessionTimeoutMins ?? 30);
+  const [sessionTimeoutMins, setSessionTimeoutMins] = useState(systemSettings.sessionTimeoutMins ?? 43200);
   const [maxLoginAttempts, setMaxLoginAttempts] = useState(systemSettings.maxLoginAttempts ?? 5);
   const [enforcePasswordPolicy, setEnforcePasswordPolicy] = useState(systemSettings.enforcePasswordPolicy ?? true);
   const [sensitiveActionConfirm, setSensitiveActionConfirm] = useState(systemSettings.sensitiveActionConfirm ?? true);
@@ -128,7 +148,7 @@ export default function SettingsPage() {
       setPaymentUpiId(systemSettings.paymentUpiId || 'cosko@icici');
       setPaymentBankDetails(systemSettings.paymentBankDetails || 'HDFC Bank · A/C 50200012345678 · IFSC HDFC0001234');
 
-      setSessionTimeoutMins(systemSettings.sessionTimeoutMins ?? 30);
+      setSessionTimeoutMins(systemSettings.sessionTimeoutMins ?? 43200);
       setMaxLoginAttempts(systemSettings.maxLoginAttempts ?? 5);
       setEnforcePasswordPolicy(systemSettings.enforcePasswordPolicy ?? true);
       setSensitiveActionConfirm(systemSettings.sensitiveActionConfirm ?? true);
@@ -365,6 +385,7 @@ export default function SettingsPage() {
               { id: 'invoice', label: 'Invoice Template', icon: 'DocumentTextIcon' },
               { id: 'security', label: 'Security & RBAC', icon: 'ShieldCheckIcon' },
               { id: 'alerts', label: 'Automated Alerts', icon: 'BellIcon' },
+              { id: 'payment-methods', label: 'Payment Methods', icon: 'CreditCardIcon' },
             ] as const
           ).map((tab) => (
             <button
@@ -821,32 +842,45 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 pt-2 border-t border-border">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
+                <div className="space-y-3 pt-2 border-t border-border">
+                  <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-card/60">
+                    <div>
+                      <span className="font-bold text-foreground block text-xs">
+                        Enforce Mandatory HSN/SAC Codes
+                      </span>
+                      <span className="text-3xs text-muted-foreground block">
+                        Require valid HSN/SAC classification on all invoice line items.
+                      </span>
+                    </div>
+                    <ToggleSwitch
                       id="hsn"
                       disabled={!isSuperAdmin}
                       checked={hsnMandatory}
-                      onChange={(e) => setHsnMandatory(e.target.checked)}
-                      className="rounded"
+                      onChange={setHsnMandatory}
+                      size="sm"
+                      onText="ON"
+                      offText="OFF"
                     />
-                    <label htmlFor="hsn" className="font-bold text-foreground cursor-pointer">
-                      Enforce Mandatory HSN/SAC Codes on Invoice Generation
-                    </label>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
+
+                  <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-card/60">
+                    <div>
+                      <span className="font-bold text-foreground block text-xs">
+                        Reverse Charge Mechanism (RCM)
+                      </span>
+                      <span className="text-3xs text-muted-foreground block">
+                        Enable Reverse Charge Mechanism applicability flag on B2B invoices.
+                      </span>
+                    </div>
+                    <ToggleSwitch
                       id="rcm"
                       disabled={!isSuperAdmin}
                       checked={enableReverseCharge}
-                      onChange={(e) => setEnableReverseCharge(e.target.checked)}
-                      className="rounded"
+                      onChange={setEnableReverseCharge}
+                      size="sm"
+                      onText="ON"
+                      offText="OFF"
                     />
-                    <label htmlFor="rcm" className="font-bold text-foreground cursor-pointer">
-                      Enable Reverse Charge Mechanism (RCM) applicability flag on B2B invoices
-                    </label>
                   </div>
                 </div>
               </div>
@@ -1041,34 +1075,46 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
+                <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-card/60">
+                  <div>
+                    <span className="font-bold text-foreground block text-xs">
+                      Store Address on Invoices
+                    </span>
+                    <span className="text-3xs text-muted-foreground block">
+                      Automatically include registered store outlet address and manager contact on invoices.
+                    </span>
+                  </div>
+                  <ToggleSwitch
                     id="showStore"
                     disabled={!isSuperAdmin}
                     checked={showStoreAddress}
-                    onChange={(e) => setShowStoreAddress(e.target.checked)}
-                    className="rounded"
+                    onChange={setShowStoreAddress}
+                    size="sm"
+                    onText="ON"
+                    offText="OFF"
                   />
-                  <label htmlFor="showStore" className="font-bold text-foreground cursor-pointer">
-                    Automatically include registered store outlet address and manager contact on invoices
-                  </label>
                 </div>
 
                 {/* UPI QR Settings */}
                 <div className="p-4 rounded-xl border border-border bg-card/60 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-foreground block text-xs">
+                        Instant UPI Payment QR Code
+                      </span>
+                      <span className="text-3xs text-muted-foreground block">
+                        Print instant UPI QR code on generated invoices and checkout thermal receipts.
+                      </span>
+                    </div>
+                    <ToggleSwitch
                       id="showQr"
                       disabled={!isSuperAdmin}
                       checked={showPaymentQr}
-                      onChange={(e) => setShowPaymentQr(e.target.checked)}
-                      className="rounded"
+                      onChange={setShowPaymentQr}
+                      size="sm"
+                      onText="ON"
+                      offText="OFF"
                     />
-                    <label htmlFor="showQr" className="font-bold text-foreground cursor-pointer">
-                      Print Instant UPI Payment QR Code on Invoices & Receipts
-                    </label>
                   </div>
 
                   {showPaymentQr && (
@@ -1139,17 +1185,17 @@ export default function SettingsPage() {
               <div className="space-y-4 text-xs">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="font-bold text-foreground block mb-1">Inactivity Session Timeout (Minutes)</label>
+                    <label className="font-bold text-foreground block mb-1">Inactivity Session Timeout (Minutes · 30 Days = 43200m)</label>
                     <input
                       type="number"
                       min="5"
-                      max="480"
+                      max="43200"
                       disabled={!isSuperAdmin}
                       value={sessionTimeoutMins}
                       onChange={(e) => setSessionTimeoutMins(Number(e.target.value))}
                       className="input-field text-xs font-mono"
                     />
-                    <p className="text-3xs text-muted-foreground mt-0.5">Users will be safely prompted before automatic logout.</p>
+                    <p className="text-3xs text-muted-foreground mt-0.5">Global policy across all users (Default: 43,200 minutes / 30 days).</p>
                   </div>
                   <div>
                     <label className="font-bold text-foreground block mb-1">Max Failed Login Attempts</label>
@@ -1167,31 +1213,44 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-3 pt-2 border-t border-border">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
+                  <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-card/60">
+                    <div>
+                      <span className="font-bold text-foreground block text-xs">
+                        Enterprise Password Policy
+                      </span>
+                      <span className="text-3xs text-muted-foreground block">
+                        Enforce enterprise password complexity (min 8 chars, uppercase, digit, special character).
+                      </span>
+                    </div>
+                    <ToggleSwitch
                       id="policy"
                       disabled={!isSuperAdmin}
                       checked={enforcePasswordPolicy}
-                      onChange={(e) => setEnforcePasswordPolicy(e.target.checked)}
-                      className="rounded"
+                      onChange={setEnforcePasswordPolicy}
+                      size="sm"
+                      onText="ON"
+                      offText="OFF"
                     />
-                    <label htmlFor="policy" className="font-bold text-foreground cursor-pointer">
-                      Enforce enterprise password complexity (min 8 chars, uppercase, digit, special character)
-                    </label>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
+
+                  <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-card/60">
+                    <div>
+                      <span className="font-bold text-foreground block text-xs">
+                        Secondary Action Confirmation
+                      </span>
+                      <span className="text-3xs text-muted-foreground block">
+                        Require secondary confirmation for sensitive actions (void sales, inventory write-offs).
+                      </span>
+                    </div>
+                    <ToggleSwitch
                       id="sensitive"
                       disabled={!isSuperAdmin}
                       checked={sensitiveActionConfirm}
-                      onChange={(e) => setSensitiveActionConfirm(e.target.checked)}
-                      className="rounded"
+                      onChange={setSensitiveActionConfirm}
+                      size="sm"
+                      onText="ON"
+                      offText="OFF"
                     />
-                    <label htmlFor="sensitive" className="font-bold text-foreground cursor-pointer">
-                      Require secondary confirmation for sensitive actions (void sales, inventory write-offs, vendor bill eliminations)
-                    </label>
                   </div>
                 </div>
               </div>
@@ -1213,23 +1272,27 @@ export default function SettingsPage() {
               <div className="space-y-4 text-xs">
                 <div className="p-4 rounded-xl border border-border bg-card/60 space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        id="lowStock"
-                        disabled={!isSuperAdmin}
-                        checked={lowStockAlerts}
-                        onChange={(e) => setLowStockAlerts(e.target.checked)}
-                        className="rounded"
-                      />
-                      <label htmlFor="lowStock" className="font-bold text-foreground cursor-pointer">
-                        Trigger low stock warning alerts when store inventory drops below threshold
-                      </label>
+                    <div>
+                      <span className="font-bold text-foreground block text-xs">
+                        Low Stock Warning Alerts
+                      </span>
+                      <span className="text-3xs text-muted-foreground block">
+                        Trigger low stock warning alerts when store inventory drops below threshold.
+                      </span>
                     </div>
+                    <ToggleSwitch
+                      id="lowStock"
+                      disabled={!isSuperAdmin}
+                      checked={lowStockAlerts}
+                      onChange={setLowStockAlerts}
+                      size="sm"
+                      onText="ON"
+                      offText="OFF"
+                    />
                   </div>
                   {lowStockAlerts && (
-                    <div className="pl-6 pt-1 flex items-center gap-3">
-                      <label className="text-muted-foreground">Default threshold:</label>
+                    <div className="pl-2 pt-1 flex items-center gap-3">
+                      <label className="text-muted-foreground text-xs">Default threshold:</label>
                       <input
                         type="number"
                         min="1"
@@ -1239,28 +1302,34 @@ export default function SettingsPage() {
                         onChange={(e) => setLowStockThreshold(Number(e.target.value))}
                         className="input-field text-xs w-24 font-mono font-bold"
                       />
-                      <span className="text-muted-foreground">units per store</span>
+                      <span className="text-muted-foreground text-xs">units per store</span>
                     </div>
                   )}
                 </div>
 
                 <div className="p-4 rounded-xl border border-border bg-card/60 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-foreground block text-xs">
+                        Overdue Vendor Bill Reminders
+                      </span>
+                      <span className="text-3xs text-muted-foreground block">
+                        Trigger overdue vendor bill payment reminders and alerts.
+                      </span>
+                    </div>
+                    <ToggleSwitch
                       id="overdue"
                       disabled={!isSuperAdmin}
                       checked={overduePaymentAlerts}
-                      onChange={(e) => setOverduePaymentAlerts(e.target.checked)}
-                      className="rounded"
+                      onChange={setOverduePaymentAlerts}
+                      size="sm"
+                      onText="ON"
+                      offText="OFF"
                     />
-                    <label htmlFor="overdue" className="font-bold text-foreground cursor-pointer">
-                      Trigger overdue vendor bill payment reminders
-                    </label>
                   </div>
                   {overduePaymentAlerts && (
-                    <div className="pl-6 pt-1 flex items-center gap-3">
-                      <label className="text-muted-foreground">Alert after:</label>
+                    <div className="pl-2 pt-1 flex items-center gap-3">
+                      <label className="text-muted-foreground text-xs">Alert after:</label>
                       <input
                         type="number"
                         min="1"
@@ -1270,41 +1339,49 @@ export default function SettingsPage() {
                         onChange={(e) => setOverdueThresholdDays(Number(e.target.value))}
                         className="input-field text-xs w-24 font-mono font-bold"
                       />
-                      <span className="text-muted-foreground">days past invoice due date</span>
+                      <span className="text-muted-foreground text-xs">days past invoice due date</span>
                     </div>
                   )}
                 </div>
 
-                <div className="p-4 rounded-xl border border-border bg-card/60 space-y-2">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="digest"
-                      disabled={!isSuperAdmin}
-                      checked={dailySalesDigest}
-                      onChange={(e) => setDailySalesDigest(e.target.checked)}
-                      className="rounded"
-                    />
-                    <label htmlFor="digest" className="font-bold text-foreground cursor-pointer">
-                      Send daily store closing revenue & margin digest
-                    </label>
+                <div className="p-4 rounded-xl border border-border bg-card/60 flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-foreground block text-xs">
+                      Daily Closing Digest
+                    </span>
+                    <span className="text-3xs text-muted-foreground block">
+                      Send daily store closing revenue, sales volume and margin digest.
+                    </span>
                   </div>
+                  <ToggleSwitch
+                    id="digest"
+                    disabled={!isSuperAdmin}
+                    checked={dailySalesDigest}
+                    onChange={setDailySalesDigest}
+                    size="sm"
+                    onText="ON"
+                    offText="OFF"
+                  />
                 </div>
 
-                <div className="p-4 rounded-xl border border-border bg-card/60 space-y-2">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="securityAlerts"
-                      disabled={!isSuperAdmin}
-                      checked={securityEventAlerts}
-                      onChange={(e) => setSecurityEventAlerts(e.target.checked)}
-                      className="rounded"
-                    />
-                    <label htmlFor="securityAlerts" className="font-bold text-foreground cursor-pointer">
-                      Notify administrators immediately on critical security and permission events
-                    </label>
+                <div className="p-4 rounded-xl border border-border bg-card/60 flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-foreground block text-xs">
+                      Critical Security Alerts
+                    </span>
+                    <span className="text-3xs text-muted-foreground block">
+                      Notify administrators immediately on critical security and permission events.
+                    </span>
                   </div>
+                  <ToggleSwitch
+                    id="securityAlerts"
+                    disabled={!isSuperAdmin}
+                    checked={securityEventAlerts}
+                    onChange={setSecurityEventAlerts}
+                    size="sm"
+                    onText="ON"
+                    offText="OFF"
+                  />
                 </div>
 
                 <div>
@@ -1322,8 +1399,243 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* ──────────────────────────────────────────── */}
+          {/* TAB 7: PAYMENT METHODS MASTER               */}
+          {/* ──────────────────────────────────────────── */}
+          {activeTab === 'payment-methods' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+                <div>
+                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                    <Icon name="CreditCardIcon" size={18} className="text-primary" />
+                    <span>Payment Methods Master (Single Source of Truth)</span>
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Centralized master registry of payment instruments. Modifications immediately synchronize across Sales/POS, Purchases, Vendor Payments, Customer Payments, Expenses, and Financial Ledgers.
+                  </p>
+                </div>
+                {isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPmForEdit(null);
+                      setPmModalOpen(true);
+                    }}
+                    className="btn-primary gap-1.5 text-xs font-bold shadow-xs whitespace-nowrap self-start sm:self-auto cursor-pointer"
+                  >
+                    <Icon name="PlusIcon" size={14} />
+                    <span>+ Add New Payment Method</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Metrics Summary Strip */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-xl bg-card border border-border/80 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Instruments</span>
+                    <span className="w-2 h-2 rounded-full bg-primary" />
+                  </div>
+                  <p className="text-xl font-extrabold text-foreground font-tabular mt-1">{paymentMethods.length}</p>
+                  <p className="text-3xs text-muted-foreground mt-0.5">Configured in Master DB</p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-card border border-border/80 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Active Everywhere</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  </div>
+                  <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 font-tabular mt-1">
+                    {paymentMethods.filter((pm) => pm.status === 'Active').length}
+                  </p>
+                  <p className="text-3xs text-emerald-600/80 dark:text-emerald-400/80 mt-0.5">Live on POS & Voucher dropdowns</p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-card border border-border/80 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Deactivated</span>
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  </div>
+                  <p className="text-xl font-extrabold text-amber-600 dark:text-amber-400 font-tabular mt-1">
+                    {paymentMethods.filter((pm) => pm.status === 'Inactive').length}
+                  </p>
+                  <p className="text-3xs text-amber-600/80 dark:text-amber-400/80 mt-0.5">Preserved for historical audit integrity</p>
+                </div>
+              </div>
+
+              {/* Search & Status Filters */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="relative w-full sm:w-80">
+                  <Icon name="MagnifyingGlassIcon" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search by name, instrument code, or classification..."
+                    value={pmSearch}
+                    onChange={(e) => setPmSearch(e.target.value)}
+                    className="input-field pl-9 pr-3 text-xs"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                  {(['All', 'Active', 'Inactive'] as const).map((st) => (
+                    <button
+                      key={`pm-filter-${st}`}
+                      type="button"
+                      onClick={() => setPmStatusFilter(st)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                        pmStatusFilter === st
+                          ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                          : 'bg-card border-border/80 text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Payment Methods Table */}
+              <div className="border border-border/80 rounded-xl overflow-hidden shadow-2xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="table-header">
+                        <th className="px-4 py-3">Order</th>
+                        <th className="px-4 py-3">Payment Method Name</th>
+                        <th className="px-4 py-3">Instrument Code</th>
+                        <th className="px-4 py-3">Classification</th>
+                        <th className="px-4 py-3">Description / Details</th>
+                        <th className="px-4 py-3 text-center">Live Status</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {paymentMethods
+                        .filter((pm) => {
+                          const matchesQuery =
+                            !pmSearch.trim() ||
+                            pm.name.toLowerCase().includes(pmSearch.toLowerCase()) ||
+                            pm.code.toLowerCase().includes(pmSearch.toLowerCase()) ||
+                            pm.type?.toLowerCase().includes(pmSearch.toLowerCase()) ||
+                            pm.description?.toLowerCase().includes(pmSearch.toLowerCase());
+                          const matchesStatus =
+                            pmStatusFilter === 'All' || pm.status === pmStatusFilter;
+                          return matchesQuery && matchesStatus;
+                        })
+                        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
+                        .map((pm) => {
+                          const isActive = pm.status === 'Active';
+                          return (
+                            <tr key={`pm-row-${pm.id}`} className="table-row">
+                              <td className="px-4 py-3 font-mono text-muted-foreground text-3xs">
+                                #{pm.sortOrder ?? 0}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-foreground text-xs">{pm.name}</span>
+                                  {pm.isSystem && (
+                                    <span className="px-1.5 py-0.2 rounded text-4xs font-bold uppercase tracking-wider bg-secondary text-muted-foreground border border-border">
+                                      System Core
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 font-mono font-bold text-primary text-2xs">
+                                {pm.code}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="px-2 py-0.5 rounded-full text-3xs font-semibold bg-muted text-foreground border border-border/80">
+                                  {pm.type || 'Instrument'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground text-3xs max-w-xs truncate">
+                                {pm.description || '—'}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                {isSuperAdmin ? (
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <ToggleSwitch
+                                      checked={isActive}
+                                      onChange={async (newChecked) => {
+                                        const newStatus = newChecked ? 'Active' : 'Inactive';
+                                        await updatePaymentMethod(pm.id, { status: newStatus });
+                                      }}
+                                      size="sm"
+                                      onText="ON"
+                                      offText="OFF"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
+                                      isActive
+                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                        : 'bg-muted text-muted-foreground'
+                                    }`}
+                                  >
+                                    {pm.status}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {isSuperAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedPmForEdit(pm);
+                                        setPmModalOpen(true);
+                                      }}
+                                      className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors inline-flex items-center cursor-pointer"
+                                      title="Edit Payment Method"
+                                    >
+                                      <Icon name="PencilSquareIcon" size={14} />
+                                    </button>
+                                  )}
+
+                                  {isSuperAdmin && !pm.isSystem && (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        const confirmed = await confirmAction({
+                                          actionType: 'delete',
+                                          title: `Delete Payment Method: ${pm.name}`,
+                                          subtitle: 'Are you sure you want to permanently remove this custom payment instrument?',
+                                          confirmLabel: 'Delete Method',
+                                          variant: 'danger',
+                                          warningMessage: 'Deleting this payment method will remove it from the master list. Historical records referencing this method will still maintain their audit names.',
+                                        });
+                                        if (confirmed) {
+                                          await deletePaymentMethod(pm.id);
+                                        }
+                                      }}
+                                      className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors inline-flex items-center cursor-pointer"
+                                      title="Delete Custom Payment Method"
+                                    >
+                                      <Icon name="TrashIcon" size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      {paymentMethods.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground text-xs">
+                            No payment methods configured. Click &quot;+ Add New Payment Method&quot; to define your first instrument.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Form Submit Footer */}
-          {isSuperAdmin && (
+          {isSuperAdmin && activeTab !== 'payment-methods' && (
             <div className="flex justify-end pt-4 border-t border-border">
               <button
                 type="submit"
@@ -1353,6 +1665,17 @@ export default function SettingsPage() {
           )}
         </form>
       </div>
+
+      {/* Centralized Reusable Payment Method Modal */}
+      <PaymentMethodModal
+        open={pmModalOpen}
+        onClose={() => {
+          setPmModalOpen(false);
+          setSelectedPmForEdit(null);
+        }}
+        paymentMethod={selectedPmForEdit}
+        zIndex={1200}
+      />
     </AppLayout>
   );
 }

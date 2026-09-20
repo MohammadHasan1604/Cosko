@@ -1,0 +1,349 @@
+'use client';
+import React, { useState, useEffect, useMemo } from 'react';
+import Modal from '@/components/ui/Modal';
+import Icon from '@/components/ui/AppIcon';
+import CustomSelect, { SelectOption } from '@/components/ui/CustomSelect';
+import NumericInput from '@/components/ui/NumericInput';
+import CategoryFormModal from './CategoryFormModal';
+import { useApp, Vendor } from '@/context/AppContext';
+import { toast } from 'sonner';
+import { validateAndNormalizeGstin } from '@/lib/gstUtils';
+
+interface VendorFormModalProps {
+  open: boolean;
+  onClose: () => void;
+  vendor?: Vendor | null;
+  onSuccess?: (vendorName: string, vendor?: Vendor) => void;
+  quickMode?: boolean;
+  zIndex?: number;
+}
+
+export default function VendorFormModal({
+  open,
+  onClose,
+  vendor,
+  onSuccess,
+  quickMode = false,
+  zIndex = 100,
+}: VendorFormModalProps) {
+  const { addVendor, updateVendor, categoriesList, confirmAction } = useApp();
+
+  const [name, setName] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [gstin, setGstin] = useState('');
+  const [category, setCategory] = useState('');
+  const [address, setAddress] = useState('');
+  const [paymentTerms, setPaymentTerms] = useState('Net 30');
+  const [leadTimeDays, setLeadTimeDays] = useState<number | ''>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Dynamic Category Child Modal State
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+
+  const isEdit = Boolean(vendor);
+
+  // Dynamic Categories from database
+  const categoryOptions: SelectOption[] = useMemo(() => {
+    return categoriesList
+      .filter((c) => c.status !== 'Archived')
+      .map((c) => ({
+        value: c.name,
+        label: c.name,
+        sublabel: c.categoryType,
+        badge: c.status === 'Active' ? undefined : c.status,
+      }));
+  }, [categoriesList]);
+
+  useEffect(() => {
+    if (open) {
+      if (vendor) {
+        setName(vendor.name || '');
+        setContactPerson(vendor.contactPerson || '');
+        setPhone(vendor.phone || '');
+        setEmail(vendor.email || '');
+        setGstin(vendor.gstin || '');
+        setCategory(vendor.category || '');
+        setAddress(vendor.address || '');
+        setPaymentTerms(vendor.paymentTerms || 'Net 30');
+        setLeadTimeDays(vendor.leadTimeDays !== undefined && vendor.leadTimeDays !== null ? vendor.leadTimeDays : '');
+      } else {
+        setName('');
+        setContactPerson('');
+        setPhone('');
+        setEmail('');
+        setGstin('');
+        setCategory(categoryOptions[0]?.value || '');
+        setAddress('');
+        setPaymentTerms('Net 30');
+        setLeadTimeDays('');
+      }
+    }
+  }, [open, vendor, categoryOptions]);
+
+  if (!open) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = name.trim();
+    if (!cleanName) {
+      toast.error('Vendor / Supplier Company Name is required');
+      return;
+    }
+
+    if (gstin.trim()) {
+      const gstinCheck = validateAndNormalizeGstin(gstin);
+      if (!gstinCheck.isValid) {
+        toast.error(gstinCheck.error || 'Invalid GSTIN format');
+        return;
+      }
+    }
+
+    const cleanGstin = gstin.trim().toUpperCase();
+
+    const confirmed = await confirmAction({
+      actionType: isEdit ? 'update' : 'create',
+      title: isEdit ? `Confirm Vendor Update: ${cleanName}` : 'Confirm Vendor Onboarding',
+      subtitle: 'Please review supplier information and payment terms before proceeding.',
+      confirmLabel: isEdit ? 'Confirm & Update Vendor' : 'Confirm & Register Vendor',
+      summaryItems: [
+        { label: 'Vendor Name', value: cleanName, highlighted: true },
+        { label: 'Contact Person', value: contactPerson.trim() || 'Account Manager' },
+        { label: 'Phone', value: phone.trim() || 'N/A' },
+        { label: 'Category', value: category.trim() || 'General Hardware' },
+        { label: 'Payment Terms', value: paymentTerms.trim() || 'Net 30' },
+        ...(cleanGstin ? [{ label: 'GSTIN', value: cleanGstin }] : []),
+      ],
+      warningMessage: isEdit
+        ? 'Supplier profile modifications will immediately update across all purchase order pipelines and payable ledgers.'
+        : 'Once registered, this vendor will immediately be available for purchase order procurement.',
+    });
+
+    if (!confirmed) return;
+
+    setIsSubmitting(true);
+    try {
+      if (isEdit && vendor) {
+        await updateVendor(vendor.id, {
+          name: cleanName,
+          contactPerson: contactPerson.trim() || 'Account Manager',
+          email: email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
+          phone: phone.trim() || '+91 98000 00000',
+          gstin: cleanGstin || undefined,
+          category: category.trim() || 'General Hardware',
+          address: address.trim() || undefined,
+          paymentTerms: paymentTerms.trim() || 'Net 30',
+          leadTimeDays: leadTimeDays !== '' && leadTimeDays !== undefined && leadTimeDays !== null ? Number(leadTimeDays) : undefined,
+        });
+
+        toast.success(`Vendor "${cleanName}" updated successfully`);
+        if (onSuccess) onSuccess(cleanName, { ...vendor, name: cleanName });
+        onClose();
+      } else {
+        const created = await addVendor({
+          name: cleanName,
+          contactPerson: contactPerson.trim() || 'Account Manager',
+          email: email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
+          phone: phone.trim() || '+91 98000 00000',
+          gstin: cleanGstin || undefined,
+          category: category.trim() || 'General Hardware',
+          address: address.trim() || undefined,
+          paymentTerms: paymentTerms.trim() || 'Net 30',
+          leadTimeDays: leadTimeDays !== '' && leadTimeDays !== undefined && leadTimeDays !== null ? Number(leadTimeDays) : undefined,
+          outstandingPayable: 0,
+          rating: 4.8,
+        });
+
+        toast.success(`Vendor "${cleanName}" registered successfully!`);
+        if (onSuccess) onSuccess(cleanName, created || undefined);
+        onClose();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save vendor');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <Modal
+        open={open}
+        onClose={onClose}
+        title={isEdit ? `Edit Supplier: ${vendor?.name}` : quickMode ? 'Quick Vendor Onboarding' : 'Onboard Supplier Vendor'}
+        subtitle={isEdit ? `Code: ${vendor?.code || vendor?.id}` : 'Unified vendor directory across Purchase Orders, Accounts, and Inventory'}
+        size={quickMode ? 'sm' : 'md'}
+        zIndex={zIndex}
+      >
+        <form onSubmit={handleSubmit} className="space-y-3.5 py-2">
+          {/* Company Name */}
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Company / Vendor Name <span className="text-danger">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              autoFocus
+              placeholder="e.g. Polycab India Ltd, Foxconn Electronics"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input-field text-xs"
+            />
+          </div>
+
+          {/* Contact Person & Phone */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">Contact Person</label>
+              <input
+                type="text"
+                placeholder="e.g. Rajesh Kumar"
+                value={contactPerson}
+                onChange={(e) => setContactPerson(e.target.value)}
+                className="input-field text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">Phone Number</label>
+              <input
+                type="tel"
+                placeholder="e.g. +91 98765 43210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="input-field text-xs"
+              />
+            </div>
+          </div>
+
+          {/* Email & GSTIN */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Email <span className="text-muted-foreground font-normal">(Optional)</span>
+              </label>
+              <input
+                type="email"
+                placeholder="orders@vendor.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="input-field text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                GSTIN <span className="text-muted-foreground font-normal">(15 Characters)</span>
+              </label>
+              <input
+                type="text"
+                maxLength={15}
+                placeholder="29AAAAA0000A1Z5"
+                value={gstin}
+                onChange={(e) => setGstin(e.target.value.toUpperCase())}
+                className="input-field text-xs font-mono uppercase"
+              />
+            </div>
+          </div>
+
+          {/* Category (Dynamic Dropdown with + Add New Category) & Lead Time */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <CustomSelect
+                label="Category / Trade"
+                required
+                placeholder="Select or add trade category..."
+                value={category}
+                onChange={setCategory}
+                options={categoryOptions}
+                searchable={true}
+                addNewLabel="+ Add New Category"
+                onAddNew={() => setCategoryModalOpen(true)}
+                size="sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">Lead Time (Days)</label>
+              <NumericInput
+                min={0}
+                allowDecimals={false}
+                placeholder="e.g. 3"
+                value={leadTimeDays}
+                onChange={(val) => setLeadTimeDays(val)}
+                className="text-xs font-tabular h-8"
+              />
+            </div>
+          </div>
+
+          {/* Address & Payment Terms */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">Payment Terms</label>
+              <select
+                value={paymentTerms}
+                onChange={(e) => setPaymentTerms(e.target.value)}
+                className="input-field text-xs font-medium"
+              >
+                <option value="Net 30">Net 30 Days</option>
+                <option value="Net 15">Net 15 Days</option>
+                <option value="Net 7">Net 7 Days</option>
+                <option value="Immediate">Immediate / COD</option>
+                <option value="Advance">100% Advance</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">Office / Warehouse Address</label>
+              <input
+                type="text"
+                placeholder="e.g. Industrial Area Phase 2, Peenya"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className="input-field text-xs"
+              />
+            </div>
+          </div>
+
+          {/* Submit Actions */}
+          <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-secondary text-xs"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary text-xs gap-1.5"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Icon name="CheckIcon" size={14} />
+                  {isEdit ? 'Update Vendor' : quickMode ? 'Save & Select Supplier' : 'Onboard Supplier'}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Embedded Dynamic Category Creation Modal */}
+      <CategoryFormModal
+        open={categoryModalOpen}
+        onClose={() => setCategoryModalOpen(false)}
+        onSuccess={(catName) => {
+          setCategory(catName);
+          toast.success(`Category "${catName}" created & selected for vendor!`);
+        }}
+        quickMode={true}
+      />
+    </>
+  );
+}

@@ -147,7 +147,7 @@ async function drilldownSupplierPurchases(vendorId: string, start: Date, end: Da
     status: po.status,
     paymentStatus: po.paymentStatus,
     totalCost: Number(po.totalCost),
-    paidAmount: po.payments.reduce((s, p) => s + (Number(p.amount) || 0), 0),
+    paidAmount: po.payments?.reduce((s, p) => s + (Number(p.amount) || 0), 0) ?? (Number(po.paidAmount) || 0),
     creditAmount: Number(po.creditAmount),
     itemCount: po.items.length,
     totalUnits: po.items.reduce((s, i) => s + i.qtyOrdered, 0),

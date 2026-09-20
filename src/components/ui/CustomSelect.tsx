@@ -12,16 +12,21 @@ export interface SelectOption {
   disabled?: boolean;
 }
 
-interface CustomSelectProps {
+export interface CustomSelectProps {
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
   placeholder?: string;
+  searchPlaceholder?: string;
   label?: string;
   disabled?: boolean;
   className?: string;
   searchable?: boolean;
   size?: 'sm' | 'md';
+  required?: boolean;
+  addNewLabel?: string;
+  onAddNew?: (initialSearch?: string) => void;
+  allowClear?: boolean;
 }
 
 export default function CustomSelect({
@@ -29,11 +34,16 @@ export default function CustomSelect({
   onChange,
   options,
   placeholder = 'Select an option...',
+  searchPlaceholder = 'Search options...',
   label,
   disabled = false,
   className = '',
-  searchable = false,
+  searchable = true,
   size = 'md',
+  required = false,
+  addNewLabel,
+  onAddNew,
+  allowClear = false,
 }: CustomSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -88,9 +98,22 @@ export default function CustomSelect({
 
   const heightClass = size === 'sm' ? 'h-8 text-xs' : 'h-[38px] text-xs sm:text-sm';
 
+  const handleAddNewClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const term = search.trim() || undefined;
+    setOpen(false);
+    if (onAddNew) {
+      onAddNew(term);
+    }
+  };
+
   return (
     <div className={`relative ${className}`} ref={containerRef}>
-      {label && <label className="label-text">{label}</label>}
+      {label && (
+        <label className="text-xs font-bold text-foreground block mb-1">
+          {label} {required && <span className="text-danger">*</span>}
+        </label>
+      )}
 
       {/* Trigger Button */}
       <button
@@ -109,26 +132,41 @@ export default function CustomSelect({
             {selectedOption ? selectedOption.label : placeholder}
           </span>
           {selectedOption?.badge && (
-            <span className="text-3xs bg-primary/10 text-primary font-bold px-1.5 py-0.2 rounded-full">
+            <span className="text-3xs bg-primary/10 text-primary font-bold px-1.5 py-0.5 rounded-full">
               {selectedOption.badge}
             </span>
           )}
         </span>
 
-        <Icon
-          name="ChevronDownIcon"
-          size={14}
-          className={`text-muted-foreground flex-shrink-0 transition-transform duration-200 ${
-            open ? 'rotate-180 text-primary' : ''
-          }`}
-        />
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {allowClear && value && !disabled && (
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange('');
+              }}
+              className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+              title="Clear selection"
+            >
+              <Icon name="XMarkIcon" size={12} />
+            </span>
+          )}
+          <Icon
+            name="ChevronDownIcon"
+            size={14}
+            className={`text-muted-foreground transition-transform duration-200 ${
+              open ? 'rotate-180 text-primary' : ''
+            }`}
+          />
+        </div>
       </button>
 
       {/* Dropdown Menu */}
       {open && (
-        <div className="absolute left-0 right-0 z-50 mt-1.5 bg-card rounded-xl border border-border shadow-dropdown p-1.5 fade-in max-h-60 overflow-hidden flex flex-col min-w-[200px]">
+        <div className="absolute left-0 right-0 z-[70] mt-1.5 bg-card rounded-xl border border-border shadow-dropdown p-1.5 fade-in max-h-72 overflow-hidden flex flex-col min-w-[220px]">
+          {/* Search Header */}
           {searchable && (
-            <div className="p-1.5 border-b border-border/80 mb-1">
+            <div className="p-1 border-b border-border/80 mb-1">
               <div className="relative">
                 <Icon
                   name="MagnifyingGlassIcon"
@@ -138,19 +176,44 @@ export default function CustomSelect({
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search options..."
+                  placeholder={searchPlaceholder}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full h-7 pl-7 pr-2 text-xs rounded-md border border-border bg-muted/40 focus:outline-none focus:border-primary focus:bg-card"
+                  className="w-full h-7 pl-7 pr-2 text-xs rounded-md border border-border bg-muted/40 focus:outline-none focus:border-primary focus:bg-card text-foreground"
                 />
               </div>
             </div>
           )}
 
-          <div className="overflow-y-auto scrollbar-thin space-y-0.5 max-h-48 pr-0.5">
+          {/* Prominent "+ Add New [Entity]" Action Button inside dropdown */}
+          {onAddNew && (
+            <div className="p-1 border-b border-border/70 mb-1">
+              <button
+                type="button"
+                onClick={handleAddNewClick}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold text-primary hover:bg-primary/10 transition-colors text-left cursor-pointer border border-primary/20 bg-primary/5"
+              >
+                <Icon name="PlusCircleIcon" size={15} className="text-primary flex-shrink-0" />
+                <span className="truncate">{addNewLabel || '+ Add New Record'}</span>
+              </button>
+            </div>
+          )}
+
+          {/* Options List */}
+          <div className="overflow-y-auto scrollbar-thin space-y-0.5 max-h-52 pr-0.5">
             {filteredOptions.length === 0 ? (
-              <div className="py-4 text-center text-xs text-muted-foreground">
-                No matching options
+              <div className="py-4 text-center text-xs text-muted-foreground space-y-2">
+                <p>No matching records</p>
+                {onAddNew && search.trim() && (
+                  <button
+                    type="button"
+                    onClick={handleAddNewClick}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
+                  >
+                    <Icon name="PlusCircleIcon" size={13} />
+                    {addNewLabel || `+ Add "${search}"`}
+                  </button>
+                )}
               </div>
             ) : (
               filteredOptions.map((option) => {
@@ -175,7 +238,7 @@ export default function CustomSelect({
                         <Icon name={option.icon as any} size={14} className={isSelected ? 'text-primary' : 'text-muted-foreground'} />
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate leading-tight">{option.label}</p>
+                        <p className="truncate leading-tight font-medium">{option.label}</p>
                         {option.sublabel && (
                           <p className="text-3xs text-muted-foreground truncate leading-tight mt-0.5">{option.sublabel}</p>
                         )}
@@ -184,7 +247,7 @@ export default function CustomSelect({
 
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {option.badge && (
-                        <span className="text-3xs bg-muted text-muted-foreground px-1.5 py-0.2 rounded font-medium">
+                        <span className="text-3xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">
                           {option.badge}
                         </span>
                       )}
@@ -202,3 +265,5 @@ export default function CustomSelect({
     </div>
   );
 }
+
+export { CustomSelect as SearchableDynamicSelect };

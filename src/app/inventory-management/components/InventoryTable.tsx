@@ -5,10 +5,11 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import EmptyState from '@/components/ui/EmptyState';
-import StockAdjustmentForm from './StockAdjustmentForm';
+import StockAdjustmentModal from '@/components/forms/StockAdjustmentModal';
 import AddItemModal from './AddItemModal';
 import ProductDetailModal from './ProductDetailModal';
 import BarcodeScannerModal from '@/components/ui/BarcodeScannerModal';
+import StoreStockModal from './StoreStockModal';
 import { useApp, InventoryItem } from '@/context/AppContext';
 import { toast } from 'sonner';
 
@@ -47,7 +48,7 @@ interface InventoryTableProps {
 }
 
 export default function InventoryTable({ categoryFilter: propCategoryFilter, setCategoryFilter: propSetCategoryFilter }: InventoryTableProps = {}) {
-  const { inventory, deleteItem: removeInventoryItem, updateItem, selectedStore, setSelectedStore, categoriesList, storesList, currentUser, sales, inventoryLedger } = useApp();
+  const { inventory, deleteItem: removeInventoryItem, updateItem, selectedStore, setSelectedStore, categoriesList, storesList, currentUser, sales, inventoryLedger, confirmAction } = useApp();
 
   const [search, setSearch] = useState('');
   const [localCategoryFilter, setLocalCategoryFilter] = useState('All Categories');
@@ -72,6 +73,7 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [statusDropdownId, setStatusDropdownId] = useState<string | null>(null);
+  const [storeStockItem, setStoreStockItem] = useState<InventoryItem | null>(null);
 
   const visibleColumns = columnConfig.filter((c) => c.visible);
 
@@ -174,10 +176,18 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
 
   const sorted = useMemo(() => {
     if (sortMode === 'newest') {
-      return [...filtered]; // Default newest first from MySQL
+      return [...filtered].sort((a, b) => {
+        const at = a.createdAt ? String(a.createdAt) : '';
+        const bt = b.createdAt ? String(b.createdAt) : '';
+        return bt.localeCompare(at);
+      });
     }
     if (sortMode === 'oldest') {
-      return [...filtered].reverse();
+      return [...filtered].sort((a, b) => {
+        const at = a.createdAt ? String(a.createdAt) : '';
+        const bt = b.createdAt ? String(b.createdAt) : '';
+        return at.localeCompare(bt);
+      });
     }
     return [...filtered].sort((a, b) => {
       const key = sortMode as keyof InventoryItem;
@@ -421,11 +431,27 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
                         )}
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-mono text-3xs text-muted-foreground">{item.sku}</span>
-                          <span className="badge-info text-3xs font-mono">{item.store}</span>
+                          {item.store === 'All Locations' ? (
+                            <span className="badge-info text-3xs font-mono">All Stores · {item.qtyOnHand} units</span>
+                          ) : (
+                            <span className="badge-info text-3xs font-mono">{item.store}</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStoreStockItem(item);
+                            }}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-bold text-primary hover:text-primary-focus bg-primary/10 border border-primary/20 transition-all ml-auto cursor-pointer"
+                            title="View store-wise stock allocation"
+                          >
+                            <Icon name="BuildingStorefrontIcon" size={11} />
+                            View Stores
+                          </button>
                         </div>
-                        <h4 className="text-xs font-bold text-foreground truncate">{item.name}</h4>
+                        <h4 className="text-xs font-bold text-foreground truncate mt-0.5">{item.name}</h4>
                         <p className="text-2xs text-muted-foreground">{item.brand} · {item.category}</p>
                       </div>
                     </div>
@@ -439,6 +465,9 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
                   </div>
 
                   <div className="flex items-center justify-end gap-1.5 pt-1">
+                    <button onClick={() => setStoreStockItem(item)} className="btn-ghost text-3xs py-1 px-2 text-primary font-medium">
+                      <Icon name="BuildingStorefrontIcon" size={13} /> Stock
+                    </button>
                     <button onClick={() => setViewItem(item)} className="btn-ghost text-3xs py-1 px-2 text-info">
                       <Icon name="EyeIcon" size={13} /> View
                     </button>
@@ -592,7 +621,7 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
 
                         if (col.key === 'mrp') return (
                           <td key={`cell-${item.id}-mrp`} className="table-cell">
-                            <span className="font-tabular text-sm text-muted-foreground">₹{item.mrp.toLocaleString('en-IN')}</span>
+                            <span className="font-tabular text-sm text-muted-foreground">{item.mrp !== undefined && item.mrp !== null ? `₹${item.mrp.toLocaleString('en-IN')}` : '—'}</span>
                           </td>
                         );
 
@@ -613,16 +642,42 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
                         if (col.key === 'store') return (
                           <td key={`cell-${item.id}-store`} className="table-cell">
                             {item.store === 'All Locations' ? (
-                              <div className="flex flex-col gap-0.5">
-                                <span className="badge-info text-2xs font-semibold">All Stores</span>
-                                {item.locationStock && Object.keys(item.locationStock).length > 0 && (
-                                  <span className="text-3xs text-muted-foreground font-mono" title={Object.entries(item.locationStock).map(([s, q]) => `${s}: ${q}`).join(' · ')}>
-                                    {Object.entries(item.locationStock).map(([s, q]) => `${s}: ${q}`).join(' · ')}
+                              <div className="flex flex-col items-start gap-1 py-0.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="badge-info text-2xs font-semibold">All Stores</span>
+                                  <span className="text-xs font-bold text-foreground font-tabular">
+                                    {item.qtyOnHand} {item.qtyOnHand === 1 ? 'unit' : 'units'}
                                   </span>
-                                )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setStoreStockItem(item);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-semibold text-primary hover:text-primary-focus bg-primary/10 hover:bg-primary/20 border border-primary/25 transition-all duration-150 active:scale-95 cursor-pointer"
+                                  title={`View real-time stock across all stores for ${item.name}`}
+                                >
+                                  <Icon name="BuildingStorefrontIcon" size={12} />
+                                  View All Stores
+                                </button>
                               </div>
                             ) : (
-                              <span className="badge-info text-2xs">{item.store}</span>
+                              <div className="flex flex-col items-start gap-1 py-0.5">
+                                <span className="badge-info text-2xs font-semibold">{item.store}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setStoreStockItem(item);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-semibold text-muted-foreground hover:text-primary bg-muted/60 hover:bg-muted border border-border transition-all duration-150 active:scale-95 cursor-pointer"
+                                  title={`Check stock at other stores for ${item.name}`}
+                                >
+                                  <Icon name="BuildingStorefrontIcon" size={11} />
+                                  View All Stores
+                                </button>
+                              </div>
                             )}
                           </td>
                         );
@@ -663,6 +718,13 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
                       {/* Actions */}
                       <td className="table-cell text-right pr-4">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                          <button
+                            onClick={() => setStoreStockItem(item)}
+                            className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all duration-150"
+                            title={`View all stores stock for ${item.name}`}
+                          >
+                            <Icon name="BuildingStorefrontIcon" size={15} />
+                          </button>
                           <button
                             onClick={() => setAdjustItem(item)}
                             className="p-1.5 rounded-lg hover:bg-warning/10 text-muted-foreground hover:text-warning transition-all duration-150"
@@ -759,21 +821,13 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
         )}
       </div>
 
-      {/* Stock Adjustment Modal */}
-      {adjustItem && (
-        <Modal
-          open={!!adjustItem}
-          onClose={() => setAdjustItem(null)}
-          title="Stock Adjustment"
-          subtitle={`${adjustItem.sku} · ${adjustItem.name}`}
-          size="md"
-        >
-          <StockAdjustmentForm
-            item={adjustItem}
-            onClose={() => setAdjustItem(null)}
-          />
-        </Modal>
-      )}
+      {/* Master Single Source of Truth Stock Adjustment Modal */}
+      <StockAdjustmentModal
+        open={Boolean(adjustItem)}
+        onClose={() => setAdjustItem(null)}
+        item={adjustItem}
+        onSuccess={() => setAdjustItem(null)}
+      />
 
       {/* Add / Edit Modal */}
       <AddItemModal
@@ -787,6 +841,14 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
       <ProductDetailModal
         item={viewItem}
         onClose={() => setViewItem(null)}
+      />
+
+      {/* View All Stores Stock Modal */}
+      <StoreStockModal
+        open={!!storeStockItem}
+        item={storeStockItem}
+        onClose={() => setStoreStockItem(null)}
+        selectedStoreFilter={selectedStore}
       />
 
       {/* Safe Delete / Archive Confirm Modal */}
@@ -836,17 +898,29 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
                       type="button"
                       disabled={deleteLoading}
                       onClick={async () => {
-                        setDeleteLoading(true);
-                        try {
-                          await removeInventoryItem(deleteItemModal.id, false);
-                          setDeleteItemModal(null);
-                        } finally {
-                          setDeleteLoading(false);
-                        }
+                        await confirmAction({
+                          actionType: 'delete',
+                          title: `Archive Product "${deleteItemModal.name}"`,
+                          subtitle: 'Please review the item details before archiving.',
+                          confirmLabel: 'Confirm & Archive Product',
+                          variant: 'warning',
+                          summaryItems: [
+                            { label: 'Product Name', value: deleteItemModal.name, highlighted: true },
+                            { label: 'SKU Code', value: deleteItemModal.sku },
+                            { label: 'Store Location', value: deleteItemModal.store },
+                            { label: 'Stock On Hand', value: `${deleteItemModal.qtyOnHand} units` },
+                            { label: 'Action Mode', value: 'SAFE ARCHIVAL' },
+                          ],
+                          warningMessage: 'Archiving will hide this SKU from the active catalog and POS checkout while preserving historical reports and stock logs.',
+                          onConfirm: async () => {
+                            await removeInventoryItem(deleteItemModal.id, false);
+                            setDeleteItemModal(null);
+                          },
+                        });
                       }}
                       className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4"
                     >
-                      {deleteLoading ? 'Archiving...' : 'Safe Archive'}
+                      Safe Archive
                     </button>
 
                     {!hasHistory && currentUser.role === 'Super Admin' && (
@@ -854,17 +928,28 @@ export default function InventoryTable({ categoryFilter: propCategoryFilter, set
                         type="button"
                         disabled={deleteLoading}
                         onClick={async () => {
-                          setDeleteLoading(true);
-                          try {
-                            await removeInventoryItem(deleteItemModal.id, true);
-                            setDeleteItemModal(null);
-                          } finally {
-                            setDeleteLoading(false);
-                          }
+                          await confirmAction({
+                            actionType: 'delete',
+                            title: `Permanently Delete SKU "${deleteItemModal.name}"`,
+                            subtitle: 'This will permanently erase the product from database records.',
+                            confirmLabel: 'Confirm & Delete Permanently',
+                            variant: 'danger',
+                            summaryItems: [
+                              { label: 'Product Name', value: deleteItemModal.name, highlighted: true },
+                              { label: 'SKU Code', value: deleteItemModal.sku },
+                              { label: 'Store Location', value: deleteItemModal.store },
+                              { label: 'Action Mode', value: 'PERMANENT RECORD REMOVAL' },
+                            ],
+                            warningMessage: 'Warning: This product has zero inventory and zero sales transactions. Deletion cannot be undone.',
+                            onConfirm: async () => {
+                              await removeInventoryItem(deleteItemModal.id, true);
+                              setDeleteItemModal(null);
+                            },
+                          });
                         }}
                         className="btn-danger text-xs font-bold px-4"
                       >
-                        {deleteLoading ? 'Deleting...' : 'Permanent Delete'}
+                        Permanent Delete
                       </button>
                     )}
                   </div>

@@ -3,181 +3,53 @@ import React, { useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
-import QuickVendorModal from '@/components/ui/QuickVendorModal';
 import { useApp, PurchaseOrder } from '@/context/AppContext';
+import PurchaseOrderFormModal from '@/components/forms/PurchaseOrderFormModal';
+import SupplierPaymentModal from '@/components/forms/SupplierPaymentModal';
+import ProofViewerModal, { ProofViewerData } from '@/components/ui/ProofViewerModal';
 import { toast } from 'sonner';
 
 export default function PurchasesPage() {
-  const { purchases, vendors, inventory, addPurchase, updatePurchase, deletePurchase, selectedStore, storesList, refreshAllData } = useApp();
+  const { purchases, vendors, inventory, addPurchase, updatePurchase, deletePurchase, selectedStore, storesList, refreshAllData, recordPurchasePayment } = useApp();
 
   const [createPoModal, setCreatePoModal] = useState(false);
   const [editPoModal, setEditPoModal] = useState<PurchaseOrder | null>(null);
   const [deletePoModal, setDeletePoModal] = useState<PurchaseOrder | null>(null);
-  const [quickVendorOpen, setQuickVendorOpen] = useState(false);
 
-  // Payment Recording Modal State (Requirement 28 & 29)
+  // Payment Recording Modal State (Master Single Source of Truth SupplierPaymentModal)
   const [paymentModalPo, setPaymentModalPo] = useState<PurchaseOrder | null>(null);
-  const [payAmount, setPayAmount] = useState<number | ''>('');
-  const [payMethod, setPayMethod] = useState('Bank Transfer');
-  const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
-  const [payRef, setPayRef] = useState('');
-  const [payNotes, setPayNotes] = useState('');
-  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
-
-  // Form state - Clean initial state without fake mock pre-fills
-  const [vendorName, setVendorName] = useState('');
-  const [store, setStore] = useState('CENTRAL');
-  const [itemName, setItemName] = useState('');
-  const [qty, setQty] = useState<string | number>('');
-  const [unitCost, setUnitCost] = useState<string | number>('');
-  const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Partial' | 'Unpaid'>('Unpaid');
-  const [paidAmount, setPaidAmount] = useState<string | number>('');
-  const [expectedDate, setExpectedDate] = useState('');
-
-  const handleRecordPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!paymentModalPo || !payAmount || Number(payAmount) <= 0) {
-      toast.error('Please enter a valid payment amount');
-      return;
-    }
-    const amountNum = Number(payAmount);
-    const remaining = paymentModalPo.remainingAmount !== undefined
-      ? paymentModalPo.remainingAmount
-      : Math.max(0, paymentModalPo.totalAmount - (paymentModalPo.paidAmount || 0));
-
-    if (amountNum > remaining) {
-      toast.error(`Payment amount cannot exceed remaining balance (₹${remaining.toLocaleString('en-IN')})`);
-      return;
-    }
-
-    setIsSubmittingPayment(true);
-    try {
-      const res = await fetch('/api/purchases/payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          purchaseId: paymentModalPo.id,
-          amount: amountNum,
-          paymentDate: payDate,
-          paymentMethod: payMethod,
-          referenceNo: payRef || undefined,
-          notes: payNotes || undefined,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        toast.error(data.error || 'Failed to record payment');
-        return;
-      }
-
-      toast.success(`Payment of ₹${amountNum.toLocaleString('en-IN')} recorded successfully!`);
-      setPaymentModalPo(null);
-      setPayAmount('');
-      setPayRef('');
-      setPayNotes('');
-      await refreshAllData();
-    } catch (err: any) {
-      toast.error(err.message || 'Error recording payment');
-    } finally {
-      setIsSubmittingPayment(false);
-    }
-  };
+  const [proofViewerData, setProofViewerData] = useState<ProofViewerData | null>(null);
 
   const openPaymentModal = (po: PurchaseOrder) => {
     setPaymentModalPo(po);
-    const remaining = po.remainingAmount !== undefined
-      ? po.remainingAmount
-      : Math.max(0, po.totalAmount - (po.paidAmount || 0) - (po.creditAmount || 0));
-    setPayAmount(remaining > 0 ? remaining : '');
-    setPayMethod('Bank Transfer');
-    setPayDate(new Date().toISOString().split('T')[0]);
-    setPayRef('');
-    setPayNotes('');
   };
 
   const filteredPurchases = selectedStore === 'All Stores' ? purchases : purchases.filter((p) => p.store === selectedStore);
 
-  const numQty = Number(qty) || 0;
-  const numUnitCost = Number(unitCost) || 0;
-  const currentTotal = numQty * numUnitCost;
-  const numPaid = paymentStatus === 'Paid' ? currentTotal : paymentStatus === 'Unpaid' ? 0 : Number(paidAmount) || 0;
-  const currentRemaining = Math.max(0, currentTotal - numPaid);
-
-  const handleCreatePo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!vendorName) {
-      toast.error('Please select a supplier vendor');
-      return;
-    }
-    if (!itemName) {
-      toast.error('Item description or SKU is required');
-      return;
-    }
-    if (numQty <= 0) {
-      toast.error('Quantity must be greater than 0');
-      return;
-    }
-    if (numUnitCost < 0) {
-      toast.error('Unit cost must be positive');
-      return;
-    }
-
-    await addPurchase({
-      vendorName,
-      store,
-      items: [{ name: itemName, qty: numQty, unitCost: numUnitCost }],
-      totalAmount: currentTotal,
-      paidAmount: numPaid,
-      remainingAmount: currentRemaining,
-      status: 'Sent',
-      paymentStatus,
-      expectedDate: expectedDate || 'ASAP',
-    });
-    setCreatePoModal(false);
-    resetForm();
-  };
-
-  const handleUpdatePoSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editPoModal) return;
-
-    await updatePurchase(editPoModal.id, {
-      vendorName,
-      store,
-      items: [{ name: itemName, qty: numQty, unitCost: numUnitCost }],
-      totalAmount: currentTotal,
-      paidAmount: numPaid,
-      remainingAmount: currentRemaining,
-      paymentStatus,
-      expectedDate: expectedDate || 'ASAP',
-    });
-    setEditPoModal(null);
-    resetForm();
-  };
-
   const openEdit = (po: PurchaseOrder) => {
     setEditPoModal(po);
-    setVendorName(po.vendorName);
-    setStore(po.store);
-    setItemName(po.items[0]?.name || '');
-    setQty(po.items[0]?.qty || '');
-    setUnitCost(po.items[0]?.unitCost || '');
-    setPaymentStatus(po.paymentStatus);
-    setPaidAmount(po.paidAmount !== undefined ? po.paidAmount : po.paymentStatus === 'Paid' ? po.totalAmount : '');
-    setExpectedDate(po.expectedDate || '');
   };
 
-  const resetForm = () => {
-    setVendorName('');
-    setStore('CENTRAL');
-    setItemName('');
-    setQty('');
-    setUnitCost('');
-    setPaymentStatus('Unpaid');
-    setPaidAmount('');
-    setExpectedDate('');
+  // Expandable PO items state
+  const [expandedPoIds, setExpandedPoIds] = useState<Set<string>>(new Set());
+
+  const togglePoExpand = (id: string) => {
+    setExpandedPoIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleReceiveGrn = async (po: PurchaseOrder) => {
+    try {
+      await updatePurchase(po.id, { status: 'Received' });
+      toast.success(`GRN Received! ${po.items?.length || 0} product(s) credited to inventory in ${po.store}.`);
+      await refreshAllData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to receive goods');
+    }
   };
 
   return (
@@ -187,10 +59,10 @@ export default function PurchasesPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Purchases & Goods Receiving</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Purchase orders, supplier shipments, Goods Received Notes (GRN), and payable tracking.
+              Multi-product purchase orders, supplier fulfillment, Goods Received Notes (GRN), and inventory receiving.
             </p>
           </div>
-          <button onClick={() => { resetForm(); setCreatePoModal(true); }} className="btn-primary gap-2">
+          <button onClick={() => setCreatePoModal(true)} className="btn-primary gap-2 font-bold">
             <Icon name="PlusIcon" size={18} />
             Create Purchase Order
           </button>
@@ -205,69 +77,156 @@ export default function PurchasesPage() {
 
           {/* Mobile PO Cards (<md) */}
           <div className="block md:hidden divide-y divide-border">
-            {filteredPurchases.map((po) => (
-              <div key={`m-po-${po.id}`} className="p-4 space-y-3 bg-card hover:bg-muted/10 transition-colors">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-xs font-bold text-primary">{po.poNo}</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className={`text-3xs font-semibold px-2 py-0.5 rounded ${po.status === 'Received' ? 'bg-positive/10 text-positive' : 'bg-warning/10 text-warning'}`}>
-                      {po.status}
-                    </span>
-                    <span className={`text-3xs font-semibold px-2 py-0.5 rounded ${po.paymentStatus === 'Paid' ? 'bg-positive/10 text-positive' : po.paymentStatus === 'Partial' ? 'bg-info/10 text-info' : 'bg-danger/10 text-danger'}`}>
-                      {po.paymentStatus === 'Partial' ? `Partial (Rem: ₹${(po.remainingAmount ?? (po.totalAmount - (po.paidAmount || 0))).toLocaleString('en-IN')})` : po.paymentStatus}
-                    </span>
+            {filteredPurchases.map((po) => {
+              const isExpanded = expandedPoIds.has(po.id);
+              return (
+                <div key={`m-po-${po.id}`} className="p-4 space-y-3 bg-card hover:bg-muted/10 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs font-bold text-primary">{po.poNo}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-3xs font-semibold px-2 py-0.5 rounded ${po.status === 'Received' ? 'bg-positive/10 text-positive' : 'bg-warning/10 text-warning'}`}>
+                        {po.status}
+                      </span>
+                      <span className={`text-3xs font-semibold px-2 py-0.5 rounded ${po.paymentStatus === 'Paid' ? 'bg-positive/10 text-positive' : po.paymentStatus === 'Partial' ? 'bg-info/10 text-info' : 'bg-danger/10 text-danger'}`}>
+                        {po.paymentStatus === 'Partial' ? `Partial (Rem: ₹${(po.remainingAmount ?? (po.totalAmount - (po.paidAmount || 0))).toLocaleString('en-IN')})` : po.paymentStatus}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">{po.vendorName}</h4>
+                      <p className="text-2xs text-muted-foreground mt-0.5">
+                        Expected: {po.expectedDate} · Store: <span className="badge-info text-3xs font-mono">{po.store}</span>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-extrabold font-tabular text-foreground block">
+                        ₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                      {po.items && po.items.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => togglePoExpand(po.id)}
+                          className="text-3xs font-semibold text-primary hover:underline mt-0.5 inline-flex items-center gap-0.5"
+                        >
+                          {po.items.length} item{po.items.length > 1 ? 's' : ''}
+                          <Icon name={isExpanded ? 'ChevronUpIcon' : 'ChevronDownIcon'} size={11} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mobile Expanded Items List */}
+                  {isExpanded && po.items && po.items.length > 0 && (
+                    <div className="p-2.5 rounded-lg bg-muted/30 border border-border space-y-1.5 text-2xs">
+                      <div className="font-bold text-muted-foreground text-3xs uppercase tracking-wider pb-1 border-b border-border/50">
+                        Line Items Breakdown
+                      </div>
+                      {po.items.map((it, idx) => (
+                        <div key={`m-po-it-${idx}`} className="flex items-center justify-between gap-2 py-0.5">
+                          <div className="truncate flex-1">
+                            <span className="font-semibold text-foreground">{it.name}</span>
+                            {it.sku && <span className="text-3xs text-muted-foreground font-mono ml-1">({it.sku})</span>}
+                          </div>
+                          <div className="text-right font-tabular shrink-0 text-muted-foreground">
+                            {it.qty} × ₹{it.unitCost.toLocaleString('en-IN')} ={' '}
+                            <strong className="text-foreground">
+                              ₹{(it.lineTotal || it.qty * it.unitCost).toLocaleString('en-IN')}
+                            </strong>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Mobile Payment History */}
+                      {po.payments && po.payments.length > 0 && (
+                        <div className="pt-2 border-t border-border/60 space-y-1">
+                          <div className="font-bold text-muted-foreground text-3xs uppercase tracking-wider flex items-center justify-between">
+                            <span>Payment History ({po.payments.length})</span>
+                            <span className="text-emerald-600 font-bold">Paid: ₹{(po.paidAmount || 0).toLocaleString('en-IN')}</span>
+                          </div>
+                          {po.payments.map((p: any) => (
+                            <div key={`m-pay-${p.id}`} className="flex items-center justify-between text-3xs py-1.5 border-b border-border/30 last:border-0">
+                              <div>
+                                <span className="font-mono font-bold text-primary mr-1.5">{p.voucherNo || 'PV'}</span>
+                                <span className="text-muted-foreground">{new Date(p.paymentDate || p.createdAt).toLocaleDateString('en-IN')} · {p.paymentMethod}</span>
+                                {p.referenceNo && <span className="text-muted-foreground font-mono block text-4xs">Ref: {p.referenceNo}</span>}
+                                {p.notes && <span className="text-muted-foreground italic block text-4xs">{p.notes}</span>}
+                                {p.receiptUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setProofViewerData({
+                                      proofUrl: p.receiptUrl,
+                                      title: `Payment Proof — Voucher #${p.voucherNo || 'PV'}`,
+                                      amount: Number(p.amount),
+                                      paymentMethod: p.paymentMethod,
+                                      referenceNo: p.referenceNo,
+                                      paymentDate: p.paymentDate,
+                                      recordedBy: p.recordedBy,
+                                      entityName: po.vendorName,
+                                      billNo: po.invoiceNo || po.poNo,
+                                      notes: p.notes,
+                                    })}
+                                    className="mt-0.5 inline-flex items-center gap-1 text-4xs font-bold text-emerald-600 hover:underline"
+                                  >
+                                    <Icon name="DocumentCheckIcon" size={11} /> View Proof
+                                  </button>
+                                )}
+                              </div>
+                              <span className="font-extrabold font-tabular text-emerald-600">₹{Number(p.amount).toLocaleString('en-IN')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
+                    {po.paymentStatus !== 'Paid' && (
+                      <button
+                        onClick={() => openPaymentModal(po)}
+                        className="btn-secondary text-3xs py-1 px-2.5 gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                      >
+                        <Icon name="BanknotesIcon" size={12} />
+                        Record Payment
+                      </button>
+                    )}
+                    {po.status !== 'Received' && (
+                      <button
+                        onClick={() => handleReceiveGrn(po)}
+                        className="btn-primary text-3xs py-1 px-2.5 gap-1"
+                        title="Receive Goods Received Note (GRN) & Credit Stock"
+                      >
+                        <Icon name="CheckIcon" size={12} />
+                        Receive GRN
+                      </button>
+                    )}
+                    <button onClick={() => openEdit(po)} className="btn-secondary text-3xs py-1 px-2.5 gap-1">
+                      <Icon name="PencilSquareIcon" size={13} />
+                      Edit PO
+                    </button>
+                    <button onClick={() => setDeletePoModal(po)} className="btn-ghost text-3xs py-1 px-2 text-danger hover:bg-danger/10">
+                      <Icon name="TrashIcon" size={13} />
+                      Delete
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h4 className="text-sm font-bold text-foreground">{po.vendorName}</h4>
-                    <p className="text-2xs text-muted-foreground mt-0.5">Expected: {po.expectedDate} · Store: <span className="badge-info text-3xs font-mono">{po.store}</span></p>
-                  </div>
-                  <span className="text-sm font-extrabold font-tabular text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</span>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
-                  {po.paymentStatus !== 'Paid' && (
-                    <button
-                      onClick={() => openPaymentModal(po)}
-                      className="btn-secondary text-3xs py-1 px-2.5 gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
-                    >
-                      <Icon name="BanknotesIcon" size={12} />
-                      Record Payment
-                    </button>
-                  )}
-                  {po.status !== 'Received' && (
-                    <button
-                      onClick={() => updatePurchase(po.id, { status: 'Received' })}
-                      className="btn-primary text-3xs py-1 px-2.5 gap-1"
-                    >
-                      <Icon name="CheckIcon" size={12} />
-                      Receive GRN
-                    </button>
-                  )}
-                  <button onClick={() => openEdit(po)} className="btn-secondary text-3xs py-1 px-2.5 gap-1">
-                    <Icon name="PencilSquareIcon" size={13} />
-                    Edit PO
-                  </button>
-                  <button onClick={() => setDeletePoModal(po)} className="btn-ghost text-3xs py-1 px-2 text-danger hover:bg-danger/10">
-                    <Icon name="TrashIcon" size={13} />
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Desktop PO Table (>=md) */}
           <div className="hidden md:block overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left min-w-[700px]">
+            <table className="w-full text-left min-w-[850px]">
               <thead>
                 <tr className="table-header">
+                  <th className="px-3 py-3 w-8 text-center"></th>
                   <th className="px-4 py-3">PO Number</th>
                   <th className="px-4 py-3">Vendor</th>
                   <th className="px-4 py-3">Store</th>
-                  <th className="px-4 py-3 font-tabular">Amount</th>
+                  <th className="px-4 py-3">Products & Items</th>
+                  <th className="px-4 py-3 font-tabular">Subtotal / Tax</th>
+                  <th className="px-4 py-3 font-tabular">Grand Total</th>
                   <th className="px-4 py-3">Fulfillment</th>
                   <th className="px-4 py-3">Payment</th>
                   <th className="px-4 py-3">Expected Date</th>
@@ -275,388 +234,244 @@ export default function PurchasesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60 text-xs">
-                {filteredPurchases.map((po) => (
-                  <tr key={`po-row-${po.id}`} className="table-row">
-                    <td className="px-4 py-3 font-mono text-xs font-bold text-primary">{po.poNo}</td>
-                    <td className="px-4 py-3 font-semibold text-foreground">{po.vendorName}</td>
-                    <td className="px-4 py-3"><span className="badge-info text-3xs font-semibold">{po.store}</span></td>
-                    <td className="px-4 py-3 font-extrabold font-tabular text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-3xs font-bold px-2 py-0.5 rounded-full ${po.status === 'Received' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'}`}>
-                        {po.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-3xs font-bold px-2 py-0.5 rounded-full ${po.paymentStatus === 'Paid' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : po.paymentStatus === 'Partial' ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'}`}>
-                        {po.paymentStatus === 'Partial' ? `Partial (Rem: ₹${(po.remainingAmount ?? (po.totalAmount - (po.paidAmount || 0))).toLocaleString('en-IN')})` : po.paymentStatus}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-2xs text-muted-foreground whitespace-nowrap">{po.expectedDate}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {po.paymentStatus !== 'Paid' && (
-                          <button
-                            onClick={() => openPaymentModal(po)}
-                            className="btn-secondary h-7 text-3xs py-1 px-2.5 gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 border-emerald-500/30"
-                            title="Record Payment against PO"
-                          >
-                            <Icon name="BanknotesIcon" size={12} />
-                            Pay
-                          </button>
-                        )}
-                        {po.status !== 'Received' && (
-                          <button
-                            onClick={() => updatePurchase(po.id, { status: 'Received' })}
-                            className="btn-primary h-7 text-3xs py-1 px-2.5 gap-1"
-                            title="Receive Goods Received Note (GRN) & Credit Stock"
-                          >
-                            <Icon name="CheckIcon" size={12} />
-                            Receive GRN
-                          </button>
-                        )}
-                        <button onClick={() => openEdit(po)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit PO">
-                          <Icon name="PencilSquareIcon" size={14} />
-                        </button>
-                        <button onClick={() => setDeletePoModal(po)} className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors" title="Delete PO">
-                          <Icon name="TrashIcon" size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filteredPurchases.map((po) => {
+                  const isExpanded = expandedPoIds.has(po.id);
+                  const itemCount = po.items?.length || 0;
+
+                  return (
+                    <React.Fragment key={`po-frag-${po.id}`}>
+                      <tr className="table-row">
+                        {/* Expand Toggle */}
+                        <td className="px-3 py-3 text-center">
+                          {itemCount > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => togglePoExpand(po.id)}
+                              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                              title={isExpanded ? 'Collapse items' : 'View line items'}
+                            >
+                              <Icon name={isExpanded ? 'ChevronUpIcon' : 'ChevronDownIcon'} size={14} />
+                            </button>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs font-bold text-primary">{po.poNo}</td>
+                        <td className="px-4 py-3 font-semibold text-foreground">{po.vendorName}</td>
+                        <td className="px-4 py-3"><span className="badge-info text-3xs font-semibold">{po.store}</span></td>
+
+                        {/* Multi-product count & summary */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-muted/60 text-foreground font-bold text-3xs font-tabular">
+                              {itemCount} item{itemCount !== 1 ? 's' : ''}
+                            </span>
+                            <span className="text-2xs text-muted-foreground truncate max-w-[160px]" title={po.items?.map((i) => i.name).join(', ')}>
+                              {po.items?.[0]?.name || 'No items'}
+                              {itemCount > 1 ? ` +${itemCount - 1} more` : ''}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Subtotal & Tax breakdown */}
+                        <td className="px-4 py-3 font-tabular text-2xs text-muted-foreground">
+                          <div>Sub: ₹{(po.subtotal ?? po.totalAmount).toLocaleString('en-IN')}</div>
+                          {po.taxAmount ? (
+                            <div className="text-3xs text-muted-foreground">Tax: ₹{po.taxAmount.toLocaleString('en-IN')}</div>
+                          ) : null}
+                        </td>
+
+                        {/* Grand Total */}
+                        <td className="px-4 py-3 font-extrabold font-tabular text-foreground">
+                          ₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Fulfillment Status */}
+                        <td className="px-4 py-3">
+                          <span className={`text-3xs font-bold px-2 py-0.5 rounded-full ${po.status === 'Received' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'}`}>
+                            {po.status}
+                          </span>
+                        </td>
+
+                        {/* Payment Status */}
+                        <td className="px-4 py-3">
+                          <span className={`text-3xs font-bold px-2 py-0.5 rounded-full ${po.paymentStatus === 'Paid' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : po.paymentStatus === 'Partial' ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'}`}>
+                            {po.paymentStatus === 'Partial' ? `Partial (Rem: ₹${(po.remainingAmount ?? (po.totalAmount - (po.paidAmount || 0))).toLocaleString('en-IN')})` : po.paymentStatus}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3 text-2xs text-muted-foreground whitespace-nowrap">{po.expectedDate}</td>
+
+                        {/* Actions */}
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {po.paymentStatus !== 'Paid' && (
+                              <button
+                                onClick={() => openPaymentModal(po)}
+                                className="btn-secondary h-7 text-3xs py-1 px-2.5 gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 border-emerald-500/30"
+                                title="Record Payment against PO"
+                              >
+                                <Icon name="BanknotesIcon" size={12} />
+                                Pay
+                              </button>
+                            )}
+                            {po.status !== 'Received' && (
+                              <button
+                                onClick={() => handleReceiveGrn(po)}
+                                className="btn-primary h-7 text-3xs py-1 px-2.5 gap-1"
+                                title="Receive Goods Received Note (GRN) & Credit Stock"
+                              >
+                                <Icon name="CheckIcon" size={12} />
+                                Receive GRN
+                              </button>
+                            )}
+                            <button onClick={() => openEdit(po)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit PO">
+                              <Icon name="PencilSquareIcon" size={14} />
+                            </button>
+                            <button onClick={() => setDeletePoModal(po)} className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors" title="Delete PO">
+                              <Icon name="TrashIcon" size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Desktop Expanded Line Items Subtable */}
+                      {isExpanded && po.items && po.items.length > 0 && (
+                        <tr className="bg-muted/15 border-b border-border/80">
+                          <td colSpan={11} className="p-3 pl-12 pr-4">
+                            <div className="rounded-lg border border-border bg-card p-3 shadow-xs space-y-2">
+                              <div className="flex items-center justify-between text-2xs text-muted-foreground border-b border-border pb-1.5">
+                                <span className="font-bold text-foreground uppercase tracking-wider">
+                                  PO #{po.poNo} Line Items ({po.items.length})
+                                </span>
+                                <span>Destination Hub: <strong className="text-foreground">{po.store}</strong></span>
+                              </div>
+
+                              <table className="w-full text-left text-2xs">
+                                <thead>
+                                  <tr className="text-muted-foreground border-b border-border/40 pb-1">
+                                    <th className="py-1">Product Name</th>
+                                    <th className="py-1 font-mono">SKU</th>
+                                    <th className="py-1 text-center">Qty Ordered</th>
+                                    <th className="py-1 text-right">Unit Cost</th>
+                                    <th className="py-1 text-center">GST Rate</th>
+                                    <th className="py-1 text-right">Tax Amount</th>
+                                    <th className="py-1 text-right">Line Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/30">
+                                  {po.items.map((it, idx) => (
+                                    <tr key={`expanded-row-${idx}`} className="hover:bg-muted/30">
+                                      <td className="py-1.5 font-medium text-foreground">{it.name}</td>
+                                      <td className="py-1.5 font-mono text-muted-foreground">{it.sku || '—'}</td>
+                                      <td className="py-1.5 text-center font-bold font-tabular">{it.qty}</td>
+                                      <td className="py-1.5 text-right font-tabular">₹{it.unitCost.toLocaleString('en-IN')}</td>
+                                      <td className="py-1.5 text-center">{it.taxRate ? `${it.taxRate}%` : '0%'}</td>
+                                      <td className="py-1.5 text-right font-tabular text-muted-foreground">
+                                        ₹{(it.taxAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                      </td>
+                                      <td className="py-1.5 text-right font-extrabold font-tabular text-foreground">
+                                        ₹{(it.lineTotal || it.qty * it.unitCost).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+
+                              {/* Verified Payment History Section */}
+                              <div className="pt-2 border-t border-border/80 space-y-1.5">
+                                <div className="flex items-center justify-between text-2xs">
+                                  <span className="font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                    <Icon name="BanknotesIcon" size={13} className="text-emerald-600" />
+                                    Payment Transactions History ({po.payments?.length || 0})
+                                  </span>
+                                  <div className="flex items-center gap-3 text-3xs font-tabular">
+                                    <span>Total Cost: <strong>₹{po.totalAmount.toLocaleString('en-IN')}</strong></span>
+                                    <span>Already Paid: <strong className="text-emerald-600">₹{(po.paidAmount || 0).toLocaleString('en-IN')}</strong></span>
+                                    <span>Remaining: <strong className={(po.remainingAmount ?? (po.totalAmount - (po.paidAmount || 0))) > 0 ? "text-danger" : "text-emerald-600"}>₹{(po.remainingAmount ?? (po.totalAmount - (po.paidAmount || 0))).toLocaleString('en-IN')}</strong></span>
+                                  </div>
+                                </div>
+
+                                {(!po.payments || po.payments.length === 0) ? (
+                                  <p className="text-3xs text-muted-foreground italic py-1">No payment transactions recorded yet. Click &quot;Pay&quot; to add a payment tranche.</p>
+                                ) : (
+                                  <div className="overflow-x-auto rounded border border-border/60">
+                                    <table className="w-full text-left text-3xs">
+                                      <thead>
+                                        <tr className="bg-muted/40 text-muted-foreground font-semibold">
+                                          <th className="py-1 px-2.5">Voucher #</th>
+                                          <th className="py-1 px-2.5">Payment Date</th>
+                                          <th className="py-1 px-2.5 text-right">Amount</th>
+                                          <th className="py-1 px-2.5">Payment Method</th>
+                                          <th className="py-1 px-2.5">Reference / UTR</th>
+                                          <th className="py-1 px-2.5 text-center">Payment Proof</th>
+                                          <th className="py-1 px-2.5">Remarks</th>
+                                          <th className="py-1 px-2.5">Recorded By</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-border/30 font-tabular">
+                                        {po.payments.map((p: any) => (
+                                          <tr key={`dt-pay-${p.id}`} className="hover:bg-muted/20">
+                                            <td className="py-1.5 px-2.5 font-mono font-bold text-primary">{p.voucherNo || 'PV-LEGACY'}</td>
+                                            <td className="py-1.5 px-2.5 text-muted-foreground">{new Date(p.paymentDate || p.createdAt).toLocaleDateString('en-IN')}</td>
+                                            <td className="py-1.5 px-2.5 text-right font-extrabold text-emerald-600">₹{Number(p.amount).toLocaleString('en-IN')}</td>
+                                            <td className="py-1.5 px-2.5 font-medium">{p.paymentMethod}</td>
+                                            <td className="py-1.5 px-2.5 font-mono text-muted-foreground">{p.referenceNo || '—'}</td>
+                                            <td className="py-1.5 px-2.5 text-center">
+                                              {p.receiptUrl ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setProofViewerData({
+                                                    proofUrl: p.receiptUrl,
+                                                    title: `Payment Proof — Voucher #${p.voucherNo || 'PV'}`,
+                                                    amount: Number(p.amount),
+                                                    paymentMethod: p.paymentMethod,
+                                                    referenceNo: p.referenceNo,
+                                                    paymentDate: p.paymentDate,
+                                                    recordedBy: p.recordedBy,
+                                                    entityName: po.vendorName,
+                                                    billNo: po.invoiceNo || po.poNo,
+                                                    notes: p.notes,
+                                                  })}
+                                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-3xs font-bold bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors"
+                                                  title="View Attached Payment Proof"
+                                                >
+                                                  <Icon name="DocumentCheckIcon" size={12} />
+                                                  View Proof
+                                                </button>
+                                              ) : (
+                                                <span className="text-3xs text-muted-foreground/60 italic">—</span>
+                                              )}
+                                            </td>
+                                            <td className="py-1.5 px-2.5 text-muted-foreground max-w-[200px] truncate" title={p.notes || ''}>{p.notes || '—'}</td>
+                                            <td className="py-1.5 px-2.5 text-muted-foreground">{p.recordedBy || '—'}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      {/* Create Purchase Order Modal */}
-      <Modal
-        open={createPoModal}
-        onClose={() => setCreatePoModal(false)}
-        title="Create New Purchase Order"
-        subtitle="Generate PO for supplier inventory replenishment"
-        size="md"
-      >
-        <form onSubmit={handleCreatePo} className="space-y-4 py-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold text-foreground block">Select Supplier Vendor *</label>
-                <button
-                  type="button"
-                  onClick={() => setQuickVendorOpen(true)}
-                  className="text-3xs text-primary font-bold hover:underline flex items-center gap-0.5"
-                >
-                  <Icon name="PlusIcon" size={10} />
-                  Add New
-                </button>
-              </div>
-              <select
-                value={vendorName}
-                onChange={(e) => setVendorName(e.target.value)}
-                className="input-field text-xs font-medium"
-                required
-              >
-                <option value="">-- Select Vendor --</option>
-                {vendors.map((v) => (
-                  <option key={`v-po-${v.id}`} value={v.name}>
-                    {v.name} ({v.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Target Receiving Store *</label>
-              <select value={store} onChange={(e) => setStore(e.target.value)} className="input-field text-xs font-medium">
-                {[...storesList]
-                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
-                  .map((st) => (
-                    <option key={`po-create-${st.code}`} value={st.code}>
-                      {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-foreground">Item Description / SKU *</label>
-              {inventory.length > 0 && (
-                <span className="text-3xs text-muted-foreground">Pick from catalog or type custom below</span>
-              )}
-            </div>
-            {inventory.length > 0 && (
-              <select
-                className="input-field text-xs font-medium mb-1.5"
-                onChange={(e) => {
-                  const selectedId = e.target.value;
-                  if (!selectedId) return;
-                  const found = inventory.find(i => i.id === selectedId || i.productId === selectedId);
-                  if (found) {
-                    setItemName(found.name);
-                    if (found.costPrice > 0) setUnitCost(found.costPrice);
-                  }
-                }}
-              >
-                <option value="">-- Quick Pick from Inventory Catalog (Optional) --</option>
-                {inventory.map((inv) => (
-                  <option key={`inv-opt-${inv.id}`} value={inv.id}>
-                    {inv.name} ({inv.sku}) — Cost: ₹{inv.costPrice}
-                  </option>
-                ))}
-              </select>
-            )}
-            <input
-              type="text"
-              required
-              placeholder="e.g. Polycab 1.5 Sq mm Wire"
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-              className="input-field text-xs"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Order Quantity *</label>
-              <input
-                type="number"
-                min="1"
-                required
-                placeholder="e.g. 50"
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                className="input-field text-xs"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Unit Cost Price (₹) *</label>
-              <input
-                type="number"
-                min="0"
-                required
-                placeholder="e.g. 1850"
-                value={unitCost}
-                onChange={(e) => setUnitCost(e.target.value)}
-                className="input-field text-xs"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Payment Status</label>
-              <select
-                value={paymentStatus}
-                onChange={(e) => {
-                  const val = e.target.value as any;
-                  setPaymentStatus(val);
-                  if (val === 'Paid') setPaidAmount(currentTotal);
-                  else if (val === 'Unpaid') setPaidAmount(0);
-                }}
-                className="input-field text-xs font-medium"
-              >
-                <option value="Unpaid">Unpaid</option>
-                <option value="Partial">Partial</option>
-                <option value="Paid">Paid</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Expected Delivery Date</label>
-              <input
-                type="date"
-                value={expectedDate}
-                onChange={(e) => setExpectedDate(e.target.value)}
-                className="input-field text-xs"
-              />
-            </div>
-          </div>
-
-          {paymentStatus === 'Partial' && (
-            <div className="p-3 bg-muted/40 border border-border rounded-xl space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <span>Total Amount:</span>
-                <span>₹{currentTotal.toLocaleString('en-IN')}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-2xs font-bold text-foreground block mb-1">Amount Paid (₹) *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max={currentTotal}
-                    required
-                    placeholder="Enter paid amount"
-                    value={paidAmount}
-                    onChange={(e) => setPaidAmount(e.target.value)}
-                    className="input-field text-xs font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="text-2xs font-bold text-muted-foreground block mb-1">Amount Remaining (₹)</label>
-                  <div className="input-field text-xs font-bold bg-muted text-danger font-tabular flex items-center">
-                    ₹{currentRemaining.toLocaleString('en-IN')}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between pt-3 border-t border-border">
-            <span className="text-xs font-bold text-foreground">
-              Total PO Amount: ₹{currentTotal.toLocaleString('en-IN')}
-            </span>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setCreatePoModal(false)} className="btn-secondary text-xs">
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary text-xs">
-                Dispatch PO
-              </button>
-            </div>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Edit Purchase Order Modal */}
-      {editPoModal && (
-        <Modal
-          open={!!editPoModal}
-          onClose={() => setEditPoModal(null)}
-          title="Edit Purchase Order"
-          subtitle={`Modify PO ${editPoModal.poNo}`}
-          size="md"
-        >
-          <form onSubmit={handleUpdatePoSubmit} className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Supplier Vendor</label>
-                <input
-                  type="text"
-                  value={vendorName}
-                  onChange={(e) => setVendorName(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Target Store</label>
-                <select value={store} onChange={(e) => setStore(e.target.value)} className="input-field text-xs font-medium">
-                  {[...storesList]
-                    .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
-                    .map((st) => (
-                      <option key={`po-edit-${st.code}`} value={st.code}>
-                        {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
-                      </option>
-                    ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Item Description</label>
-              <input
-                type="text"
-                value={itemName}
-                onChange={(e) => setItemName(e.target.value)}
-                className="input-field text-xs"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Order Quantity</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Unit Cost Price (₹)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={unitCost}
-                  onChange={(e) => setUnitCost(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Payment Status</label>
-                <select
-                  value={paymentStatus}
-                  onChange={(e) => {
-                    const val = e.target.value as any;
-                    setPaymentStatus(val);
-                    if (val === 'Paid') setPaidAmount(currentTotal);
-                    else if (val === 'Unpaid') setPaidAmount(0);
-                  }}
-                  className="input-field text-xs font-medium"
-                >
-                  <option value="Unpaid">Unpaid</option>
-                  <option value="Partial">Partial</option>
-                  <option value="Paid">Paid</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Expected Delivery Date</label>
-                <input
-                  type="date"
-                  value={expectedDate}
-                  onChange={(e) => setExpectedDate(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-            </div>
-
-            {paymentStatus === 'Partial' && (
-              <div className="p-3 bg-muted/40 border border-border rounded-xl space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span>Total Amount:</span>
-                  <span>₹{currentTotal.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-2xs font-bold text-foreground block mb-1">Amount Paid (₹) *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max={currentTotal}
-                      required
-                      placeholder="Enter paid amount"
-                      value={paidAmount}
-                      onChange={(e) => setPaidAmount(e.target.value)}
-                      className="input-field text-xs font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-2xs font-bold text-muted-foreground block mb-1">Amount Remaining (₹)</label>
-                    <div className="input-field text-xs font-bold bg-muted text-danger font-tabular flex items-center">
-                      ₹{currentRemaining.toLocaleString('en-IN')}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-border">
-              <button type="button" onClick={() => setEditPoModal(null)} className="btn-secondary text-xs">
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary text-xs">
-                Save PO Changes
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      {/* Reusable Single-Source-of-Truth Purchase Order Form Modal */}
+      <PurchaseOrderFormModal
+        open={createPoModal || !!editPoModal}
+        onClose={() => {
+          setCreatePoModal(false);
+          setEditPoModal(null);
+        }}
+        purchase={editPoModal}
+      />
 
       {/* Delete PO Modal */}
       {deletePoModal && (
@@ -709,125 +524,21 @@ export default function PurchasesPage() {
         </Modal>
       )}
 
-      {/* Record Payment Modal */}
-      {paymentModalPo && (
-        <Modal
-          open={!!paymentModalPo}
-          onClose={() => setPaymentModalPo(null)}
-          title="Record Supplier Payment"
-          subtitle={`PO #${paymentModalPo.poNo} — ${paymentModalPo.vendorName}`}
-          size="md"
-        >
-          <form onSubmit={handleRecordPayment} className="space-y-4 py-2">
-            {/* Summary breakdown */}
-            <div className="p-3.5 bg-muted/40 border border-border rounded-xl space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total PO Cost:</span>
-                <span className="font-bold text-foreground">₹{paymentModalPo.totalAmount.toLocaleString('en-IN')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Already Paid:</span>
-                <span className="font-semibold text-emerald-600">₹{(paymentModalPo.paidAmount || 0).toLocaleString('en-IN')}</span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-border font-bold">
-                <span className="text-foreground">Remaining Balance:</span>
-                <span className="text-danger font-tabular">
-                  ₹{Math.max(0, paymentModalPo.totalAmount - (paymentModalPo.paidAmount || 0)).toLocaleString('en-IN')}
-                </span>
-              </div>
-            </div>
+      {/* Master Single Source of Truth Supplier Payment Modal */}
+      <SupplierPaymentModal
+        open={Boolean(paymentModalPo)}
+        onClose={() => setPaymentModalPo(null)}
+        purchase={paymentModalPo}
+        onSuccess={() => {
+          refreshAllData();
+        }}
+      />
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Payment Amount (₹) *</label>
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  max={Math.max(0, paymentModalPo.totalAmount - (paymentModalPo.paidAmount || 0))}
-                  required
-                  placeholder="e.g. 5000"
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="input-field text-xs font-bold text-emerald-600"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Payment Method *</label>
-                <select
-                  value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value)}
-                  className="input-field text-xs font-medium"
-                >
-                  <option value="Bank Transfer">Bank Transfer (NEFT/RTGS/IMPS)</option>
-                  <option value="UPI">UPI / QR Code</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Credit Card">Credit Card</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Payment Date *</label>
-                <input
-                  type="date"
-                  required
-                  value={payDate}
-                  onChange={(e) => setPayDate(e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Reference / UTR / Cheque #</label>
-                <input
-                  type="text"
-                  placeholder="e.g. UTR9283741829"
-                  value={payRef}
-                  onChange={(e) => setPayRef(e.target.value)}
-                  className="input-field text-xs font-mono"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Payment Remarks (Optional)</label>
-              <input
-                type="text"
-                placeholder="e.g. Advance payment tranche 1"
-                value={payNotes}
-                onChange={(e) => setPayNotes(e.target.value)}
-                className="input-field text-xs"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
-              <button
-                type="button"
-                onClick={() => setPaymentModalPo(null)}
-                className="btn-secondary text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmittingPayment}
-                className="btn-primary text-xs gap-1.5"
-              >
-                <Icon name="BanknotesIcon" size={14} />
-                {isSubmittingPayment ? 'Recording...' : 'Record Payment'}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* Quick Vendor Modal */}
-      <QuickVendorModal
-        open={quickVendorOpen}
-        onClose={() => setQuickVendorOpen(false)}
-        onSuccess={(name) => setVendorName(name)}
+      {/* Proof Viewer Modal */}
+      <ProofViewerModal
+        open={!!proofViewerData}
+        onClose={() => setProofViewerData(null)}
+        data={proofViewerData}
       />
     </AppLayout>
   );

@@ -3,6 +3,7 @@ import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { normalizeMobileNumber } from '@/lib/phoneUtils';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { executeWithIdempotency } from '@/lib/idempotency';
 
 /**
  * GET /api/customers - Search customer by normalized phone or query (excludes Archived by default)
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
     const customers = await (prisma as any).customer.findMany({
       where: whereClause,
       orderBy: {
-        totalSpent: 'desc',
+        createdAt: 'desc',
       },
       take: 100,
     });
@@ -86,41 +87,58 @@ export async function POST(req: NextRequest) {
 
     const normalizedPhone = normalizeMobileNumber(body.phone);
 
-    const existingCustomer = await (prisma as any).customer.findFirst({
-      where: { normalizedPhone },
-    });
+    const customKey =
+      body.idempotencyKey ||
+      req.headers.get('x-idempotency-key') ||
+      `cust_${normalizedPhone}_${Date.now()}`;
 
-    let customer;
-    if (existingCustomer) {
-      customer = await (prisma as any).customer.update({
-        where: { id: existingCustomer.id },
-        data: {
-          name: body.name,
-          email: body.email || undefined,
-          address: body.address || undefined,
-          city: body.city || undefined,
-          status: 'Active',
-        },
-      });
-    } else {
-      customer = await (prisma as any).customer.create({
-        data: {
-          name: body.name,
-          phone: body.phone,
-          normalizedPhone,
-          email: body.email || null,
-          address: body.address || null,
-          city: body.city || user.store,
-          totalSpent: body.totalSpend || 0,
-          creditBalance: body.creditBalance || 0,
-          status: 'Active',
-        },
-      });
-    }
+    return await executeWithIdempotency(
+      req,
+      {
+        action: 'CREATE_CUSTOMER',
+        key: customKey,
+        userId: user.id,
+        extractEntityId: (d) => d?.customer?.id,
+      },
+      async () => {
+        const customer = await prisma.$transaction(async (tx: any) => {
+          const existingCustomer = await tx.customer.findFirst({
+            where: { normalizedPhone },
+          });
 
-    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: customer.id, name: customer.name, phone: customer.phone, action: 'saved' });
+          if (existingCustomer) {
+            return tx.customer.update({
+              where: { id: existingCustomer.id },
+              data: {
+                name: body.name,
+                email: body.email || undefined,
+                address: body.address || undefined,
+                city: body.city || undefined,
+                status: 'Active',
+              },
+            });
+          }
 
-    return NextResponse.json({ success: true, customer }, { status: 201 });
+          return tx.customer.create({
+            data: {
+              name: body.name,
+              phone: body.phone,
+              normalizedPhone,
+              email: body.email || null,
+              address: body.address || null,
+              city: body.city || user.store,
+              totalSpent: body.totalSpend || 0,
+              creditBalance: body.creditBalance || 0,
+              status: 'Active',
+            },
+          });
+        }, { maxWait: 15000, timeout: 45000 });
+
+        broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: customer.id, name: customer.name, phone: customer.phone, action: 'saved' });
+
+        return { status: 201, data: { success: true, customer } };
+      }
+    );
   } catch (error: any) {
     console.error('API /api/customers POST error:', error);
     return NextResponse.json({ error: error.message || 'Failed to save customer' }, { status: 500 });
@@ -220,9 +238,11 @@ export async function DELETE(req: NextRequest) {
       });
     }
 
-    // Hard-delete only for completely unused customers by Super Admin
-    await (prisma as any).customerExternalLink.deleteMany({ where: { coskoCustomerId: target.id } });
-    await (prisma as any).customer.delete({ where: { id: target.id } });
+    // Hard-delete only for completely unused customers by Super Admin wrapped in atomic transaction
+    await prisma.$transaction(async (tx: any) => {
+      await tx.customerExternalLink.deleteMany({ where: { coskoCustomerId: target.id } });
+      await tx.customer.delete({ where: { id: target.id } });
+    }, { maxWait: 15000, timeout: 45000 });
 
     broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: target.id, name: target.name, action: 'deleted' });
 

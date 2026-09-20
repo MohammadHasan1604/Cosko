@@ -5,6 +5,7 @@ import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import { useApp, UserAccount } from '@/context/AppContext';
+import UserFormModal from '@/components/forms/UserFormModal';
 import { RBACEngine, RBACUser, PERMISSION_CATALOGUE, SUPER_ADMIN_PROTECTED_PERMISSIONS, PermissionDefinition, ROLE_SECURITY_LEVELS } from '@/lib/rbacEngine';
 import { toast } from 'sonner';
 
@@ -32,22 +33,20 @@ export default function UsersPage() {
   const [permissionsModalUser, setPermissionsModalUser] = useState<UserAccount | null>(null);
   const [performanceModalUser, setPerformanceModalUser] = useState<UserAccount | null>(null);
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<UserAccount | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
+
+  const handleOpenPermissions = (u: UserAccount) => {
+    if (u.role === 'Super Admin') {
+      toast.info('Super Admin accounts possess unconditional root-level enterprise access. Access Matrix configuration is not applicable.');
+      return;
+    }
+    setPermissionsModalUser(u);
+  };
 
   // Status Filter State
   const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive' | 'Suspended'>('All');
 
   // Permission UI Category Expand/Collapse State
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
-
-  // Form State
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserAccount['role']>('Store Manager');
-  const [store, setStore] = useState('BLR');
-  const [userStatus, setUserStatusState] = useState<'Active' | 'Inactive' | 'Suspended'>('Active');
 
   // Convert context users to RBACUser format for engine evaluation
   const rbacCurrentUser: RBACUser = {
@@ -86,55 +85,6 @@ export default function UsersPage() {
     setCollapsedCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
   };
 
-  const handleInviteSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !email || !password) {
-      toast.error('Full Name, Email, and Password are required');
-      return;
-    }
-
-    if (role === 'Super Admin' && currentUser.role !== 'Super Admin') {
-      toast.error('Deny Access: Only existing Level 100 Super Admins can create new Super Admin accounts.');
-      return;
-    }
-
-    addUserAccount({
-      name,
-      email,
-      phone: phone || '+91 98765 43210',
-      password,
-      role,
-      store,
-      allowedStores: [store],
-      status: userStatus,
-      shiftStatus: 'On Shift',
-    });
-    setInviteModal(false);
-    resetForm();
-  };
-
-  const handleUpdateUserSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editUserModal) return;
-
-    if (editUserModal.role === 'Super Admin' && currentUser.role !== 'Super Admin') {
-      toast.error('Deny Access: Lower-level roles cannot modify Super Admin security records.');
-      return;
-    }
-
-    updateUserAccount(editUserModal.id, {
-      name,
-      email,
-      phone,
-      password: password || editUserModal.password,
-      role,
-      store,
-      status: userStatus,
-    });
-    setEditUserModal(null);
-    resetForm();
-  };
-
   const handleDeleteClick = (u: UserAccount) => {
     if (u.role === 'Super Admin' && currentUser.role !== 'Super Admin') {
       toast.error('Deny Access: Protected Boundary. Lower-level roles cannot delete Super Admin accounts.');
@@ -149,24 +99,6 @@ export default function UsersPage() {
       return;
     }
     setEditUserModal(u);
-    setName(u.name);
-    setEmail(u.email);
-    setPhone(u.phone || '');
-    setPassword(u.password || '');
-    setRole(u.role);
-    setStore(u.store);
-    setUserStatusState(u.status);
-  };
-
-  const resetForm = () => {
-    setName('');
-    setEmail('');
-    setPhone('');
-    setPassword('');
-    setShowPassword(false);
-    setRole('Store Manager');
-    setStore('BLR');
-    setUserStatusState('Active');
   };
 
   // Group permissions by Category for UI Sections
@@ -218,7 +150,7 @@ export default function UsersPage() {
             </p>
           </div>
 
-          <button onClick={() => { resetForm(); setInviteModal(true); }} className="btn-primary gap-2">
+          <button onClick={() => setInviteModal(true)} className="btn-primary gap-2">
             <Icon name="UserPlusIcon" size={18} />
             Provision New User
           </button>
@@ -354,13 +286,20 @@ export default function UsersPage() {
                       )}
 
                       {fullUserRecord && (
-                        <button
-                          onClick={() => setPermissionsModalUser(fullUserRecord)}
-                          className="btn-primary text-3xs py-1 px-2 gap-1"
-                        >
-                          <Icon name="KeyIcon" size={13} />
-                          Access Matrix
-                        </button>
+                        isProtectedSuperAdmin ? (
+                          <span className="badge-danger text-3xs py-1 px-2 gap-1 font-bold flex items-center">
+                            <Icon name="ShieldCheckIcon" size={12} />
+                            Full Root Access
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleOpenPermissions(fullUserRecord)}
+                            className="btn-primary text-3xs py-1 px-2 gap-1"
+                          >
+                            <Icon name="KeyIcon" size={13} />
+                            Access Matrix
+                          </button>
+                        )
                       )}
                     </div>
                   </div>
@@ -471,14 +410,24 @@ export default function UsersPage() {
                           )}
 
                           {fullUserRecord && (
-                            <button
-                              onClick={() => setPermissionsModalUser(fullUserRecord)}
-                              className="btn-primary h-7 text-3xs py-1 px-2.5 gap-1"
-                              title="Config Granular Permissions"
-                            >
-                              <Icon name="KeyIcon" size={12} />
-                              Access Matrix
-                            </button>
+                            isProtectedSuperAdmin ? (
+                              <span
+                                className="inline-flex items-center gap-1 text-3xs font-extrabold px-2 py-1 rounded-lg bg-danger/10 text-danger border border-danger/20"
+                                title="Super Admin holds unrestricted root-level access to all modules, pages, stores, and actions."
+                              >
+                                <Icon name="ShieldCheckIcon" size={12} />
+                                Full Root Access
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenPermissions(fullUserRecord)}
+                                className="btn-primary h-7 text-3xs py-1 px-2.5 gap-1"
+                                title="Config Granular Permissions"
+                              >
+                                <Icon name="KeyIcon" size={12} />
+                                Access Matrix
+                              </button>
+                            )
                           )}
 
                           {(!isProtectedSuperAdmin || currentUser.role === 'Super Admin') && fullUserRecord && (
@@ -504,149 +453,23 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Provision User Modal */}
-      <Modal open={inviteModal} onClose={() => setInviteModal(false)} title="Provision New User Account" subtitle="Create credentials and assign security level & store scope" size="md">
-        <form onSubmit={handleInviteSubmit} className="space-y-3.5 py-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Full Name *</label>
-              <input type="text" required placeholder="Pooja Deshmukh" value={name} onChange={(e) => setName(e.target.value)} className="input-field text-xs" />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Email Address *</label>
-              <input type="email" required placeholder="pooja@cosko.com" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field text-xs" />
-            </div>
-          </div>
+      {/* Reusable Single-Source-of-Truth User Form Modal */}
+      <UserFormModal
+        open={inviteModal || !!editUserModal}
+        onClose={() => {
+          setInviteModal(false);
+          setEditUserModal(null);
+        }}
+        user={editUserModal}
+      />
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Assign Role & Level *</label>
-              <select value={role} onChange={(e) => setRole(e.target.value as any)} className="input-field text-xs font-medium">
-                <option value="Store Manager">Level 80 — Store Manager</option>
-                <option value="Inventory Auditor">Level 60 — Inventory Auditor</option>
-                <option value="Sales Executive">Level 40 — Sales Executive</option>
-                <option value="POS Cashier">Level 20 — POS Cashier</option>
-                <option value="Super Admin">Level 100 — Super Admin</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Primary Store *</label>
-              <select value={store} onChange={(e) => setStore(e.target.value)} className="input-field text-xs font-medium">
-                {[...storesList]
-                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
-                  .map((st) => (
-                    <option key={`prov-${st.code}`} value={st.code}>
-                      {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
-                    </option>
-                  ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Account Status *</label>
-              <select value={userStatus} onChange={(e) => setUserStatusState(e.target.value as any)} className="input-field text-xs font-medium">
-                <option value="Active">ACTIVE</option>
-                <option value="Inactive">INACTIVE</option>
-                <option value="Suspended">SUSPENDED</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-foreground block mb-1">Account Password *</label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                placeholder="Set password for user"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-field text-xs pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={14} />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-border">
-            <button type="button" onClick={() => setInviteModal(false)} className="btn-secondary text-xs">Cancel</button>
-            <button type="submit" className="btn-primary text-xs">Provision Account</button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Edit User Modal */}
-      {editUserModal && (
-        <Modal open={!!editUserModal} onClose={() => setEditUserModal(null)} title="Edit Security Credentials & Scope" subtitle={`Updating account for ${editUserModal.name}`} size="md">
-          <form onSubmit={handleUpdateUserSubmit} className="space-y-3.5 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Full Name</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="input-field text-xs" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Email Address</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field text-xs" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Role</label>
-                <select value={role} onChange={(e) => setRole(e.target.value as any)} className="input-field text-xs font-medium">
-                  <option value="Store Manager">Level 80 — Store Manager</option>
-                  <option value="Inventory Auditor">Level 60 — Inventory Auditor</option>
-                  <option value="Sales Executive">Level 40 — Sales Executive</option>
-                  <option value="POS Cashier">Level 20 — POS Cashier</option>
-                  <option value="Super Admin">Level 100 — Super Admin</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Primary Store</label>
-                <select value={store} onChange={(e) => setStore(e.target.value)} className="input-field text-xs font-medium">
-                  {[...storesList]
-                    .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
-                    .map((st) => (
-                      <option key={`edit-${st.code}`} value={st.code}>
-                        {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Status</label>
-                <select value={userStatus} onChange={(e) => setUserStatusState(e.target.value as any)} className="input-field text-xs font-medium">
-                  <option value="Active">ACTIVE</option>
-                  <option value="Inactive">INACTIVE</option>
-                  <option value="Suspended">SUSPENDED</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Reset Password (Optional)</label>
-              <input type="password" placeholder="Leave blank to keep existing password" value={password} onChange={(e) => setPassword(e.target.value)} className="input-field text-xs" />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-border">
-              <button type="button" onClick={() => setEditUserModal(null)} className="btn-secondary text-xs">Cancel</button>
-              <button type="submit" className="btn-primary text-xs">Save Account Changes</button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* Super Admin User Access & Permissions Matrix Modal */}
-      {permissionsModalUser && (
+      {/* Non-Super-Admin User Access & Permissions Matrix Modal */}
+      {permissionsModalUser && permissionsModalUser.role !== 'Super Admin' && (
         <Modal
           open={!!permissionsModalUser}
           onClose={() => setPermissionsModalUser(null)}
           title={`User Access & Permissions — ${permissionsModalUser.name}`}
-          subtitle={`${permissionsModalUser.email} · Role: ${permissionsModalUser.role} (Level ${permissionsModalUser.securityLevel || (permissionsModalUser.role === 'Super Admin' ? 100 : 80)})`}
+          subtitle={`${permissionsModalUser.email} · Role: ${permissionsModalUser.role} (Level ${permissionsModalUser.securityLevel || 80})`}
           size="lg"
         >
           <div className="space-y-5 py-2">
@@ -663,24 +486,21 @@ export default function UsersPage() {
                   const isStoreOn = permissionsModalUser.store === 'All Stores' || allowedStores.includes(stHub.code);
 
                   return (
-                    <div key={`st-toggle-${stHub.code}`} className="flex items-center justify-between gap-3 bg-card px-3.5 py-2 rounded-xl border border-border min-w-[140px]">
+                    <div key={`st-toggle-${stHub.code}`} className="flex items-center justify-between gap-3 bg-card px-3.5 py-2 rounded-xl border border-border min-w-[150px]">
                       <div>
                         <span className="text-xs font-bold text-foreground font-mono">{stHub.code}</span>
                         <span className="text-3xs text-muted-foreground block">{stHub.city}</span>
                       </div>
 
-                      {/* Prominent Store ON / OFF Toggle Button */}
-                      <button
-                        type="button"
-                        onClick={() => toggleUserStoreAccess(permissionsModalUser.id, stHub.code)}
-                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all shadow-xs flex items-center gap-1 ${
-                          isStoreOn
-                            ? 'bg-success text-white hover:bg-success/90'
-                            : 'bg-muted text-muted-foreground hover:bg-muted/80 border border-border'
-                        }`}
-                      >
-                        {isStoreOn ? 'ON' : 'OFF'}
-                      </button>
+                      {/* Prominent Store ON / OFF Toggle Switch */}
+                      <ToggleSwitch
+                        checked={isStoreOn}
+                        onChange={() => toggleUserStoreAccess(permissionsModalUser.id, stHub.code)}
+                        size="sm"
+                        onText="ON"
+                        offText="OFF"
+                        title={`Toggle access for store ${stHub.code}`}
+                      />
                     </div>
                   );
                 })}
@@ -751,7 +571,7 @@ export default function UsersPage() {
                 return (
                   <div key={`cat-sec-${category}`} className="border border-border rounded-xl overflow-hidden bg-card">
                     {/* Module Header with Page ON/OFF Switch */}
-                    <div className="p-3.5 bg-muted/40 flex items-center justify-between gap-3 cursor-pointer select-none" onClick={() => toggleCategoryCollapse(category)}>
+                    <div className="p-3 bg-muted/40 flex items-center justify-between gap-3 cursor-pointer select-none" onClick={() => toggleCategoryCollapse(category)}>
                       <div className="flex items-center gap-2">
                         <button type="button" className="text-muted-foreground hover:text-foreground">
                           <Icon name={isCollapsed ? 'ChevronRightIcon' : 'ChevronDownIcon'} size={16} />
@@ -760,23 +580,20 @@ export default function UsersPage() {
                         <span className="text-3xs text-muted-foreground">({perms.length} actions)</span>
                       </div>
 
-                      <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2.5" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-2xs font-semibold text-muted-foreground hidden sm:inline">{category} Access:</span>
                         {pageViewPerm && !pageViewPerm.isProtected ? (
-                          <button
-                            type="button"
-                            onClick={() => setUserPermissionOverride(permissionsModalUser.id, pageViewPerm.code, isPageOn ? 'DENY' : 'ALLOW')}
-                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all shadow-xs flex items-center gap-1 ${
-                              isPageOn
-                                ? 'bg-success text-white hover:bg-success/90'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/80 border border-border'
-                            }`}
-                          >
-                            <span>{category} Access:</span>
-                            <span>{isPageOn ? 'ON' : 'OFF'}</span>
-                          </button>
+                          <ToggleSwitch
+                            checked={isPageOn}
+                            onChange={() => setUserPermissionOverride(permissionsModalUser.id, pageViewPerm.code, isPageOn ? 'DENY' : 'ALLOW')}
+                            size="sm"
+                            onText="ON"
+                            offText="OFF"
+                            title={`Toggle entire ${category} module access`}
+                          />
                         ) : (
                           <span className={`text-3xs font-bold px-2 py-0.5 rounded-full ${isPageOn ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}>
-                            {category} Access: {isPageOn ? 'ON' : 'OFF'}
+                            {isPageOn ? 'ON' : 'OFF'}
                           </span>
                         )}
                       </div>
@@ -816,19 +633,24 @@ export default function UsersPage() {
                                   </span>
                                 ) : (
                                   <div className="flex items-center gap-2">
-                                    {/* Prominent ON / OFF Clickable Toggle Button */}
-                                    <button
-                                      type="button"
-                                      onClick={() => setUserPermissionOverride(permissionsModalUser.id, perm.code, isActionOn ? 'DENY' : 'ALLOW')}
-                                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 ${
-                                        isActionOn
-                                          ? 'bg-success text-white hover:bg-success/90'
-                                          : 'bg-muted text-muted-foreground hover:bg-muted/80 border border-border'
-                                      }`}
-                                    >
-                                      <span>{isActionOn ? 'ON' : 'OFF'}</span>
-                                      <span className="text-3xs font-normal opacity-80">({permState})</span>
-                                    </button>
+                                    <span className={`text-3xs font-bold px-1.5 py-0.5 rounded ${
+                                      permState === 'Custom Allow'
+                                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                        : permState === 'Custom Deny'
+                                        ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                                        : 'text-muted-foreground'
+                                    }`}>
+                                      {permState}
+                                    </span>
+                                    {/* Prominent ON / OFF Clickable Toggle Switch */}
+                                    <ToggleSwitch
+                                      checked={isActionOn}
+                                      onChange={() => setUserPermissionOverride(permissionsModalUser.id, perm.code, isActionOn ? 'DENY' : 'ALLOW')}
+                                      size="sm"
+                                      onText="ON"
+                                      offText="OFF"
+                                      title={`Toggle ${perm.name} (${perm.code})`}
+                                    />
                                   </div>
                                 )}
                               </div>

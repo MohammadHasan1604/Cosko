@@ -7,7 +7,7 @@ import { useApp } from '@/context/AppContext';
 
 interface StockAdjustmentFormValues {
   adjustmentType: 'add' | 'remove' | 'set';
-  quantity: number;
+  quantity: number | '';
   reason: string;
   notes: string;
   store: string;
@@ -48,7 +48,7 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
   } = useForm<StockAdjustmentFormValues>({
     defaultValues: {
       adjustmentType: 'add',
-      quantity: 1,
+      quantity: '',
       reason: '',
       notes: '',
       store: item.store,
@@ -59,7 +59,9 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
   const quantity = watch('quantity');
 
   const getNewQty = () => {
-    const qty = Number(quantity) || 0;
+    if (quantity === '' || quantity === null || quantity === undefined) return item.qtyOnHand;
+    const qty = Number(quantity);
+    if (isNaN(qty)) return item.qtyOnHand;
     if (adjustmentType === 'add') return item.qtyOnHand + qty;
     if (adjustmentType === 'remove') return Math.max(0, item.qtyOnHand - qty);
     if (adjustmentType === 'set') return qty;
@@ -144,11 +146,20 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
           id="adj-qty"
           type="number"
           min={0}
+          placeholder="Enter quantity..."
           className={`input-field mt-1.5 ${errors.quantity ? 'border-danger ring-1 ring-danger' : ''}`}
           {...register('quantity', {
             required: 'Quantity is required',
             min: { value: 0, message: 'Quantity cannot be negative' },
-            validate: (v) => Number(v) > 0 || 'Quantity must be greater than 0',
+            validate: (v) => {
+              if (v === '' || v === null || v === undefined) return 'Quantity is required';
+              const num = Number(v);
+              if (isNaN(num)) return 'Quantity must be a valid number';
+              if (adjustmentType === 'set') {
+                return num >= 0 || 'Quantity cannot be negative';
+              }
+              return num > 0 || 'Quantity must be greater than 0';
+            },
           })}
         />
         {errors.quantity && <p className="error-text">{errors.quantity.message}</p>}

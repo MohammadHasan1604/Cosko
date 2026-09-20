@@ -10,6 +10,7 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  zIndex?: number;
 }
 
 const sizeClasses = {
@@ -19,7 +20,7 @@ const sizeClasses = {
   xl: 'max-w-4xl',
 };
 
-export default function Modal({ open, onClose, title, subtitle, children, footer, size = 'md' }: ModalProps) {
+export default function Modal({ open, onClose, title, subtitle, children, footer, size = 'md', zIndex = 100 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,7 +42,8 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 overflow-y-auto backdrop-blur-sm bg-slate-950/45 transition-all"
+      style={{ zIndex }}
+      className="fixed inset-0 flex items-center justify-center p-3 sm:p-5 overflow-y-auto backdrop-blur-sm bg-slate-950/45 transition-all"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
       role="dialog"
       aria-modal="true"

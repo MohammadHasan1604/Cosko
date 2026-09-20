@@ -3,6 +3,10 @@ import { prisma } from '@/lib/db';
 import { comparePassword, signSessionToken, isValidAuthOrigin } from '@/lib/auth';
 import { checkRateLimit, recordFailedAttempt, clearRateLimit, getClientIp } from '@/lib/rateLimit';
 
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes temporary lockout
+const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days in seconds
+
 export async function POST(req: NextRequest) {
   // 1. Origin / CSRF validation
   if (!isValidAuthOrigin(req)) {
@@ -20,31 +24,21 @@ export async function POST(req: NextRequest) {
     const cleanEmail = body.email.toLowerCase().trim();
     const password = body.password;
 
-    // 2. Rate Limiting Check (by IP and Email Identifier)
-    const ipRateLimit = checkRateLimit(`ip:${clientIp}`);
+    // 2. Fast In-Memory Rate Limiting Check (IP DDoS protection: 50 requests/15m; Account lockout: 5 attempts/15m)
+    const ipRateLimit = checkRateLimit(`ip:${clientIp}`, 50);
     if (!ipRateLimit.allowed) {
       return NextResponse.json(
         {
-          error: `Too many login attempts. Please try again in ${ipRateLimit.retryAfterSeconds || 900} seconds.`,
+          error: `Too many login attempts from this network. Please try again in ${ipRateLimit.retryAfterSeconds || 900} seconds.`,
           retryAfter: ipRateLimit.retryAfterSeconds,
-        },
-        { status: 429 }
-      );
-    }
-
-    const emailRateLimit = checkRateLimit(`email:${cleanEmail}`);
-    if (!emailRateLimit.allowed) {
-      return NextResponse.json(
-        {
-          error: `Too many login attempts for this account. Please try again in ${emailRateLimit.retryAfterSeconds || 900} seconds.`,
-          retryAfter: emailRateLimit.retryAfterSeconds,
+          locked: true,
         },
         { status: 429 }
       );
     }
 
     // 3. User Lookup in MySQL
-    let user;
+    let user: any;
     try {
       user = await prisma.userAccount.findUnique({
         where: { email: cleanEmail },
@@ -60,12 +54,49 @@ export async function POST(req: NextRequest) {
 
     // 4. Generic rejection on missing user (prevents account enumeration)
     if (!user) {
-      recordFailedAttempt(`ip:${clientIp}`);
-      recordFailedAttempt(`email:${cleanEmail}`);
+      recordFailedAttempt(`ip:${clientIp}`, 50);
+      const r = recordFailedAttempt(`email:${cleanEmail}`, 5);
+      if (!r.allowed) {
+        return NextResponse.json(
+          {
+            error: `Account is temporarily locked due to 5 consecutive failed login attempts. Please try again in ${r.retryAfterSeconds || 900} seconds.`,
+            retryAfter: r.retryAfterSeconds,
+            locked: true,
+          },
+          { status: 429 }
+        );
+      }
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
-    // 5. Check if user is suspended or inactive
+    // 5. Database-Authoritative Account Lockout Check (Cannot be bypassed by refresh, new tab, or IP change)
+    const now = new Date();
+    if (user.lockedUntil && user.lockedUntil > now) {
+      const retryAfterSeconds = Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 1000);
+      return NextResponse.json(
+        {
+          error: `Account is temporarily locked due to 5 consecutive failed login attempts. Please try again in ${retryAfterSeconds} seconds.`,
+          retryAfter: retryAfterSeconds,
+          locked: true,
+        },
+        { status: 429 }
+      );
+    }
+
+    // If lockout window has expired, reset counter safely
+    if (user.lockedUntil && user.lockedUntil <= now) {
+      try {
+        await prisma.userAccount.update({
+          where: { id: user.id },
+          data: { failedLoginAttempts: 0, lockedUntil: null },
+        });
+        user.failedLoginAttempts = 0;
+        user.lockedUntil = null;
+        clearRateLimit(`email:${cleanEmail}`);
+      } catch {}
+    }
+
+    // 6. Check if user is suspended or inactive
     if (user.status === 'Suspended' || user.status === 'Inactive') {
       return NextResponse.json(
         { error: 'Account is inactive or suspended. Please contact Super Admin.' },
@@ -73,7 +104,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 6. Verify salted bcrypt hash
+    // 7. Verify salted bcrypt hash
     let passwordMatch = false;
     try {
       passwordMatch = await comparePassword(password, user.passwordHash);
@@ -83,29 +114,72 @@ export async function POST(req: NextRequest) {
     }
 
     if (!passwordMatch) {
-      recordFailedAttempt(`ip:${clientIp}`);
-      recordFailedAttempt(`email:${cleanEmail}`);
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
+      const currentFailed = (user.failedLoginAttempts || 0) + 1;
+      let isNowLocked = currentFailed >= MAX_FAILED_LOGIN_ATTEMPTS;
+      const lockoutDate = isNowLocked ? new Date(Date.now() + LOCKOUT_DURATION_MS) : null;
+
+      try {
+        await prisma.userAccount.update({
+          where: { id: user.id },
+          data: {
+            failedLoginAttempts: currentFailed,
+            lockedUntil: lockoutDate,
+          },
+        });
+      } catch (dbUpdateErr) {
+        console.error('Failed to update failed login attempts counter:', dbUpdateErr);
+      }
+
+      recordFailedAttempt(`ip:${clientIp}`, 50);
+      recordFailedAttempt(`email:${cleanEmail}`, 5);
+
+      if (isNowLocked) {
+        return NextResponse.json(
+          {
+            error: `Account is temporarily locked due to 5 consecutive failed login attempts. Please try again in 900 seconds.`,
+            retryAfter: 900,
+            locked: true,
+          },
+          { status: 429 }
+        );
+      }
+
+      const remaining = Math.max(0, MAX_FAILED_LOGIN_ATTEMPTS - currentFailed);
+      return NextResponse.json(
+        {
+          error: `Invalid email or password (${remaining} attempt${remaining === 1 ? '' : 's'} remaining before temporary account lockout)`,
+          remainingAttempts: remaining,
+        },
+        { status: 401 }
+      );
     }
 
-    // 7. Successful Authentication - Clear rate limit counters
+    // 8. Successful Authentication - Clear rate limit & reset database lockout counters
     clearRateLimit(`ip:${clientIp}`);
     clearRateLimit(`email:${cleanEmail}`);
 
-    // Update last login timestamp safely
     try {
       await prisma.userAccount.update({
         where: { id: user.id },
-        data: { lastLogin: new Date() },
+        data: {
+          lastLogin: new Date(),
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
       });
     } catch (updateErr) {
-      console.warn('Could not update last login timestamp:', updateErr);
+      console.warn('Could not update last login & reset lockout timestamp:', updateErr);
     }
 
-    const allowedStores = user.storeAssignments.map((a) => a.storeCode);
+    const allowedStores = user.storeAssignments.map((a: any) => a.storeCode);
     if (user.storeScope && !allowedStores.includes(user.storeScope)) {
       allowedStores.push(user.storeScope);
     }
+
+    // Enforce strict store scope RBAC: Non-Super Admin MUST be permanently assigned to a physical store
+    const effectiveStore = user.role === 'Super Admin'
+      ? (user.storeScope || 'All Stores')
+      : ((user.storeScope && user.storeScope !== 'All Stores') ? user.storeScope : (allowedStores[0] || 'BLR'));
 
     const sessionUser = {
       id: user.id,
@@ -113,8 +187,10 @@ export async function POST(req: NextRequest) {
       email: user.email,
       role: user.role as any,
       securityLevel: user.securityLevel,
-      store: user.storeScope,
-      allowedStores: allowedStores.length > 0 ? allowedStores : (user.role === 'Super Admin' ? ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'] : [user.storeScope]),
+      store: effectiveStore,
+      allowedStores: user.role === 'Super Admin'
+        ? (allowedStores.length > 0 ? allowedStores : ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'])
+        : (allowedStores.length > 0 ? allowedStores : [effectiveStore]),
       avatar: user.name.substring(0, 2).toUpperCase(),
       shiftStatus: user.shiftStatus as any,
       avatarUrl: user.avatarUrl || undefined,
@@ -130,12 +206,12 @@ export async function POST(req: NextRequest) {
       mustChangePassword: sessionUser.mustChangePassword,
     });
 
-    // Set secure HttpOnly session cookie
+    // Set secure HttpOnly 30-day session cookie
     response.cookies.set('cosko_session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: SESSION_COOKIE_MAX_AGE, // 30 days
       path: '/',
     });
 

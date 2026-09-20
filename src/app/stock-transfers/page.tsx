@@ -3,8 +3,18 @@ import React, { useState, useMemo } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
+import StockTransferModal from '@/components/forms/StockTransferModal';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
+import {
+  calculateTransferLineItem,
+  formatTransferINR,
+  formatTransferMargin,
+  getTransferProfitColorClass,
+  validateTransferHeader,
+  validateTransferItem,
+  round2,
+} from '@/lib/stockTransferCalculations';
 
 export default function StockTransfersPage() {
   const {
@@ -24,63 +34,14 @@ export default function StockTransfersPage() {
   const [cancelLoading, setCancelLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [storeFilter, setStoreFilter] = useState('All Stores');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Form State
-  const defaultSource = currentUser.role === 'Super Admin' ? 'CENTRAL' : currentUser.store;
-  const [sourceStore, setSourceStore] = useState(defaultSource);
-  const [destStore, setDestStore] = useState('BLR');
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [transferQty, setTransferQty] = useState(1);
-  const [transferPriceInput, setTransferPriceInput] = useState<number | ''>('');
-  const [notes, setNotes] = useState('');
-
-  // Available source physical locations
-  const availableSourceStores = useMemo(() => {
-    if (currentUser.role === 'Super Admin') {
-      return storesList.filter((s) => s.status === 'Active');
-    }
-    return storesList.filter((s) => s.code === currentUser.store || currentUser.allowedStores?.includes(s.code));
-  }, [storesList, currentUser]);
-
-  // Available destination physical locations (cannot be same as source)
-  const availableDestStores = useMemo(() => {
-    return storesList.filter((s) => s.status === 'Active' && s.code !== sourceStore);
-  }, [storesList, sourceStore]);
-
-  // Items available at source location
-  const sourceInventoryItems = useMemo(() => {
-    return inventory.filter((i) => i.store === sourceStore && i.qtyOnHand > 0);
-  }, [inventory, sourceStore]);
-
-  // Active selected item for transfer
-  const activeItem = useMemo(() => {
-    if (!selectedProductId && sourceInventoryItems.length > 0) return sourceInventoryItems[0];
-    return sourceInventoryItems.find((i) => i.id === selectedProductId) || sourceInventoryItems[0] || null;
-  }, [selectedProductId, sourceInventoryItems]);
-
-  // Update default transfer price when activeItem or destination store changes
-  React.useEffect(() => {
-    if (activeItem) {
-      setTransferPriceInput(activeItem.transferPrice || Math.round(activeItem.costPrice * 1.2));
-    }
-  }, [activeItem, destStore]);
-
-  // Live Calculations
-  const unitCost = activeItem ? activeItem.costPrice : 0;
-  const effectivePrice = typeof transferPriceInput === 'number' ? transferPriceInput : unitCost;
-  const availableStock = activeItem ? activeItem.qtyOnHand : 0;
-  const totalCost = unitCost * transferQty;
-  const totalTransferValue = effectivePrice * transferQty;
-  const grossProfit = totalTransferValue - totalCost;
 
   // Filtered Transfers History
   const filteredTransfers = useMemo(() => {
     return stockTransfers.filter((t: any) => {
-      const matchStore =
-        storeFilter === 'All Stores' ||
-        t.sourceStore === storeFilter ||
-        t.destStore === storeFilter;
+      const assignedStore = currentUser.store || 'BLR';
+      const matchStore = currentUser.role === 'Super Admin'
+        ? (storeFilter === 'All Stores' || t.sourceStore === storeFilter || t.destStore === storeFilter)
+        : (t.sourceStore === assignedStore || t.destStore === assignedStore);
       const matchSearch =
         searchQuery === '' ||
         (t.transferNo && t.transferNo.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -88,64 +49,7 @@ export default function StockTransfersPage() {
         (t.notes && t.notes.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchStore && matchSearch;
     });
-  }, [stockTransfers, storeFilter, searchQuery]);
-
-  const handleCreateTransferSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeItem) {
-      toast.error('Please select a valid product to transfer');
-      return;
-    }
-    if (transferQty <= 0) {
-      toast.error('Transfer quantity must be at least 1 unit');
-      return;
-    }
-    if (transferQty > availableStock) {
-      toast.error(`Transfer quantity (${transferQty}) exceeds available stock (${availableStock}) at ${sourceStore}`);
-      return;
-    }
-    if (sourceStore === destStore) {
-      toast.error('Source and Destination stores cannot be identical');
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      const res = await fetch('/api/transfers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          sourceStore,
-          destStore,
-          notes: notes || undefined,
-          items: [
-            {
-              productId: activeItem.productId || activeItem.id,
-              qty: transferQty,
-              costPerUnit: unitCost,
-              transferPricePerUnit: effectivePrice,
-            },
-          ],
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Transfer failed');
-      }
-
-      toast.success(`Successfully dispatched ${transferQty} units from ${sourceStore} to ${destStore} (${data.transfer.transferNo})`);
-      setCreateModalOpen(false);
-      setNotes('');
-      setTransferQty(1);
-      await refreshAllData();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to complete stock transfer');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  }, [stockTransfers, storeFilter, searchQuery, currentUser.role, currentUser.store]);
 
   return (
     <AppLayout activeRoute="/stock-transfers">
@@ -167,7 +71,6 @@ export default function StockTransfersPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                if (availableDestStores.length > 0) setDestStore(availableDestStores[0].code);
                 setCreateModalOpen(true);
               }}
               className="btn-primary gap-1.5 text-xs sm:text-sm font-bold shadow-sm"
@@ -193,26 +96,28 @@ export default function StockTransfersPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <select
-              value={storeFilter}
-              onChange={(e) => setStoreFilter(e.target.value)}
-              className="input-field text-xs py-2 px-3"
-            >
-              <optgroup label="Reporting Scope">
-                <option value="All Stores">All Stores (Consolidated Transfers)</option>
-              </optgroup>
-              <optgroup label="Physical Hubs & Stores">
-                {[...storesList]
-                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
-                  .map((st) => (
-                    <option key={st.id} value={st.code}>
-                      {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.name} (${st.code})`}
-                    </option>
-                  ))}
-              </optgroup>
-            </select>
-          </div>
+          {currentUser.role === 'Super Admin' && (
+            <div className="flex items-center gap-2">
+              <select
+                value={storeFilter}
+                onChange={(e) => setStoreFilter(e.target.value)}
+                className="input-field text-xs py-2 px-3"
+              >
+                <optgroup label="Reporting Scope">
+                  <option value="All Stores">All Stores (Consolidated Transfers)</option>
+                </optgroup>
+                <optgroup label="Physical Hubs & Stores">
+                  {[...storesList]
+                    .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
+                    .map((st) => (
+                      <option key={st.id} value={st.code}>
+                        {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.name} (${st.code})`}
+                      </option>
+                    ))}
+                </optgroup>
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Transfers Directory Table */}
@@ -261,11 +166,11 @@ export default function StockTransfersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-extrabold text-foreground">{t.totalUnits || t.qty}</td>
-                      <td className="px-4 py-3 text-right font-extrabold text-foreground">
-                        ₹{(Number(t.totalTransferValue) || (t.transferPrice * t.qty) || 0).toLocaleString('en-IN')}
+                      <td className="px-4 py-3 text-right font-extrabold text-foreground font-tabular">
+                        {formatTransferINR(Number(t.totalTransferValue) !== undefined && !isNaN(Number(t.totalTransferValue)) && Number(t.totalTransferValue) > 0 ? Number(t.totalTransferValue) : ((Number(t.transferPrice) || 0) * (t.totalUnits || t.qty || 1)))}
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                        {t.sourceStore === 'CENTRAL' ? `+₹${(Number(t.grossProfit) || t.transferProfit || 0).toLocaleString('en-IN')}` : '₹0.00'}
+                      <td className={`px-4 py-3 text-right font-bold font-tabular ${getTransferProfitColorClass(Number(t.grossProfit) !== undefined && !isNaN(Number(t.grossProfit)) ? Number(t.grossProfit) : t.transferProfit)}`}>
+                        {formatTransferINR(Number(t.grossProfit) !== undefined && !isNaN(Number(t.grossProfit)) ? Number(t.grossProfit) : (t.transferProfit || 0), { showPositiveSign: true })}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={t.status === 'Cancelled' ? 'badge-danger text-3xs font-bold' : 'badge-success text-3xs font-bold'}>
@@ -300,164 +205,16 @@ export default function StockTransfersPage() {
         </div>
       </div>
 
-      {/* Create Stock Transfer Modal */}
-      <Modal
+      {/* Master Single Source of Truth Stock Transfer Modal */}
+      <StockTransferModal
         open={createModalOpen}
-        onClose={() => !isSubmitting && setCreateModalOpen(false)}
-        title="Execute Inter-Store Stock Transfer"
-        subtitle="Atomic transfer with automatic destination stock credit and ledger logging"
-        size="lg"
-      >
-        <form onSubmit={handleCreateTransferSubmit} className="space-y-4 py-2 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">From Location (Source) *</label>
-              <select
-                value={sourceStore}
-                onChange={(e) => {
-                  setSourceStore(e.target.value);
-                  setSelectedProductId('');
-                }}
-                disabled={currentUser.role !== 'Super Admin'}
-                className="input-field text-xs"
-              >
-                {availableSourceStores.map((st) => (
-                  <option key={`src-${st.id}`} value={st.code}>
-                    {st.name} ({st.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">To Location (Destination) *</label>
-              <select
-                value={destStore}
-                onChange={(e) => setDestStore(e.target.value)}
-                className="input-field text-xs"
-              >
-                {availableDestStores.map((st) => (
-                  <option key={`dest-${st.id}`} value={st.code}>
-                    {st.name} ({st.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-foreground block mb-1">Select Product *</label>
-            {sourceInventoryItems.length === 0 ? (
-              <div className="p-3 rounded-lg border border-warning/40 bg-warning/10 text-warning text-xs">
-                No inventory in stock at {sourceStore}. Please select another source location or receive goods at Central.
-              </div>
-            ) : (
-              <select
-                value={activeItem?.id || ''}
-                onChange={(e) => setSelectedProductId(e.target.value)}
-                className="input-field text-xs"
-              >
-                {sourceInventoryItems.map((it) => (
-                  <option key={`prod-${it.id}`} value={it.id}>
-                    {it.name} (SKU: {it.sku}) — Available: {it.qtyOnHand} pcs
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {activeItem && (
-            <div className="p-3 rounded-xl bg-muted/40 border border-border space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Available at {sourceStore}:</span>
-                <strong className="text-foreground font-tabular">{availableStock} units</strong>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Base Purchase Cost:</span>
-                <span className="font-tabular font-semibold">₹{unitCost.toLocaleString('en-IN')}/unit</span>
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Transfer Quantity *</label>
-              <input
-                type="number"
-                min="1"
-                max={availableStock}
-                value={transferQty}
-                onChange={(e) => setTransferQty(Math.max(1, parseInt(e.target.value) || 1))}
-                className="input-field text-xs"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">
-                Transfer Price per Unit (₹) {sourceStore === 'CENTRAL' && <span className="text-primary">*</span>}
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                value={transferPriceInput}
-                onChange={(e) => setTransferPriceInput(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                className="input-field text-xs"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Financial Breakdown Preview */}
-          {activeItem && (
-            <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-1.5 font-tabular">
-              <div className="flex justify-between text-muted-foreground">
-                <span>Total Inventory Cost:</span>
-                <span>₹{totalCost.toLocaleString('en-IN')}</span>
-              </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>Total Transfer Value:</span>
-                <span className="font-bold text-foreground">₹{totalTransferValue.toLocaleString('en-IN')}</span>
-              </div>
-              {sourceStore === 'CENTRAL' && (
-                <div className="flex justify-between text-success pt-1 border-t border-primary/20 font-bold">
-                  <span>Gross Central Transfer Profit:</span>
-                  <span>+₹{grossProfit.toLocaleString('en-IN')}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div>
-            <label className="text-xs font-bold text-foreground block mb-1">Notes / Instructions (Optional)</label>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Dispatched via Express Logistics"
-              className="input-field text-xs"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-border">
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => setCreateModalOpen(false)}
-              className="btn-secondary text-xs"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || sourceInventoryItems.length === 0}
-              className="btn-primary text-xs font-bold"
-            >
-              {isSubmitting ? 'Processing Transfer...' : 'Confirm & Dispatch Stock'}
-            </button>
-          </div>
-        </form>
-      </Modal>
+        onClose={() => setCreateModalOpen(false)}
+        initialSourceStore={currentUser.role === 'Super Admin' ? 'CENTRAL' : currentUser.store}
+        onSuccess={() => {
+          setCreateModalOpen(false);
+          refreshAllData();
+        }}
+      />
 
       {/* View Transfer Details Modal */}
       {viewModalTransfer && (
@@ -484,16 +241,22 @@ export default function StockTransfersPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Transfer Value:</span>
-                <span className="font-tabular font-bold">
-                  ₹{(Number(viewModalTransfer.totalTransferValue) || (viewModalTransfer.transferPrice * viewModalTransfer.qty) || 0).toLocaleString('en-IN')}
+                <span className="font-tabular font-bold text-foreground">
+                  {formatTransferINR(Number(viewModalTransfer.totalTransferValue) !== undefined && !isNaN(Number(viewModalTransfer.totalTransferValue)) && Number(viewModalTransfer.totalTransferValue) > 0 ? Number(viewModalTransfer.totalTransferValue) : ((Number(viewModalTransfer.transferPrice) || 0) * (viewModalTransfer.totalUnits || viewModalTransfer.qty || 1)))}
                 </span>
               </div>
-              {viewModalTransfer.sourceStore === 'CENTRAL' && (
-                <div className="flex justify-between text-success font-bold">
-                  <span>Gross Central Profit:</span>
-                  <span>₹{(Number(viewModalTransfer.grossProfit) || viewModalTransfer.transferProfit || 0).toLocaleString('en-IN')}</span>
-                </div>
-              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Inventory Cost:</span>
+                <span className="font-tabular font-bold text-foreground">
+                  {formatTransferINR(Number(viewModalTransfer.totalCost) !== undefined && !isNaN(Number(viewModalTransfer.totalCost)) && Number(viewModalTransfer.totalCost) > 0 ? Number(viewModalTransfer.totalCost) : ((Number(viewModalTransfer.purchaseCost) || 0) * (viewModalTransfer.totalUnits || viewModalTransfer.qty || 1)))}
+                </span>
+              </div>
+              <div className={`flex justify-between font-bold ${getTransferProfitColorClass(Number(viewModalTransfer.grossProfit) !== undefined && !isNaN(Number(viewModalTransfer.grossProfit)) ? Number(viewModalTransfer.grossProfit) : viewModalTransfer.transferProfit)}`}>
+                <span>Gross Transfer Profit:</span>
+                <span>
+                  {formatTransferINR(Number(viewModalTransfer.grossProfit) !== undefined && !isNaN(Number(viewModalTransfer.grossProfit)) ? Number(viewModalTransfer.grossProfit) : (viewModalTransfer.transferProfit || 0), { showPositiveSign: true })}
+                </span>
+              </div>
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t border-border">
@@ -572,6 +335,8 @@ export default function StockTransfersPage() {
           </div>
         </Modal>
       )}
+
+
     </AppLayout>
   );
 }

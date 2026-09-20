@@ -3,8 +3,20 @@ import React, { useState, useMemo } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
+import CustomSelect from '@/components/ui/CustomSelect';
+import StoreFormModal from '@/components/forms/StoreFormModal';
+import NumericInput from '@/components/ui/NumericInput';
 import { useApp, StockTransferRecord, InventoryItem } from '@/context/AppContext';
 import { toast } from 'sonner';
+import {
+  calculateTransferLineItem,
+  formatTransferINR,
+  formatTransferMargin,
+  getTransferProfitColorClass,
+  validateTransferHeader,
+  validateTransferItem,
+  round2,
+} from '@/lib/stockTransferCalculations';
 
 export default function CentralProfitPage() {
   const {
@@ -25,6 +37,7 @@ export default function CentralProfitPage() {
 
   // Modals state
   const [createModal, setCreateModal] = useState(false);
+  const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
   const [managePricesModal, setManagePricesModal] = useState(false);
   const [confirmTransferModal, setConfirmTransferModal] = useState(false);
   const [viewTransferModal, setViewTransferModal] = useState<StockTransferRecord | null>(null);
@@ -33,14 +46,14 @@ export default function CentralProfitPage() {
   const [fromStore, setFromStore] = useState('CENTRAL');
   const [toStore, setToStore] = useState('MUM');
   const [selectedProductId, setSelectedProductId] = useState('');
-  const [transferQty, setTransferQty] = useState(1);
+  const [transferQty, setTransferQty] = useState<number | ''>('');
   const [customTransferPriceInput, setCustomTransferPriceInput] = useState<number | ''>('');
   const [transferStatusInput, setTransferStatusInput] = useState<'Completed' | 'Draft'>('Completed');
 
   // Manage Prices Form State
   const [selectedProductForPricing, setSelectedProductForPricing] = useState('');
   const [selectedStoreForPricing, setSelectedStoreForPricing] = useState('MUM');
-  const [defaultPriceInput, setDefaultPriceInput] = useState<number>(0);
+  const [defaultPriceInput, setDefaultPriceInput] = useState<number | ''>('');
 
   // Available Inventory Items at selected source location
   const sourceItems = useMemo(() => {
@@ -69,21 +82,34 @@ export default function CentralProfitPage() {
     }
   }, [activeItem, toStore, defaultStoreTransferPrices]);
 
-  // Derived transfer live calculations
-  const unitCost = activeItem ? activeItem.costPrice : 0;
-  const effectiveTransferPrice = typeof customTransferPriceInput === 'number' && customTransferPriceInput > 0 ? customTransferPriceInput : 0;
-  const availableStock = activeItem ? activeItem.qtyOnHand : 0;
-  const totalInventoryCostCalc = unitCost * transferQty;
-  const totalTransferValueCalc = effectiveTransferPrice * transferQty;
-  const unitProfitCalc = effectiveTransferPrice - unitCost;
-  const totalGrossProfitCalc = unitProfitCalc * transferQty;
-  const grossMarginPercentCalc = totalTransferValueCalc > 0 ? (totalGrossProfitCalc / totalTransferValueCalc) * 100 : 0;
+  // Derived transfer live calculations via centralized engine
+  const unitCost = round2(activeItem ? Number(activeItem.costPrice) || 0 : 0);
+  const effectiveTransferPrice =
+    typeof customTransferPriceInput === 'number' && customTransferPriceInput >= 0
+      ? round2(customTransferPriceInput)
+      : unitCost;
+  const availableStock = activeItem ? Number(activeItem.qtyOnHand) || 0 : 0;
+
+  const numericQty = transferQty === '' ? 0 : Number(transferQty);
+  const lineCalc = calculateTransferLineItem({
+    qty: numericQty,
+    costPerUnit: unitCost,
+    transferPricePerUnit: effectiveTransferPrice,
+  });
+  const totalInventoryCostCalc = lineCalc.lineTotalCost;
+  const totalTransferValueCalc = lineCalc.lineTotalValue;
+  const unitProfitCalc = lineCalc.unitProfit;
+  const totalGrossProfitCalc = lineCalc.lineProfit;
+  const grossMarginPercentCalc = lineCalc.profitMarginPercent;
 
   // Filtered Transfers List
   const filteredTransfers = useMemo(() => {
     const isCompletedStatus = (st: string) => st === 'Completed' || st === 'Received';
     return stockTransfers.filter((t) => {
-      const matchStore = storeFilter === 'All Stores' || t.destStore === storeFilter || t.sourceStore === storeFilter;
+      const assignedStore = currentUser.store || 'BLR';
+      const matchStore = currentUser.role === 'Super Admin'
+        ? (storeFilter === 'All Stores' || t.destStore === storeFilter || t.sourceStore === storeFilter)
+        : (t.destStore === assignedStore || t.sourceStore === assignedStore);
       const matchStatus = statusFilter === 'All' 
         ? true 
         : statusFilter === 'Completed' 
@@ -98,50 +124,91 @@ export default function CentralProfitPage() {
     });
   }, [stockTransfers, storeFilter, statusFilter, searchRef]);
 
-  // High-Level Central Profit KPIs (Completed/Received Transfers Only for Profit)
+  // High-Level Central Profit KPIs (Authoritative Stored Totals)
   const isCompletedTransfer = (status: string) => status === 'Completed' || status === 'Received';
   const completedTransfers = useMemo(() => filteredTransfers.filter((t) => isCompletedTransfer(t.status)), [filteredTransfers]);
-  const totalTransferRevenue = useMemo(() => completedTransfers.reduce((acc, t) => acc + t.transferPrice * t.qty, 0), [completedTransfers]);
-  const totalInventoryCost = useMemo(() => completedTransfers.reduce((acc, t) => acc + t.purchaseCost * t.qty, 0), [completedTransfers]);
-  const totalGrossTransferProfit = useMemo(() => completedTransfers.reduce((acc, t) => acc + t.transferProfit, 0), [completedTransfers]);
+
+  const totalTransferRevenue = useMemo(
+    () =>
+      completedTransfers.reduce(
+        (acc, t) =>
+          round2(
+            acc +
+              (t.totalTransferValue !== undefined && !isNaN(Number(t.totalTransferValue))
+                ? Number(t.totalTransferValue)
+                : (Number(t.transferPrice) || 0) * (t.qty || 1))
+          ),
+        0
+      ),
+    [completedTransfers]
+  );
+
+  const totalInventoryCost = useMemo(
+    () =>
+      completedTransfers.reduce(
+        (acc, t) =>
+          round2(
+            acc +
+              (t.totalCost !== undefined && !isNaN(Number(t.totalCost))
+                ? Number(t.totalCost)
+                : (Number(t.purchaseCost) || 0) * (t.qty || 1))
+          ),
+        0
+      ),
+    [completedTransfers]
+  );
+
+  // Authoritative Gross Profit: Revenue - Cost
+  const totalGrossTransferProfit = useMemo(
+    () => round2(totalTransferRevenue - totalInventoryCost),
+    [totalTransferRevenue, totalInventoryCost]
+  );
 
   // Central Expenses
   const centralExpenses = useMemo(() => {
-    return expenses
-      .filter((e) => e.store === 'CENTRAL' || e.description.toLowerCase().includes('central') || e.category === 'Transport')
-      .reduce((acc, e) => acc + e.amount, 0);
+    return round2(
+      expenses
+        .filter((e) => e.store === 'CENTRAL' || e.description.toLowerCase().includes('central') || e.category === 'Transport')
+        .reduce((acc, e) => acc + (Number(e.amount) || 0), 0)
+    );
   }, [expenses]);
 
-  const netCentralProfit = totalGrossTransferProfit - centralExpenses;
-  const totalUnitsTransferred = useMemo(() => completedTransfers.reduce((acc, t) => acc + t.qty, 0), [completedTransfers]);
+  const netCentralProfit = round2(totalGrossTransferProfit - centralExpenses);
+  const totalUnitsTransferred = useMemo(() => completedTransfers.reduce((acc, t) => acc + (t.qty || 0), 0), [completedTransfers]);
   const activeStoresCount = useMemo(() => new Set(completedTransfers.map((t) => t.destStore)).size, [completedTransfers]);
 
-  // Store Breakdown Calculations
+  // Store Breakdown Calculations with Exact Paisa Reconciliation
   const storeBreakdown = useMemo(() => {
     const map: Record<string, { store: string; cost: number; revenue: number; profit: number }> = {};
 
     completedTransfers.forEach((t) => {
       const dest = t.destStore;
       if (!map[dest]) map[dest] = { store: dest, cost: 0, revenue: 0, profit: 0 };
-      map[dest].cost += t.purchaseCost * t.qty;
-      map[dest].revenue += t.transferPrice * t.qty;
-      map[dest].profit += t.transferProfit;
+      const tVal = round2(t.totalTransferValue !== undefined && !isNaN(Number(t.totalTransferValue)) ? Number(t.totalTransferValue) : (Number(t.transferPrice) || 0) * (t.qty || 1));
+      const tCost = round2(t.totalCost !== undefined && !isNaN(Number(t.totalCost)) ? Number(t.totalCost) : (Number(t.purchaseCost) || 0) * (t.qty || 1));
+      const tProfit = round2(tVal - tCost);
+      map[dest].cost = round2(map[dest].cost + tCost);
+      map[dest].revenue = round2(map[dest].revenue + tVal);
+      map[dest].profit = round2(map[dest].profit + tProfit);
     });
 
     return Object.values(map);
   }, [completedTransfers]);
 
-  // Product Profitability Breakdown
+  // Product Profitability Breakdown with Exact Paisa Reconciliation
   const productBreakdown = useMemo(() => {
     const map: Record<string, { name: string; sku: string; qty: number; cost: number; revenue: number; profit: number }> = {};
 
     completedTransfers.forEach((t) => {
-      const key = t.sku;
+      const key = t.sku || 'SKU';
       if (!map[key]) map[key] = { name: t.productName, sku: t.sku, qty: 0, cost: 0, revenue: 0, profit: 0 };
-      map[key].qty += t.qty;
-      map[key].cost += t.purchaseCost * t.qty;
-      map[key].revenue += t.transferPrice * t.qty;
-      map[key].profit += t.transferProfit;
+      const tVal = round2(t.totalTransferValue !== undefined && !isNaN(Number(t.totalTransferValue)) ? Number(t.totalTransferValue) : (Number(t.transferPrice) || 0) * (t.qty || 1));
+      const tCost = round2(t.totalCost !== undefined && !isNaN(Number(t.totalCost)) ? Number(t.totalCost) : (Number(t.purchaseCost) || 0) * (t.qty || 1));
+      const tProfit = round2(tVal - tCost);
+      map[key].qty += t.qty || 1;
+      map[key].cost = round2(map[key].cost + tCost);
+      map[key].revenue = round2(map[key].revenue + tVal);
+      map[key].profit = round2(map[key].profit + tProfit);
     });
 
     return Object.values(map);
@@ -150,24 +217,34 @@ export default function CentralProfitPage() {
   const openCreateModal = () => {
     if (sourceItems.length > 0) {
       setSelectedProductId(sourceItems[0].productId || sourceItems[0].id);
-      setTransferQty(1);
+      setTransferQty('');
     }
     setCreateModal(true);
   };
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeItem) return;
-    if (transferQty <= 0) {
-      toast.error('Transfer quantity must be greater than 0');
+    if (!activeItem) {
+      toast.error('Please select an item to transfer');
       return;
     }
-    if (transferQty > availableStock) {
-      toast.error(`Cannot transfer more than available stock at ${fromStore} (${availableStock} units)`);
+    const headerVal = validateTransferHeader({ sourceStore: fromStore, destStore: toStore, itemsCount: 1 });
+    if (!headerVal.isValid) {
+      toast.error(headerVal.error);
       return;
     }
-    if (customTransferPriceInput === '' || Number(customTransferPriceInput) <= 0) {
-      toast.error('Please specify a positive transfer price per unit');
+    if (transferQty === '' || Number(transferQty) <= 0) {
+      toast.error('Please enter a valid transfer quantity');
+      return;
+    }
+    const itemVal = validateTransferItem({
+      qty: Number(transferQty),
+      costPerUnit: unitCost,
+      transferPricePerUnit: effectiveTransferPrice,
+      availableStock,
+    });
+    if (!itemVal.isValid) {
+      toast.error(itemVal.error);
       return;
     }
     setConfirmTransferModal(true);
@@ -179,12 +256,13 @@ export default function CentralProfitPage() {
       fromStore,
       toStore,
       activeItem.productId || activeItem.id,
-      transferQty,
+      Math.floor(Number(transferQty)),
       effectiveTransferPrice,
       transferStatusInput
     );
     setConfirmTransferModal(false);
     setCreateModal(false);
+    setTransferQty('');
   };
 
   const handleSaveDefaultPrice = (e: React.FormEvent) => {
@@ -193,8 +271,12 @@ export default function CentralProfitPage() {
       toast.error('Select a product to set default pricing');
       return;
     }
-    setDefaultStoreTransferPrice(selectedProductForPricing, selectedStoreForPricing, defaultPriceInput);
-    setDefaultPriceInput(0);
+    if (defaultPriceInput === '' || Number(defaultPriceInput) < 0) {
+      toast.error('Please enter a valid default transfer price');
+      return;
+    }
+    setDefaultStoreTransferPrice(selectedProductForPricing, selectedStoreForPricing, Number(defaultPriceInput));
+    setDefaultPriceInput('');
   };
 
   return (
@@ -256,44 +338,50 @@ export default function CentralProfitPage() {
             </div>
           </div>
 
-          <select value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)} className="input-field text-xs py-1.5 px-3 w-full sm:w-auto">
-            <option value="All Stores">All Destination Stores</option>
-            <option value="BLR">BLR (Bengaluru)</option>
-            <option value="HYD">HYD (Hyderabad)</option>
-            <option value="DEL">DEL (Delhi)</option>
-            <option value="MUM">MUM (Mumbai)</option>
-          </select>
+          {currentUser.role === 'Super Admin' && (
+            <select value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)} className="input-field text-xs py-1.5 px-3 w-full sm:w-auto">
+              <option value="All Stores">All Destination Stores</option>
+              <option value="BLR">BLR (Bengaluru)</option>
+              <option value="HYD">HYD (Hyderabad)</option>
+              <option value="DEL">DEL (Delhi)</option>
+              <option value="MUM">MUM (Mumbai)</option>
+            </select>
+          )}
         </div>
 
         {/* 7 KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           <div className="card p-3 space-y-1 border-l-4 border-l-primary">
             <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Transfer Revenue</span>
-            <span className="text-base font-extrabold text-foreground block font-tabular">₹{totalTransferRevenue.toLocaleString('en-IN')}</span>
+            <span className="text-base font-extrabold text-foreground block font-tabular">{formatTransferINR(totalTransferRevenue)}</span>
             <span className="text-3xs text-muted-foreground">Gross Internal Value</span>
           </div>
 
           <div className="card p-3 space-y-1 border-l-4 border-l-muted-foreground">
             <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Inventory Cost</span>
-            <span className="text-base font-extrabold text-foreground block font-tabular">₹{totalInventoryCost.toLocaleString('en-IN')}</span>
+            <span className="text-base font-extrabold text-foreground block font-tabular">{formatTransferINR(totalInventoryCost)}</span>
             <span className="text-3xs text-muted-foreground">Actual Vendor Cost</span>
           </div>
 
           <div className="card p-3 space-y-1 border-l-4 border-l-positive">
-            <span className="text-3xs font-bold uppercase tracking-wider text-positive">Gross Profit</span>
-            <span className="text-base font-extrabold text-positive block font-tabular">₹{totalGrossTransferProfit.toLocaleString('en-IN')}</span>
-            <span className="text-3xs text-positive font-medium">Revenue − Cost</span>
+            <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Gross Profit</span>
+            <span className={`text-base font-extrabold block font-tabular ${getTransferProfitColorClass(totalGrossTransferProfit)}`}>
+              {formatTransferINR(totalGrossTransferProfit, { showPositiveSign: true })}
+            </span>
+            <span className="text-3xs text-muted-foreground">Revenue − Cost</span>
           </div>
 
           <div className="card p-3 space-y-1 border-l-4 border-l-warning">
             <span className="text-3xs font-bold uppercase tracking-wider text-warning">Central Expenses</span>
-            <span className="text-base font-extrabold text-warning block font-tabular">₹{centralExpenses.toLocaleString('en-IN')}</span>
+            <span className="text-base font-extrabold text-warning block font-tabular">{formatTransferINR(centralExpenses)}</span>
             <span className="text-3xs text-muted-foreground">Logistics & Ops</span>
           </div>
 
           <div className="card p-3 space-y-1 border-l-4 border-l-info">
             <span className="text-3xs font-bold uppercase tracking-wider text-info">Net Central Profit</span>
-            <span className="text-base font-extrabold text-info block font-tabular">₹{netCentralProfit.toLocaleString('en-IN')}</span>
+            <span className={`text-base font-extrabold block font-tabular ${getTransferProfitColorClass(netCentralProfit)}`}>
+              {formatTransferINR(netCentralProfit, { showPositiveSign: true })}
+            </span>
             <span className="text-3xs text-muted-foreground">Gross Profit − Exp</span>
           </div>
 
@@ -333,14 +421,18 @@ export default function CentralProfitPage() {
                 </thead>
                 <tbody className="divide-y divide-border font-tabular">
                   {storeBreakdown.map((s) => {
-                    const margin = s.revenue > 0 ? ((s.profit / s.revenue) * 100).toFixed(1) : '0';
+                    const margin = s.revenue > 0 ? (s.profit / s.revenue) * 100 : 0;
                     return (
                       <tr key={`sb-${s.store}`} className="hover:bg-muted/30">
                         <td className="px-4 py-3 font-bold text-foreground">{s.store}</td>
-                        <td className="px-4 py-3 text-right text-muted-foreground">₹{s.cost.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-semibold">₹{s.revenue.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-extrabold text-positive">₹{s.profit.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-bold text-info">{margin}%</td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">{formatTransferINR(s.cost)}</td>
+                        <td className="px-4 py-3 text-right font-semibold">{formatTransferINR(s.revenue)}</td>
+                        <td className={`px-4 py-3 text-right font-extrabold ${getTransferProfitColorClass(s.profit)}`}>
+                          {formatTransferINR(s.profit, { showPositiveSign: true })}
+                        </td>
+                        <td className={`px-4 py-3 text-right font-bold ${getTransferProfitColorClass(s.profit)}`}>
+                          {formatTransferMargin(margin)}
+                        </td>
                       </tr>
                     );
                   })}
@@ -377,7 +469,7 @@ export default function CentralProfitPage() {
                 </thead>
                 <tbody className="divide-y divide-border font-tabular">
                   {productBreakdown.map((p) => {
-                    const margin = p.revenue > 0 ? ((p.profit / p.revenue) * 100).toFixed(1) : '0';
+                    const margin = p.revenue > 0 ? (p.profit / p.revenue) * 100 : 0;
                     return (
                       <tr key={`pb-${p.sku}`} className="hover:bg-muted/30">
                         <td className="px-4 py-3">
@@ -385,9 +477,13 @@ export default function CentralProfitPage() {
                           <p className="text-3xs text-muted-foreground font-mono">{p.sku}</p>
                         </td>
                         <td className="px-4 py-3 text-right font-bold">{p.qty}</td>
-                        <td className="px-4 py-3 text-right font-semibold">₹{p.revenue.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-extrabold text-positive">₹{p.profit.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-bold text-info">{margin}%</td>
+                        <td className="px-4 py-3 text-right font-semibold">{formatTransferINR(p.revenue)}</td>
+                        <td className={`px-4 py-3 text-right font-extrabold ${getTransferProfitColorClass(p.profit)}`}>
+                          {formatTransferINR(p.profit, { showPositiveSign: true })}
+                        </td>
+                        <td className={`px-4 py-3 text-right font-bold ${getTransferProfitColorClass(p.profit)}`}>
+                          {formatTransferMargin(margin)}
+                        </td>
                       </tr>
                     );
                   })}
@@ -444,9 +540,11 @@ export default function CentralProfitPage() {
                       <span className="badge-info text-3xs">{t.destStore}</span>
                     </td>
                     <td className="px-4 py-3 text-right font-extrabold">{t.qty}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">₹{t.purchaseCost.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3 text-right font-bold text-foreground">₹{t.transferPrice.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3 text-right font-extrabold text-positive">₹{t.transferProfit.toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{formatTransferINR(t.purchaseCost)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-foreground">{formatTransferINR(t.transferPrice)}</td>
+                    <td className={`px-4 py-3 text-right font-extrabold ${getTransferProfitColorClass(t.transferProfit)}`}>
+                      {formatTransferINR(t.transferProfit, { showPositiveSign: true })}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`px-2 py-0.5 rounded text-3xs font-bold ${
@@ -497,50 +595,65 @@ export default function CentralProfitPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">Source Location *</label>
-                <select
+                <CustomSelect
                   value={fromStore}
-                  onChange={(e) => {
-                    setFromStore(e.target.value);
+                  onChange={(val) => {
+                    setFromStore(val);
                     setSelectedProductId('');
                   }}
-                  className="input-field text-xs font-medium"
-                >
-                  {storesList.filter((s) => s.status === 'Active').map((st) => (
-                    <option key={`from-st-${st.code}`} value={st.code}>
-                      {st.code} — {st.name}
-                    </option>
-                  ))}
-                </select>
+                  options={storesList
+                    .filter((s) => s.status === 'Active')
+                    .map((st) => ({
+                      value: st.code,
+                      label: `${st.code} — ${st.name}`,
+                    }))}
+                  placeholder="Select Source"
+                  searchPlaceholder="Search source..."
+                  required
+                />
               </div>
 
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">Destination Store *</label>
-                <select value={toStore} onChange={(e) => setToStore(e.target.value)} className="input-field text-xs font-medium">
-                  {storesList
+                <CustomSelect
+                  value={toStore}
+                  onChange={(val) => setToStore(val)}
+                  options={storesList
                     .filter((s) => s.code !== fromStore && s.status === 'Active')
-                    .map((st) => (
-                      <option key={`st-opt-${st.code}`} value={st.code}>
-                        {st.code} — {st.name}
-                      </option>
-                    ))}
-                </select>
+                    .map((st) => ({
+                      value: st.code,
+                      label: `${st.code} — ${st.name}`,
+                    }))}
+                  placeholder="Select Destination"
+                  searchPlaceholder="Search store..."
+                  addNewLabel="+ Add New Store"
+                  onAddNew={() => setIsStoreModalOpen(true)}
+                  required
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">Select Product *</label>
-                <select
-                  value={selectedProductId}
-                  onChange={(e) => setSelectedProductId(e.target.value)}
-                  className="input-field text-xs font-medium"
-                >
-                  {sourceItems.map((item) => (
-                    <option key={`sitem-${item.id}`} value={item.id}>
-                      {item.name} ({item.sku}) — Avail: {item.qtyOnHand} units
-                    </option>
-                  ))}
-                </select>
+                {sourceItems.length === 0 ? (
+                  <div className="p-2.5 rounded-lg border border-warning/40 bg-warning/10 text-warning text-2xs">
+                    No available inventory at {fromStore}. Select another source.
+                  </div>
+                ) : (
+                  <CustomSelect
+                    value={selectedProductId}
+                    onChange={(val) => setSelectedProductId(val)}
+                    options={sourceItems.map((item) => ({
+                      value: item.id,
+                      label: item.name,
+                      sublabel: `${item.sku} • Avail: ${item.qtyOnHand} units`,
+                    }))}
+                    placeholder="Search or select product..."
+                    searchPlaceholder="Search by name or SKU..."
+                    required
+                  />
+                )}
                 <p className="text-3xs text-muted-foreground mt-1">
                   Available at {fromStore}: <strong className="text-primary">{availableStock} units</strong>
                 </p>
@@ -548,14 +661,14 @@ export default function CentralProfitPage() {
 
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">Quantity to Transfer *</label>
-                <input
-                  type="number"
+                <NumericInput
                   min={1}
                   max={availableStock}
                   required
                   value={transferQty}
-                  onChange={(e) => setTransferQty(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={(val) => setTransferQty(val)}
                   className="input-field text-xs font-bold"
+                  placeholder="Enter qty..."
                 />
               </div>
             </div>
@@ -574,14 +687,12 @@ export default function CentralProfitPage() {
 
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">Transfer Price Per Unit (Editable) *</label>
-                <input
-                  type="number"
+                <NumericInput
                   min={0}
-                  step="0.01"
                   required
                   placeholder={`Reference Cost: ₹${unitCost.toLocaleString('en-IN')}`}
                   value={customTransferPriceInput}
-                  onChange={(e) => setCustomTransferPriceInput(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                  onChange={(val) => setCustomTransferPriceInput(val)}
                   className="input-field text-xs font-bold text-primary"
                 />
                 <p className="text-3xs text-muted-foreground mt-0.5">Custom transfer price for {toStore}</p>
@@ -610,27 +721,33 @@ export default function CentralProfitPage() {
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
                 <div className="p-2 rounded-lg bg-background border border-border">
                   <span className="text-3xs uppercase font-bold text-muted-foreground block">Inventory Cost</span>
-                  <span className="text-xs font-bold text-foreground font-tabular">₹{totalInventoryCostCalc.toLocaleString('en-IN')}</span>
+                  <span className="text-xs font-bold text-foreground font-tabular">{formatTransferINR(totalInventoryCostCalc)}</span>
                 </div>
 
                 <div className="p-2 rounded-lg bg-background border border-border">
                   <span className="text-3xs uppercase font-bold text-muted-foreground block">Transfer Value</span>
-                  <span className="text-xs font-bold text-foreground font-tabular">₹{totalTransferValueCalc.toLocaleString('en-IN')}</span>
+                  <span className="text-xs font-bold text-foreground font-tabular">{formatTransferINR(totalTransferValueCalc)}</span>
                 </div>
 
                 <div className="p-2 rounded-lg bg-background border border-border">
                   <span className="text-3xs uppercase font-bold text-muted-foreground block">Profit / Unit</span>
-                  <span className="text-xs font-bold text-positive font-tabular">₹{unitProfitCalc.toLocaleString('en-IN')}</span>
+                  <span className={`text-xs font-bold font-tabular ${getTransferProfitColorClass(unitProfitCalc)}`}>
+                    {formatTransferINR(unitProfitCalc, { showPositiveSign: true })}
+                  </span>
                 </div>
 
                 <div className="p-2 rounded-lg bg-background border border-border">
-                  <span className="text-3xs uppercase font-bold text-positive block">Central Gross Profit</span>
-                  <span className="text-sm font-extrabold text-positive font-tabular">₹{totalGrossProfitCalc.toLocaleString('en-IN')}</span>
+                  <span className="text-3xs uppercase font-bold text-muted-foreground block">Central Gross Profit</span>
+                  <span className={`text-sm font-extrabold font-tabular ${getTransferProfitColorClass(totalGrossProfitCalc)}`}>
+                    {formatTransferINR(totalGrossProfitCalc, { showPositiveSign: true })}
+                  </span>
                 </div>
 
                 <div className="p-2 rounded-lg bg-background border border-border col-span-2 sm:col-span-1">
                   <span className="text-3xs uppercase font-bold text-info block">Gross Margin</span>
-                  <span className="text-xs font-extrabold text-info font-tabular">{grossMarginPercentCalc.toFixed(2)}%</span>
+                  <span className={`text-xs font-extrabold font-tabular ${getTransferProfitColorClass(totalGrossProfitCalc)}`}>
+                    {formatTransferMargin(grossMarginPercentCalc)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -672,23 +789,25 @@ export default function CentralProfitPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Inventory Cost / unit:</span>
-                <span className="font-bold text-foreground">₹{unitCost.toLocaleString('en-IN')}</span>
+                <span className="font-bold text-foreground">{formatTransferINR(unitCost)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Transfer Price / unit:</span>
-                <span className="font-bold text-primary">₹{effectiveTransferPrice.toLocaleString('en-IN')}</span>
+                <span className="font-bold text-primary">{formatTransferINR(effectiveTransferPrice)}</span>
               </div>
               <div className="flex justify-between pt-2 border-t border-border">
                 <span className="font-bold text-foreground">Total Inventory Cost:</span>
-                <span className="font-bold text-foreground">₹{totalInventoryCostCalc.toLocaleString('en-IN')}</span>
+                <span className="font-bold text-foreground">{formatTransferINR(totalInventoryCostCalc)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-bold text-foreground">Total Transfer Value:</span>
-                <span className="font-bold text-foreground">₹{totalTransferValueCalc.toLocaleString('en-IN')}</span>
+                <span className="font-bold text-foreground">{formatTransferINR(totalTransferValueCalc)}</span>
               </div>
               <div className="flex justify-between text-sm pt-2 border-t border-border">
-                <span className="font-extrabold text-positive">Central Gross Profit:</span>
-                <span className="font-extrabold text-positive">₹{totalGrossProfitCalc.toLocaleString('en-IN')}</span>
+                <span className="font-extrabold text-foreground">Central Gross Profit:</span>
+                <span className={`font-extrabold ${getTransferProfitColorClass(totalGrossProfitCalc)}`}>
+                  {formatTransferINR(totalGrossProfitCalc, { showPositiveSign: true })}
+                </span>
               </div>
             </div>
 
@@ -750,13 +869,13 @@ export default function CentralProfitPage() {
                 </div>
                 <div>
                   <label className="text-3xs font-bold text-muted-foreground block mb-1">Default Transfer Price (₹)</label>
-                  <input
-                    type="number"
+                  <NumericInput
                     min={0}
                     required
                     value={defaultPriceInput}
-                    onChange={(e) => setDefaultPriceInput(parseFloat(e.target.value) || 0)}
+                    onChange={(val) => setDefaultPriceInput(val)}
                     className="input-field text-xs py-1 font-bold"
+                    placeholder="Enter price..."
                   />
                 </div>
               </div>
@@ -824,16 +943,30 @@ export default function CentralProfitPage() {
                 <span className="font-extrabold">{viewTransferModal.qty} units</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Purchase Cost:</span>
-                <span>₹{viewTransferModal.purchaseCost.toLocaleString('en-IN')}</span>
+                <span className="text-muted-foreground">Purchase Cost / Unit:</span>
+                <span className="text-foreground">{formatTransferINR(viewTransferModal.purchaseCost)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Transfer Price:</span>
-                <span className="font-bold text-primary">₹{viewTransferModal.transferPrice.toLocaleString('en-IN')}</span>
+                <span className="text-muted-foreground">Transfer Price / Unit:</span>
+                <span className="font-bold text-primary">{formatTransferINR(viewTransferModal.transferPrice)}</span>
               </div>
-              <div className="flex justify-between text-sm pt-2 border-t border-border">
-                <span className="font-bold text-positive">Total Transfer Profit:</span>
-                <span className="font-extrabold text-positive">₹{viewTransferModal.transferProfit.toLocaleString('en-IN')}</span>
+              <div className="flex justify-between pt-1 border-t border-border">
+                <span className="text-muted-foreground">Total Inventory Cost:</span>
+                <span className="font-semibold text-foreground">
+                  {formatTransferINR(viewTransferModal.totalCost || (viewTransferModal.purchaseCost * viewTransferModal.qty))}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Transfer Value:</span>
+                <span className="font-semibold text-foreground">
+                  {formatTransferINR(viewTransferModal.totalTransferValue || (viewTransferModal.transferPrice * viewTransferModal.qty))}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm pt-1.5 border-t border-border">
+                <span className="font-bold text-foreground">Total Transfer Profit:</span>
+                <span className={`font-extrabold ${getTransferProfitColorClass(viewTransferModal.transferProfit)}`}>
+                  {formatTransferINR(viewTransferModal.transferProfit, { showPositiveSign: true })}
+                </span>
               </div>
             </div>
             <div className="flex justify-end">
@@ -843,6 +976,17 @@ export default function CentralProfitPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {isStoreModalOpen && (
+        <StoreFormModal
+          open={isStoreModalOpen}
+          onClose={() => setIsStoreModalOpen(false)}
+          zIndex={110}
+          onSuccess={(newStore) => {
+            setToStore(newStore.code);
+          }}
+        />
       )}
     </AppLayout>
   );

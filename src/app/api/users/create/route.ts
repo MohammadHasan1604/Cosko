@@ -22,8 +22,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Password is required to provision a new account' }, { status: 400 });
     }
 
+    // 🔒 STRICT SUPER ADMIN SINGLETON: Prohibit creating new Super Admin
+    if (role === 'Super Admin' || Number(securityLevel) === 100) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: System enforces exactly ONE protected Super Admin. Creating additional Super Admin accounts is prohibited.' },
+        { status: 403 }
+      );
+    }
+
     const cleanEmail = email.toLowerCase().trim();
-    const level = securityLevel || (role === 'Super Admin' ? 100 : role === 'Store Manager' ? 80 : role === 'Inventory Auditor' ? 60 : role === 'Sales Executive' ? 40 : 20);
+    const level = securityLevel || (role === 'Store Manager' ? 80 : role === 'Inventory Auditor' ? 60 : role === 'Sales Executive' ? 40 : 20);
 
     const existing = await prisma.userAccount.findUnique({
       where: { email: cleanEmail },
@@ -33,8 +41,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'User with this email already exists' }, { status: 400 });
     }
 
+    // Resolve assigned stores (single source of truth)
+    const rawStores: string[] = Array.isArray(body.assignedStores) && body.assignedStores.length > 0
+      ? body.assignedStores
+      : Array.isArray(body.allowedStores) && body.allowedStores.length > 0
+      ? body.allowedStores
+      : [store || 'BLR'];
+
+    const validHubs = await prisma.storeHub.findMany({ select: { code: true } });
+    const validCodes = new Set(validHubs.map((s) => s.code));
+    const targetAssignedStores = rawStores.filter((c: string) => validCodes.has(c));
+
+    if (targetAssignedStores.length === 0) {
+      return NextResponse.json({ success: false, error: 'User must be assigned to at least one valid store' }, { status: 400 });
+    }
+
+    // Non-Super-Admin callers can only assign stores they have access to
+    if (authUser && authUser.role !== 'Super Admin') {
+      const callerAllowed = authUser.allowedStores && authUser.allowedStores.length > 0 ? authUser.allowedStores : [authUser.store];
+      const hasInvalidAssignment = targetAssignedStores.some((s) => !callerAllowed.includes(s));
+      if (hasInvalidAssignment) {
+        return NextResponse.json({ success: false, error: 'Forbidden: You can only assign users to stores you are authorized for' }, { status: 403 });
+      }
+    }
+
     const hashedPassword = await hashPassword(password);
-    const storeCode = (store && store !== 'All Stores' && store !== 'ALL') ? store : 'CENTRAL';
+    const primaryStore = targetAssignedStores[0];
 
     // Execute atomic transaction for user and store assignments
     const newUser = await prisma.$transaction(async (tx) => {
@@ -46,19 +78,21 @@ export async function POST(request: Request) {
           phone: phone || null,
           role: role || 'Store Manager',
           securityLevel: level,
-          storeScope: storeCode,
+          storeScope: primaryStore,
           status: status || 'Active',
           shiftStatus: 'On Shift',
           mustChangePassword: true, // Force password change on first login
         } as any,
       });
 
-      await tx.userStoreAssignment.create({
-        data: {
-          userId: user.id,
-          storeCode: storeCode,
-        },
-      });
+      for (const sCode of targetAssignedStores) {
+        await tx.userStoreAssignment.create({
+          data: {
+            userId: user.id,
+            storeCode: sCode,
+          },
+        });
+      }
 
       return user;
     });
@@ -71,14 +105,15 @@ export async function POST(request: Request) {
       securityLevel: newUser.securityLevel,
       store: newUser.storeScope,
       status: newUser.status,
-      assignedStores: [storeCode],
+      assignedStores: targetAssignedStores,
+      allowedStores: targetAssignedStores,
       createdAt: newUser.createdAt,
       shiftStatus: newUser.shiftStatus,
       mustChangePassword: true,
     };
 
     // Broadcast SSE realtime event
-    broadcastRealtimeEvent('users', 'USER_CREATED', { userId: newUser.id, email: newUser.email, store: storeCode });
+    broadcastRealtimeEvent('users', 'USER_CREATED', { userId: newUser.id, email: newUser.email, stores: targetAssignedStores });
 
     return NextResponse.json({
       success: true,

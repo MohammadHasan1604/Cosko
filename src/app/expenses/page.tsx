@@ -1,41 +1,27 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
+import ExpenseFormModal from '@/components/forms/ExpenseFormModal';
 import { useApp, Expense } from '@/context/AppContext';
+import { toast } from 'sonner';
+import ProofViewerModal, { PaymentProofData } from '@/components/ui/ProofViewerModal';
 
 export default function ExpensesPage() {
-  const { expenses, addExpense, updateExpense, deleteExpense, selectedStore, storesList } = useApp();
+  const { expenses, deleteExpense, selectedStore } = useApp();
   
-  // Create state
+  // Master modal state
   const [modalOpen, setModalOpen] = useState(false);
-  const [category, setCategory] = useState('Store Rent');
-  const [description, setDescription] = useState('');
-  const [store, setStore] = useState(selectedStore === 'All Stores' ? 'CENTRAL' : selectedStore);
-  const [amount, setAmount] = useState(5000);
-  const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
-
-  // Edit state
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [editCategory, setEditCategory] = useState('Store Rent');
-  const [editDescription, setEditDescription] = useState('');
-  const [editStore, setEditStore] = useState('CENTRAL');
-  const [editAmount, setEditAmount] = useState(0);
-  const [editPaymentMethod, setEditPaymentMethod] = useState('Bank Transfer');
+
+  // Proof viewer modal
+  const [selectedProof, setSelectedProof] = useState<PaymentProofData | null>(null);
 
   // Delete state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // Keep store in sync when create modal opens
-  useEffect(() => {
-    if (modalOpen) {
-      setStore(selectedStore === 'All Stores' ? 'CENTRAL' : selectedStore);
-    }
-  }, [modalOpen, selectedStore]);
 
   // Filtered expenses based on active store scope
   const filteredExpenses = selectedStore === 'All Stores'
@@ -44,42 +30,8 @@ export default function ExpensesPage() {
 
   const totalExpense = filteredExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
 
-  const handleSubmitCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await addExpense({
-      category,
-      description,
-      store: store || 'CENTRAL',
-      amount,
-      paymentMethod,
-      status: 'Approved',
-    });
-    setModalOpen(false);
-    setDescription('');
-  };
-
   const handleOpenEdit = (exp: Expense) => {
     setEditingExpense(exp);
-    setEditCategory(exp.category);
-    setEditDescription(exp.description);
-    setEditStore(exp.store);
-    setEditAmount(exp.amount);
-    setEditPaymentMethod(exp.paymentMethod);
-    setEditModalOpen(true);
-  };
-
-  const handleSubmitEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingExpense) return;
-    await updateExpense(editingExpense.id, {
-      category: editCategory,
-      description: editDescription,
-      store: editStore,
-      amount: editAmount,
-      paymentMethod: editPaymentMethod,
-    });
-    setEditModalOpen(false);
-    setEditingExpense(null);
   };
 
   const handleOpenDelete = (exp: Expense) => {
@@ -143,6 +95,7 @@ export default function ExpensesPage() {
                   <th className="px-4 py-3">Store</th>
                   <th className="px-4 py-3 font-tabular text-right">Amount</th>
                   <th className="px-4 py-3">Payment Method</th>
+                  <th className="px-4 py-3 text-center">Payment Proof</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -151,7 +104,7 @@ export default function ExpensesPage() {
               <tbody className="divide-y divide-border/60">
                 {filteredExpenses.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground text-xs">
+                    <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground text-xs">
                       No expense records found for {selectedStore}. Click &quot;Log New Expense&quot; to add one.
                     </td>
                   </tr>
@@ -164,6 +117,30 @@ export default function ExpensesPage() {
                       <td className="px-4 py-3"><span className="badge-info text-3xs font-semibold">{exp.store}</span></td>
                       <td className="px-4 py-3 font-extrabold font-tabular text-foreground text-right">₹{exp.amount.toLocaleString('en-IN')}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{exp.paymentMethod}</td>
+                      <td className="px-4 py-3 text-center">
+                        {exp.receiptUrl ? (
+                          <button
+                            onClick={() => setSelectedProof({
+                              url: exp.receiptUrl!,
+                              referenceNo: exp.referenceNoText || exp.referenceNo,
+                              amount: exp.amount,
+                              paymentMethod: exp.paymentMethod,
+                              paymentDate: exp.date,
+                              payeeOrPayer: exp.category,
+                              recordedBy: exp.recordedBy || 'Finance Dept',
+                              timestamp: exp.createdAt || exp.date,
+                              notes: exp.description,
+                            })}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-3xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors shadow-2xs"
+                            title="View Attached Proof"
+                          >
+                            <Icon name="DocumentCheckIcon" size={13} />
+                            View Proof
+                          </button>
+                        ) : (
+                          <span className="text-3xs text-muted-foreground italic">No Proof</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className="badge-success text-3xs font-bold">{exp.status}</span>
                       </td>
@@ -193,107 +170,15 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      {/* Log Expense Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Log Business Expense" size="md">
-        <form onSubmit={handleSubmitCreate} className="space-y-4 py-2 text-sm">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Expense Category</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)} className="input-field py-2">
-                {['Store Rent', 'Utilities & Power', 'Logistics & Freight', 'Staff Salaries', 'Maintenance & Repairs', 'Marketing'].map((cat) => (
-                  <option key={`exp-cat-${cat}`} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Store / Warehouse Hub *</label>
-              <select value={store} onChange={(e) => setStore(e.target.value)} className="input-field py-2 font-medium">
-                {[...storesList]
-                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
-                  .map((st) => (
-                    <option key={`exp-store-${st.code}`} value={st.code}>
-                      {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Description / Notes</label>
-            <input required type="text" value={description} onChange={(e) => setDescription(e.target.value)} className="input-field py-2" placeholder="e.g. Monthly freight bill" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Amount (₹)</label>
-              <input type="number" min="1" value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="input-field py-2 font-tabular" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Payment Method</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="input-field py-2">
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Direct Debit">Direct Debit</option>
-                <option value="Corporate Card">Corporate Card</option>
-                <option value="Cash">Cash</option>
-              </select>
-            </div>
-          </div>
-          <div className="pt-2 border-t border-border flex justify-end gap-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="btn-ghost">Cancel</button>
-            <button type="submit" className="btn-primary">Record Expense</button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Edit Expense Modal */}
-      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)} title={`Edit Expense (${editingExpense?.referenceNo || ''})`} size="md">
-        <form onSubmit={handleSubmitEdit} className="space-y-4 py-2 text-sm">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Expense Category</label>
-              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="input-field py-2">
-                {['Store Rent', 'Utilities & Power', 'Logistics & Freight', 'Staff Salaries', 'Maintenance & Repairs', 'Marketing'].map((cat) => (
-                  <option key={`edit-exp-cat-${cat}`} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Store / Warehouse Hub *</label>
-              <select value={editStore} onChange={(e) => setEditStore(e.target.value)} className="input-field py-2 font-medium">
-                {[...storesList]
-                  .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
-                  .map((st) => (
-                    <option key={`edit-exp-store-${st.code}`} value={st.code}>
-                      {st.code === 'CENTRAL' ? 'COSKO Central Warehouse (CENTRAL)' : `${st.code} — ${st.name}`}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Description / Notes</label>
-            <input required type="text" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="input-field py-2" placeholder="e.g. Monthly freight bill" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Amount (₹)</label>
-              <input type="number" min="1" value={editAmount} onChange={(e) => setEditAmount(Number(e.target.value))} className="input-field py-2 font-tabular" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Payment Method</label>
-              <select value={editPaymentMethod} onChange={(e) => setEditPaymentMethod(e.target.value)} className="input-field py-2">
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Direct Debit">Direct Debit</option>
-                <option value="Corporate Card">Corporate Card</option>
-                <option value="Cash">Cash</option>
-              </select>
-            </div>
-          </div>
-          <div className="pt-2 border-t border-border flex justify-end gap-2">
-            <button type="button" onClick={() => setEditModalOpen(false)} className="btn-ghost">Cancel</button>
-            <button type="submit" className="btn-primary">Update Expense</button>
-          </div>
-        </form>
-      </Modal>
+      {/* Master Reusable Expense Form Modal (Record or Edit) */}
+      <ExpenseFormModal
+        open={modalOpen || !!editingExpense}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingExpense(null);
+        }}
+        expense={editingExpense}
+      />
 
       {/* Delete Confirmation Modal */}
       <Modal open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Delete Expense Record" size="sm">
@@ -312,6 +197,13 @@ export default function ExpensesPage() {
           </div>
         </div>
       </Modal>
+
+
+      {/* Full-Screen Payment Proof Viewer */}
+      <ProofViewerModal
+        proof={selectedProof}
+        onClose={() => setSelectedProof(null)}
+      />
     </AppLayout>
   );
 }

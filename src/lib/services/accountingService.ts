@@ -25,32 +25,30 @@ export interface LedgerEntryInput {
  */
 export async function recordLedgerEntries(tx: any, entries: LedgerEntryInput[]) {
   if (!entries || entries.length === 0) return [];
-  const created = [];
-  for (const item of entries) {
-    const res = await tx.financialLedgerEntry.create({
-      data: {
-        entryNo: item.entryNo,
-        entryDate: item.entryDate || new Date(),
-        storeCode: item.storeCode,
-        accountCategory: item.accountCategory,
-        accountName: item.accountName,
-        debit: item.debit || 0,
-        credit: item.credit || 0,
-        amount: item.amount,
-        refType: item.refType,
-        refId: item.refId || null,
-        refNo: item.refNo,
-        entityName: item.entityName || null,
-        description: item.description,
-        isEliminated: item.isEliminated || false,
-        metadataJson: item.metadataJson || null,
-        createdBy: item.createdBy,
-        createdAt: item.entryDate || new Date(),
-      },
-    });
-    created.push(res);
-  }
-  return created;
+  const data = entries.map((item) => ({
+    entryNo: item.entryNo,
+    entryDate: item.entryDate || new Date(),
+    storeCode: item.storeCode,
+    accountCategory: item.accountCategory,
+    accountName: item.accountName,
+    debit: item.debit || 0,
+    credit: item.credit || 0,
+    amount: item.amount,
+    refType: item.refType,
+    refId: item.refId || null,
+    refNo: item.refNo,
+    entityName: item.entityName || null,
+    description: item.description,
+    isEliminated: item.isEliminated || false,
+    metadataJson: item.metadataJson || null,
+    createdBy: item.createdBy,
+    createdAt: item.entryDate || new Date(),
+  }));
+
+  await tx.financialLedgerEntry.createMany({
+    data,
+  });
+  return data;
 }
 
 export interface AccountingFilterParams {
@@ -637,7 +635,7 @@ export async function getGeneralLedgerEntries(filters: {
     (prisma as any).financialLedgerEntry.count({ where }),
     (prisma as any).financialLedgerEntry.findMany({
       where,
-      orderBy: { entryDate: 'desc' },
+      orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
       skip: (page - 1) * limit,
       take: limit,
     }),
@@ -660,25 +658,35 @@ export async function getGeneralLedgerEntries(filters: {
     totalPages: Math.ceil(totalCount / limit),
     totalDebit: Math.round(totalDebit * 100) / 100,
     totalCredit: Math.round(totalCredit * 100) / 100,
-    entries: entries.map((e: any) => ({
-      id: e.id,
-      entryNo: e.entryNo,
-      entryDate: e.entryDate,
-      storeCode: e.storeCode,
-      accountCategory: e.accountCategory,
-      accountName: e.accountName,
-      debit: Number(e.debit),
-      credit: Number(e.credit),
-      amount: Number(e.amount),
-      refType: e.refType,
-      refId: e.refId,
-      refNo: e.refNo,
-      entityName: e.entityName,
-      description: e.description,
-      isEliminated: e.isEliminated,
-      createdBy: e.createdBy,
-      createdAt: e.createdAt,
-    })),
+    entries: entries.map((e: any) => {
+      let meta: any = null;
+      try {
+        if (e.metadataJson) meta = JSON.parse(e.metadataJson);
+      } catch {}
+      return {
+        id: e.id,
+        entryNo: e.entryNo,
+        entryDate: e.entryDate,
+        storeCode: e.storeCode,
+        accountCategory: e.accountCategory,
+        accountName: e.accountName,
+        debit: Number(e.debit),
+        credit: Number(e.credit),
+        amount: Number(e.amount),
+        refType: e.refType,
+        refId: e.refId,
+        refNo: e.refNo,
+        entityName: e.entityName,
+        description: e.description,
+        isEliminated: e.isEliminated,
+        createdBy: e.createdBy,
+        createdAt: e.createdAt,
+        metadataJson: e.metadataJson,
+        proofUrl: meta?.proofUrl || meta?.receiptUrl || null,
+        referenceNo: meta?.referenceNo || e.refNo || null,
+        paymentMethod: meta?.paymentMethod || null,
+      };
+    }),
   };
 }
 

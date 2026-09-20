@@ -193,7 +193,7 @@ export default function DashboardFilters() {
                             </span>
                           )}
                         </div>
-                        <span className="text-3xs text-muted-foreground block truncate">{st.city} · {st.registers} Registers</span>
+                        <span className="text-3xs text-muted-foreground block truncate">{st.city}</span>
                       </div>
                       {isLocked ? (
                         <Icon name="LockClosedIcon" size={13} className="text-muted-foreground flex-shrink-0" />

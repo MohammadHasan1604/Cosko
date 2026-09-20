@@ -15,69 +15,117 @@ interface ApiResponse<T = any> {
   [key: string]: any;
 }
 
-async function apiCall<T = any>(url: string, method: string, body?: any): Promise<ApiResponse<T>> {
-  try {
-    let activeToken = '';
-    let activeEmail = '';
-    let activeRole = '';
-    let activeStore = '';
+// In-flight request deduplication cache to intercept duplicate client-side network calls
+const inFlightRequests = new Map<string, Promise<ApiResponse<any>>>();
 
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('cosko_active_session');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          activeEmail = parsed.email || '';
-          activeRole = parsed.role || '';
-          activeStore = parsed.store || '';
-          activeToken = parsed.token || '';
-        }
-      } catch {}
+async function apiCall<T = any>(
+  url: string,
+  method: string,
+  body?: any,
+  customHeaders?: Record<string, string>
+): Promise<ApiResponse<T>> {
+  const isMutation = method !== 'GET' && method !== 'HEAD';
+
+  // Extract or generate idempotency key for mutations
+  let idempotencyKey: string | undefined = undefined;
+  if (isMutation) {
+    if (customHeaders && (customHeaders['x-idempotency-key'] || customHeaders['idempotency-key'])) {
+      idempotencyKey = customHeaders['x-idempotency-key'] || customHeaders['idempotency-key'];
+    } else if (body && typeof body === 'object' && body.idempotencyKey) {
+      idempotencyKey = String(body.idempotencyKey).trim();
+    } else {
+      idempotencyKey = `cli_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     }
+  }
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
-    if (activeEmail) headers['x-user-email'] = activeEmail;
-    if (activeRole) headers['x-user-role'] = activeRole;
-    if (activeStore) headers['x-user-store'] = activeStore;
+  // Deduplication cache key: prevents rapid multi-clicks or duplicate requests from dispatching twice
+  const requestFingerprint = isMutation
+    ? `${method}:${url}:${JSON.stringify(body || {})}:${idempotencyKey || ''}`
+    : '';
 
-    const options: RequestInit = {
-      method,
-      headers,
-      credentials: 'include', // Send cookies for auth
-    };
+  if (isMutation && requestFingerprint && inFlightRequests.has(requestFingerprint)) {
+    return inFlightRequests.get(requestFingerprint)!;
+  }
 
-    if (body && method !== 'GET' && method !== 'DELETE') {
-      options.body = JSON.stringify(body);
-    }
+  const executeCall = (async (): Promise<ApiResponse<T>> => {
+    try {
+      let activeToken = '';
+      let activeEmail = '';
+      let activeRole = '';
+      let activeStore = '';
 
-    const res = await fetch(url, options);
-    const result = await res.json().catch(() => ({ error: res.statusText }));
+      if (typeof window !== 'undefined') {
+        try {
+          const saved = localStorage.getItem('cosko_active_session');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            activeEmail = parsed.email || '';
+            activeRole = parsed.role || '';
+            activeStore = parsed.store || '';
+            activeToken = parsed.token || '';
+          }
+        } catch {}
+      }
 
-    if (!res.ok) {
-      console.error(`[MySQLDataService] ${method} ${url} failed (${res.status}):`, result);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(customHeaders || {}),
+      };
+      if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
+      if (activeEmail) headers['x-user-email'] = activeEmail;
+      if (activeRole) headers['x-user-role'] = activeRole;
+      if (activeStore) headers['x-user-store'] = activeStore;
+      if (idempotencyKey && !headers['x-idempotency-key']) {
+        headers['x-idempotency-key'] = idempotencyKey;
+      }
+
+      const options: RequestInit = {
+        method,
+        headers,
+        credentials: 'include', // Send cookies for auth
+      };
+
+      if (body && method !== 'GET' && method !== 'DELETE') {
+        options.body = JSON.stringify(body);
+      }
+
+      const res = await fetch(url, options);
+      const result = await res.json().catch(() => ({ error: res.statusText }));
+
+      if (!res.ok) {
+        console.error(`[MySQLDataService] ${method} ${url} failed (${res.status}):`, result);
+        return {
+          success: false,
+          error: result.error || result.message || `Request failed with status ${res.status}`,
+          ...result,
+        };
+      }
+
       return {
-        success: false,
-        error: result.error || result.message || `Request failed with status ${res.status}`,
+        success: result.success !== false,
+        data: result,
         ...result,
       };
+    } catch (err: any) {
+      console.error(`[MySQLDataService] ${method} ${url} network error:`, err);
+      return {
+        success: false,
+        error: err.message || 'Network connection failed. Check database and backend status.',
+      };
+    } finally {
+      if (requestFingerprint) {
+        inFlightRequests.delete(requestFingerprint);
+      }
     }
+  })();
 
-    return {
-      success: result.success !== false,
-      data: result,
-      ...result,
-    };
-  } catch (err: any) {
-    console.error(`[MySQLDataService] ${method} ${url} network error:`, err);
-    return {
-      success: false,
-      error: err.message || 'Network connection failed. Check database and backend status.',
-    };
+  if (isMutation && requestFingerprint) {
+    inFlightRequests.set(requestFingerprint, executeCall);
   }
+
+  return executeCall;
 }
+
 
 export const MySQLDataService = {
   getSystemHealth() {
@@ -190,16 +238,20 @@ export const MySQLDataService = {
 
   // ─── STORES ──────────────────────────────────────────
   async syncStore(store: any) {
-    return apiCall('/api/stores', 'POST', {
+    const payload: any = {
       code: store.code,
       name: store.name,
       city: store.city,
       address: store.address,
-      managerName: store.manager,
+      ownerName: store.owner || store.manager,
+      managerName: store.owner || store.manager,
       phone: store.phone,
-      registersCount: store.registers,
       status: store.status,
-    });
+    };
+    if (store.registers !== undefined && store.registers !== null && store.registers !== '') {
+      payload.registersCount = Number(store.registers);
+    }
+    return apiCall('/api/stores', 'POST', payload);
   },
 
   async deleteStore(id: string, permanent = false) {
@@ -223,6 +275,8 @@ export const MySQLDataService = {
       password: user.password || 'Cosko2026@',
       role: user.role,
       store: user.store,
+      assignedStores: user.assignedStores || user.allowedStores || [user.store],
+      allowedStores: user.assignedStores || user.allowedStores || [user.store],
       phone: user.phone,
       status: user.status || 'Active',
       securityLevel: user.securityLevel,
@@ -239,6 +293,10 @@ export const MySQLDataService = {
       status: user.status,
       securityLevel: user.securityLevel,
       shiftStatus: user.shiftStatus,
+      assignedStores: user.assignedStores || user.allowedStores,
+      allowedStores: user.assignedStores || user.allowedStores,
+      overrides: user.overrides,
+      permissionOverride: user.permissionOverride,
     });
   },
 
@@ -321,6 +379,8 @@ export const MySQLDataService = {
       storeCode: expense.store || expense.storeCode,
       description: expense.description,
       paymentMethod: expense.paymentMethod,
+      referenceNo: expense.referenceNo || expense.payRef,
+      receiptUrl: expense.receiptUrl || expense.proofUrl,
       date: expense.date,
     });
   },
@@ -334,6 +394,8 @@ export const MySQLDataService = {
       storeCode: payload.store || payload.storeCode,
       description: payload.description,
       paymentMethod: payload.paymentMethod,
+      referenceNo: payload.referenceNo || payload.payRef,
+      receiptUrl: payload.receiptUrl || payload.proofUrl,
       date: payload.date,
     });
   },
@@ -423,6 +485,23 @@ export const MySQLDataService = {
     return apiCall('/api/settings', 'POST', { section, data });
   },
 
+  // ─── CATEGORY TYPES (DYNAMIC TAXONOMY) ─────────────
+  async fetchCategoryTypes() {
+    return apiCall('/api/category-types', 'GET');
+  },
+
+  async createCategoryType(type: { name: string; description?: string; color?: string }) {
+    return apiCall('/api/category-types', 'POST', type);
+  },
+
+  async updateCategoryType(type: { id: string; name?: string; description?: string; color?: string }) {
+    return apiCall('/api/category-types', 'PUT', type);
+  },
+
+  async deleteCategoryType(id: string) {
+    return apiCall(`/api/category-types?id=${encodeURIComponent(id)}`, 'DELETE');
+  },
+
   // ─── CATEGORIES ──────────────────────────────────────
   async createCategory(cat: any) {
     return apiCall('/api/categories', 'POST', {
@@ -453,6 +532,57 @@ export const MySQLDataService = {
 
   async deleteCategory(id: string, permanent = false) {
     return apiCall(`/api/categories?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`, 'DELETE');
+  },
+
+  // ─── PAYMENT METHODS ────────────────────────────────
+  async fetchPaymentMethods() {
+    return apiCall('/api/payment-methods', 'GET');
+  },
+
+  async createPaymentMethod(method: any) {
+    return apiCall('/api/payment-methods', 'POST', method);
+  },
+
+  async updatePaymentMethod(method: any) {
+    return apiCall('/api/payment-methods', 'PUT', method);
+  },
+
+  async deletePaymentMethod(id: string) {
+    return apiCall(`/api/payment-methods?id=${encodeURIComponent(id)}`, 'DELETE');
+  },
+
+  // ─── BRANDS ─────────────────────────────────────────
+  async fetchBrands() {
+    return apiCall('/api/brands', 'GET');
+  },
+
+  async createBrand(brand: any) {
+    return apiCall('/api/brands', 'POST', brand);
+  },
+
+  async updateBrand(brand: any) {
+    return apiCall('/api/brands', 'PUT', brand);
+  },
+
+  async deleteBrand(id: string) {
+    return apiCall(`/api/brands?id=${encodeURIComponent(id)}`, 'DELETE');
+  },
+
+  // ─── UNITS OF MEASUREMENT ───────────────────────────
+  async fetchUnits() {
+    return apiCall('/api/units', 'GET');
+  },
+
+  async createUnit(unit: any) {
+    return apiCall('/api/units', 'POST', unit);
+  },
+
+  async updateUnit(unit: any) {
+    return apiCall('/api/units', 'PUT', unit);
+  },
+
+  async deleteUnit(id: string) {
+    return apiCall(`/api/units?id=${encodeURIComponent(id)}`, 'DELETE');
   },
 
   // Backward compatibility alias methods

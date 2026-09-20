@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import KpiCard from './KpiCard';
 import PendingVendorBillsModal from './PendingVendorBillsModal';
 import { useApp } from '@/context/AppContext';
@@ -23,100 +23,152 @@ export default function KpiBentoGrid() {
 
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
 
-  // Store filter matcher
-  const matchStore = (storeCode?: string) =>
-    selectedStore === 'All Stores' || storeCode === selectedStore;
-
-  // Real Sales Filtering by store & period
-  const filteredSales = sales.filter((s) => {
-    const isStore = matchStore(s.store);
-    const isDate = isWithinDatePeriod(s.createdAt, datePeriod, customDateRange);
-    const isValid = s.status !== 'Refunded' && s.status !== 'Cancelled' && s.status !== 'Voided';
-    return isStore && isDate && isValid;
-  });
-
-  // Prior Period Sales for calculating real % trend
-  const prevDateRange = getPreviousDateRange(datePeriod, customDateRange);
-  const prevSales = sales.filter((s) => {
-    const isStore = matchStore(s.store);
-    const isValid = s.status !== 'Refunded' && s.status !== 'Cancelled' && s.status !== 'Voided';
-    if (!s.createdAt) return false;
-    const t = new Date(s.createdAt).getTime();
-    return isStore && isValid && t >= prevDateRange.start.getTime() && t <= prevDateRange.end.getTime();
-  });
-
-  const totalRevenue = filteredSales.reduce((acc, s) => acc + (s.total || 0), 0);
-  const prevRevenue = prevSales.reduce((acc, s) => acc + (s.total || 0), 0);
-
-  let revChange = '0%';
-  let revTrend: 'up' | 'down' | 'neutral' = 'neutral';
-  if (prevRevenue > 0) {
-    const diffPct = ((totalRevenue - prevRevenue) / prevRevenue) * 100;
-    revChange = `${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%`;
-    revTrend = diffPct >= 0 ? 'up' : 'down';
-  } else if (totalRevenue > 0) {
-    revChange = '+100%';
-    revTrend = 'up';
-  }
-
-  // Authoritative Gross Profit from DB records
-  const grossProfit = filteredSales.reduce((acc, s) => {
-    if (s.grossProfit !== undefined && s.grossProfit !== null && !isNaN(Number(s.grossProfit))) {
-      return acc + Number(s.grossProfit);
+  // Pre-index inventory cost map for O(1) lookups instead of O(N) per item per sale
+  const invCostMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const inv of inventory) {
+      if (inv.productId) map.set(inv.productId, inv.costPrice || 0);
+      if (inv.sku) map.set(inv.sku, inv.costPrice || 0);
+      if (inv.name) map.set(inv.name, inv.costPrice || 0);
     }
-    const saleCost = s.totalCost !== undefined && s.totalCost !== null && !isNaN(Number(s.totalCost))
-      ? Number(s.totalCost)
-      : (s.items?.reduce((itemAcc, it) => {
-          const invMatch = inventory.find((inv) => inv.productId === it.itemId || inv.sku === it.sku || inv.name === it.name);
-          const unitCost = invMatch ? invMatch.costPrice : 0;
-          return itemAcc + (unitCost * it.qty);
-        }, 0) || 0);
-    return acc + Math.max(0, (s.total || 0) - saleCost);
-  }, 0);
+    return map;
+  }, [inventory]);
 
-  const grossMarginPct = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0';
+  const {
+    filteredSales,
+    totalRevenue,
+    prevRevenue,
+    revChange,
+    revTrend,
+    grossProfit,
+    grossMarginPct,
+    filteredExpenses,
+    totalExp,
+    netProfit,
+    invValue,
+    filteredInv,
+    receivablesTotal,
+    pendingReceivablesCount,
+    activePendingBills,
+    payablesTotal,
+    pendingBillsCount,
+    activeOutletsCount,
+  } = useMemo(() => {
+    // Store filter matcher
+    const matchStore = (storeCode?: string) =>
+      selectedStore === 'All Stores' || storeCode === selectedStore;
 
-  // Authoritative Operational Expenses scoped to store & date period
-  const filteredExpenses = expenses.filter((e) => {
-    const isStore = matchStore(e.store);
-    const isDate = isWithinDatePeriod(e.date, datePeriod, customDateRange);
-    const isValid = e.status !== 'Rejected';
-    return isStore && isDate && isValid;
-  });
-  const totalExp = filteredExpenses.reduce((acc, e) => acc + (e.amount || 0), 0);
+    // Real Sales Filtering by store & period
+    const filteredSales = sales.filter((s) => {
+      const isStore = matchStore(s.store);
+      const isDate = isWithinDatePeriod(s.createdAt, datePeriod, customDateRange);
+      const isValid = s.status !== 'Refunded' && s.status !== 'Cancelled' && s.status !== 'Voided';
+      return isStore && isDate && isValid;
+    });
 
-  // Net Profit = Gross Profit - Operating Expenses
-  const netProfit = grossProfit - totalExp;
+    // Prior Period Sales for calculating real % trend
+    const prevDateRange = getPreviousDateRange(datePeriod, customDateRange);
+    const prevSales = sales.filter((s) => {
+      const isStore = matchStore(s.store);
+      const isValid = s.status !== 'Refunded' && s.status !== 'Cancelled' && s.status !== 'Voided';
+      if (!s.createdAt) return false;
+      const t = new Date(s.createdAt).getTime();
+      return isStore && isValid && t >= prevDateRange.start.getTime() && t <= prevDateRange.end.getTime();
+    });
 
-  // Inventory Asset Value (point-in-time balance in store scope)
-  const filteredInv = selectedStore === 'All Stores'
-    ? inventory
-    : inventory.filter((i) => i.store === selectedStore);
-  const invValue = filteredInv.reduce((acc, i) => acc + (i.costPrice || 0) * (i.qtyOnHand || 0), 0);
+    const totalRevenue = filteredSales.reduce((acc, s) => acc + (s.total || 0), 0);
+    const prevRevenue = prevSales.reduce((acc, s) => acc + (s.total || 0), 0);
 
-  // Customer Receivables (outstanding customer credit balance)
-  const receivablesTotal = customers.reduce((acc, c) => acc + (c.creditBalance || 0), 0);
-  const pendingReceivablesCount = customers.filter((c) => (c.creditBalance || 0) > 0).length;
+    let revChange = '0%';
+    let revTrend: 'up' | 'down' | 'neutral' = 'neutral';
+    if (prevRevenue > 0) {
+      const diffPct = ((totalRevenue - prevRevenue) / prevRevenue) * 100;
+      revChange = `${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%`;
+      revTrend = diffPct >= 0 ? 'up' : 'down';
+    } else if (totalRevenue > 0) {
+      revChange = '+100%';
+      revTrend = 'up';
+    }
 
-  // Authoritative Vendor Payables: Active, non-cancelled purchase orders in store scope
-  const activePendingBills = purchases.filter((p) => {
-    const isStore = matchStore(p.store);
-    const isNotCancelled = p.status !== 'Cancelled' && p.status !== 'Archived';
-    const isUnpaid = p.paymentStatus !== 'Paid';
-    const rem = p.remainingAmount !== undefined ? p.remainingAmount : (p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0));
-    return isStore && isNotCancelled && isUnpaid && rem > 0.005;
-  });
+    // Authoritative Gross Profit from DB records
+    const grossProfit = filteredSales.reduce((acc, s) => {
+      if (s.grossProfit !== undefined && s.grossProfit !== null && !isNaN(Number(s.grossProfit))) {
+        return acc + Number(s.grossProfit);
+      }
+      const saleCost = s.totalCost !== undefined && s.totalCost !== null && !isNaN(Number(s.totalCost))
+        ? Number(s.totalCost)
+        : (s.items?.reduce((itemAcc, it) => {
+            const unitCost = (it.itemId && invCostMap.get(it.itemId)) || (it.sku && invCostMap.get(it.sku)) || (it.name && invCostMap.get(it.name)) || 0;
+            return itemAcc + (unitCost * it.qty);
+          }, 0) || 0);
+      return acc + Math.max(0, (s.total || 0) - saleCost);
+    }, 0);
 
-  const payablesTotal = activePendingBills.reduce((acc, p) => {
-    const rem = p.remainingAmount !== undefined ? p.remainingAmount : Math.max(0, p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0));
-    return acc + rem;
-  }, 0);
-  const pendingBillsCount = activePendingBills.length;
+    const grossMarginPct = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0';
 
-  // Active Outlets count
-  const activeOutletsCount = selectedStore === 'All Stores'
-    ? storesList.filter((s) => s.status === 'Active').length
-    : 1;
+    // Authoritative Operational Expenses scoped to store & date period
+    const filteredExpenses = expenses.filter((e) => {
+      const isStore = matchStore(e.store);
+      const isDate = isWithinDatePeriod(e.date, datePeriod, customDateRange);
+      const isValid = e.status !== 'Rejected';
+      return isStore && isDate && isValid;
+    });
+    const totalExp = filteredExpenses.reduce((acc, e) => acc + (e.amount || 0), 0);
+
+    // Net Profit = Gross Profit - Operating Expenses
+    const netProfit = grossProfit - totalExp;
+
+    // Inventory Asset Value (point-in-time balance in store scope)
+    const filteredInv = selectedStore === 'All Stores'
+      ? inventory
+      : inventory.filter((i) => i.store === selectedStore);
+    const invValue = filteredInv.reduce((acc, i) => acc + (i.costPrice || 0) * (i.qtyOnHand || 0), 0);
+
+    // Customer Receivables (outstanding customer credit balance)
+    const receivablesTotal = customers.reduce((acc, c) => acc + (c.creditBalance || 0), 0);
+    const pendingReceivablesCount = customers.filter((c) => (c.creditBalance || 0) > 0).length;
+
+    // Authoritative Vendor Payables: Active, non-cancelled purchase orders in store scope
+    const activePendingBills = purchases.filter((p) => {
+      const isStore = matchStore(p.store);
+      const isNotCancelled = p.status !== 'Cancelled' && p.status !== 'Archived';
+      const isUnpaid = p.paymentStatus !== 'Paid';
+      const rem = p.remainingAmount !== undefined ? p.remainingAmount : (p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0));
+      return isStore && isNotCancelled && isUnpaid && rem > 0.005;
+    });
+
+    const payablesTotal = activePendingBills.reduce((acc, p) => {
+      const rem = p.remainingAmount !== undefined ? p.remainingAmount : Math.max(0, p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0));
+      return acc + rem;
+    }, 0);
+    const pendingBillsCount = activePendingBills.length;
+
+    // Active Outlets count
+    const activeOutletsCount = selectedStore === 'All Stores'
+      ? storesList.filter((s) => s.status === 'Active').length
+      : 1;
+
+    return {
+      filteredSales,
+      totalRevenue,
+      prevRevenue,
+      revChange,
+      revTrend,
+      grossProfit,
+      grossMarginPct,
+      filteredExpenses,
+      totalExp,
+      netProfit,
+      invValue,
+      filteredInv,
+      receivablesTotal,
+      pendingReceivablesCount,
+      activePendingBills,
+      payablesTotal,
+      pendingBillsCount,
+      activeOutletsCount,
+    };
+  }, [sales, inventory, expenses, purchases, customers, storesList, selectedStore, datePeriod, customDateRange, invCostMap]);
 
   const displayPeriodLabel =
     datePeriod === 'Custom Range' && customDateRange?.start && customDateRange?.end
@@ -174,7 +226,7 @@ export default function KpiBentoGrid() {
       value: `₹${invValue.toLocaleString('en-IN')}`,
       change: `${filteredInv.length} SKUs`,
       trend: 'neutral' as const,
-      subtext: `${filteredInv.reduce((acc, i) => acc + (i.qtyOnHand || 0), 0)} units on hand`,
+      subtext: `${filteredInv.reduce((acc: number, i: any) => acc + (i.qtyOnHand || 0), 0)} units on hand`,
       icon: 'CubeIcon',
       variant: 'normal' as const,
       color: 'info' as const,

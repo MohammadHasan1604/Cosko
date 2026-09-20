@@ -74,9 +74,65 @@ export class StorageService {
   }
 
   /**
+   * Upload payment proof handler: uploads file directly to backend /api/upload
+   * Supporting JPG, PNG, WebP, PDF up to 10MB, returning permanent URL
+   */
+  static async uploadPaymentProof(file: File): Promise<{
+    success: boolean;
+    url?: string;
+    filename?: string;
+    size?: number;
+    mimeType?: string;
+    error?: string;
+  }> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', 'payment-proofs');
+
+      let token = '';
+      if (typeof window !== 'undefined') {
+        try {
+          const saved = localStorage.getItem('cosko_active_session');
+          if (saved) {
+            token = JSON.parse(saved).token || '';
+          }
+        } catch {}
+      }
+
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Failed to upload payment proof' };
+      }
+
+      return {
+        success: true,
+        url: data.url,
+        filename: data.filename,
+        size: data.size,
+        mimeType: data.mimeType,
+      };
+    } catch (err: any) {
+      console.error('StorageService.uploadPaymentProof error:', err);
+      return { success: false, error: err.message || 'Network error during upload' };
+    }
+  }
+
+  /**
    * Safely deletes file object from storage
    */
   static async deleteFile(bucket: 'product-images' | 'sale-attachments' | 'branding', path: string): Promise<boolean> {
     return true;
   }
 }
+

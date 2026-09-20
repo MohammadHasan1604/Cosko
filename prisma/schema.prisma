@@ -14,6 +14,7 @@ model StoreHub {
   name           String   @db.VarChar(128)
   city           String   @db.VarChar(64)
   address        String   @db.VarChar(255)
+  ownerName      String?  @map("owner_name") @db.VarChar(128)
   managerName    String?  @map("manager_name") @db.VarChar(128)
   phone          String?  @db.VarChar(32)
   registersCount Int      @default(0) @map("registers_count")
@@ -24,6 +25,8 @@ model StoreHub {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
+  @@index([status])
+  @@index([createdAt])
   @@map("stores")
 }
 
@@ -42,12 +45,19 @@ model UserAccount {
   mustChangePassword Boolean  @default(false) @map("must_change_password")
   avatarUrl          String?  @map("avatar_url") @db.LongText
   lastLogin          DateTime? @map("last_login")
+  failedLoginAttempts Int      @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   storeAssignments UserStoreAssignment[]
   permissionOverrides UserPermissionOverride[]
+  workSessions        UserWorkSession[]
+  dailyActivities     UserDailyActivity[]
 
+  @@index([role])
+  @@index([status])
+  @@index([createdAt])
   @@map("users")
 }
 
@@ -61,6 +71,7 @@ model UserStoreAssignment {
   user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, storeCode])
+  @@index([storeCode])
   @@map("user_store_assignments")
 }
 
@@ -123,7 +134,23 @@ model Category {
   @@index([parentCategoryId])
   @@index([categoryType])
   @@index([status])
+  @@index([sortOrder])
+  @@index([createdAt])
   @@map("categories")
+}
+
+// 4C. DYNAMIC CATEGORY TYPES
+model CategoryType {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(64)
+  code        String   @unique @db.VarChar(64)
+  description String?  @db.VarChar(255)
+  color       String?  @default("primary") @db.VarChar(32)
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("category_types")
 }
 
 // 5. PRODUCTS & CATALOG
@@ -155,6 +182,10 @@ model Product {
 
   @@index([category])
   @@index([brand])
+  @@index([status])
+  @@index([createdAt])
+  @@index([name])
+  @@index([barcode])
   @@map("products")
 }
 
@@ -175,6 +206,7 @@ model Inventory {
 
   @@unique([productId, storeCode])
   @@index([storeCode])
+  @@index([qtyOnHand])
   @@map("inventory")
 }
 
@@ -197,6 +229,10 @@ model InventoryLedger {
 
   @@index([storeCode])
   @@index([refNo])
+  @@index([productId])
+  @@index([createdAt])
+  @@index([type])
+  @@index([storeCode, createdAt])
   @@map("inventory_ledger")
 }
 
@@ -223,6 +259,9 @@ model StockTransfer {
 
   @@index([sourceStore])
   @@index([destStore])
+  @@index([status])
+  @@index([createdAt])
+  @@index([shipDate])
   @@map("stock_transfers")
 }
 
@@ -240,6 +279,8 @@ model StockTransferItem {
   transfer StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
   product  Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  @@index([transferId])
+  @@index([productId])
   @@map("stock_transfer_items")
 }
 
@@ -264,6 +305,10 @@ model Customer {
   externalLinks CustomerExternalLink[]
 
   @@index([normalizedPhone])
+  @@index([createdAt])
+  @@index([status])
+  @@index([name])
+  @@index([phone])
   @@map("customers")
 }
 
@@ -286,6 +331,7 @@ model CustomerExternalLink {
   @@index([normalizedMobile])
   @@index([externalCustomerId])
   @@index([linkStatus])
+  @@index([coskoCustomerId])
   @@map("customer_external_links")
 }
 
@@ -307,6 +353,9 @@ model RepairEnquiry {
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@index([normalizedPhone])
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
   @@map("repair_enquiries")
 }
 
@@ -331,6 +380,8 @@ model Vendor {
 
   purchases PurchaseOrder[]
 
+  @@index([status])
+  @@index([createdAt])
   @@map("vendors")
 }
 
@@ -344,6 +395,9 @@ model PurchaseOrder {
   expectedDate DateTime? @map("expected_date")
   dueDate      DateTime? @map("due_date")
   receivedDate DateTime? @map("received_date")
+  subtotal     Decimal?  @default(0) @db.Decimal(15, 2)
+  taxAmount    Decimal?  @default(0) @map("tax_amount") @db.Decimal(15, 2)
+  discountAmount Decimal? @default(0) @map("discount_amount") @db.Decimal(15, 2)
   totalCost    Decimal   @map("total_cost") @db.Decimal(15, 2)
   paidAmount   Decimal   @default(0) @map("paid_amount") @db.Decimal(15, 2)
   creditAmount Decimal   @default(0) @map("credit_amount") @db.Decimal(15, 2)
@@ -360,6 +414,12 @@ model PurchaseOrder {
   grns     GoodsReceivedNote[]
 
   @@index([storeCode])
+  @@index([vendorId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@index([storeCode, createdAt])
+  @@index([orderDate])
   @@map("purchases")
 }
 
@@ -380,6 +440,8 @@ model PurchasePayment {
   purchase PurchaseOrder @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
 
   @@index([purchaseId])
+  @@index([paymentDate])
+  @@index([createdAt])
   @@map("purchase_payments")
 }
 
@@ -397,21 +459,29 @@ model GoodsReceivedNote {
   purchase PurchaseOrder @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
 
   @@index([purchaseId])
+  @@index([storeCode])
+  @@index([receivedDate])
+  @@index([createdAt])
   @@map("goods_received_notes")
 }
 
 model PurchaseOrderItem {
-  id          String  @id @default(uuid())
-  poId        String  @map("po_id")
-  productId   String  @map("product_id")
-  qtyOrdered  Int     @map("qty_ordered")
-  qtyReceived Int     @map("qty_received")
-  unitCost    Decimal @map("unit_cost") @db.Decimal(12, 2)
-  lineTotal   Decimal @map("line_total") @db.Decimal(12, 2)
+  id          String   @id @default(uuid())
+  poId        String   @map("po_id")
+  productId   String   @map("product_id")
+  qtyOrdered  Int      @map("qty_ordered")
+  qtyReceived Int      @map("qty_received")
+  unitCost    Decimal  @map("unit_cost") @db.Decimal(12, 2)
+  taxRate     Decimal? @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount   Decimal? @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  discount    Decimal? @default(0) @db.Decimal(12, 2)
+  lineTotal   Decimal  @map("line_total") @db.Decimal(12, 2)
 
   po      PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
   product Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  @@index([poId])
+  @@index([productId])
   @@map("purchase_items")
 }
 
@@ -430,6 +500,8 @@ model SalesOrder {
   totalCost      Decimal  @map("total_cost") @db.Decimal(15, 2)
   grossProfit    Decimal  @map("gross_profit") @db.Decimal(15, 2)
   paymentMethod  String   @default("UPI") @map("payment_method") @db.VarChar(32)
+  referenceNo    String?  @map("reference_no") @db.VarChar(64)
+  paymentProofUrl String? @map("payment_proof_url") @db.LongText
   status         String   @default("Completed") @db.VarChar(16)
   cashierName    String   @map("cashier_name") @db.VarChar(128)
   photosJson     String?  @map("photos_json") @db.Text
@@ -441,6 +513,11 @@ model SalesOrder {
 
   @@index([storeCode])
   @@index([orderNo])
+  @@index([createdAt])
+  @@index([storeCode, createdAt])
+  @@index([status])
+  @@index([customerId])
+  @@index([paymentMethod])
   @@map("sales")
 }
 
@@ -460,6 +537,8 @@ model SalesOrderItem {
   order   SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  @@index([orderId])
+  @@index([productId])
   @@map("sale_items")
 }
 
@@ -472,11 +551,18 @@ model Expense {
   amount        Decimal  @db.Decimal(12, 2)
   description   String   @db.VarChar(255)
   paymentMethod String   @default("Bank Transfer") @map("payment_method") @db.VarChar(32)
+  referenceNo   String?  @map("reference_no") @db.VarChar(64)
+  receiptUrl    String?  @map("receipt_url") @db.LongText
   approvedBy    String   @map("approved_by") @db.VarChar(128)
+  recordedBy    String?  @map("recorded_by") @db.VarChar(128)
   date          DateTime @default(now())
   createdAt     DateTime @default(now()) @map("created_at")
 
   @@index([storeCode])
+  @@index([createdAt])
+  @@index([date])
+  @@index([category])
+  @@index([storeCode, date])
   @@map("expenses")
 }
 
@@ -487,10 +573,16 @@ model CentralExpense {
   amount        Decimal  @db.Decimal(12, 2)
   description   String   @db.VarChar(255)
   paymentMethod String   @default("Bank Transfer") @map("payment_method") @db.VarChar(32)
+  referenceNo   String?  @map("reference_no") @db.VarChar(64)
+  receiptUrl    String?  @map("receipt_url") @db.LongText
   approvedBy    String   @map("approved_by") @db.VarChar(128)
+  recordedBy    String?  @map("recorded_by") @db.VarChar(128)
   date          DateTime @default(now())
   createdAt     DateTime @default(now()) @map("created_at")
 
+  @@index([createdAt])
+  @@index([date])
+  @@index([category])
   @@map("central_expenses")
 }
 
@@ -508,6 +600,8 @@ model AuditLog {
 
   @@index([module])
   @@index([userEmail])
+  @@index([createdAt])
+  @@index([storeCode])
   @@map("audit_logs")
 }
 
@@ -560,7 +654,7 @@ model SystemSettings {
   paymentUpiId          String?  @map("payment_upi_id") @db.VarChar(128)
   paymentBankDetails    String?  @map("payment_bank_details") @db.Text
   // ─── Security ───
-  sessionTimeoutMins    Int      @default(30) @map("session_timeout_mins")
+  sessionTimeoutMins    Int      @default(43200) @map("session_timeout_mins")
   maxLoginAttempts      Int      @default(5) @map("max_login_attempts")
   enforcePasswordPolicy Boolean  @default(true) @map("enforce_password_policy")
   sensitiveActionConfirm Boolean @default(true) @map("sensitive_action_confirm")
@@ -632,5 +726,125 @@ model FinancialLedgerEntry {
   @@index([accountCategory])
   @@index([refType])
   @@index([refNo])
+  @@index([storeCode, entryDate])
+  @@index([accountCategory, entryDate])
   @@map("financial_ledger")
 }
+
+// 17. IDEMPOTENCY & TRANSACTION-SAFE DUPLICATE PROTECTION
+model IdempotencyRecord {
+  id           String    @id @default(uuid())
+  key          String    @unique @db.VarChar(128)
+  action       String    @db.VarChar(64)
+  status       String    @default("PROCESSING") @db.VarChar(32) // PROCESSING, COMPLETED, FAILED
+  responseCode Int?      @map("response_code")
+  responseData String?   @map("response_data") @db.LongText
+  entityId     String?   @map("entity_id") @db.VarChar(64)
+  userId       String?   @map("user_id") @db.VarChar(64)
+  storeCode    String?   @map("store_code") @db.VarChar(16)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  expiresAt    DateTime  @map("expires_at")
+
+  @@index([key])
+  @@index([action])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("idempotency_records")
+}
+
+// 18. PAYMENT METHODS
+model PaymentMethod {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(64)
+  code        String   @unique @db.VarChar(64)
+  type        String   @default("Bank") @db.VarChar(32) // Cash, Bank, Digital, Card, Credit, Other
+  description String?  @db.VarChar(255)
+  status      String   @default("Active") @db.VarChar(16)
+  isSystem    Boolean  @default(false) @map("is_system")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([sortOrder])
+  @@map("payment_methods")
+}
+
+// 19. BRANDS MASTER
+model Brand {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(64)
+  code        String   @unique @db.VarChar(64)
+  description String?  @db.VarChar(255)
+  status      String   @default("Active") @db.VarChar(16)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("brands")
+}
+
+// 20. UNITS OF MEASUREMENT
+model Unit {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(64)
+  code        String   @unique @db.VarChar(32)
+  symbol      String   @default("pcs") @db.VarChar(16)
+  description String?  @db.VarChar(255)
+  status      String   @default("Active") @db.VarChar(16)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("units")
+}
+
+// 21. USER WORK SESSIONS & ACTIVITY TRACKING
+model UserWorkSession {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  sessionToken  String?   @map("session_token") @db.VarChar(128)
+  storeCode     String    @map("store_code") @db.VarChar(16)
+  startedAt     DateTime  @default(now()) @map("started_at")
+  lastActiveAt  DateTime  @default(now()) @map("last_active_at")
+  endedAt       DateTime? @map("ended_at")
+  activeSeconds Int       @default(0) @map("active_seconds")
+  idleSeconds   Int       @default(0) @map("idle_seconds")
+  isClosed      Boolean   @default(false) @map("is_closed")
+  ipAddress     String?   @map("ip_address") @db.VarChar(64)
+  userAgent     String?   @map("user_agent") @db.VarChar(255)
+  device        String?   @db.VarChar(64)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([startedAt])
+  @@index([lastActiveAt])
+  @@index([storeCode])
+  @@index([isClosed])
+  @@map("user_work_sessions")
+}
+
+model UserDailyActivity {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  date          String    @db.VarChar(10) // YYYY-MM-DD
+  activeSeconds Int       @default(0) @map("active_seconds")
+  idleSeconds   Int       @default(0) @map("idle_seconds")
+  firstLogin    DateTime  @default(now()) @map("first_login")
+  lastActivity  DateTime  @default(now()) @map("last_activity")
+  sessionsCount Int       @default(1) @map("sessions_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([date])
+  @@index([userId])
+  @@map("user_daily_activity")
+}
+

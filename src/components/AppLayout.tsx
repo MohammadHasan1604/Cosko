@@ -14,6 +14,8 @@ import ScrollManager from './ScrollManager';
 import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
 import CoskoLogo from '@/components/ui/CoskoLogo';
+import GlobalConfirmationModal from '@/components/ui/GlobalConfirmationModal';
+import ActivityTracker from './ActivityTracker';
 import { useApp } from '@/context/AppContext';
 
 interface AppLayoutProps {
@@ -25,6 +27,7 @@ const superAdminOnly = ['Super Admin'];
 const managerRoles = ['Super Admin', 'Store Manager'];
 const auditorRoles = ['Super Admin', 'Store Manager', 'Inventory Auditor'];
 const cashierRoles = ['Super Admin', 'Store Manager', 'POS Cashier', 'Sales Executive'];
+const allRoles = ['Super Admin', 'Store Manager', 'Department Manager', 'Accountant', 'Procurement Staff', 'Inventory Auditor', 'Sales Executive', 'POS Cashier', 'Employee'];
 
 const routePermissions: Record<string, string[]> = {
   '/dashboard': managerRoles,
@@ -44,6 +47,7 @@ const routePermissions: Record<string, string[]> = {
   '/employees': managerRoles,
   '/stores': superAdminOnly,
   '/users': superAdminOnly,
+  '/work-activity': allRoles,
   '/audit-logs': superAdminOnly,
   '/settings': superAdminOnly,
   '/settings/data-connections': superAdminOnly,
@@ -53,7 +57,14 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const { currentUser, authStatus, branding } = useApp();
+  const {
+    currentUser,
+    authStatus,
+    branding,
+    confirmationModalState,
+    closeConfirmationModal,
+    executeConfirmationAction,
+  } = useApp();
 
   // Redirect to login if user session is UNAUTHENTICATED (DO NOT FALL BACK TO SUPER ADMIN)
   useEffect(() => {
@@ -107,12 +118,13 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
     );
   }
 
-  // Route Permission Check: Verify current user role against allowed roles for this route
+  // Route Permission Check: Verify current user role against allowed roles for this route (Super Admin always authorized)
   const allowedRoles = activeRoute ? routePermissions[activeRoute] : undefined;
-  const isAuthorized = !allowedRoles || (currentUser.role && allowedRoles.includes(currentUser.role));
+  const isAuthorized = currentUser.role === 'Super Admin' || !allowedRoles || (currentUser.role && allowedRoles.includes(currentUser.role));
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
+      <ActivityTracker />
       {/* Mobile overlay */}
       {mobileSidebarOpen && (
         <div
@@ -168,9 +180,17 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
       {/* Global Modals & Drawers */}
       <GlobalSearchModal />
       <NotificationsDrawer />
-      <StoreSelectorModal />
+      {currentUser.role === 'Super Admin' && <StoreSelectorModal />}
       <UserProfileModal />
       <ForcePasswordChangeModal />
+      <GlobalConfirmationModal
+        open={confirmationModalState.open}
+        config={confirmationModalState.config}
+        onClose={closeConfirmationModal}
+        onExecuteConfirm={executeConfirmationAction}
+        isProcessing={confirmationModalState.isProcessing}
+        errorMessage={confirmationModalState.errorMessage}
+      />
     </div>
   );
 }

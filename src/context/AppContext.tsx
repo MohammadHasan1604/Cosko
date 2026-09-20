@@ -1,7 +1,10 @@
 'use client';
-import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { MySQLDataService } from '@/lib/mysqlSync';
+import { round2, calculateTransferTotals, validateTransferHeader, validateTransferItem } from '@/lib/stockTransferCalculations';
+import { ActionConfirmationConfig } from '@/components/ui/GlobalConfirmationModal';
+export type { ActionConfirmationConfig };
 
 import { normalizeMobileNumber } from '@/lib/phoneUtils';
 export { normalizeMobileNumber };
@@ -74,7 +77,7 @@ export interface InventoryItem {
   costPrice: number;
   transferPrice: number;
   sellingPrice: number;
-  mrp: number;
+  mrp?: number;
   description?: string;
   hsn?: string;
   taxRate: number;
@@ -87,6 +90,7 @@ export interface InventoryItem {
   primaryImage?: string;
   imageUrl?: string;
   locationStock?: Record<string, number>;
+  createdAt?: string;
 }
 
 export interface ProductStoreTransferPrice {
@@ -105,12 +109,19 @@ export interface StockTransferRecord {
   sku: string;
   productName: string;
   qty: number;
+  totalUnits?: number;
   purchaseCost: number;
   transferPrice: number;
+  totalCost: number;
+  totalTransferValue: number;
+  grossProfit: number;
   transferProfit: number;
+  grossMarginPercent?: number;
+  notes?: string;
   status: 'Completed' | 'Received' | 'Draft' | 'In Transit' | 'Cancelled';
   createdBy: string;
   createdAt: string;
+  items?: any[];
 }
 
 export interface InventoryLedgerEntry {
@@ -130,13 +141,25 @@ export interface InventoryLedgerEntry {
   createdAt: string;
 }
 
+export interface CategoryTypeItem {
+  id: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  color?: string | null;
+  isSystem?: boolean;
+  categoryCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface CategoryItem {
   id: string;
   name: string;
   slug: string;
   parentCategoryId?: string | null;
   parentCategoryName?: string;
-  categoryType: 'Product' | 'Service' | 'Spare Part' | 'Accessory' | 'Device' | 'EV' | 'Home Appliance';
+  categoryType: string;
   description?: string;
   imageUrl?: string;
   icon?: string;
@@ -147,8 +170,44 @@ export interface CategoryItem {
   updatedAt?: string;
 }
 
+export interface PaymentMethodItem {
+  id: string;
+  name: string;
+  code: string;
+  type: string; // 'Cash' | 'Bank' | 'Digital' | 'Card' | 'Credit' | 'Other'
+  description?: string | null;
+  status: 'Active' | 'Inactive';
+  isSystem?: boolean;
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BrandItem {
+  id: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  status: 'Active' | 'Inactive';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UnitItem {
+  id: string;
+  name: string;
+  code: string;
+  symbol: string;
+  description?: string | null;
+  status: 'Active' | 'Inactive';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+
 export interface RepairEnquiry {
   id: string;
+  ticketNo?: string;
   customerPhone: string;
   customerName: string;
   enquiryDate: string;
@@ -176,6 +235,7 @@ export interface SalePhoto {
 export interface SalesOrder {
   id: string;
   orderNo: string;
+  customerId?: string;
   customerName: string;
   customerPhone: string;
   store: string;
@@ -187,12 +247,31 @@ export interface SalesOrder {
   grossProfit?: number;
   totalCost?: number;
   taxEnabled: boolean;
-  paymentMethod: 'Cash' | 'UPI' | 'Card' | 'Credit';
+  paymentMethod: string;
+  referenceNo?: string;
+  paymentProofUrl?: string;
+  cashierName?: string;
   status: 'Completed' | 'Refunded' | 'Pending' | 'Cancelled' | 'Voided';
   createdAt: string;
   period: 'Today' | 'Yesterday' | 'Last 7 Days' | 'This Month' | 'Last Month' | 'This Quarter' | 'This Year' | 'DB';
   salePhotos?: SalePhoto[];
   warrantyExpiryDate?: string;
+  idempotencyKey?: string;
+}
+
+export interface PurchaseOrderItemData {
+  id?: string;
+  itemId?: string;
+  productId?: string;
+  name: string;
+  sku?: string;
+  qty: number;
+  unitCost: number;
+  taxRate?: number;
+  taxAmount?: number;
+  discount?: number;
+  lineTotal?: number;
+  qtyReceived?: number;
 }
 
 export interface PurchaseOrder {
@@ -202,8 +281,12 @@ export interface PurchaseOrder {
   vendorName: string;
   vendorId?: string;
   store: string;
-  items: { name: string; qty: number; unitCost: number; sku?: string }[];
+  items: PurchaseOrderItemData[];
+  subtotal?: number;
+  taxAmount?: number;
+  discountAmount?: number;
   totalAmount: number;
+  totalCost?: number;
   paidAmount?: number;
   creditAmount?: number;
   remainingAmount?: number;
@@ -211,6 +294,7 @@ export interface PurchaseOrder {
   paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
   expectedDate: string;
   dueDate?: string;
+  receivedDate?: string;
   createdAt: string;
   notes?: string;
   payments?: any[];
@@ -228,6 +312,9 @@ export interface Customer {
   totalSpend: number;
   creditBalance: number;
   lastPurchase: string;
+  gstin?: string;
+  notes?: string;
+  createdAt?: string;
 }
 
 export interface Vendor {
@@ -242,6 +329,7 @@ export interface Vendor {
   address?: string;
   gstin?: string;
   paymentTerms?: string;
+  status?: string;
   outstandingPayable: number;
   totalBilledAmount?: number;
   totalPaidAmount?: number;
@@ -250,7 +338,8 @@ export interface Vendor {
   unpaidBillsCount?: number;
   overdueBillsCount?: number;
   rating: number;
-  leadTimeDays: number;
+  leadTimeDays?: number;
+  createdAt?: string;
 }
 
 export interface Expense {
@@ -261,8 +350,13 @@ export interface Expense {
   store: string;
   amount: number;
   paymentMethod: string;
+  referenceNoText?: string;
+  receiptUrl?: string;
+  recordedBy?: string;
+  approvedBy?: string;
   status: 'Approved' | 'Pending' | 'Rejected';
   date: string;
+  createdAt?: string;
 }
 
 export interface StoreHub {
@@ -271,12 +365,14 @@ export interface StoreHub {
   name: string;
   city: string;
   address: string;
-  manager: string;
+  owner: string;
+  manager?: string;
   phone: string;
-  registers: number;
-  skusCount: number;
-  monthlyRevenue: number;
+  registers?: number;
+  skusCount?: number;
+  monthlyRevenue?: number;
   status: 'Active' | 'Inactive';
+  createdAt?: string;
 }
 
 export interface UserPermissionOverride {
@@ -301,6 +397,7 @@ export interface UserAccount {
   allowedStores?: string[];
   avatarUrl?: string;
   mustChangePassword?: boolean;
+  createdAt?: string;
 }
 
 export interface AuditLog {
@@ -362,7 +459,7 @@ export const defaultSystemSettings: SystemSettings = {
   showPaymentQr: false,
   paymentUpiId: 'cosko@icici',
   paymentBankDetails: 'HDFC Bank · A/C 50200012345678 · IFSC HDFC0001234',
-  sessionTimeoutMins: 30,
+  sessionTimeoutMins: 43200,
   maxLoginAttempts: 5,
   enforcePasswordPolicy: true,
   sensitiveActionConfirm: true,
@@ -376,6 +473,46 @@ export const defaultSystemSettings: SystemSettings = {
 };
 
 const initialStoreHubs: StoreHub[] = [];
+
+export const initialCategoryTypes: CategoryTypeItem[] = [
+  { id: 'type-prod', name: 'Product', code: 'product', description: 'General retail products and inventory goods', color: 'primary', isSystem: true, categoryCount: 0 },
+  { id: 'type-exp', name: 'Expense', code: 'expense', description: 'Operational, administrative and store expenses', color: 'danger', isSystem: true, categoryCount: 0 },
+  { id: 'type-dev', name: 'Device', code: 'device', description: 'Smartphones, Tablets, Smartwatches, Laptops and finished electronics', color: 'info', isSystem: true, categoryCount: 0 },
+  { id: 'type-spare', name: 'Spare Part', code: 'spare-part', description: 'Replacement parts, repair components and hardware', color: 'warning', isSystem: true, categoryCount: 0 },
+  { id: 'type-acc', name: 'Accessory', code: 'accessory', description: 'Cables, cases, chargers and peripherals', color: 'success', isSystem: true, categoryCount: 0 },
+  { id: 'type-serv', name: 'Service', code: 'service', description: 'Labor, diagnostic services and maintenance packages', color: 'purple', isSystem: true, categoryCount: 0 },
+  { id: 'type-ev', name: 'EV', code: 'ev', description: 'Electric vehicle components, battery packs and drives', color: 'emerald', isSystem: true, categoryCount: 0 },
+  { id: 'type-app', name: 'Home Appliance', code: 'home-appliance', description: 'ACs, TVs, Refrigerators, Washing machines and spares', color: 'amber', isSystem: true, categoryCount: 0 },
+];
+
+export const initialPaymentMethods: PaymentMethodItem[] = [
+  { id: 'pm-cash', name: 'Cash', code: 'CASH', type: 'Cash', description: 'Cash on counter / cash disbursement', isSystem: true, sortOrder: 1, status: 'Active' },
+  { id: 'pm-upi', name: 'UPI', code: 'UPI', type: 'Digital', description: 'Instant UPI / QR Code transfer (GPay, PhonePe, Paytm)', isSystem: true, sortOrder: 2, status: 'Active' },
+  { id: 'pm-card', name: 'Card', code: 'CARD', type: 'Card', description: 'Credit or Debit Card swipe / POS terminal', isSystem: true, sortOrder: 3, status: 'Active' },
+  { id: 'pm-bank', name: 'Bank Transfer', code: 'BANK_TRANSFER', type: 'Bank', description: 'Direct Bank NEFT / RTGS / IMPS wire', isSystem: true, sortOrder: 4, status: 'Active' },
+  { id: 'pm-corp-card', name: 'Corporate Card', code: 'CORP_CARD', type: 'Card', description: 'Company / Corporate Card payment', isSystem: true, sortOrder: 5, status: 'Active' },
+  { id: 'pm-debit', name: 'Direct Debit', code: 'DIRECT_DEBIT', type: 'Bank', description: 'Automated bank ECS / ACH direct debit', isSystem: true, sortOrder: 6, status: 'Active' },
+  { id: 'pm-cheque', name: 'Cheque', code: 'CHEQUE', type: 'Bank', description: 'Physical bank cheque clearing', isSystem: true, sortOrder: 7, status: 'Active' },
+  { id: 'pm-credit', name: 'Credit', code: 'CREDIT', type: 'Credit', description: 'Store credit / customer ledger credit', isSystem: true, sortOrder: 8, status: 'Active' },
+];
+
+export const initialBrands: BrandItem[] = [
+  { id: 'br-apple', name: 'Apple', code: 'apple', status: 'Active' },
+  { id: 'br-samsung', name: 'Samsung', code: 'samsung', status: 'Active' },
+  { id: 'br-google', name: 'Google', code: 'google', status: 'Active' },
+  { id: 'br-oneplus', name: 'OnePlus', code: 'oneplus', status: 'Active' },
+  { id: 'br-xiaomi', name: 'Xiaomi', code: 'xiaomi', status: 'Active' },
+  { id: 'br-generic', name: 'Generic / OEM', code: 'generic', status: 'Active' },
+];
+
+export const initialUnits: UnitItem[] = [
+  { id: 'u-pcs', name: 'Piece', code: 'pcs', symbol: 'pcs', status: 'Active' },
+  { id: 'u-box', name: 'Box', code: 'box', symbol: 'bx', status: 'Active' },
+  { id: 'u-set', name: 'Set', code: 'set', symbol: 'set', status: 'Active' },
+  { id: 'u-kg', name: 'Kilogram', code: 'kg', symbol: 'kg', status: 'Active' },
+  { id: 'u-m', name: 'Meter', code: 'meter', symbol: 'm', status: 'Active' },
+  { id: 'u-pack', name: 'Pack', code: 'pack', symbol: 'pk', status: 'Active' },
+];
 
 export const initialCategories: CategoryItem[] = [];
 
@@ -435,6 +572,11 @@ interface AppContextType {
   toggleUserStoreAccess: (userId: string, storeCode: string) => void;
   deleteUserAccount: (id: string, permanent?: boolean) => Promise<{ success: boolean; mode?: string; message?: string }>;
   categoriesList: CategoryItem[];
+  categoryTypes: CategoryTypeItem[];
+  addCategoryType: (type: { name: string; description?: string; color?: string }) => Promise<any>;
+  updateCategoryType: (type: { id: string; name?: string; description?: string; color?: string }) => Promise<any>;
+  deleteCategoryType: (id: string) => Promise<{ success: boolean; message?: string }>;
+  refreshCategoryTypes: () => Promise<void>;
   addCategory: (cat: Omit<CategoryItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<any>;
   updateCategory: (id: string, updated: Partial<CategoryItem>) => Promise<any>;
   toggleCategoryStatus: (id: string) => void;
@@ -486,9 +628,25 @@ interface AppContextType {
   addExpense: (expense: Omit<Expense, 'id' | 'referenceNo' | 'date'>) => Promise<any>;
   updateExpense: (id: string, updated: Partial<Expense>) => Promise<any>;
   deleteExpense: (id: string) => Promise<{ success: boolean; mode?: string; message?: string }>;
+  paymentMethods: PaymentMethodItem[];
+  addPaymentMethod: (method: { name: string; code?: string; type?: string; description?: string; status?: 'Active' | 'Inactive'; sortOrder?: number }) => Promise<any>;
+  updatePaymentMethod: (id: string, updated: Partial<PaymentMethodItem>) => Promise<any>;
+  deletePaymentMethod: (id: string) => Promise<{ success: boolean; message?: string }>;
+  refreshPaymentMethods: () => Promise<void>;
+  brands: BrandItem[];
+  addBrand: (brand: { name: string; code?: string; description?: string; status?: 'Active' | 'Inactive' }) => Promise<any>;
+  updateBrand: (id: string, updated: Partial<BrandItem>) => Promise<any>;
+  deleteBrand: (id: string) => Promise<{ success: boolean; message?: string }>;
+  refreshBrands: () => Promise<void>;
+  units: UnitItem[];
+  addUnit: (unit: { name: string; code?: string; symbol?: string; description?: string; status?: 'Active' | 'Inactive' }) => Promise<any>;
+  updateUnit: (id: string, updated: Partial<UnitItem>) => Promise<any>;
+  deleteUnit: (id: string) => Promise<{ success: boolean; message?: string }>;
+  refreshUnits: () => Promise<void>;
   auditLogs: AuditLog[];
   addAuditLog: (module: string, action: string, details: string) => void;
   refreshAllData: () => Promise<void>;
+  refreshDomainData?: (channel: string) => Promise<any>;
   notifications: NotificationItem[];
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
@@ -500,6 +658,16 @@ interface AppContextType {
   setStoreSelectorOpen: (open: boolean) => void;
   userProfileOpen: boolean;
   setUserProfileOpen: (open: boolean) => void;
+  // Two-Step Action Confirmation System
+  confirmAction: (config: ActionConfirmationConfig) => Promise<boolean>;
+  confirmationModalState: {
+    open: boolean;
+    config: ActionConfirmationConfig | null;
+    isProcessing: boolean;
+    errorMessage: string | null;
+  };
+  closeConfirmationModal: () => void;
+  executeConfirmationAction: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -550,6 +718,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   
   const [storesList, setStoresList] = useState<StoreHub[]>(initialStoreHubs);
   const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(initialCategories);
+  const [categoryTypes, setCategoryTypes] = useState<CategoryTypeItem[]>(initialCategoryTypes);
   const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
   const [stockTransfers, setStockTransfers] = useState<StockTransferRecord[]>(initialStockTransfers);
   const [inventoryLedger, setInventoryLedger] = useState<InventoryLedgerEntry[]>(initialInventoryLedger);
@@ -559,6 +728,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [vendors, setVendors] = useState<Vendor[]>(initialVendors);
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>(initialPaymentMethods);
+  const [brands, setBrands] = useState<BrandItem[]>(initialBrands);
+  const [units, setUnits] = useState<UnitItem[]>(initialUnits);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialAuditLogs);
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -568,7 +740,79 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [storeSelectorOpen, setStoreSelectorOpen] = useState(false);
   const [userProfileOpen, setUserProfileOpen] = useState(false);
 
+  // Global Two-Step Action Confirmation System State
+  const [confirmationModalState, setConfirmationModalState] = useState<{
+    open: boolean;
+    config: ActionConfirmationConfig | null;
+    isProcessing: boolean;
+    errorMessage: string | null;
+  }>({
+    open: false,
+    config: null,
+    isProcessing: false,
+    errorMessage: null,
+  });
+
+  const confirmResolverRef = useRef<((value: boolean) => void) | null>(null);
+
+  const confirmAction = useCallback((config: ActionConfirmationConfig): Promise<boolean> => {
+    return new Promise<boolean>((resolve) => {
+      confirmResolverRef.current = resolve;
+      setConfirmationModalState({
+        open: true,
+        config,
+        isProcessing: false,
+        errorMessage: null,
+      });
+    });
+  }, []);
+
+  const closeConfirmationModal = useCallback(() => {
+    if (confirmationModalState.isProcessing) return; // Prevent closing while action is in flight
+    if (confirmResolverRef.current) {
+      confirmResolverRef.current(false);
+      confirmResolverRef.current = null;
+    }
+    setConfirmationModalState({
+      open: false,
+      config: null,
+      isProcessing: false,
+      errorMessage: null,
+    });
+  }, [confirmationModalState.isProcessing]);
+
+  const executeConfirmationAction = useCallback(async () => {
+    if (!confirmationModalState.config || confirmationModalState.isProcessing) return;
+
+    setConfirmationModalState(prev => ({ ...prev, isProcessing: true, errorMessage: null }));
+
+    try {
+      if (confirmationModalState.config.onConfirm) {
+        await confirmationModalState.config.onConfirm();
+      }
+      if (confirmResolverRef.current) {
+        confirmResolverRef.current(true);
+        confirmResolverRef.current = null;
+      }
+      setConfirmationModalState({
+        open: false,
+        config: null,
+        isProcessing: false,
+        errorMessage: null,
+      });
+    } catch (err: any) {
+      console.error('[GlobalConfirmation] Execution error:', err);
+      // Re-enable only on genuine failure, keeping modal open and details intact for retry
+      setConfirmationModalState(prev => ({
+        ...prev,
+        isProcessing: false,
+        errorMessage: err?.message || 'Operation failed. Please verify details and try again.',
+      }));
+    }
+  }, [confirmationModalState.config, confirmationModalState.isProcessing]);
+
   // Invoice sequence is now handled server-side in salesService.ts via DB count
+
 
   const unauthenticatedUser = {
     id: '',
@@ -640,135 +884,156 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => { isMounted = false; };
   }, []);
 
-  // ─── LOAD ALL DATA FROM MySQL API ON MOUNT & REFRESH ─────────────────────
-  // Authoritative persistence: fetch real data from MySQL database
-  const refreshAllData = useCallback(async () => {
-    try {
-      let activeToken = '';
-      if (typeof window !== 'undefined') {
-        try {
-          const saved = localStorage.getItem('cosko_active_session');
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            activeToken = parsed.token || '';
+  // ─── INACTIVITY SESSION MONITOR (30 DAYS ENFORCEMENT) ────────────────────
+  useEffect(() => {
+    if (authStatus !== 'AUTHENTICATED' || typeof window === 'undefined') return;
+
+    const timeoutMins = systemSettings.sessionTimeoutMins || 43200; // 30 days
+    const maxInactivityMs = timeoutMins * 60 * 1000;
+
+    const recordActivity = () => {
+      try {
+        localStorage.setItem('cosko_last_active_time', String(Date.now()));
+      } catch {}
+    };
+
+    const checkExpiry = () => {
+      try {
+        const lastStr = localStorage.getItem('cosko_last_active_time');
+        if (lastStr) {
+          const lastTime = parseInt(lastStr, 10);
+          if (Date.now() - lastTime > maxInactivityMs) {
+            toast.error('Session expired due to 30 days of inactivity. Please sign in again.');
+            logoutUser();
+            return;
           }
-        } catch {}
-      }
-
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (activeToken) {
-        headers['Authorization'] = `Bearer ${activeToken}`;
-      }
-      const opts: RequestInit = { credentials: 'include', headers };
-
-      // Fetch all authoritative data in parallel
-      const [
-        storesRes, categoriesRes, inventoryRes, salesRes, purchasesRes,
-        customersRes, vendorsRes, expensesRes, repairsRes, usersRes,
-        transfersRes, ledgerRes, settingsRes, auditLogsRes
-      ] = await Promise.allSettled([
-        fetch('/api/stores', opts),
-        fetch('/api/categories', opts),
-        fetch('/api/inventory', opts),
-        fetch('/api/sales', opts),
-        fetch('/api/purchases', opts),
-        fetch('/api/customers', opts),
-        fetch('/api/vendors', opts),
-        fetch('/api/expenses', opts),
-        fetch('/api/repairs', opts),
-        fetch('/api/users', opts),
-        fetch('/api/transfers', opts),
-        fetch('/api/inventory/ledger', opts),
-        fetch('/api/settings', opts),
-        fetch('/api/audit-logs?limit=200', opts),
-      ]);
-
-      const safeJson = async (result: PromiseSettledResult<Response>) => {
-        if (result.status === 'fulfilled' && result.value.ok) {
-          return await result.value.json();
+        } else {
+          recordActivity();
         }
-        return null;
-      };
+      } catch {}
+    };
 
-      const storesData = await safeJson(storesRes);
-      if (storesData?.success && Array.isArray(storesData.stores)) {
-        setStoresList(storesData.stores.map((s: any) => ({
-          id: s.id, code: s.code, name: s.name, city: s.city,
-          address: s.address, manager: s.managerName || '',
-          phone: s.phone || '', registers: s.registersCount,
-          skusCount: s.skusCount, monthlyRevenue: Number(s.monthlyRevenue) || 0,
-          status: s.status,
-        })));
+    checkExpiry();
+    recordActivity();
+
+    let lastThrottledTime = Date.now();
+    const handleInteraction = () => {
+      const now = Date.now();
+      if (now - lastThrottledTime > 30000) {
+        lastThrottledTime = now;
+        recordActivity();
       }
+    };
 
-      const categoriesData = await safeJson(categoriesRes);
-      if (categoriesData?.success && Array.isArray(categoriesData.categories)) {
-        setCategoriesList(categoriesData.categories.map((c: any) => ({
-          id: c.id, name: c.name, slug: c.slug,
-          parentCategoryId: c.parentCategoryId || null,
-          parentCategoryName: c.parent?.name,
-          categoryType: c.categoryType || 'Product',
-          description: c.description || '',
-          icon: c.icon, imageUrl: c.imageUrl,
-          status: c.status || 'Active',
-          sortOrder: c.sortOrder || 0,
-          createdAt: c.createdAt, updatedAt: c.updatedAt,
-        })));
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach((evt) => window.addEventListener(evt, handleInteraction, { passive: true }));
+    const interval = setInterval(checkExpiry, 60000);
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, handleInteraction));
+      clearInterval(interval);
+    };
+  }, [authStatus, systemSettings.sessionTimeoutMins]);
+
+  // ─── LOAD ALL DATA FROM MySQL API ON MOUNT & REFRESH ─────────────────────
+  // Authoritative persistence: fetch real data from MySQL database with connection starvation protection
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
+  const lastRefreshTimestampRef = useRef<number>(0);
+  const domainRefreshInFlightRef = useRef<Record<string, Promise<any> | null>>({});
+
+  const getAuthOpts = useCallback((): RequestInit => {
+    let activeToken = '';
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('cosko_active_session');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          activeToken = parsed.token || '';
+        }
+      } catch {}
+    }
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (activeToken) {
+      headers['Authorization'] = `Bearer ${activeToken}`;
+    }
+    return { credentials: 'include', headers };
+  }, []);
+
+  const safeFetchJson = async (url: string, opts: RequestInit) => {
+    try {
+      const res = await fetch(url, opts);
+      if (res.ok) {
+        return await res.json();
       }
+    } catch {}
+    return null;
+  };
 
-      const inventoryData = await safeJson(inventoryRes);
-      if (inventoryData?.success && Array.isArray(inventoryData.products)) {
-        const items: InventoryItem[] = [];
-        for (const p of inventoryData.products) {
-          if (p.status === 'deleted' || p.status === 'archived') continue;
+  const fetchStoresData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/stores', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.stores)) {
+      setStoresList(res.stores.map((s: any) => ({
+        id: s.id, code: s.code, name: s.name, city: s.city,
+        address: s.address,
+        owner: s.ownerName || s.managerName || '',
+        manager: s.ownerName || s.managerName || '',
+        phone: s.phone || '', registers: s.registersCount,
+        skusCount: s.skusCount, monthlyRevenue: Number(s.monthlyRevenue) || 0,
+        status: s.status,
+        createdAt: s.createdAt,
+      })));
+    }
+  }, [getAuthOpts]);
 
-          // Build location stock map for this product
-          const locStock: Record<string, number> = {};
-          if (p.inventoryItems && p.inventoryItems.length > 0) {
-            p.inventoryItems.forEach((inv: any) => {
-              locStock[inv.storeCode] = inv.qtyOnHand;
-            });
-          }
+  const fetchCategoryTypesData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/category-types', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.categoryTypes)) {
+      setCategoryTypes(res.categoryTypes.map((t: any) => ({
+        id: t.id, name: t.name, code: t.code,
+        description: t.description || '', color: t.color || 'primary',
+        isSystem: Boolean(t.isSystem),
+        categoryCount: Number(t.categoryCount) || 0,
+        createdAt: t.createdAt, updatedAt: t.updatedAt,
+      })));
+    }
+  }, [getAuthOpts]);
 
-          const productMrp = p.mrp !== null && p.mrp !== undefined ? Number(p.mrp) : (Number(p.baseSellingPrice) || 0);
-          const productImg = p.imageUrl || undefined;
+  const fetchCategoriesData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/categories', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.categories)) {
+      setCategoriesList(res.categories.map((c: any) => ({
+        id: c.id, name: c.name, slug: c.slug,
+        parentCategoryId: c.parentCategoryId || null,
+        parentCategoryName: c.parent?.name,
+        categoryType: c.categoryType || 'Product',
+        description: c.description || '',
+        icon: c.icon, imageUrl: c.imageUrl,
+        status: c.status || 'Active',
+        sortOrder: c.sortOrder || 0,
+        createdAt: c.createdAt, updatedAt: c.updatedAt,
+      })));
+    }
+  }, [getAuthOpts]);
 
-          if (p.inventoryItems && p.inventoryItems.length > 0) {
-            for (const inv of p.inventoryItems) {
-              items.push({
-                id: inv.id || `${p.id}-${inv.storeCode}`,
-                productId: p.id,
-                sku: p.sku,
-                barcode: p.barcode || '',
-                name: p.name,
-                brand: p.brand || '',
-                model: p.model || '',
-                category: p.category,
-                subcategory: p.subcategory || '',
-                description: p.description || '',
-                store: inv.storeCode,
-                qtyOnHand: inv.qtyOnHand,
-                reorderPt: inv.reorderPt || 5,
-                costPrice: Number(p.baseCostPrice),
-                transferPrice: Number(p.baseCostPrice),
-                sellingPrice: Number(p.baseSellingPrice),
-                mrp: productMrp,
-                hsn: '',
-                taxRate: Number(p.gstRate) || 0,
-                warrantyMonths: p.warrantyMonths || 0,
-                minStock: inv.reorderPt || 10,
-                status: p.status as any,
-                fifoLots: 1,
-                lastMovement: 'Synced',
-                imageUrl: productImg,
-                primaryImage: productImg,
-                images: productImg ? [productImg] : [],
-                locationStock: locStock,
-              });
-            }
-          } else {
+  const fetchInventoryData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/inventory', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.products)) {
+      const items: InventoryItem[] = [];
+      for (const p of res.products) {
+        if (p.status === 'deleted' || p.status === 'archived') continue;
+        const locStock: Record<string, number> = {};
+        if (p.inventoryItems && p.inventoryItems.length > 0) {
+          p.inventoryItems.forEach((inv: any) => {
+            locStock[inv.storeCode] = inv.qtyOnHand;
+          });
+        }
+        const productMrp = p.mrp !== null && p.mrp !== undefined ? Number(p.mrp) : (Number(p.baseSellingPrice) || 0);
+        const productImg = p.imageUrl || undefined;
+
+        if (p.inventoryItems && p.inventoryItems.length > 0) {
+          for (const inv of p.inventoryItems) {
             items.push({
-              id: `${p.id}-UNASSIGNED`,
+              id: inv.id || `${p.id}-${inv.storeCode}`,
               productId: p.id,
               sku: p.sku,
               barcode: p.barcode || '',
@@ -778,9 +1043,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               category: p.category,
               subcategory: p.subcategory || '',
               description: p.description || '',
-              store: 'UNASSIGNED',
-              qtyOnHand: 0,
-              reorderPt: 5,
+              store: inv.storeCode,
+              qtyOnHand: inv.qtyOnHand,
+              reorderPt: inv.reorderPt || 5,
               costPrice: Number(p.baseCostPrice),
               transferPrice: Number(p.baseCostPrice),
               sellingPrice: Number(p.baseSellingPrice),
@@ -788,260 +1053,547 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               hsn: '',
               taxRate: Number(p.gstRate) || 0,
               warrantyMonths: p.warrantyMonths || 0,
-              minStock: 10,
+              minStock: inv.reorderPt || 10,
               status: p.status as any,
-              fifoLots: 0,
-              lastMovement: 'Never',
+              fifoLots: 1,
+              lastMovement: 'Synced',
               imageUrl: productImg,
               primaryImage: productImg,
               images: productImg ? [productImg] : [],
               locationStock: locStock,
+              createdAt: p.createdAt,
             });
           }
-        }
-        setInventory(items);
-      }
-
-      const salesData = await safeJson(salesRes);
-      if (salesData?.success && Array.isArray(salesData.sales)) {
-        setSales(salesData.sales.map((s: any) => ({
-          id: s.id, orderNo: s.orderNo,
-          customerName: s.customerName, customerPhone: s.customerPhone,
-          store: s.storeCode,
-          cashierName: s.cashierName || 'Sales Staff',
-          items: s.items?.map((it: any) => ({
-            itemId: it.productId, name: it.productName, sku: it.sku,
-            qty: it.qty, unitPrice: Number(it.unitPrice),
-            unitCost: Number(it.unitCost) || 0,
-            lineTotal: Number(it.lineTotal) || 0,
-            lineProfit: Number(it.lineProfit) || 0,
-            taxRate: 18,
-          })) || [],
-          subtotal: Number(s.subtotal), taxTotal: Number(s.taxAmount),
-          discount: Number(s.discountAmount) || 0,
-          total: Number(s.grandTotal), taxEnabled: true,
-          paymentMethod: s.paymentMethod, status: s.status,
-          createdAt: s.createdAt,
-          grossProfit: Number(s.grossProfit) || 0,
-          totalCost: Number(s.totalCost) || 0,
-          period: 'DB',
-        })));
-      }
-
-      const purchasesData = await safeJson(purchasesRes);
-      if (purchasesData?.success && Array.isArray(purchasesData.purchases)) {
-        setPurchases(purchasesData.purchases.map((p: any) => {
-          const total = Number(p.totalCost) || 0;
-          const credit = Number(p.creditAmount) || 0;
-          const realPaid = p.payments?.reduce((sum: number, pay: any) => sum + (Number(pay.amount) || 0), 0) ?? (p.paidAmount !== undefined && p.paidAmount !== null ? Number(p.paidAmount) : 0);
-          const remaining = Math.max(0, Math.round((total - realPaid - credit) * 100) / 100);
-
-          return {
-            id: p.id,
-            poNo: p.poNo,
-            invoiceNo: p.invoiceNo || p.poNo,
-            vendorName: p.vendor?.name || 'Vendor',
-            vendorId: p.vendorId,
-            store: p.storeCode || 'CENTRAL',
-            items: p.items?.map((it: any) => ({
-              itemId: it.productId,
-              name: it.productName || 'Item',
-              sku: it.sku || '',
-              qty: it.qtyOrdered,
-              unitCost: Number(it.unitCost),
-            })) || [],
-            totalAmount: total,
-            paidAmount: realPaid,
-            creditAmount: credit,
-            remainingAmount: remaining,
-            status: p.status,
-            paymentStatus: p.paymentStatus,
-            notes: p.notes || '',
+        } else {
+          items.push({
+            id: `${p.id}-UNASSIGNED`,
+            productId: p.id,
+            sku: p.sku,
+            barcode: p.barcode || '',
+            name: p.name,
+            brand: p.brand || '',
+            model: p.model || '',
+            category: p.category,
+            subcategory: p.subcategory || '',
+            description: p.description || '',
+            store: 'UNASSIGNED',
+            qtyOnHand: 0,
+            reorderPt: 5,
+            costPrice: Number(p.baseCostPrice),
+            transferPrice: Number(p.baseCostPrice),
+            sellingPrice: Number(p.baseSellingPrice),
+            mrp: productMrp,
+            hsn: '',
+            taxRate: Number(p.gstRate) || 0,
+            warrantyMonths: p.warrantyMonths || 0,
+            minStock: 10,
+            status: p.status as any,
+            fifoLots: 0,
+            lastMovement: 'Never',
+            imageUrl: productImg,
+            primaryImage: productImg,
+            images: productImg ? [productImg] : [],
+            locationStock: locStock,
             createdAt: p.createdAt,
-            expectedDate: p.expectedDate ? p.expectedDate : '',
-            dueDate: p.dueDate ? p.dueDate : (p.expectedDate ? p.expectedDate : ''),
-            payments: p.payments || [],
+          });
+        }
+      }
+      setInventory(items);
+    }
+  }, [getAuthOpts]);
+
+  const fetchSalesData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/sales', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.sales)) {
+      setSales(res.sales.map((s: any) => ({
+        id: s.id, orderNo: s.orderNo,
+        customerName: s.customerName, customerPhone: s.customerPhone,
+        store: s.storeCode,
+        cashierName: s.cashierName || 'Sales Staff',
+        items: s.items?.map((it: any) => ({
+          itemId: it.productId, name: it.productName, sku: it.sku,
+          qty: it.qty, unitPrice: Number(it.unitPrice),
+          unitCost: Number(it.unitCost) || 0,
+          lineTotal: Number(it.lineTotal) || 0,
+          lineProfit: Number(it.lineProfit) || 0,
+          taxRate: 18,
+        })) || [],
+        subtotal: Number(s.subtotal), taxTotal: Number(s.taxAmount),
+        discount: Number(s.discountAmount) || 0,
+        total: Number(s.grandTotal), taxEnabled: true,
+        paymentMethod: s.paymentMethod, status: s.status,
+        referenceNo: s.referenceNo || undefined,
+        paymentProofUrl: s.paymentProofUrl || (s.photosJson ? JSON.parse(s.photosJson)?.[0] : undefined),
+        createdAt: s.createdAt,
+        grossProfit: Number(s.grossProfit) || 0,
+        totalCost: Number(s.totalCost) || 0,
+        period: 'DB',
+      })));
+    }
+  }, [getAuthOpts]);
+
+  const fetchPurchasesData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/purchases', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.purchases)) {
+      setPurchases(res.purchases.map((p: any) => {
+        const total = Number(p.totalCost) || 0;
+        const subtotal = p.subtotal !== null && p.subtotal !== undefined ? Number(p.subtotal) : total;
+        const taxAmount = p.taxAmount !== null && p.taxAmount !== undefined ? Number(p.taxAmount) : 0;
+        const discountAmount = p.discountAmount !== null && p.discountAmount !== undefined ? Number(p.discountAmount) : 0;
+        const credit = Number(p.creditAmount) || 0;
+        const realPaid = p.payments?.reduce((sum: number, pay: any) => sum + (Number(pay.amount) || 0), 0) ?? (p.paidAmount !== undefined && p.paidAmount !== null ? Number(p.paidAmount) : 0);
+        const remaining = Math.max(0, Math.round((total - realPaid - credit) * 100) / 100);
+        const paymentStatus = remaining <= 0.01 && total > 0 ? 'Paid' : (realPaid > 0.005 ? 'Partial' : 'Unpaid');
+
+        return {
+          id: p.id,
+          poNo: p.poNo,
+          invoiceNo: p.invoiceNo || p.poNo,
+          vendorName: p.vendor?.name || 'Vendor',
+          vendorId: p.vendorId,
+          store: p.storeCode || 'CENTRAL',
+          items: p.items?.map((it: any) => ({
+            id: it.id,
+            itemId: it.productId,
+            productId: it.productId,
+            name: it.product?.name || it.productName || it.name || 'Item',
+            sku: it.product?.sku || it.sku || '',
+            qty: it.qtyOrdered || it.qty || 1,
+            unitCost: Number(it.unitCost) || 0,
+            taxRate: it.taxRate !== null && it.taxRate !== undefined ? Number(it.taxRate) : Number(it.product?.gstRate || 0),
+            taxAmount: it.taxAmount !== null && it.taxAmount !== undefined ? Number(it.taxAmount) : 0,
+            discount: it.discount !== null && it.discount !== undefined ? Number(it.discount) : 0,
+            lineTotal: Number(it.lineTotal) || ((it.qtyOrdered || it.qty || 1) * (Number(it.unitCost) || 0)),
+            qtyReceived: it.qtyReceived || 0,
+          })) || [],
+          subtotal,
+          taxAmount,
+          discountAmount,
+          totalAmount: total,
+          totalCost: total,
+          paidAmount: realPaid,
+          creditAmount: credit,
+          remainingAmount: remaining,
+          status: p.status,
+          paymentStatus: paymentStatus,
+          notes: p.notes || '',
+          createdAt: p.createdAt,
+          expectedDate: p.expectedDate ? p.expectedDate : '',
+          dueDate: p.dueDate ? p.dueDate : (p.expectedDate ? p.expectedDate : ''),
+          receivedDate: p.receivedDate || undefined,
+          payments: p.payments || [],
+        };
+      }));
+    }
+  }, [getAuthOpts]);
+
+  const fetchCustomersData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/customers', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.customers)) {
+      setCustomers(res.customers.filter((c: any) => c.status !== 'Archived').map((c: any) => ({
+        id: c.id, name: c.name, phone: c.phone,
+        email: c.email || '', city: c.city || '',
+        address: c.address || '',
+        status: c.status || 'Active',
+        tier: Number(c.totalSpent) > 50000 ? 'VIP' : 'Regular',
+        totalSpend: Number(c.totalSpent) || 0,
+        creditBalance: Number(c.creditBalance) || 0,
+        lastPurchase: c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('en-IN') : 'Never',
+        createdAt: c.createdAt,
+      })));
+    }
+  }, [getAuthOpts]);
+
+  const fetchVendorsData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/vendors', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.vendors)) {
+      setVendors(res.vendors.filter((v: any) => v.status !== 'Archived').map((v: any) => ({
+        id: v.id,
+        code: v.code,
+        name: v.name,
+        contactPerson: v.contactPerson,
+        email: v.email,
+        phone: v.phone,
+        city: v.city,
+        address: v.address || '',
+        category: v.categories || 'General',
+        gstin: v.gstin || '',
+        paymentTerms: v.paymentTerms || 'Net 30',
+        status: v.status || 'Active',
+        outstandingPayable: Number(v.outstandingPayable) || 0,
+        totalBilledAmount: Number(v.totalBilledAmount) || 0,
+        totalPaidAmount: Number(v.totalPaidAmount) || 0,
+        totalCreditsAmount: Number(v.totalCreditsAmount) || 0,
+        totalBillsCount: Number(v.totalBillsCount) || 0,
+        unpaidBillsCount: Number(v.unpaidBillsCount) || 0,
+        overdueBillsCount: Number(v.overdueBillsCount) || 0,
+        rating: Number(v.rating) || 5.0,
+        leadTimeDays: Number(v.leadTimeDays) || 3,
+        createdAt: v.createdAt,
+      })));
+    }
+  }, [getAuthOpts]);
+
+  const fetchExpensesData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/expenses', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.expenses)) {
+      setExpenses(res.expenses.map((e: any) => ({
+        id: e.id, referenceNo: e.expenseNo,
+        category: e.category, amount: Number(e.amount),
+        store: e.storeCode, description: e.description,
+        paymentMethod: e.paymentMethod, status: 'Approved',
+        referenceNoText: e.referenceNo || e.expenseNo,
+        receiptUrl: e.receiptUrl,
+        recordedBy: e.recordedBy || e.approvedBy,
+        date: e.date || e.createdAt,
+        createdAt: e.createdAt,
+      })));
+    }
+  }, [getAuthOpts]);
+
+  const fetchPaymentMethodsData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/payment-methods', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.paymentMethods)) {
+      setPaymentMethods(res.paymentMethods.map((pm: any) => ({
+        id: pm.id,
+        name: pm.name,
+        code: pm.code,
+        type: pm.type || 'Bank',
+        description: pm.description || '',
+        status: pm.status || 'Active',
+        isSystem: Boolean(pm.isSystem),
+        sortOrder: Number(pm.sortOrder) || 0,
+        createdAt: pm.createdAt,
+        updatedAt: pm.updatedAt,
+      })));
+    }
+  }, [getAuthOpts]);
+
+  const fetchBrandsData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/brands', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.brands)) {
+      setBrands(res.brands.map((b: any) => ({
+        id: b.id,
+        name: b.name,
+        code: b.code,
+        description: b.description || '',
+        status: b.status || 'Active',
+        createdAt: b.createdAt,
+        updatedAt: b.updatedAt,
+      })));
+    }
+  }, [getAuthOpts]);
+
+  const fetchUnitsData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/units', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.units)) {
+      setUnits(res.units.map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        code: u.code,
+        symbol: u.symbol || u.code,
+        description: u.description || '',
+        status: u.status || 'Active',
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
+      })));
+    }
+  }, [getAuthOpts]);
+
+  const fetchUsersData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/users', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.users)) {
+      setUsersList(res.users.map((u: any) => ({
+        id: u.id, name: u.name, email: u.email,
+        role: u.role, securityLevel: u.securityLevel,
+        store: u.store, allowedStores: u.allowedStores || u.assignedStores || [u.store || 'CENTRAL'],
+        status: u.status || 'Active', shiftStatus: u.shiftStatus || 'On Shift',
+        lastLogin: u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('en-IN') : 'Recent',
+        permissions: u.role === 'Super Admin' ? ['ALL_PERMISSIONS'] : (u.permissions || []),
+        overrides: u.overrides || [],
+        avatarUrl: u.avatarUrl,
+        createdAt: u.createdAt,
+      })));
+    }
+  }, [getAuthOpts]);
+
+  const fetchRepairsData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/repairs', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.repairs)) {
+      setRepairsEnquiries(res.repairs.map((r: any) => ({
+        id: r.id,
+        ticketNo: r.ticketNo,
+        customerPhone: r.customerPhone,
+        customerName: r.customerName,
+        enquiryDate: r.enquiryDate || (r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : 'Recent'),
+        deviceType: r.deviceType || 'Mobile',
+        deviceName: r.deviceName,
+        repairStatus: r.status,
+        repairRequested: r.issueDescription,
+        technicianNotes: r.technicianNotes || '',
+        estimatedCost: Number(r.estimatedCost) || 0,
+        assignedTech: r.assignedTech || '',
+        storeCode: r.storeCode || 'CENTRAL',
+        createdAt: r.createdAt,
+      })));
+    }
+  }, [getAuthOpts]);
+
+  const fetchSettingsData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/settings', opts || getAuthOpts());
+    if (res?.success) {
+      if (res.branding) {
+        setBranding((prev) => {
+          const updated = {
+            ...prev,
+            ...res.branding,
+            taxNumber: res.systemSettings?.gstin || res.branding.taxNumber || prev.taxNumber,
           };
-        }));
+          try {
+            localStorage.setItem('cosko_branding', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
       }
-
-      const customersData = await safeJson(customersRes);
-      if (customersData?.success && Array.isArray(customersData.customers)) {
-        setCustomers(customersData.customers.filter((c: any) => c.status !== 'Archived').map((c: any) => ({
-          id: c.id, name: c.name, phone: c.phone,
-          email: c.email || '', city: c.city || '',
-          address: c.address || '',
-          status: c.status || 'Active',
-          tier: Number(c.totalSpent) > 50000 ? 'VIP' : 'Regular',
-          totalSpend: Number(c.totalSpent) || 0,
-          creditBalance: Number(c.creditBalance) || 0,
-          lastPurchase: c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('en-IN') : 'Never',
-        })));
+      if (res.systemSettings) {
+        setSystemSettings((prev) => {
+          const updated = {
+            ...prev,
+            ...res.systemSettings,
+            defaultTaxRate: Number(res.systemSettings.defaultTaxRate) || prev.defaultTaxRate,
+          };
+          try {
+            localStorage.setItem('cosko_system_settings', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
       }
+    }
+  }, [getAuthOpts]);
 
-      const vendorsData = await safeJson(vendorsRes);
-      if (vendorsData?.success && Array.isArray(vendorsData.vendors)) {
-        setVendors(vendorsData.vendors.filter((v: any) => v.status !== 'Archived').map((v: any) => ({
-          id: v.id,
-          code: v.code,
-          name: v.name,
-          contactPerson: v.contactPerson,
-          email: v.email,
-          phone: v.phone,
-          city: v.city,
-          address: v.address || '',
-          category: v.categories || 'General',
-          gstin: v.gstin || '',
-          paymentTerms: v.paymentTerms || 'Net 30',
-          outstandingPayable: Number(v.outstandingPayable) || 0,
-          totalBilledAmount: Number(v.totalBilledAmount) || 0,
-          totalPaidAmount: Number(v.totalPaidAmount) || 0,
-          totalCreditsAmount: Number(v.totalCreditsAmount) || 0,
-          totalBillsCount: Number(v.totalBillsCount) || 0,
-          unpaidBillsCount: Number(v.unpaidBillsCount) || 0,
-          overdueBillsCount: Number(v.overdueBillsCount) || 0,
-          rating: Number(v.rating) || 5.0,
-          leadTimeDays: Number(v.leadTimeDays) || 3,
-        })));
-      }
+  const fetchTransfersData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/transfers', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.transfers)) {
+      setStockTransfers(res.transfers.map((t: any) => {
+        const totalUnits = Number(t.totalUnits) || 0;
+        const totalCost = round2(Number(t.totalCost) || 0);
+        const totalTransferValue = round2(Number(t.totalTransferValue) || 0);
+        const grossProfit = round2(
+          t.grossProfit !== undefined && t.grossProfit !== null && !isNaN(Number(t.grossProfit))
+            ? Number(t.grossProfit)
+            : totalTransferValue - totalCost
+        );
+        const purchaseCost = totalUnits > 0 ? round2(totalCost / totalUnits) : (Number(t.items?.[0]?.costPerUnit) || 0);
+        const transferPrice = totalUnits > 0 ? round2(totalTransferValue / totalUnits) : (Number(t.items?.[0]?.transferPricePerUnit) || 0);
+        const grossMarginPercent = totalTransferValue > 0 ? round2((grossProfit / totalTransferValue) * 100) : 0;
 
-      const expensesData = await safeJson(expensesRes);
-      if (expensesData?.success && Array.isArray(expensesData.expenses)) {
-        setExpenses(expensesData.expenses.map((e: any) => ({
-          id: e.id, referenceNo: e.expenseNo,
-          category: e.category, amount: Number(e.amount),
-          store: e.storeCode, description: e.description,
-          paymentMethod: e.paymentMethod, status: 'Approved',
-          date: e.date || e.createdAt,
-        })));
-      }
-
-      const usersData = await safeJson(usersRes);
-      if (usersData?.success && Array.isArray(usersData.users)) {
-        setUsersList(usersData.users.map((u: any) => ({
-          id: u.id, name: u.name, email: u.email,
-          role: u.role, securityLevel: u.securityLevel,
-          store: u.store, allowedStores: u.assignedStores,
-          status: u.status, shiftStatus: 'On Shift',
-          lastLogin: u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('en-IN') : 'Recent',
-          permissions: u.role === 'Super Admin' ? ['ALL_PERMISSIONS'] : [],
-        })));
-      }
-
-      const repairsData = await safeJson(repairsRes);
-      if (repairsData?.success && Array.isArray(repairsData.repairs)) {
-        setRepairsEnquiries(repairsData.repairs.map((r: any) => ({
-          id: r.id,
-          ticketNo: r.ticketNo,
-          customerPhone: r.customerPhone,
-          customerName: r.customerName,
-          enquiryDate: r.enquiryDate || (r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : 'Recent'),
-          deviceType: r.deviceType || 'Mobile',
-          deviceName: r.deviceName,
-          repairStatus: r.status,
-          repairRequested: r.issueDescription,
-          technicianNotes: r.technicianNotes || '',
-          estimatedCost: Number(r.estimatedCost) || 0,
-          assignedTech: r.assignedTech || '',
-          storeCode: r.storeCode || 'CENTRAL',
-          createdAt: r.createdAt,
-        })));
-      }
-
-      const settingsData = await safeJson(settingsRes);
-      if (settingsData?.success) {
-        if (settingsData.branding) {
-          setBranding((prev) => {
-            const updated = {
-              ...prev,
-              ...settingsData.branding,
-              taxNumber: settingsData.systemSettings?.gstin || settingsData.branding.taxNumber || prev.taxNumber,
-            };
-            try {
-              localStorage.setItem('cosko_branding', JSON.stringify(updated));
-            } catch {}
-            return updated;
-          });
-        }
-        if (settingsData.systemSettings) {
-          setSystemSettings((prev) => {
-            const updated = {
-              ...prev,
-              ...settingsData.systemSettings,
-              defaultTaxRate: Number(settingsData.systemSettings.defaultTaxRate) || prev.defaultTaxRate,
-            };
-            try {
-              localStorage.setItem('cosko_system_settings', JSON.stringify(updated));
-            } catch {}
-            return updated;
-          });
-        }
-      }
-
-      const transfersData = await safeJson(transfersRes);
-      if (transfersData?.success && Array.isArray(transfersData.transfers)) {
-        setStockTransfers(transfersData.transfers.map((t: any) => ({
+        return {
           id: t.id,
           transferNo: t.transferNo,
           sourceStore: t.sourceStore,
           destStore: t.destStore,
           status: t.status,
-          qty: t.totalUnits,
-          totalUnits: t.totalUnits,
-          transferPrice: Number(t.totalTransferValue) / (t.totalUnits || 1),
-          purchaseCost: Number(t.totalCost) / (t.totalUnits || 1),
-          totalCost: Number(t.totalCost),
-          totalTransferValue: Number(t.totalTransferValue),
-          grossProfit: Number(t.grossProfit),
-          transferProfit: Number(t.grossProfit),
+          qty: totalUnits,
+          totalUnits,
+          transferPrice,
+          purchaseCost,
+          totalCost,
+          totalTransferValue,
+          grossProfit,
+          transferProfit: grossProfit,
+          grossMarginPercent,
           notes: t.notes || '',
           productName: t.items?.[0]?.product?.name || 'Stock Item',
           sku: t.items?.[0]?.product?.sku || 'SKU',
+          productId: t.items?.[0]?.productId || '',
           createdAt: t.createdAt,
           items: t.items || [],
-        })));
-      }
-
-      const ledgerData = await safeJson(ledgerRes);
-      if (ledgerData?.success && Array.isArray(ledgerData.ledger)) {
-        setInventoryLedger(ledgerData.ledger.map((l: any) => ({
-          id: l.id,
-          productId: l.productId,
-          productName: l.product?.name || 'Item',
-          sku: l.product?.sku || '',
-          storeCode: l.storeCode,
-          movementType: l.type,
-          qtyChange: l.qtyChange,
-          costPerUnit: Number(l.costPerUnit),
-          balanceAfter: l.balanceAfter,
-          referenceNo: l.refNo,
-          notes: l.notes || '',
-          userEmail: l.createdBy || 'System',
-          createdAt: l.createdAt,
-        })));
-      }
-
-      const auditLogsData = await safeJson(auditLogsRes);
-      if (auditLogsData?.success && Array.isArray(auditLogsData.logs)) {
-        setAuditLogs(auditLogsData.logs.map((a: any) => ({
-          id: a.id,
-          timestamp: a.createdAt ? new Date(a.createdAt).toLocaleString('en-IN') : 'Recent',
-          userName: a.userName || a.userEmail || 'System',
-          userRole: a.userRole || 'Admin',
-          module: a.module || 'System',
-          action: a.action || 'Action',
-          details: a.details || a.description || '',
-          ipAddress: a.ipAddress || '127.0.0.1',
-        })));
-      }
-
-      setDataLoaded(true);
-      console.log('[COSKO] Authoritative data loaded from MySQL database');
-    } catch (err) {
-      console.warn('[COSKO] Data loading error:', err);
-      setDataLoaded(true);
+        };
+      }));
     }
-  }, []);
+  }, [getAuthOpts]);
+
+  const fetchLedgerData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/inventory/ledger', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.ledger)) {
+      setInventoryLedger(res.ledger.map((l: any) => ({
+        id: l.id,
+        productId: l.productId,
+        productName: l.product?.name || 'Item',
+        sku: l.product?.sku || '',
+        storeCode: l.storeCode,
+        movementType: l.type,
+        qtyChange: l.qtyChange,
+        costPerUnit: Number(l.costPerUnit),
+        balanceAfter: l.balanceAfter,
+        referenceNo: l.refNo,
+        notes: l.notes || '',
+        userEmail: l.createdBy || 'System',
+        createdAt: l.createdAt,
+      })));
+    }
+  }, [getAuthOpts]);
+
+  const fetchAuditLogsData = useCallback(async (opts?: RequestInit) => {
+    const res = await safeFetchJson('/api/audit-logs?limit=200', opts || getAuthOpts());
+    if (res?.success && Array.isArray(res.logs)) {
+      setAuditLogs(res.logs.map((a: any) => ({
+        id: a.id,
+        timestamp: a.createdAt ? new Date(a.createdAt).toLocaleString('en-IN') : 'Recent',
+        userName: a.userName || a.userEmail || 'System',
+        userRole: a.userRole || 'Admin',
+        module: a.module || 'System',
+        action: a.action || 'Action',
+        details: a.details || a.description || '',
+        ipAddress: a.ipAddress || '127.0.0.1',
+      })));
+    }
+  }, [getAuthOpts]);
+
+  const refreshAllData = useCallback(async () => {
+    // Return existing in-flight promise if a refresh is already running
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current;
+    }
+
+    // Debounce calls within 300ms to avoid flooding remote MySQL connection pool
+    const now = Date.now();
+    if (now - lastRefreshTimestampRef.current < 300) {
+      return;
+    }
+    lastRefreshTimestampRef.current = now;
+
+    const doRefresh = async () => {
+      try {
+        const opts = getAuthOpts();
+        // Fetch all authoritative data concurrently via modular domain handlers
+        await Promise.allSettled([
+          fetchStoresData(opts),
+          fetchCategoriesData(opts),
+          fetchCategoryTypesData(opts),
+          fetchPaymentMethodsData(opts),
+          fetchBrandsData(opts),
+          fetchUnitsData(opts),
+          fetchInventoryData(opts),
+          fetchSalesData(opts),
+          fetchPurchasesData(opts),
+          fetchCustomersData(opts),
+          fetchVendorsData(opts),
+          fetchExpensesData(opts),
+          fetchRepairsData(opts),
+          fetchUsersData(opts),
+          fetchTransfersData(opts),
+          fetchLedgerData(opts),
+          fetchSettingsData(opts),
+          fetchAuditLogsData(opts),
+        ]);
+
+        setDataLoaded(true);
+        console.log('[COSKO] Authoritative data loaded from MySQL database');
+      } catch (err) {
+        console.warn('[COSKO] Data loading error:', err);
+        setDataLoaded(true);
+      } finally {
+        refreshInFlightRef.current = null;
+      }
+    };
+
+    const promise = doRefresh();
+    refreshInFlightRef.current = promise;
+    return promise;
+  }, [
+    getAuthOpts,
+    fetchStoresData,
+    fetchCategoriesData,
+    fetchCategoryTypesData,
+    fetchPaymentMethodsData,
+    fetchBrandsData,
+    fetchUnitsData,
+    fetchInventoryData,
+    fetchSalesData,
+    fetchPurchasesData,
+    fetchCustomersData,
+    fetchVendorsData,
+    fetchExpensesData,
+    fetchRepairsData,
+    fetchUsersData,
+    fetchTransfersData,
+    fetchLedgerData,
+    fetchSettingsData,
+    fetchAuditLogsData,
+  ]);
+
+  // Targeted domain refresh: refreshes ONLY the affected entities rather than pounding all 15 endpoints
+  const refreshDomainData = useCallback(async (channel: string) => {
+    const c = (channel || '').toLowerCase().trim();
+    if (domainRefreshInFlightRef.current[c]) {
+      return domainRefreshInFlightRef.current[c];
+    }
+
+    const doDomainRefresh = async () => {
+      try {
+        const opts = getAuthOpts();
+        if (c === 'sales') {
+          await Promise.allSettled([fetchSalesData(opts), fetchInventoryData(opts), fetchCustomersData(opts)]);
+        } else if (c === 'inventory') {
+          await Promise.allSettled([fetchInventoryData(opts), fetchTransfersData(opts), fetchLedgerData(opts), fetchBrandsData(opts), fetchUnitsData(opts)]);
+        } else if (c === 'transfers') {
+          await Promise.allSettled([fetchTransfersData(opts), fetchInventoryData(opts), fetchLedgerData(opts)]);
+        } else if (c === 'purchases') {
+          await Promise.allSettled([fetchPurchasesData(opts), fetchVendorsData(opts), fetchInventoryData(opts), fetchPaymentMethodsData(opts)]);
+        } else if (c === 'expenses') {
+          await Promise.allSettled([fetchExpensesData(opts), fetchPaymentMethodsData(opts)]);
+        } else if (c === 'repairs') {
+          await fetchRepairsData(opts);
+        } else if (c === 'customers') {
+          await fetchCustomersData(opts);
+        } else if (c === 'vendors') {
+          await fetchVendorsData(opts);
+        } else if (c === 'users') {
+          await fetchUsersData(opts);
+        } else if (c === 'settings') {
+          await fetchSettingsData(opts);
+        } else if (c === 'categories') {
+          await Promise.allSettled([fetchCategoriesData(opts), fetchCategoryTypesData(opts)]);
+        } else if (c === 'payment-methods' || c === 'paymentmethods') {
+          await fetchPaymentMethodsData(opts);
+        } else if (c === 'brands') {
+          await fetchBrandsData(opts);
+        } else if (c === 'units') {
+          await fetchUnitsData(opts);
+        } else if (c === 'stores') {
+          await fetchStoresData(opts);
+        } else {
+          await refreshAllData();
+        }
+      } catch (err) {
+        console.warn(`[COSKO] Domain refresh error (${c}):`, err);
+      } finally {
+        domainRefreshInFlightRef.current[c] = null;
+      }
+    };
+
+    const promise = doDomainRefresh();
+    domainRefreshInFlightRef.current[c] = promise;
+    return promise;
+  }, [
+    getAuthOpts,
+    fetchSalesData,
+    fetchInventoryData,
+    fetchCustomersData,
+    fetchTransfersData,
+    fetchLedgerData,
+    fetchPurchasesData,
+    fetchVendorsData,
+    fetchExpensesData,
+    fetchRepairsData,
+    fetchUsersData,
+    fetchSettingsData,
+    fetchCategoriesData,
+    fetchCategoryTypesData,
+    fetchStoresData,
+    refreshAllData,
+  ]);
 
   // Load data immediately whenever user is authenticated
   useEffect(() => {
@@ -1054,14 +1606,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined' || authStatus !== 'AUTHENTICATED') return;
 
-    // 1. Revalidate on window focus
+    // 1. Revalidate on window focus only if stale (> 30 seconds since last refresh)
     const handleFocus = () => {
-      refreshAllData();
+      if (Date.now() - lastRefreshTimestampRef.current > 30000) {
+        refreshAllData();
+      }
     };
 
-    // 2. Revalidate on tab visibility change
+    // 2. Revalidate on tab visibility change only if stale (> 30 seconds since last refresh)
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && Date.now() - lastRefreshTimestampRef.current > 30000) {
         refreshAllData();
       }
     };
@@ -1069,12 +1623,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // 3. Periodic background sync (every 15s)
+    // 3. Periodic background sync (60s interval - SSE provides instantaneous mutation propagation)
     const interval = setInterval(() => {
       refreshAllData();
-    }, 15000);
+    }, 60000);
 
-    // 4. SSE Realtime Event Broadcaster
+    // 4. SSE Realtime Event Broadcaster - targeted domain dispatch
     let eventSource: EventSource | null = null;
     try {
       eventSource = new EventSource('/api/realtime');
@@ -1082,8 +1636,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         try {
           const data = JSON.parse(event.data);
           if (data.channel) {
-            // Re-fetch fresh database state immediately on any entity mutation
-            refreshAllData();
+            // Re-fetch only affected domain data rather than flooding all 15 endpoints
+            refreshDomainData(data.channel);
             if (data.channel === 'sales' && data.payload?.grandTotal) {
               toast.info(`⚡ Live POS Sale Recorded on ${data.payload?.storeCode || 'Store'}: ₹${data.payload?.grandTotal}`);
             }
@@ -1100,7 +1654,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       clearInterval(interval);
       if (eventSource) eventSource.close();
     };
-  }, [authStatus, refreshAllData]);
+  }, [authStatus, refreshAllData, refreshDomainData]);
 
   const setCurrentUser = (user: any) => {
     if (!user || !user.id) {
@@ -1246,13 +1800,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toast.info('Application branding reset to defaults');
   };
 
-  const toggleCurrentUserShift = () => {
+  const toggleCurrentUserShift = async () => {
     if (authStatus !== 'AUTHENTICATED') return;
     const nextStatus = currentUser.shiftStatus === 'On Shift' ? 'On Leave' : 'On Shift';
     setCurrentUserState((prev) => ({ ...prev, shiftStatus: nextStatus }));
     setUsersList((prev) => prev.map((u) => (u.id === currentUser.id ? { ...u, shiftStatus: nextStatus } : u)));
     addAuditLog('Employees', 'Toggle Shift Status', `Changed shift status to ${nextStatus}`);
     toast.success(`You are now ${nextStatus}`);
+    try {
+      await MySQLDataService.updateProfile({ id: currentUser.id, shiftStatus: nextStatus });
+    } catch (err: any) {
+      console.error('Failed to sync current user shift to DB:', err);
+    }
   };
 
   const updateProfileAvatar = (avatarUrl: string | null) => {
@@ -1263,13 +1822,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setSelectedStore = (store: string) => {
-    if (currentUser.role !== 'Super Admin' && authStatus === 'AUTHENTICATED') {
+    if (currentUser.role !== 'Super Admin') {
       const assignedStore = (currentUser.store && currentUser.store !== 'All Stores') ? currentUser.store : 'BLR';
-      if (store !== assignedStore) {
-        toast.warning(`Store Access Locked: You are restricted to ${assignedStore}`);
-        setSelectedStoreState(assignedStore);
-        return;
-      }
+      setSelectedStoreState(assignedStore);
+      return;
     }
     setSelectedStoreState(store);
   };
@@ -1284,12 +1840,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           name: res.store.name,
           city: res.store.city,
           address: res.store.address,
-          manager: res.store.managerName || '',
+          owner: res.store.ownerName || res.store.managerName || '',
+          manager: res.store.ownerName || res.store.managerName || '',
           phone: res.store.phone || '',
-          registers: res.store.registersCount || 2,
-          skusCount: 0,
-          monthlyRevenue: 0,
+          registers: res.store.registersCount ?? 0,
+          skusCount: res.store.skusCount ?? 0,
+          monthlyRevenue: Number(res.store.monthlyRevenue) || 0,
           status: res.store.status,
+          createdAt: res.store.createdAt,
         };
         setStoresList((prev) => [newStore, ...prev.filter(s => s.id !== newStore.id && s.code !== newStore.code)]);
         addAuditLog('Stores', 'Create Store Hub', `Created store hub "${newStore.name}" (${newStore.code})`);
@@ -1374,6 +1932,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           shiftStatus: 'On Shift',
           lastLogin: 'Never',
           permissions: res.user.role === 'Super Admin' ? ['ALL_PERMISSIONS'] : [],
+          createdAt: res.user.createdAt,
         };
         setUsersList((prev) => [newAccount, ...prev.filter(u => u.id !== newAccount.id && u.email !== newAccount.email)]);
         addAuditLog('Users & Roles', 'Provision User', `Provisioned account for ${newAccount.name} (${newAccount.role})`);
@@ -1421,6 +1980,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const res = await MySQLDataService.updateProfile(updatedUser);
       if (res?.success) {
         setUsersList((prev) => prev.map((usr) => (usr.id === id ? updatedUser : usr)));
+        if (id === currentUser.id) {
+          setCurrentUserState((prev) => ({ ...prev, shiftStatus: nextShift as any }));
+        }
         toast.success(`Shift status changed to ${nextShift}`);
         await refreshAllData();
       } else {
@@ -1450,41 +2012,96 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const setUserPermissionOverride = (userId: string, permissionCode: string, overrideType: 'ALLOW' | 'DENY' | 'RESET') => {
+  const setUserPermissionOverride = async (userId: string, permissionCode: string, overrideType: 'ALLOW' | 'DENY' | 'RESET') => {
+    const targetUser = usersList.find((u) => u.id === userId);
+    if (targetUser?.role === 'Super Admin') {
+      toast.info('Super Admin holds full root-level enterprise access. Permissions cannot be overridden.');
+      return;
+    }
+    const currentOverrides = targetUser?.overrides || [];
+    let updatedOverrides: UserPermissionOverride[];
+    if (overrideType === 'RESET') {
+      updatedOverrides = currentOverrides.filter((o) => o.permissionCode !== permissionCode);
+    } else {
+      updatedOverrides = [
+        ...currentOverrides.filter((o) => o.permissionCode !== permissionCode),
+        { permissionCode, overrideType },
+      ];
+    }
+
+    // 1. Optimistic instant visual update
     setUsersList((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          const currentOverrides = u.overrides || [];
-          let updatedOverrides: UserPermissionOverride[];
-          if (overrideType === 'RESET') {
-            updatedOverrides = currentOverrides.filter((o) => o.permissionCode !== permissionCode);
-          } else {
-            updatedOverrides = [
-              ...currentOverrides.filter((o) => o.permissionCode !== permissionCode),
-              { permissionCode, overrideType },
-            ];
-          }
-          return { ...u, overrides: updatedOverrides };
-        }
-        return u;
-      })
+      prev.map((u) => (u.id === userId ? { ...u, overrides: updatedOverrides } : u))
     );
     toast.success(`Permission ${permissionCode} override updated`);
+
+    // 2. Persist to MySQL database
+    try {
+      const res = await MySQLDataService.updateProfile({
+        id: userId,
+        permissionOverride: { permissionCode, overrideType },
+        overrides: updatedOverrides,
+      });
+      if (!res?.success) {
+        toast.error(res?.error || 'Failed to persist permission override to database');
+        // Rollback on error
+        setUsersList((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, overrides: currentOverrides } : u))
+        );
+      }
+    } catch (err: any) {
+      toast.error('Network error saving permission override');
+      setUsersList((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, overrides: currentOverrides } : u))
+      );
+    }
   };
 
-  const toggleUserStoreAccess = (userId: string, storeCode: string) => {
+  const toggleUserStoreAccess = async (userId: string, storeCode: string) => {
+    const targetUser = usersList.find((u) => u.id === userId);
+    if (targetUser?.role === 'Super Admin') {
+      toast.info('Super Admin has unrestricted access to all store locations.');
+      return;
+    }
+    const currentAllowed = targetUser?.allowedStores && targetUser.allowedStores.length > 0
+      ? targetUser.allowedStores
+      : [targetUser?.store || 'BLR'];
+    const hasAccess = currentAllowed.includes(storeCode);
+    if (hasAccess && currentAllowed.length === 1) {
+      toast.error('A user must be assigned to at least one store.');
+      return;
+    }
+    const nextAllowed = hasAccess ? currentAllowed.filter((s) => s !== storeCode) : [...currentAllowed, storeCode];
+    const finalAllowed = nextAllowed.length > 0 ? nextAllowed : [targetUser?.store || 'BLR'];
+    const primaryStore = finalAllowed[0] || 'BLR';
+
+    // 1. Optimistic instant visual update
     setUsersList((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          const allowed = u.allowedStores || [u.store];
-          const hasAccess = allowed.includes(storeCode);
-          const nextAllowed = hasAccess ? allowed.filter((s) => s !== storeCode) : [...allowed, storeCode];
-          return { ...u, allowedStores: nextAllowed.length > 0 ? nextAllowed : [u.store] };
-        }
-        return u;
-      })
+      prev.map((u) => (u.id === userId ? { ...u, allowedStores: finalAllowed, store: primaryStore } : u))
     );
     toast.success(`Updated store scope access for ${storeCode}`);
+
+    // 2. Persist to MySQL database
+    try {
+      const res = await MySQLDataService.updateProfile({
+        id: userId,
+        assignedStores: finalAllowed,
+        allowedStores: finalAllowed,
+        store: primaryStore,
+      });
+      if (!res?.success) {
+        toast.error(res?.error || 'Failed to persist store scope to database');
+        // Rollback on error
+        setUsersList((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, allowedStores: currentAllowed } : u))
+        );
+      }
+    } catch (err: any) {
+      toast.error('Network error saving store scope access');
+      setUsersList((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, allowedStores: currentAllowed } : u))
+      );
+    }
   };
 
   const deleteUserAccount = async (id: string, permanent = false) => {
@@ -1528,7 +2145,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           createdAt: c.createdAt,
           updatedAt: c.updatedAt,
         };
-        setCategoriesList((prev) => [...prev.filter(cat => cat.id !== newCat.id), newCat]);
+        setCategoriesList((prev) => [newCat, ...prev.filter(cat => cat.id !== newCat.id)]);
         addAuditLog('Categories', 'Create Category', `Created category "${newCat.name}" (${newCat.categoryType})`);
         toast.success(`Category "${newCat.name}" saved to MySQL!`);
         refreshAllData();
@@ -1611,6 +2228,352 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err: any) {
       toast.error(err.message || 'Error removing category');
+      return { success: false, message: err.message };
+    }
+  };
+
+  const refreshCategoryTypes = async () => {
+    try {
+      const res = await MySQLDataService.fetchCategoryTypes();
+      if (res?.success && Array.isArray(res.categoryTypes)) {
+        setCategoryTypes(res.categoryTypes.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          code: t.code,
+          description: t.description || '',
+          color: t.color || 'primary',
+          isSystem: Boolean(t.isSystem),
+          categoryCount: Number(t.categoryCount) || 0,
+          createdAt: t.createdAt,
+          updatedAt: t.updatedAt,
+        })));
+      }
+    } catch (err: any) {
+      console.error('Failed to refresh category types:', err);
+    }
+  };
+
+  const addCategoryType = async (typeData: { name: string; description?: string; color?: string }) => {
+    try {
+      const res = await MySQLDataService.createCategoryType(typeData);
+      if (res?.success && res.categoryType) {
+        const newT: CategoryTypeItem = {
+          id: res.categoryType.id,
+          name: res.categoryType.name,
+          code: res.categoryType.code,
+          description: res.categoryType.description || '',
+          color: res.categoryType.color || 'primary',
+          isSystem: Boolean(res.categoryType.isSystem),
+          categoryCount: 0,
+          createdAt: res.categoryType.createdAt,
+          updatedAt: res.categoryType.updatedAt,
+        };
+        setCategoryTypes((prev) => [newT, ...prev.filter((t) => t.id !== newT.id && t.name.toLowerCase() !== newT.name.toLowerCase())]);
+        addAuditLog('Categories', 'Create Category Type', `Created category type "${newT.name}"`);
+        toast.success(`Category Type "${newT.name}" created!`);
+        refreshCategoryTypes();
+        return { success: true, categoryType: newT };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to create category type');
+        return { success: false, error: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error creating category type');
+      return { success: false, error: err.message };
+    }
+  };
+
+  const updateCategoryType = async (typeData: { id: string; name?: string; description?: string; color?: string }) => {
+    try {
+      const res = await MySQLDataService.updateCategoryType(typeData);
+      if (res?.success && res.categoryType) {
+        const u = res.categoryType;
+        setCategoryTypes((prev) =>
+          prev.map((t) => (t.id === u.id ? { ...t, ...u } : t))
+        );
+        addAuditLog('Categories', 'Update Category Type', `Updated category type "${u.name}"`);
+        toast.success(`Category Type "${u.name}" updated!`);
+        refreshCategoryTypes();
+        refreshAllData();
+        return { success: true, categoryType: u };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to update category type');
+        return { success: false, error: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating category type');
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteCategoryType = async (id: string) => {
+    try {
+      const target = categoryTypes.find((t) => t.id === id);
+      const res = await MySQLDataService.deleteCategoryType(id);
+      if (res?.success) {
+        setCategoryTypes((prev) => prev.filter((t) => t.id !== id));
+        if (target) {
+          addAuditLog('Categories', 'Delete Category Type', `Deleted category type "${target.name}"`);
+        }
+        toast.success(res?.message || 'Category type removed');
+        refreshCategoryTypes();
+        return { success: true };
+      } else {
+        toast.error(res?.message || res?.error || 'Failed to delete category type');
+        return { success: false, message: res?.message || res?.error };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error deleting category type');
+      return { success: false, message: err.message };
+    }
+  };
+
+  // ─── PAYMENT METHODS ────────────────────────────────
+  const refreshPaymentMethods = async () => {
+    try {
+      const res = await MySQLDataService.fetchPaymentMethods();
+      if (res?.success && Array.isArray(res.paymentMethods)) {
+        setPaymentMethods(res.paymentMethods.map((pm: any) => ({
+          id: pm.id,
+          name: pm.name,
+          code: pm.code,
+          type: pm.type || 'Bank',
+          description: pm.description || '',
+          status: pm.status || 'Active',
+          isSystem: Boolean(pm.isSystem),
+          sortOrder: Number(pm.sortOrder) || 0,
+          createdAt: pm.createdAt,
+          updatedAt: pm.updatedAt,
+        })));
+      }
+    } catch (err) {
+      console.error('Failed to refresh payment methods:', err);
+    }
+  };
+
+  const addPaymentMethod = async (methodData: { name: string; code?: string; type?: string; description?: string; status?: 'Active' | 'Inactive'; sortOrder?: number }) => {
+    try {
+      const res = await MySQLDataService.createPaymentMethod(methodData);
+      if (res?.success && res.paymentMethod) {
+        const newM = res.paymentMethod;
+        setPaymentMethods((prev) => [newM, ...prev.filter((m) => m.id !== newM.id && m.name.toLowerCase() !== newM.name.toLowerCase())]);
+        addAuditLog('Accounting', 'Create Payment Method', `Created payment method "${newM.name}"`);
+        toast.success(`Payment Method "${newM.name}" created!`);
+        refreshPaymentMethods();
+        return { success: true, paymentMethod: newM };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to create payment method');
+        return { success: false, error: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error creating payment method');
+      return { success: false, error: err.message };
+    }
+  };
+
+  const updatePaymentMethod = async (id: string, updated: Partial<PaymentMethodItem>) => {
+    try {
+      const res = await MySQLDataService.updatePaymentMethod({ id, ...updated });
+      if (res?.success && res.paymentMethod) {
+        const u = res.paymentMethod;
+        setPaymentMethods((prev) => prev.map((m) => (m.id === u.id ? { ...m, ...u } : m)));
+        addAuditLog('Accounting', 'Update Payment Method', `Updated payment method "${u.name}"`);
+        toast.success(`Payment Method "${u.name}" updated!`);
+        refreshPaymentMethods();
+        return { success: true, paymentMethod: u };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to update payment method');
+        return { success: false, error: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating payment method');
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deletePaymentMethod = async (id: string) => {
+    try {
+      const target = paymentMethods.find((m) => m.id === id);
+      const res = await MySQLDataService.deletePaymentMethod(id);
+      if (res?.success) {
+        setPaymentMethods((prev) => prev.filter((m) => m.id !== id));
+        if (target) {
+          addAuditLog('Accounting', 'Delete Payment Method', `Deleted payment method "${target.name}"`);
+        }
+        toast.success(res?.message || 'Payment method deleted');
+        refreshPaymentMethods();
+        return { success: true };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to delete payment method');
+        return { success: false, message: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error deleting payment method');
+      return { success: false, message: err.message };
+    }
+  };
+
+  // ─── BRANDS ─────────────────────────────────────────
+  const refreshBrands = async () => {
+    try {
+      const res = await MySQLDataService.fetchBrands();
+      if (res?.success && Array.isArray(res.brands)) {
+        setBrands(res.brands.map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          code: b.code,
+          description: b.description || '',
+          status: b.status || 'Active',
+          createdAt: b.createdAt,
+          updatedAt: b.updatedAt,
+        })));
+      }
+    } catch (err) {
+      console.error('Failed to refresh brands:', err);
+    }
+  };
+
+  const addBrand = async (brandData: { name: string; code?: string; description?: string; status?: 'Active' | 'Inactive' }) => {
+    try {
+      const res = await MySQLDataService.createBrand(brandData);
+      if (res?.success && res.brand) {
+        const newB = res.brand;
+        setBrands((prev) => [...prev.filter((b) => b.id !== newB.id && b.name.toLowerCase() !== newB.name.toLowerCase()), newB]);
+        addAuditLog('Catalog', 'Create Brand', `Created brand "${newB.name}"`);
+        toast.success(`Brand "${newB.name}" created!`);
+        refreshBrands();
+        return { success: true, brand: newB };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to create brand');
+        return { success: false, error: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error creating brand');
+      return { success: false, error: err.message };
+    }
+  };
+
+  const updateBrand = async (id: string, updated: Partial<BrandItem>) => {
+    try {
+      const res = await MySQLDataService.updateBrand({ id, ...updated });
+      if (res?.success && res.brand) {
+        const u = res.brand;
+        setBrands((prev) => prev.map((b) => (b.id === u.id ? { ...b, ...u } : b)));
+        addAuditLog('Catalog', 'Update Brand', `Updated brand "${u.name}"`);
+        toast.success(`Brand "${u.name}" updated!`);
+        refreshBrands();
+        return { success: true, brand: u };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to update brand');
+        return { success: false, error: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating brand');
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteBrand = async (id: string) => {
+    try {
+      const target = brands.find((b) => b.id === id);
+      const res = await MySQLDataService.deleteBrand(id);
+      if (res?.success) {
+        setBrands((prev) => prev.filter((b) => b.id !== id));
+        if (target) {
+          addAuditLog('Catalog', 'Delete Brand', `Deleted brand "${target.name}"`);
+        }
+        toast.success(res?.message || 'Brand deleted');
+        refreshBrands();
+        return { success: true };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to delete brand');
+        return { success: false, message: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error deleting brand');
+      return { success: false, message: err.message };
+    }
+  };
+
+  // ─── UNITS ──────────────────────────────────────────
+  const refreshUnits = async () => {
+    try {
+      const res = await MySQLDataService.fetchUnits();
+      if (res?.success && Array.isArray(res.units)) {
+        setUnits(res.units.map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          code: u.code,
+          symbol: u.symbol || u.code,
+          description: u.description || '',
+          status: u.status || 'Active',
+          createdAt: u.createdAt,
+          updatedAt: u.updatedAt,
+        })));
+      }
+    } catch (err) {
+      console.error('Failed to refresh units:', err);
+    }
+  };
+
+  const addUnit = async (unitData: { name: string; code?: string; symbol?: string; description?: string; status?: 'Active' | 'Inactive' }) => {
+    try {
+      const res = await MySQLDataService.createUnit(unitData);
+      if (res?.success && res.unit) {
+        const newU = res.unit;
+        setUnits((prev) => [...prev.filter((u) => u.id !== newU.id && u.name.toLowerCase() !== newU.name.toLowerCase()), newU]);
+        addAuditLog('Catalog', 'Create Unit', `Created unit "${newU.name}" (${newU.symbol})`);
+        toast.success(`Unit "${newU.name}" created!`);
+        refreshUnits();
+        return { success: true, unit: newU };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to create unit');
+        return { success: false, error: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error creating unit');
+      return { success: false, error: err.message };
+    }
+  };
+
+  const updateUnit = async (id: string, updated: Partial<UnitItem>) => {
+    try {
+      const res = await MySQLDataService.updateUnit({ id, ...updated });
+      if (res?.success && res.unit) {
+        const u = res.unit;
+        setUnits((prev) => prev.map((item) => (item.id === u.id ? { ...item, ...u } : item)));
+        addAuditLog('Catalog', 'Update Unit', `Updated unit "${u.name}"`);
+        toast.success(`Unit "${u.name}" updated!`);
+        refreshUnits();
+        return { success: true, unit: u };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to update unit');
+        return { success: false, error: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating unit');
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteUnit = async (id: string) => {
+    try {
+      const target = units.find((u) => u.id === id);
+      const res = await MySQLDataService.deleteUnit(id);
+      if (res?.success) {
+        setUnits((prev) => prev.filter((u) => u.id !== id));
+        if (target) {
+          addAuditLog('Catalog', 'Delete Unit', `Deleted unit "${target.name}"`);
+        }
+        toast.success(res?.message || 'Unit deleted');
+        refreshUnits();
+        return { success: true };
+      } else {
+        toast.error(res?.error || res?.message || 'Failed to delete unit');
+        return { success: false, message: res?.error || res?.message };
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error deleting unit');
       return { success: false, message: err.message };
     }
   };
@@ -1709,6 +2672,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           imageUrl: p.imageUrl || itemData.imageUrl,
           primaryImage: p.imageUrl || itemData.primaryImage || itemData.imageUrl,
           images: itemData.images || (p.imageUrl ? [p.imageUrl] : []),
+          createdAt: p.createdAt,
         };
         setInventory((prev) => [newItem, ...prev.filter(i => i.id !== newItem.id && i.sku !== newItem.sku)]);
         addAuditLog('Inventory', 'Add Product', `Created new item "${newItem.name}" (${newItem.sku})`);
@@ -1848,9 +2812,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     notes?: string
   ) => {
     try {
-      if (fromStore === toStore) {
-        toast.error('Source store and destination store cannot be identical');
-        return { success: false, error: 'Source and destination stores cannot be identical' };
+      const headerValidation = validateTransferHeader({
+        sourceStore: fromStore,
+        destStore: toStore,
+        itemsCount: 1,
+      });
+      if (!headerValidation.isValid) {
+        toast.error(headerValidation.error);
+        return { success: false, error: headerValidation.error };
       }
 
       // Find the item matching the product AND the source store
@@ -1865,14 +2834,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: 'Source item not found' };
       }
 
-      if (sourceItem.qtyOnHand < qty) {
-        toast.error(`Insufficient stock in ${fromStore} (${sourceItem.qtyOnHand} units available, requested ${qty})`);
-        return { success: false, error: 'Insufficient stock' };
-      }
+      const unitCost = round2(Number(sourceItem.costPrice) || 0);
+      const effectiveTransferPrice =
+        customTransferPrice !== undefined && customTransferPrice !== null && !isNaN(Number(customTransferPrice))
+          ? round2(Number(customTransferPrice))
+          : (sourceItem.transferPrice && sourceItem.transferPrice > 0 ? round2(sourceItem.transferPrice) : unitCost);
 
-      const unitCost = sourceItem.costPrice;
-      const transferPrice =
-        customTransferPrice !== undefined ? customTransferPrice : (sourceItem.transferPrice || Math.round(sourceItem.costPrice * 1.18));
+      const itemValidation = validateTransferItem({
+        qty,
+        costPerUnit: unitCost,
+        transferPricePerUnit: effectiveTransferPrice,
+        availableStock: sourceItem.qtyOnHand,
+      });
+      if (!itemValidation.isValid) {
+        toast.error(itemValidation.error);
+        return { success: false, error: itemValidation.error };
+      }
 
       const realProductId = sourceItem.productId || (sourceItem.id.includes('-') ? sourceItem.id.split('-')[0] : sourceItem.id);
 
@@ -1887,9 +2864,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           items: [
             {
               productId: realProductId,
-              qty,
+              qty: Math.floor(qty),
               costPerUnit: unitCost,
-              transferPricePerUnit: transferPrice,
+              transferPricePerUnit: effectiveTransferPrice,
             },
           ],
         }),
@@ -1990,14 +2967,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         credentials: 'include',
         body: JSON.stringify({
           storeCode,
-          customerId: null,
+          customerId: saleData.customerId || null,
           customerName: saleData.customerName,
           customerPhone: saleData.customerPhone,
           items: apiItems,
           taxAmount: saleData.taxTotal || 0,
           discountAmount: saleData.discount || 0,
           paymentMethod: saleData.paymentMethod,
+          referenceNo: saleData.referenceNo || undefined,
+          paymentProofUrl: saleData.paymentProofUrl || undefined,
           cashierName: currentUser.name,
+          photos: saleData.salePhotos?.map((p) => p.url) || (saleData.paymentProofUrl ? [saleData.paymentProofUrl] : undefined),
+          idempotencyKey: saleData.idempotencyKey || undefined,
         }),
       });
 
@@ -2028,6 +3009,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         id: dbSale.id,
         orderNo: dbSale.orderNo,
         items: saleItemsWithWarranty,
+        referenceNo: dbSale.referenceNo || saleData.referenceNo,
+        paymentProofUrl: dbSale.paymentProofUrl || saleData.paymentProofUrl,
         taxEnabled: saleData.taxEnabled !== undefined ? saleData.taxEnabled : true,
         createdAt: dbSale.createdAt || new Date().toISOString(),
         grossProfit: Number(dbSale.grossProfit) || (Number(dbSale.grandTotal) - Number(dbSale.totalCost)),
@@ -2042,8 +3025,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addAuditLog('Sales', 'POS Sale Checkout', `Completed order ${newSale.orderNo} for ₹${newSale.total.toLocaleString('en-IN')}${photoMsg}`);
       toast.success(`Invoice ${newSale.orderNo} generated successfully!`);
 
-      // Refresh all data to sync inventory, customer totals, etc.
-      await refreshAllData();
+      // Refresh targeted sales domain to sync inventory, customer totals, etc. without hammering all 15 endpoints
+      await refreshDomainData('sales');
       return newSale;
     } catch (err: any) {
       console.error('[COSKO] addSale error:', err);
@@ -2057,7 +3040,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const res = await MySQLDataService.updateSale({ id, ...updated });
       if (res?.success) {
         toast.success(res.message || 'Sale order updated');
-        await refreshAllData();
+        await refreshDomainData('sales');
         return { success: true };
       } else {
         toast.error(res?.error || 'Failed to update sale order');
@@ -2074,7 +3057,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const res = await MySQLDataService.deleteSale(id);
       if (res?.success) {
         toast.success(res.message || 'Sale order voided and stock restored');
-        await refreshAllData();
+        await refreshDomainData('sales');
         return { success: true, message: res.message };
       } else {
         toast.error(res?.error || 'Failed to void sale order');
@@ -2098,20 +3081,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           vendorName: poData.vendorName,
           vendorId: p.vendorId,
           store: p.storeCode || 'CENTRAL',
-          items: poData.items,
+          items: p.items?.map((it: any) => ({
+            id: it.id,
+            itemId: it.productId,
+            productId: it.productId,
+            name: it.product?.name || it.name || 'Item',
+            sku: it.product?.sku || it.sku || '',
+            qty: it.qtyOrdered || it.qty || 1,
+            unitCost: Number(it.unitCost) || 0,
+            taxRate: Number(it.taxRate) || 0,
+            taxAmount: Number(it.taxAmount) || 0,
+            discount: Number(it.discount) || 0,
+            lineTotal: Number(it.lineTotal) || 0,
+          })) || poData.items || [],
+          subtotal: p.subtotal !== null && p.subtotal !== undefined ? Number(p.subtotal) : Number(p.totalCost),
+          taxAmount: p.taxAmount !== null && p.taxAmount !== undefined ? Number(p.taxAmount) : 0,
+          discountAmount: p.discountAmount !== null && p.discountAmount !== undefined ? Number(p.discountAmount) : 0,
           totalAmount: Number(p.totalCost),
-          paidAmount: 0,
-          creditAmount: 0,
-          remainingAmount: Number(p.totalCost),
+          totalCost: Number(p.totalCost),
+          paidAmount: Number(p.paidAmount) || 0,
+          creditAmount: Number(p.creditAmount) || 0,
+          remainingAmount: Math.max(0, Number(p.totalCost) - (Number(p.paidAmount) || 0) - (Number(p.creditAmount) || 0)),
           status: p.status,
           paymentStatus: p.paymentStatus,
           createdAt: new Date(p.createdAt).toLocaleDateString('en-IN'),
           expectedDate: poData.expectedDate || 'ASAP',
+          dueDate: p.dueDate || poData.dueDate || undefined,
+          receivedDate: p.receivedDate || undefined,
+          notes: p.notes || poData.notes || undefined,
         };
         setPurchases((prev) => [newPO, ...prev.filter(po => po.id !== newPO.id)]);
-        addAuditLog('Purchases', 'Create Purchase Order', `Generated ${newPO.poNo} for ${newPO.vendorName} (₹${newPO.totalAmount.toLocaleString('en-IN')})`);
-        toast.success(`Purchase Order ${newPO.poNo} saved to MySQL!`);
-        refreshAllData();
+        addAuditLog('Purchases', 'Create Purchase Order', `Generated ${newPO.poNo} for ${newPO.vendorName} (${newPO.items.length} items, ₹${newPO.totalAmount.toLocaleString('en-IN')})`);
+        toast.success(`Purchase Order ${newPO.poNo} saved with ${newPO.items.length} items!`);
+        refreshDomainData('purchases');
         return newPO;
       } else {
         toast.error(res?.error || 'Failed to create purchase order');
@@ -2136,10 +3138,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      setPurchases((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
+      if (data.purchaseOrder) {
+        const p = data.purchaseOrder;
+        setPurchases((prev) =>
+          prev.map((po) =>
+            po.id === id
+              ? {
+                  ...po,
+                  ...updated,
+                  status: p.status,
+                  paymentStatus: p.paymentStatus,
+                  paidAmount: Number(p.paidAmount) || 0,
+                  totalAmount: Number(p.totalCost) || po.totalAmount,
+                  totalCost: Number(p.totalCost) || po.totalAmount,
+                  remainingAmount: Math.max(0, (Number(p.totalCost) || po.totalAmount) - (Number(p.paidAmount) || 0) - (Number(p.creditAmount) || 0)),
+                  items: p.items?.map((it: any) => ({
+                    id: it.id,
+                    itemId: it.productId,
+                    productId: it.productId,
+                    name: it.product?.name || it.name || 'Item',
+                    sku: it.product?.sku || it.sku || '',
+                    qty: it.qtyOrdered || it.qty || 1,
+                    unitCost: Number(it.unitCost) || 0,
+                    taxRate: Number(it.taxRate) || 0,
+                    taxAmount: Number(it.taxAmount) || 0,
+                    discount: Number(it.discount) || 0,
+                    lineTotal: Number(it.lineTotal) || 0,
+                  })) || po.items,
+                }
+              : po
+          )
+        );
+      } else {
+        setPurchases((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
+      }
+
       addAuditLog('Purchases', 'Edit Purchase Order', `Updated PO #${id}`);
       toast.success('Purchase Order updated in MySQL');
-      await refreshAllData();
+      await refreshDomainData('purchases');
     } catch (err: any) {
       toast.error(err.message || 'Error updating purchase order');
     }
@@ -2155,7 +3191,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           addAuditLog('Purchases', res.mode === 'archived' ? 'Cancel Purchase Order' : 'Delete Purchase Order', res.message || `Removed PO ${poToDelete.poNo}`);
         }
         toast.success(res.message || `Removed Purchase Order ${poToDelete?.poNo || id}`);
-        refreshAllData();
+        refreshDomainData('purchases');
         return { success: true, mode: res.mode, message: res.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to delete purchase order');
@@ -2190,8 +3226,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: data.error };
       }
 
+      if (data.payment) {
+        setPurchases((prev) =>
+          prev.map((po) => {
+            if (po.id !== paymentData.purchaseId) return po;
+            const updatedPayments = [data.payment, ...(po.payments || [])];
+            const sumPaid = updatedPayments.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+            const total = Number(po.totalCost || po.totalAmount);
+            const credit = Number(po.creditAmount) || 0;
+            const rem = Math.max(0, Math.round((total - sumPaid - credit) * 100) / 100);
+            const status = rem <= 0.01 && total > 0 ? 'Paid' : (sumPaid > 0.005 ? 'Partial' : 'Unpaid');
+            return {
+              ...po,
+              paidAmount: sumPaid,
+              remainingAmount: rem,
+              paymentStatus: status,
+              payments: updatedPayments,
+            };
+          })
+        );
+      }
+
       toast.success(`Payment of ₹${paymentData.amount.toLocaleString('en-IN')} recorded successfully!`);
-      await refreshAllData();
+      await refreshDomainData('purchases');
       return {
         success: true,
         payment: data.payment,
@@ -2222,11 +3279,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           totalSpend: Number(c.totalSpent) || 0,
           creditBalance: Number(c.creditBalance) || 0,
           lastPurchase: 'Never',
+          createdAt: c.createdAt,
         };
         setCustomers((prev) => [newCust, ...prev.filter(cust => cust.id !== newCust.id)]);
         addAuditLog('Customers', 'Add Customer', `Registered customer "${newCust.name}"`);
         toast.success(`Customer "${newCust.name}" saved to MySQL!`);
-        refreshAllData();
+        refreshDomainData('customers');
         return newCust;
       } else {
         toast.error(res?.error || 'Failed to save customer');
@@ -2248,7 +3306,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCustomers((prev) => prev.map((c) => (c.id === id ? merged : c)));
         addAuditLog('Customers', 'Edit Customer', `Updated profile for customer #${id}`);
         toast.success('Customer record updated in MySQL');
-        await refreshAllData();
+        await refreshDomainData('customers');
         return { success: true };
       } else {
         toast.error(res?.error || 'Failed to update customer');
@@ -2270,7 +3328,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           addAuditLog('Customers', res?.mode === 'archived' ? 'Archive Customer' : 'Delete Customer', res?.message || `Removed customer "${cust.name}"`);
         }
         toast.success(res?.message || `Customer "${cust?.name || id}" removed`);
-        refreshAllData();
+        refreshDomainData('customers');
         return { success: true, mode: res?.mode || 'deleted', message: res?.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to remove customer');
@@ -2301,11 +3359,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           outstandingPayable: 0,
           rating: Number(v.rating) || Number(vendorData.rating) || 5.0,
           leadTimeDays: Number(v.leadTimeDays) || Number(vendorData.leadTimeDays) || 3,
+          createdAt: v.createdAt,
         };
         setVendors((prev) => [newVendor, ...prev.filter(vnd => vnd.id !== newVendor.id)]);
         addAuditLog('Vendors', 'Add Vendor', `Onboarded supplier "${newVendor.name}"`);
         toast.success(`Vendor "${newVendor.name}" saved to MySQL!`);
-        await refreshAllData();
+        await refreshDomainData('vendors');
         return newVendor;
       } else {
         toast.error(res?.error || 'Failed to save vendor');
@@ -2327,7 +3386,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setVendors((prev) => prev.map((v) => (v.id === id ? merged : v)));
         addAuditLog('Vendors', 'Edit Vendor', `Updated supplier #${id}`);
         toast.success('Vendor profile updated in MySQL');
-        await refreshAllData();
+        await refreshDomainData('vendors');
         return { success: true };
       } else {
         toast.error(res?.error || 'Failed to update vendor');
@@ -2349,7 +3408,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           addAuditLog('Vendors', res?.mode === 'archived' ? 'Archive Vendor' : 'Delete Vendor', res?.message || `Removed supplier "${v.name}"`);
         }
         toast.success(res?.message || `Vendor "${v?.name || id}" removed`);
-        refreshAllData();
+        refreshDomainData('vendors');
         return { success: true, mode: res?.mode || 'deleted', message: res?.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to remove vendor');
@@ -2374,13 +3433,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           store: e.storeCode,
           description: e.description,
           paymentMethod: e.paymentMethod,
+          referenceNoText: e.referenceNo || e.expenseNo,
+          receiptUrl: e.receiptUrl,
+          recordedBy: e.recordedBy || e.approvedBy,
           status: 'Approved',
           date: new Date(e.date).toLocaleDateString('en-IN'),
+          createdAt: e.createdAt,
         };
         setExpenses((prev) => [newExp, ...prev.filter(exp => exp.id !== newExp.id)]);
         addAuditLog('Expenses', 'Create Expense Record', `Logged expense "${newExp.description}" for ₹${newExp.amount.toLocaleString('en-IN')} (${newExp.store})`);
         toast.success(`Expense record ${newExp.referenceNo} saved to MySQL!`);
-        refreshAllData();
+        refreshDomainData('expenses');
         return newExp;
       } else {
         toast.error(res?.error || 'Failed to record expense');
@@ -2400,7 +3463,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           addAuditLog('Expenses', 'Delete Expense Record', `Deleted expense "${exp.description}" (${exp.referenceNo})`);
         }
         toast.success(res?.message || `Expense record ${exp?.referenceNo || id} deleted`);
-        refreshAllData();
+        refreshDomainData('expenses');
         return { success: true, mode: 'deleted', message: res?.message };
       } else {
         toast.error(res?.error || res?.message || 'Failed to delete expense record');
@@ -2425,13 +3488,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           store: e.storeCode,
           description: e.description,
           paymentMethod: e.paymentMethod,
+          referenceNoText: e.referenceNo || e.expenseNo,
+          receiptUrl: e.receiptUrl,
+          recordedBy: e.recordedBy || e.approvedBy,
           status: 'Approved',
           date: new Date(e.date).toLocaleDateString('en-IN'),
+          createdAt: e.createdAt,
         };
         setExpenses((prev) => prev.map((item) => (item.id === id || item.referenceNo === id ? updatedExp : item)));
         addAuditLog('Expenses', 'Update Expense Record', `Updated expense "${updatedExp.description}" for ₹${updatedExp.amount.toLocaleString('en-IN')} (${updatedExp.store})`);
         toast.success(`Expense record ${updatedExp.referenceNo} updated successfully`);
-        refreshAllData();
+        refreshDomainData('expenses');
         return { success: true, expense: updatedExp };
       } else {
         toast.error(res?.error || 'Failed to update expense record');
@@ -2447,9 +3514,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await MySQLDataService.createRepair(repairData);
       if (res?.success && res.repair) {
+        const r = res.repair;
+        const newRepair: RepairEnquiry = {
+          id: r.id,
+          ticketNo: r.ticketNo,
+          customerPhone: r.customerPhone,
+          customerName: r.customerName,
+          enquiryDate: r.enquiryDate || (r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : 'Recent'),
+          deviceType: r.deviceType || 'Mobile',
+          deviceName: r.deviceName,
+          repairStatus: r.status || 'Received',
+          repairRequested: r.issueDescription,
+          technicianNotes: r.technicianNotes || '',
+          estimatedCost: Number(r.estimatedCost) || 0,
+          assignedTech: r.assignedTech || '',
+          storeCode: r.storeCode || 'CENTRAL',
+          createdAt: r.createdAt,
+        };
+        setRepairsEnquiries((prev) => [newRepair, ...prev.filter((item) => item.id !== newRepair.id)]);
         toast.success(`Repair ticket ${res.repair.ticketNo} created successfully!`);
         addAuditLog('Repairs', 'Create Repair Ticket', `Created ticket ${res.repair.ticketNo} for ${res.repair.customerName} (${res.repair.deviceName})`);
-        refreshAllData();
+        refreshDomainData('repairs');
         return { success: true, repair: res.repair };
       } else {
         toast.error(res?.error || 'Failed to create repair ticket');
@@ -2467,7 +3552,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (res?.success && res.repair) {
         toast.success(`Repair ticket ${res.repair.ticketNo} updated successfully!`);
         addAuditLog('Repairs', 'Update Repair Ticket', `Updated ticket ${res.repair.ticketNo} (${res.repair.status})`);
-        refreshAllData();
+        refreshDomainData('repairs');
         return { success: true, repair: res.repair };
       } else {
         toast.error(res?.error || 'Failed to update repair ticket');
@@ -2485,7 +3570,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (res?.success) {
         toast.success(res?.message || 'Repair ticket deleted successfully');
         addAuditLog('Repairs', 'Delete Repair Ticket', `Deleted ticket ID ${id}`);
-        refreshAllData();
+        refreshDomainData('repairs');
         return { success: true, message: res?.message };
       } else {
         toast.error(res?.error || 'Failed to delete repair ticket');
@@ -2521,99 +3606,161 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toast.success('All notifications marked as read');
   };
 
+  const contextValue = useMemo(() => ({
+    branding,
+    updateBranding,
+    resetBranding,
+    systemSettings,
+    updateSystemSettings,
+    reloadSettings,
+    selectedStore,
+    setSelectedStore,
+    datePeriod,
+    setDatePeriod,
+    customDateRange,
+    setCustomDateRange,
+    authStatus,
+    currentUser,
+    setCurrentUser,
+    logoutUser,
+    toggleCurrentUserShift,
+    updateProfileAvatar,
+    storesList,
+    addStoreHub,
+    updateStoreHub,
+    deleteStoreHub,
+    usersList,
+    addUserAccount,
+    updateUserAccount,
+    toggleUserShiftStatus,
+    toggleUserStatus,
+    setUserPermissionOverride,
+    toggleUserStoreAccess,
+    deleteUserAccount,
+    categoriesList,
+    categoryTypes,
+    addCategoryType,
+    updateCategoryType,
+    deleteCategoryType,
+    refreshCategoryTypes,
+    addCategory,
+    updateCategory,
+    toggleCategoryStatus,
+    deleteCategory,
+    changeUserPassword,
+    updateUserProfile,
+    inventory,
+    addItem,
+    updateItem,
+    deleteItem,
+    adjustStock,
+    transferStock,
+    updateTransferStatus,
+    deleteTransfer,
+    defaultStoreTransferPrices,
+    setDefaultStoreTransferPrice,
+    stockTransfers,
+    inventoryLedger,
+    repairsEnquiries,
+    addRepairEnquiry,
+    updateRepairEnquiry,
+    deleteRepairEnquiry,
+    sales,
+    addSale,
+    updateSale,
+    voidSale,
+    purchases,
+    addPurchase,
+    updatePurchase,
+    deletePurchase,
+    recordPurchasePayment,
+    customers,
+    addCustomer,
+    updateCustomer,
+    deleteCustomer,
+    vendors,
+    addVendor,
+    updateVendor,
+    deleteVendor,
+    expenses,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+    paymentMethods,
+    addPaymentMethod,
+    updatePaymentMethod,
+    deletePaymentMethod,
+    refreshPaymentMethods,
+    brands,
+    addBrand,
+    updateBrand,
+    deleteBrand,
+    refreshBrands,
+    units,
+    addUnit,
+    updateUnit,
+    deleteUnit,
+    refreshUnits,
+    auditLogs,
+    addAuditLog,
+    refreshAllData,
+    refreshDomainData,
+    notifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    searchOpen,
+    setSearchOpen,
+    notificationsOpen,
+    setNotificationsOpen,
+    storeSelectorOpen,
+    setStoreSelectorOpen,
+    userProfileOpen,
+    setUserProfileOpen,
+    confirmAction,
+    confirmationModalState,
+    closeConfirmationModal,
+    executeConfirmationAction,
+  }), [
+    branding,
+    systemSettings,
+    selectedStore,
+    datePeriod,
+    customDateRange,
+    authStatus,
+    currentUser,
+    storesList,
+    usersList,
+    categoriesList,
+    categoryTypes,
+    inventory,
+    defaultStoreTransferPrices,
+    stockTransfers,
+    inventoryLedger,
+    repairsEnquiries,
+    sales,
+    purchases,
+    customers,
+    vendors,
+    expenses,
+    paymentMethods,
+    brands,
+    units,
+    auditLogs,
+    refreshAllData,
+    refreshDomainData,
+    notifications,
+    searchOpen,
+    notificationsOpen,
+    storeSelectorOpen,
+    userProfileOpen,
+    confirmAction,
+    confirmationModalState,
+    closeConfirmationModal,
+    executeConfirmationAction,
+  ]);
+
   return (
-    <AppContext.Provider
-      value={{
-        branding,
-        updateBranding,
-        resetBranding,
-        systemSettings,
-        updateSystemSettings,
-        reloadSettings,
-        selectedStore,
-        setSelectedStore,
-        datePeriod,
-        setDatePeriod,
-        customDateRange,
-        setCustomDateRange,
-        authStatus,
-        currentUser,
-        setCurrentUser,
-        logoutUser,
-        toggleCurrentUserShift,
-        updateProfileAvatar,
-        storesList,
-        addStoreHub,
-        updateStoreHub,
-        deleteStoreHub,
-        usersList,
-        addUserAccount,
-        updateUserAccount,
-        toggleUserShiftStatus,
-        toggleUserStatus,
-        setUserPermissionOverride,
-        toggleUserStoreAccess,
-        deleteUserAccount,
-        categoriesList,
-        addCategory,
-        updateCategory,
-        toggleCategoryStatus,
-        deleteCategory,
-        changeUserPassword,
-        updateUserProfile,
-        inventory,
-        addItem,
-        updateItem,
-        deleteItem,
-        adjustStock,
-        transferStock,
-        updateTransferStatus,
-        deleteTransfer,
-        defaultStoreTransferPrices,
-        setDefaultStoreTransferPrice,
-        stockTransfers,
-        inventoryLedger,
-        repairsEnquiries,
-        addRepairEnquiry,
-        updateRepairEnquiry,
-        deleteRepairEnquiry,
-        sales,
-        addSale,
-        updateSale,
-        voidSale,
-        purchases,
-        addPurchase,
-        updatePurchase,
-        deletePurchase,
-        recordPurchasePayment,
-        customers,
-        addCustomer,
-        updateCustomer,
-        deleteCustomer,
-        vendors,
-        addVendor,
-        updateVendor,
-        deleteVendor,
-        expenses,
-        addExpense,
-        updateExpense,
-        deleteExpense,
-        auditLogs,
-        addAuditLog,
-        refreshAllData,
-        notifications,
-        markNotificationRead,
-        markAllNotificationsRead,
-        searchOpen,
-        setSearchOpen,
-        notificationsOpen,
-        setNotificationsOpen,
-        storeSelectorOpen,
-        setStoreSelectorOpen,
-        userProfileOpen,
-        setUserProfileOpen,
-      }}
-    >
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );

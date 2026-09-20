@@ -75,17 +75,33 @@ async function logSettingsAudit(section: string, action: string, details: string
   }
 }
 
+let cachedSettingsPayload: any = null;
+let lastSettingsCacheTime = 0;
+const SETTINGS_CACHE_TTL = 60_000;
+
+function invalidateSettingsCache() {
+  cachedSettingsPayload = null;
+  lastSettingsCacheTime = 0;
+}
+
 /**
  * GET /api/settings - Retrieve all settings (branding + system) from MySQL
  */
 export async function GET(req: NextRequest) {
   try {
+    const forceFresh = req.nextUrl.searchParams.get('fresh') === 'true';
+    if (!forceFresh && cachedSettingsPayload && Date.now() - lastSettingsCacheTime < SETTINGS_CACHE_TTL) {
+      return NextResponse.json(cachedSettingsPayload, {
+        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
+      });
+    }
+
     const [branding, systemSettings] = await Promise.all([
       getOrCreateBranding(),
       getOrCreateSystemSettings(),
     ]);
 
-    return NextResponse.json({
+    const payload = {
       success: true,
       branding: {
         appName: branding.appName,
@@ -142,7 +158,14 @@ export async function GET(req: NextRequest) {
         alertRecipientEmails: systemSettings.alertRecipientEmails,
         updatedAt: systemSettings.updatedAt,
       },
-    }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+    };
+
+    cachedSettingsPayload = payload;
+    lastSettingsCacheTime = Date.now();
+
+    return NextResponse.json(payload, {
+      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
+    });
   } catch (error: any) {
     console.error('API /api/settings GET error:', error);
     return NextResponse.json({ error: 'Failed to retrieve system settings' }, { status: 500 });
@@ -171,6 +194,8 @@ export async function POST(req: NextRequest) {
     if (!section || !data) {
       return NextResponse.json({ error: 'Missing required fields: section and data' }, { status: 400 });
     }
+
+    invalidateSettingsCache();
 
     // ────────────────────────────────────────────
     // SECTION: branding
@@ -343,7 +368,7 @@ export async function POST(req: NextRequest) {
     if (section === 'security') {
       const updateData: any = {};
       if (data.sessionTimeoutMins !== undefined) {
-        const timeout = Math.max(5, Math.min(1440, Number(data.sessionTimeoutMins) || 30));
+        const timeout = Math.max(5, Math.min(43200, Number(data.sessionTimeoutMins) || 43200));
         updateData.sessionTimeoutMins = timeout;
       }
       if (data.maxLoginAttempts !== undefined) {

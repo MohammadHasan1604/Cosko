@@ -1,8 +1,10 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { InventoryItem } from '@/context/AppContext';
 import Modal from '@/components/ui/Modal';
 import StatusBadge from '@/components/ui/StatusBadge';
+import Icon from '@/components/ui/AppIcon';
+import StoreStockModal from './StoreStockModal';
 
 interface ProductDetailModalProps {
   item: InventoryItem | null;
@@ -10,45 +12,57 @@ interface ProductDetailModalProps {
 }
 
 export default function ProductDetailModal({ item, onClose }: ProductDetailModalProps) {
+  const [storeStockOpen, setStoreStockOpen] = useState(false);
   if (!item) return null;
 
   return (
-    <Modal
-      open={!!item}
-      onClose={onClose}
-      title="Product Master Record"
-      subtitle={`${item.sku} · ${item.barcode}`}
-      size="md"
-    >
-      <div className="space-y-5 py-2">
-        {/* Title Card */}
-        <div className="p-4 rounded-xl bg-muted/40 border border-border flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0 flex-1">
-            {item.primaryImage || (item.images && item.images[0]) || item.imageUrl ? (
-              <img
-                src={item.primaryImage || (item.images && item.images[0]) || item.imageUrl}
-                alt={item.name}
-                className="w-14 h-14 rounded-xl object-cover border border-border flex-shrink-0"
-              />
-            ) : null}
-            <div className="min-w-0 flex-1">
-              <span className="badge-info text-2xs mb-1">{item.brand || 'General'}</span>
-              <h3 className="text-base font-bold text-foreground truncate">{item.name}</h3>
-              <p className="text-xs text-muted-foreground">{item.category}{item.subcategory ? ` · ${item.subcategory}` : ''}</p>
-              {item.description && (
-                <p className="text-2xs text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
-              )}
+    <>
+      <Modal
+        open={!!item}
+        onClose={onClose}
+        title="Product Master Record"
+        subtitle={`${item.sku} · ${item.barcode}`}
+        size="md"
+      >
+        <div className="space-y-5 py-2">
+          {/* Title Card */}
+          <div className="p-4 rounded-xl bg-muted/40 border border-border flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0 flex-1">
+              {item.primaryImage || (item.images && item.images[0]) || item.imageUrl ? (
+                <img
+                  src={item.primaryImage || (item.images && item.images[0]) || item.imageUrl}
+                  alt={item.name}
+                  className="w-14 h-14 rounded-xl object-cover border border-border flex-shrink-0"
+                />
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <span className="badge-info text-2xs mb-1">{item.brand || 'General'}</span>
+                <h3 className="text-base font-bold text-foreground truncate">{item.name}</h3>
+                <p className="text-xs text-muted-foreground">{item.category}{item.subcategory ? ` · ${item.subcategory}` : ''}</p>
+                {item.description && (
+                  <p className="text-2xs text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
+                )}
+              </div>
             </div>
+            <StatusBadge variant={item.qtyOnHand === 0 ? 'out-of-stock' : item.qtyOnHand <= item.reorderPt ? 'low-stock' : 'active'} label={item.qtyOnHand === 0 ? 'Out of Stock' : item.qtyOnHand <= item.reorderPt ? 'Low Stock' : 'Active'} dot />
           </div>
-          <StatusBadge variant={item.qtyOnHand === 0 ? 'out-of-stock' : item.qtyOnHand <= item.reorderPt ? 'low-stock' : 'active'} label={item.qtyOnHand === 0 ? 'Out of Stock' : item.qtyOnHand <= item.reorderPt ? 'Low Stock' : 'Active'} dot />
-        </div>
 
-        {/* Specs Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div className="p-3 rounded-lg border border-border bg-card">
-            <p className="text-2xs text-muted-foreground uppercase font-semibold">Store Location</p>
-            <p className="text-sm font-bold text-primary mt-0.5">{item.store}</p>
-          </div>
+          {/* Specs Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="p-3 rounded-lg border border-border bg-card flex flex-col justify-between">
+              <div>
+                <p className="text-2xs text-muted-foreground uppercase font-semibold">Store Location</p>
+                <p className="text-sm font-bold text-primary mt-0.5">{item.store}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStoreStockOpen(true)}
+                className="mt-2 inline-flex items-center gap-1 text-3xs font-semibold text-primary hover:underline"
+              >
+                <Icon name="BuildingStorefrontIcon" size={11} />
+                View All Stores
+              </button>
+            </div>
 
           <div className="p-3 rounded-lg border border-border bg-card">
             <p className="text-2xs text-muted-foreground uppercase font-semibold">Qty On Hand</p>
@@ -74,7 +88,7 @@ export default function ProductDetailModal({ item, onClose }: ProductDetailModal
 
           <div className="p-3 rounded-lg border border-border bg-card">
             <p className="text-2xs text-muted-foreground uppercase font-semibold">MRP</p>
-            <p className="text-sm font-bold text-muted-foreground mt-0.5 font-tabular">₹{item.mrp.toLocaleString('en-IN')}</p>
+            <p className="text-sm font-bold text-muted-foreground mt-0.5 font-tabular">{item.mrp !== undefined && item.mrp !== null ? `₹${item.mrp.toLocaleString('en-IN')}` : '—'}</p>
           </div>
         </div>
 
@@ -103,7 +117,15 @@ export default function ProductDetailModal({ item, onClose }: ProductDetailModal
             Close Record
           </button>
         </div>
-      </div>
-    </Modal>
+        </div>
+      </Modal>
+
+      <StoreStockModal
+        open={storeStockOpen}
+        onClose={() => setStoreStockOpen(false)}
+        item={item}
+        selectedStoreFilter={item.store}
+      />
+    </>
   );
 }

@@ -4,27 +4,80 @@ import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
+import CustomerFormModal from '@/components/forms/CustomerFormModal';
 import { useApp, Customer, normalizeMobileNumber } from '@/context/AppContext';
+import PaymentMethodSelect from '@/components/ui/PaymentMethodSelect';
+import NumericInput from '@/components/ui/NumericInput';
+import PaymentProofUpload from '@/components/ui/PaymentProofUpload';
+import { toast } from 'sonner';
 
 export default function CustomersPage() {
-  const { customers, sales, repairsEnquiries, addCustomer, updateCustomer, deleteCustomer, currentUser } = useApp();
+  const { customers, sales, repairsEnquiries, deleteCustomer, updateCustomer, addAuditLog, currentUser } = useApp();
 
   const [registerModal, setRegisterModal] = useState(false);
   const [editCustomerModal, setEditCustomerModal] = useState<Customer | null>(null);
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<Customer | null>(null);
   const [crmViewCustomer, setCrmViewCustomer] = useState<Customer | null>(null);
 
+  // Settle Credit / Receive Customer Payment State
+  const [settleCreditCustomer, setSettleCreditCustomer] = useState<Customer | null>(null);
+  const [settleAmount, setSettleAmount] = useState<number | ''>('');
+  const [settleMethod, setSettleMethod] = useState<string>('UPI');
+  const [settleRef, setSettleRef] = useState<string>('');
+  const [settleProof, setSettleProof] = useState<string | null>(null);
+  const [settleNotes, setSettleNotes] = useState<string>('');
+  const [isSettling, setIsSettling] = useState(false);
+
+  const openSettleCredit = (cust: Customer) => {
+    setSettleCreditCustomer(cust);
+    setSettleAmount(cust.creditBalance || '');
+    setSettleMethod('UPI');
+    setSettleRef('');
+    setSettleProof(null);
+    setSettleNotes(`Settlement of credit receivable for ${cust.name}`);
+  };
+
+  const handleSettleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!settleCreditCustomer) return;
+    const payAmt = Number(settleAmount);
+    if (!payAmt || payAmt <= 0) {
+      toast.error('Please enter a valid payment amount');
+      return;
+    }
+    if (!settleRef.trim()) {
+      toast.error('Payment Reference / UTR number is required');
+      return;
+    }
+    setIsSettling(true);
+    try {
+      const currentBalance = Number(settleCreditCustomer.creditBalance) || 0;
+      const newBalance = Math.max(0, Math.round((currentBalance - payAmt) * 100) / 100);
+      const res = await updateCustomer(settleCreditCustomer.id, {
+        creditBalance: newBalance,
+      });
+      if (res?.success) {
+        addAuditLog(
+          'Accounting',
+          'Receive Customer Payment',
+          `Received ₹${payAmt.toLocaleString('en-IN')} via ${settleMethod} (Ref: ${settleRef}) from ${settleCreditCustomer.name}. Outstanding balance updated to ₹${newBalance.toLocaleString('en-IN')}`
+        );
+        toast.success(`Payment of ₹${payAmt.toLocaleString('en-IN')} recorded successfully!`);
+        if (crmViewCustomer?.id === settleCreditCustomer.id) {
+          setCrmViewCustomer((prev) => (prev ? { ...prev, creditBalance: newBalance } : null));
+        }
+        setSettleCreditCustomer(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to record customer payment');
+    } finally {
+      setIsSettling(false);
+    }
+  };
+
   // CRM Segment Filter & Deep Search State
   const [selectedSegment, setSelectedSegment] = useState<string>('All Customers');
   const [deepSearchQuery, setDeepSearchQuery] = useState('');
-
-  // Form State
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [city, setCity] = useState('Bengaluru');
-  const [tier, setTier] = useState<'VIP' | 'Regular' | 'New'>('Regular');
-  const [creditBalance, setCreditBalance] = useState(0);
 
   // Listen to URL query ?phone=
   useEffect(() => {
@@ -107,53 +160,8 @@ export default function CustomersPage() {
     });
   }, [customers, sales, repairsEnquiries, selectedSegment, deepSearchQuery]);
 
-  const handleCreateCustomer = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !phone) return;
-    addCustomer({
-      name,
-      phone,
-      email: email || `${name.toLowerCase().replace(/\s+/g, '')}@domain.com`,
-      city,
-      tier,
-      creditBalance,
-    });
-    setRegisterModal(false);
-    resetForm();
-  };
-
-  const handleUpdateCustomerSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editCustomerModal) return;
-    updateCustomer(editCustomerModal.id, {
-      name,
-      phone,
-      email,
-      city,
-      tier,
-      creditBalance,
-    });
-    setEditCustomerModal(null);
-    resetForm();
-  };
-
   const openEdit = (c: Customer) => {
     setEditCustomerModal(c);
-    setName(c.name);
-    setPhone(c.phone);
-    setEmail(c.email);
-    setCity(c.city);
-    setTier(c.tier);
-    setCreditBalance(c.creditBalance);
-  };
-
-  const resetForm = () => {
-    setName('');
-    setPhone('');
-    setEmail('');
-    setCity('Bengaluru');
-    setTier('Regular');
-    setCreditBalance(0);
   };
 
   // Build unified chronological timeline for Customer 360
@@ -219,7 +227,7 @@ export default function CustomersPage() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { resetForm(); setRegisterModal(true); }}
+              onClick={() => setRegisterModal(true)}
               className="btn-primary gap-2 text-xs sm:text-sm font-semibold shadow-xs"
             >
               <Icon name="UserPlusIcon" size={16} />
@@ -330,8 +338,21 @@ export default function CustomersPage() {
                         <td className="px-4 py-3 text-right font-tabular font-extrabold text-foreground">
                           ₹{cust.totalSpend.toLocaleString('en-IN')}
                         </td>
-                        <td className="px-4 py-3 text-right font-tabular font-bold text-amber-600 dark:text-amber-400">
-                          ₹{cust.creditBalance.toLocaleString('en-IN')}
+                        <td className="px-4 py-3 text-right font-tabular">
+                          <span className={`font-bold ${cust.creditBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
+                            ₹{cust.creditBalance.toLocaleString('en-IN')}
+                          </span>
+                          {cust.creditBalance > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => openSettleCredit(cust)}
+                              className="ml-2 text-3xs font-bold text-primary hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                              title="Receive Payment / Settle Credit"
+                            >
+                              <Icon name="BanknotesIcon" size={12} />
+                              <span>Settle</span>
+                            </button>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-3xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
@@ -426,10 +447,24 @@ export default function CustomersPage() {
                   <p className="text-lg font-extrabold text-foreground font-tabular mt-0.5">₹{crmViewCustomer.totalSpend.toLocaleString('en-IN')}</p>
                   <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">Verified Retail Sales</p>
                 </div>
-                <div className="p-3.5 rounded-xl bg-card border border-border">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Credit Ledger</p>
-                  <p className="text-lg font-extrabold text-warning font-tabular mt-0.5">₹{crmViewCustomer.creditBalance.toLocaleString('en-IN')}</p>
-                  <p className="text-[11px] text-muted-foreground">Account Balance</p>
+                <div className="p-3.5 rounded-xl bg-card border border-border flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Credit Ledger</p>
+                      {crmViewCustomer.creditBalance > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => openSettleCredit(crmViewCustomer)}
+                          className="text-3xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Icon name="BanknotesIcon" size={12} />
+                          <span>Receive Payment</span>
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-lg font-extrabold text-warning font-tabular mt-0.5">₹{crmViewCustomer.creditBalance.toLocaleString('en-IN')}</p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">Outstanding Receivable</p>
                 </div>
                 <div className="p-3.5 rounded-xl bg-card border border-border">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Retail Invoices</p>
@@ -544,97 +579,15 @@ export default function CustomersPage() {
           </Modal>
         )}
 
-        {/* Create / Edit Modal */}
-        {(registerModal || editCustomerModal) && (
-          <Modal
-            open={registerModal || !!editCustomerModal}
-            onClose={() => { setRegisterModal(false); setEditCustomerModal(null); }}
-            title={editCustomerModal ? 'Edit Customer Profile' : 'Register New Customer'}
-            size="sm"
-          >
-            <form onSubmit={editCustomerModal ? handleUpdateCustomerSubmit : handleCreateCustomer} className="space-y-4 py-2">
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Customer Full Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Ahmed Khan"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Mobile Number *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. +91 98765 43210"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Email Address</label>
-                <input
-                  type="email"
-                  placeholder="e.g. ahmed@domain.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">City Hub</label>
-                  <select
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="Bengaluru">Bengaluru</option>
-                    <option value="Hyderabad">Hyderabad</option>
-                    <option value="Mumbai">Mumbai</option>
-                    <option value="Delhi">Delhi</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">Tier</label>
-                  <select
-                    value={tier}
-                    onChange={(e: any) => setTier(e.target.value)}
-                    className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="Regular">Regular</option>
-                    <option value="VIP">VIP</option>
-                    <option value="New">New</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-border">
-                <button
-                  type="button"
-                  onClick={() => { setRegisterModal(false); setEditCustomerModal(null); }}
-                  className="px-4 py-2 rounded-xl border border-border text-foreground hover:bg-secondary text-xs font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90"
-                >
-                  {editCustomerModal ? 'Update Profile' : 'Save Customer'}
-                </button>
-              </div>
-            </form>
-          </Modal>
-        )}
+        {/* Single-Source-of-Truth Customer Form Modal */}
+        <CustomerFormModal
+          open={registerModal || !!editCustomerModal}
+          onClose={() => {
+            setRegisterModal(false);
+            setEditCustomerModal(null);
+          }}
+          customer={editCustomerModal}
+        />
 
         {/* Safe Delete / Archive Confirmation Dialog */}
         {deleteConfirmModal && (
@@ -707,6 +660,130 @@ export default function CustomersPage() {
                 );
               })()}
             </div>
+          </Modal>
+        )}
+        {/* Receive Customer Payment / Settle Balance Modal */}
+        {settleCreditCustomer && (
+          <Modal
+            open={Boolean(settleCreditCustomer)}
+            onClose={() => {
+              if (!isSettling) setSettleCreditCustomer(null);
+            }}
+            title={`Receive Customer Payment — ${settleCreditCustomer.name}`}
+            subtitle={`Mobile: ${settleCreditCustomer.phone} · Current Receivable: ₹${(settleCreditCustomer.creditBalance || 0).toLocaleString('en-IN')}`}
+            size="md"
+            zIndex={1150}
+          >
+            <form onSubmit={handleSettleSubmit} className="space-y-4 py-2">
+              <div className="p-3 rounded-xl bg-muted/30 border border-border/80 flex items-center justify-between">
+                <div>
+                  <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block">
+                    Outstanding Credit Balance
+                  </span>
+                  <span className="text-base font-extrabold text-warning font-tabular">
+                    ₹{(settleCreditCustomer.creditBalance || 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSettleAmount(settleCreditCustomer.creditBalance || 0)}
+                  className="btn-secondary text-3xs font-bold px-2.5 py-1"
+                >
+                  Pay Full Balance
+                </button>
+              </div>
+
+              {/* Amount & Method */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-foreground block mb-1">
+                    Amount Received (₹) <span className="text-danger">*</span>
+                  </label>
+                  <NumericInput
+                    value={settleAmount}
+                    onChange={(val) => setSettleAmount(val)}
+                    placeholder="e.g. 2500"
+                    min={1}
+                    max={Number(settleCreditCustomer.creditBalance) || 9999999}
+                    className="input-field text-xs font-tabular font-bold"
+                  />
+                </div>
+
+                <div>
+                  <PaymentMethodSelect
+                    label="Payment Method"
+                    required
+                    value={settleMethod}
+                    onChange={setSettleMethod}
+                    modalZIndex={1250}
+                  />
+                </div>
+              </div>
+
+              {/* Reference / UTR */}
+              <div>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  Payment Reference / UTR / Voucher No <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder={settleMethod === 'Cash' ? 'e.g. CASH-RCPT-001' : 'e.g. UTR-987654321 or UPI Ref ID'}
+                  value={settleRef}
+                  onChange={(e) => setSettleRef(e.target.value)}
+                  className="input-field text-xs font-mono"
+                />
+              </div>
+
+              {/* Payment Proof Upload */}
+              <PaymentProofUpload
+                value={settleProof}
+                onChange={setSettleProof}
+                required={false}
+                label="Payment Proof Receipt / Slip (Optional)"
+              />
+
+              {/* Notes */}
+              <div>
+                <label className="text-xs font-bold text-foreground block mb-1">Payment Remarks</label>
+                <input
+                  type="text"
+                  value={settleNotes}
+                  onChange={(e) => setSettleNotes(e.target.value)}
+                  placeholder="e.g. Counter cash settlement / UPI transfer"
+                  className="input-field text-xs"
+                />
+              </div>
+
+              {/* Submit / Cancel Buttons */}
+              <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                <button
+                  type="button"
+                  disabled={isSettling}
+                  onClick={() => setSettleCreditCustomer(null)}
+                  className="btn-secondary text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSettling || !settleAmount || !settleRef.trim()}
+                  className="btn-primary text-xs font-bold gap-1.5 px-5"
+                >
+                  {isSettling ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Recording Payment...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="CheckCircleIcon" size={14} />
+                      <span>Confirm & Record Payment</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </Modal>
         )}
       </div>

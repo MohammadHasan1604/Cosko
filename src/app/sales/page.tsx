@@ -1,13 +1,19 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useDeferredValue } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
 import CoskoLogo from '@/components/ui/CoskoLogo';
 import BarcodeScannerModal from '@/components/ui/BarcodeScannerModal';
+import VisualSearchModal from '@/components/ui/VisualSearchModal';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import { useApp, Customer, InventoryItem, SalePhoto, RepairEnquiry, normalizeMobileNumber } from '@/context/AppContext';
+import CustomerFormModal from '@/components/forms/CustomerFormModal';
+import PaymentMethodSelect from '@/components/ui/PaymentMethodSelect';
+import NumericInput from '@/components/ui/NumericInput';
+import PaymentProofUpload from '@/components/ui/PaymentProofUpload';
+import ProofViewerModal, { PaymentProofData } from '@/components/ui/ProofViewerModal';
 import { toast } from 'sonner';
 
 interface CartItem {
@@ -15,7 +21,7 @@ interface CartItem {
   name: string;
   sku: string;
   referenceSellingPrice: number;
-  actualSellingPrice: number;
+  actualSellingPrice: number | '';
   unitCost: number;
   qty: number;
   maxQty: number;
@@ -31,22 +37,26 @@ export default function SalesPage() {
     repairsEnquiries,
     categoriesList,
     addSale,
+    updateSale,
     voidSale,
     addCustomer,
     selectedStore,
     branding,
     systemSettings,
     currentUser,
+    paymentMethods,
     addAuditLog,
+    confirmAction,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'pos' | 'history'>('pos');
-  const [voidModalOrder, setVoidModalOrder] = useState<any | null>(null);
-  const [isVoiding, setIsVoiding] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
+  const deferredCatalogSearch = useDeferredValue(catalogSearch);
+  const [displayLimit, setDisplayLimit] = useState(48);
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [imageSearchOpen, setImageSearchOpen] = useState(false);
 
   // Cashier & Store Resolution
   const activeEmployeeName = currentUser.name || 'Sales Executive';
@@ -82,13 +92,8 @@ export default function SalesPage() {
   const [lookupDone, setLookupDone] = useState(false);
   const [customerNotFound, setCustomerNotFound] = useState(false);
 
-  // Quick Customer Inline Modal
+  // Customer Modal
   const [quickRegModal, setQuickRegModal] = useState(false);
-  const [newCustName, setNewCustName] = useState('');
-  const [newCustPhone, setNewCustPhone] = useState('');
-  const [newCustEmail, setNewCustEmail] = useState('');
-  const [newCustAddress, setNewCustAddress] = useState('');
-  const [newCustGstin, setNewCustGstin] = useState('');
 
   // GST Invoice Options
   const [gstInvoiceEnabled, setGstInvoiceEnabled] = useState(false);
@@ -97,15 +102,24 @@ export default function SalesPage() {
   const [customerBillingAddress, setCustomerBillingAddress] = useState('');
 
   // Checkout State
-  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Cash' | 'Card' | 'Credit'>('UPI');
+  const [paymentMethod, setPaymentMethod] = useState<string>('UPI');
+  const [refundModalSale, setRefundModalSale] = useState<any | null>(null);
+  const [refundMethod, setRefundMethod] = useState<string>('Cash');
+  const [isRefunding, setIsRefunding] = useState(false);
   const [cartDiscount, setCartDiscount] = useState<number>(0);
   const [heldCart, setHeldCart] = useState<CartItem[] | null>(null);
   const [receiptModal, setReceiptModal] = useState<any | null>(null);
   const [salePhotos, setSalePhotos] = useState<SalePhoto[]>([]);
+  const [posReferenceNo, setPosReferenceNo] = useState('');
+  const [posPaymentProofUrl, setPosPaymentProofUrl] = useState<string | null>(null);
+  const [selectedProof, setSelectedProof] = useState<PaymentProofData | null>(null);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const checkoutLockRef = useRef(false);
 
   // History Search & Filter State
   const [historySearch, setHistorySearch] = useState('');
   const [historyStoreFilter, setHistoryStoreFilter] = useState('All');
+
   const [historyDateFilter, setHistoryDateFilter] = useState('');
 
   // Normalize mobile number helper: strips +91, 0, spaces, dashes
@@ -254,59 +268,7 @@ export default function SalesPage() {
   };
 
   const openQuickRegisterModal = () => {
-    setNewCustPhone(customerPhoneDigits ? `+91 ${customerPhoneDigits}` : '+91 ');
-    setNewCustName('');
-    setNewCustEmail('');
-    setNewCustAddress('');
-    setNewCustGstin('');
     setQuickRegModal(true);
-  };
-
-  const handleQuickRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCustName.trim()) {
-      toast.error('Customer Name is required');
-      return;
-    }
-    const cleanDigits = clean10DigitPhone(newCustPhone);
-    if (cleanDigits.length < 10) {
-      toast.error('Please enter a valid 10-digit mobile number');
-      return;
-    }
-
-    const formattedPhone = `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}`;
-
-    const created = await addCustomer({
-      name: newCustName.trim(),
-      phone: formattedPhone,
-      email: newCustEmail.trim() || '',
-      city: 'Bengaluru',
-      address: newCustAddress.trim() || '',
-      tier: 'Regular',
-      creditBalance: 0,
-    });
-
-    if (created) {
-      setSelectedCustomerId(created.id);
-      setCustomerName(created.name);
-      setCustomerPhone(created.phone);
-      setCustomerPhoneDigits(cleanDigits);
-      setCustomerNotFound(false);
-      setLookupDone(true);
-
-      if (newCustGstin.trim()) {
-        setGstInvoiceEnabled(true);
-        setCustomerGstin(newCustGstin.trim().toUpperCase());
-      }
-      if (newCustAddress.trim()) {
-        setCustomerBillingAddress(newCustAddress.trim());
-      }
-
-      setCustomerHistory({ purchases: [], repairs: [] });
-      toast.success(`Customer "${created.name}" registered and selected!`);
-    }
-
-    setQuickRegModal(false);
   };
 
   // Inventory Filtering
@@ -315,19 +277,29 @@ export default function SalesPage() {
     return ['All Categories', ...Array.from(new Set(active))];
   }, [categoriesList]);
 
+  // Reset display limit on search or category change
+  useEffect(() => {
+    setDisplayLimit(48);
+  }, [deferredCatalogSearch, selectedCategory]);
+
   const filteredInventory = useMemo(() => {
+    const searchLower = deferredCatalogSearch.trim().toLowerCase();
     return inventory.filter((item) => {
       const matchStore = item.store === effectiveStore;
       const matchSearch =
-        catalogSearch === '' ||
-        item.name.toLowerCase().includes(catalogSearch.toLowerCase()) ||
-        item.sku.toLowerCase().includes(catalogSearch.toLowerCase()) ||
-        (item.barcode && item.barcode.includes(catalogSearch)) ||
-        (item.brand && item.brand.toLowerCase().includes(catalogSearch.toLowerCase()));
+        searchLower === '' ||
+        item.name.toLowerCase().includes(searchLower) ||
+        item.sku.toLowerCase().includes(searchLower) ||
+        (item.barcode && item.barcode.includes(searchLower)) ||
+        (item.brand && item.brand.toLowerCase().includes(searchLower));
       const matchCategory = selectedCategory === 'All Categories' || item.category === selectedCategory;
       return matchStore && matchSearch && matchCategory;
     });
-  }, [inventory, effectiveStore, catalogSearch, selectedCategory]);
+  }, [inventory, effectiveStore, deferredCatalogSearch, selectedCategory]);
+
+  const displayedInventory = useMemo(() => {
+    return filteredInventory.slice(0, displayLimit);
+  }, [filteredInventory, displayLimit]);
 
   // Cart Management with Reference vs Actual Selling Price
   const addToCart = (item: InventoryItem) => {
@@ -384,7 +356,7 @@ export default function SalesPage() {
     );
   };
 
-  const updateActualSellingPrice = (itemId: string, newPrice: number) => {
+  const updateActualSellingPrice = (itemId: string, newPrice: number | '') => {
     if (!canOverridePrice) {
       toast.error('Permission Denied: Your role is not authorized to override selling prices.');
       return;
@@ -393,7 +365,7 @@ export default function SalesPage() {
     setCart((prev) =>
       prev.map((c) => {
         if (c.itemId === itemId) {
-          if (newPrice < c.unitCost) {
+          if (newPrice !== '' && Number(newPrice) < c.unitCost) {
             toast.warning(`Warning: Price ₹${newPrice} is below purchase cost ₹${c.unitCost}!`);
           }
           addAuditLog(
@@ -410,7 +382,7 @@ export default function SalesPage() {
 
   // Cart Calculations
   const cartSubtotal = useMemo(() => {
-    return cart.reduce((acc, c) => acc + c.actualSellingPrice * c.qty, 0);
+    return cart.reduce((acc, c) => acc + (Number(c.actualSellingPrice) || 0) * c.qty, 0);
   }, [cart]);
 
   // GST Calculation: When GST is ON: 18% (CGST 9% + SGST 9%)
@@ -429,6 +401,9 @@ export default function SalesPage() {
 
   // Checkout Execution
   const handleCheckout = async () => {
+    if (checkoutLockRef.current || isCheckingOut) {
+      return;
+    }
     if (cart.length === 0) {
       toast.error('Billing cart is empty! Add products before checking out.');
       return;
@@ -443,61 +418,115 @@ export default function SalesPage() {
       }
     }
 
-    const saleOrder = await addSale({
-      customerName: customerName.trim() || 'Walk-in Customer',
-      customerPhone: customerPhone || '+91 99000 00000',
-      store: effectiveStore,
-      items: cart.map((c) => ({
-        itemId: c.itemId,
-        name: c.name,
-        qty: c.qty,
-        unitPrice: c.actualSellingPrice,
-        taxRate: gstInvoiceEnabled ? gstRate : 0,
-        warrantyMonths: c.warrantyMonths,
-      })),
-      subtotal: cartSubtotal,
-      taxTotal: cartTax,
-      discount: cartDiscount,
-      total: cartTotal,
-      taxEnabled: gstInvoiceEnabled,
-      paymentMethod,
-      status: 'Completed',
-      salePhotos,
-    });
-
-    if (!saleOrder) {
+    // Strictly validate payment reference and mandatory payment proof
+    if (!posReferenceNo.trim()) {
+      toast.error('Payment Reference / UTR / Voucher No is strictly required.');
+      return;
+    }
+    if (!posPaymentProofUrl) {
+      toast.error('Payment Proof (Receipt / Screenshot / Voucher) is strictly required to complete checkout.');
       return;
     }
 
-    // Attach GST snapshot info for receipt modal
-    const receiptSnapshot = {
-      ...saleOrder,
-      gstInvoiceEnabled,
-      customerGstin: customerGstin.trim() || undefined,
-      customerBusinessName: customerBusinessName.trim() || undefined,
-      customerBillingAddress: customerBillingAddress.trim() || undefined,
-      cgstAmount,
-      sgstAmount,
-      coskoGstin: branding.taxNumber || '29AABCC1234F1Z5',
-    };
+    const totalUnits = cart.reduce((sum, c) => sum + c.qty, 0);
 
-    setReceiptModal(receiptSnapshot);
+    const confirmed = await confirmAction({
+      actionType: 'checkout',
+      title: 'Confirm POS Sale Order',
+      subtitle: 'Please review customer, cart items, and payment details before finalizing.',
+      confirmLabel: 'Confirm & Place Order',
+      summaryItems: [
+        { label: 'Customer', value: customerName.trim() || 'Walk-in Customer' },
+        { label: 'Store Location', value: effectiveStore },
+        { label: 'Items in Cart', value: `${totalUnits} units (${cart.length} SKUs)` },
+        { label: 'Taxable Subtotal', value: `₹${cartSubtotal.toLocaleString('en-IN')}` },
+        ...(gstInvoiceEnabled ? [{ label: 'GST (18%)', value: `₹${cartTax.toLocaleString('en-IN')}` }] : []),
+        ...(cartDiscount > 0 ? [{ label: 'Discount Applied', value: `-₹${cartDiscount.toLocaleString('en-IN')}` }] : []),
+        { label: 'Payment Method', value: paymentMethod },
+        { label: 'Payment Ref / UTR', value: posReferenceNo.trim() },
+        { label: 'Total Payable Amount', value: `₹${cartTotal.toLocaleString('en-IN')}`, highlighted: true },
+      ],
+      warningMessage: 'Once confirmed, physical inventory will be deducted immediately and an official sales invoice will be generated.',
+    });
 
-    // Completely clear transactional POS form (Requirement 18 & 19)
-    setCart([]);
-    setSalePhotos([]);
-    setCartDiscount(0);
-    setCustomerPhoneDigits('');
-    setSelectedCustomerId('walkin');
-    setCustomerName('Walk-in Customer');
-    setCustomerPhone('');
-    setCustomerHistory({ purchases: [], repairs: [] });
-    setLookupDone(false);
-    setCustomerNotFound(false);
-    setGstInvoiceEnabled(false);
-    setCustomerGstin('');
-    setCustomerBusinessName('');
-    setCustomerBillingAddress('');
+    if (!confirmed) {
+      return;
+    }
+
+    checkoutLockRef.current = true;
+    setIsCheckingOut(true);
+
+    try {
+      // Client-side idempotency session key to prevent duplicate orders
+      const clientSessionKey = `pos_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+      const saleOrder = await addSale({
+        customerId: selectedCustomerId !== 'walkin' ? selectedCustomerId : undefined,
+        customerName: customerName.trim() || 'Walk-in Customer',
+        customerPhone: customerPhone || '+91 99000 00000',
+        store: effectiveStore,
+        items: cart.map((c) => ({
+          itemId: c.itemId,
+          name: c.name,
+          qty: c.qty,
+          unitPrice: c.actualSellingPrice !== '' ? Number(c.actualSellingPrice) : c.referenceSellingPrice,
+          taxRate: gstInvoiceEnabled ? gstRate : 0,
+          warrantyMonths: c.warrantyMonths,
+        })),
+        subtotal: cartSubtotal,
+        taxTotal: cartTax,
+        discount: cartDiscount,
+        total: cartTotal,
+        taxEnabled: gstInvoiceEnabled,
+        paymentMethod,
+        referenceNo: posReferenceNo.trim(),
+        paymentProofUrl: posPaymentProofUrl,
+        status: 'Completed',
+        salePhotos,
+        idempotencyKey: clientSessionKey,
+      });
+
+      if (!saleOrder) {
+        return;
+      }
+
+      // Attach GST snapshot info for receipt modal
+      const receiptSnapshot = {
+        ...saleOrder,
+        referenceNo: posReferenceNo.trim(),
+        paymentProofUrl: posPaymentProofUrl,
+        gstInvoiceEnabled,
+        customerGstin: customerGstin.trim() || undefined,
+        customerBusinessName: customerBusinessName.trim() || undefined,
+        customerBillingAddress: customerBillingAddress.trim() || undefined,
+        cgstAmount,
+        sgstAmount,
+        coskoGstin: branding.taxNumber || '29AABCC1234F1Z5',
+      };
+
+      setReceiptModal(receiptSnapshot);
+
+      // Completely clear transactional POS form (Requirement 18 & 19)
+      setCart([]);
+      setSalePhotos([]);
+      setCartDiscount(0);
+      setCustomerPhoneDigits('');
+      setSelectedCustomerId('walkin');
+      setCustomerName('Walk-in Customer');
+      setCustomerPhone('');
+      setCustomerHistory({ purchases: [], repairs: [] });
+      setLookupDone(false);
+      setCustomerNotFound(false);
+      setGstInvoiceEnabled(false);
+      setCustomerGstin('');
+      setCustomerBusinessName('');
+      setCustomerBillingAddress('');
+      setPosReferenceNo('');
+      setPosPaymentProofUrl(null);
+    } finally {
+      checkoutLockRef.current = false;
+      setIsCheckingOut(false);
+    }
   };
 
   // WhatsApp Digital Invoice Sender
@@ -526,11 +555,14 @@ export default function SalesPage() {
         s.orderNo.toLowerCase().includes(historySearch.toLowerCase()) ||
         s.customerName.toLowerCase().includes(historySearch.toLowerCase()) ||
         s.customerPhone.includes(historySearch);
-      const matchStore = historyStoreFilter === 'All' || s.store === historyStoreFilter;
+      const assignedStore = currentUser.store || 'BLR';
+      const matchStore = currentUser.role === 'Super Admin'
+        ? (historyStoreFilter === 'All' || s.store === historyStoreFilter)
+        : (s.store === assignedStore);
       const matchDate = !historyDateFilter || s.createdAt.includes(historyDateFilter);
       return matchSearch && matchStore && matchDate;
     });
-  }, [sales, historySearch, historyStoreFilter, historyDateFilter]);
+  }, [sales, historySearch, historyStoreFilter, historyDateFilter, currentUser.role, currentUser.store]);
 
   return (
     <AppLayout activeRoute="/sales">
@@ -585,9 +617,20 @@ export default function SalesPage() {
                       className="input-field pl-9 text-xs font-medium"
                     />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setImageSearchOpen(true)}
+                    className="btn-secondary h-[38px] text-xs px-3.5 gap-1.5 whitespace-nowrap shadow-xs hover:border-primary/50 text-foreground"
+                    title="Search by Image / Camera"
+                  >
+                    <Icon name="CameraIcon" size={15} className="text-primary" />
+                    <span className="hidden sm:inline">Search by Image</span>
+                    <span className="sm:hidden">Image</span>
+                  </button>
                   <button onClick={() => setScannerOpen(true)} className="btn-secondary h-[38px] text-xs px-3.5 gap-1.5 whitespace-nowrap shadow-xs" title="Barcode Scanner">
                     <Icon name="QrCodeIcon" size={15} />
-                    Scan Barcode
+                    <span className="hidden sm:inline">Scan Barcode</span>
+                    <span className="sm:hidden">Barcode</span>
                   </button>
                 </div>
 
@@ -611,7 +654,7 @@ export default function SalesPage() {
 
               {/* Product Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[580px] overflow-y-auto pr-1">
-                {filteredInventory.map((item) => (
+                {displayedInventory.map((item) => (
                   <div
                     key={`inv-grid-${item.id}`}
                     onClick={() => addToCart(item)}
@@ -620,7 +663,13 @@ export default function SalesPage() {
                     <div>
                       <div className="aspect-video w-full rounded-xl bg-muted/40 mb-2 overflow-hidden flex items-center justify-center relative border border-border/40">
                         {item.imageUrl ? (
-                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
                         ) : (
                           <Icon name="PhotoIcon" size={24} className="text-muted-foreground/40" />
                         )}
@@ -645,6 +694,17 @@ export default function SalesPage() {
                     </div>
                   </div>
                 ))}
+                {filteredInventory.length > displayLimit && (
+                  <div className="col-span-full py-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setDisplayLimit((prev) => prev + 48)}
+                      className="px-4 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold transition-colors"
+                    >
+                      Load More Products ({filteredInventory.length - displayLimit} remaining)
+                    </button>
+                  </div>
+                )}
                 {filteredInventory.length === 0 && (
                   <div className="col-span-full py-16 text-center text-muted-foreground text-xs">
                     No products found matching filters in {effectiveStore}.
@@ -800,8 +860,8 @@ export default function SalesPage() {
                       checked={gstInvoiceEnabled}
                       onChange={setGstInvoiceEnabled}
                       size="sm"
-                      onText="GST ON"
-                      offText="GST OFF"
+                      onText="ON"
+                      offText="OFF"
                     />
                   </div>
                 </div>
@@ -860,7 +920,7 @@ export default function SalesPage() {
                 ) : (
                   <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
                     {cart.map((c) => {
-                      const isBelowCost = c.actualSellingPrice < c.unitCost;
+                      const isBelowCost = c.actualSellingPrice !== '' && Number(c.actualSellingPrice) < c.unitCost;
                       return (
                         <div key={`cart-item-${c.itemId}`} className="p-3 rounded-xl bg-muted/40 border border-border space-y-2">
                           <div className="flex items-start justify-between gap-2">
@@ -897,19 +957,18 @@ export default function SalesPage() {
                               <div className="text-right">
                                 <label className="text-3xs text-muted-foreground block">Actual Sale Price (₹)</label>
                                 {canOverridePrice ? (
-                                  <input
-                                    type="number"
-                                    min="1"
+                                  <NumericInput
                                     value={c.actualSellingPrice}
-                                    onChange={(e) => updateActualSellingPrice(c.itemId, Number(e.target.value))}
+                                    onChange={(val) => updateActualSellingPrice(c.itemId, val)}
                                     className="input-field text-2xs py-0.5 px-1.5 w-20 text-right font-bold font-tabular"
+                                    placeholder="Price"
                                   />
                                 ) : (
                                   <span className="font-bold text-foreground font-tabular">₹{c.actualSellingPrice}</span>
                                 )}
                               </div>
                               <span className="text-xs font-extrabold text-foreground font-tabular min-w-[55px] text-right">
-                                ₹{(c.actualSellingPrice * c.qty).toLocaleString('en-IN')}
+                                ₹{((Number(c.actualSellingPrice) || 0) * c.qty).toLocaleString('en-IN')}
                               </span>
                             </div>
                           </div>
@@ -962,26 +1021,45 @@ export default function SalesPage() {
                   </div>
                 </div>
 
-                {/* Payment Method Selector */}
-                <div>
-                  <label className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
-                    Payment Method
-                  </label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {(['UPI', 'Cash', 'Card', 'Credit'] as const).map((m) => (
-                      <button
-                        key={`pm-btn-${m}`}
-                        onClick={() => setPaymentMethod(m)}
-                        className={`h-9 rounded-xl text-xs font-bold border transition-all duration-150 flex items-center justify-center ${
-                          paymentMethod === m
-                            ? 'bg-primary text-primary-foreground border-primary shadow-xs'
-                            : 'bg-muted/40 text-muted-foreground border-border/80 hover:border-border hover:text-foreground'
-                        }`}
-                      >
-                        {m}
-                      </button>
-                    ))}
+                {/* Payment Method Selector (Single Source of Truth) */}
+                <PaymentMethodSelect
+                  layout="pills"
+                  label="Payment Method"
+                  value={paymentMethod}
+                  onChange={setPaymentMethod}
+                  modalZIndex={1200}
+                />
+
+                {/* Payment Reference & Mandatory Proof Upload */}
+                <div className="pt-2 border-t border-border space-y-2">
+                  <div>
+                    <label className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                      Payment Reference / UTR / Voucher No <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder={paymentMethod === 'Cash' ? 'e.g. CASH-RCPT-001' : 'e.g. UTR-998210 or UPI Ref ID'}
+                      value={posReferenceNo}
+                      onChange={(e) => setPosReferenceNo(e.target.value)}
+                      className="input-field text-xs py-1.5 font-mono"
+                    />
                   </div>
+
+                  <PaymentProofUpload
+                    value={posPaymentProofUrl}
+                    onChange={setPosPaymentProofUrl}
+                    required={true}
+                    label="Payment Proof * (Receipt / Screenshot / Slip)"
+                    helperText="Upload UPI screenshot, card slip, or cash voucher (JPG, PNG, WebP, PDF) — Required"
+                  />
+
+                  {(!posPaymentProofUrl || !posReferenceNo.trim()) && cart.length > 0 && (
+                    <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-3xs font-semibold">
+                      <Icon name="ExclamationTriangleIcon" size={14} className="shrink-0 text-amber-600" />
+                      <span>Payment Reference and Payment Proof file are strictly mandatory to enable checkout.</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -1005,11 +1083,20 @@ export default function SalesPage() {
                   </button>
                   <button
                     onClick={handleCheckout}
-                    disabled={cart.length === 0}
-                    className="btn-primary h-10 text-xs font-bold shadow-xs flex items-center justify-center gap-1.5"
+                    disabled={cart.length === 0 || isCheckingOut || !posPaymentProofUrl || !posReferenceNo.trim()}
+                    className="btn-primary h-10 text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Icon name="CheckIcon" size={15} />
-                    Complete Checkout
+                    {isCheckingOut ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                        Processing Checkout...
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="CheckIcon" size={15} />
+                        Complete Checkout
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -1036,18 +1123,20 @@ export default function SalesPage() {
                     className="input-field pl-8 text-xs py-1.5 w-48"
                   />
                 </div>
-                <select
-                  value={historyStoreFilter}
-                  onChange={(e) => setHistoryStoreFilter(e.target.value)}
-                  className="select-field text-xs py-1.5 w-36"
-                >
-                  <option value="All">All Stores</option>
-                  <option value="CENTRAL">CENTRAL</option>
-                  <option value="BLR">BLR</option>
-                  <option value="HYD">HYD</option>
-                  <option value="DEL">DEL</option>
-                  <option value="MUM">MUM</option>
-                </select>
+                {currentUser.role === 'Super Admin' && (
+                  <select
+                    value={historyStoreFilter}
+                    onChange={(e) => setHistoryStoreFilter(e.target.value)}
+                    className="select-field text-xs py-1.5 w-36"
+                  >
+                    <option value="All">All Stores</option>
+                    <option value="CENTRAL">CENTRAL</option>
+                    <option value="BLR">BLR</option>
+                    <option value="HYD">HYD</option>
+                    <option value="DEL">DEL</option>
+                    <option value="MUM">MUM</option>
+                  </select>
+                )}
               </div>
             </div>
 
@@ -1064,6 +1153,7 @@ export default function SalesPage() {
                     <th className="px-4 py-3 text-right font-tabular">GST</th>
                     <th className="px-4 py-3 text-right font-tabular">Total</th>
                     <th className="px-4 py-3">Payment</th>
+                    <th className="px-4 py-3 text-center">Payment Proof</th>
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1087,6 +1177,35 @@ export default function SalesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="badge-neutral text-3xs">{s.paymentMethod}</span>
+                        {s.referenceNo && (
+                          <span className="block text-3xs font-mono text-muted-foreground mt-0.5 truncate max-w-[110px]" title={s.referenceNo}>
+                            {s.referenceNo}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {s.paymentProofUrl ? (
+                          <button
+                            onClick={() => setSelectedProof({
+                              url: s.paymentProofUrl!,
+                              referenceNo: s.referenceNo || s.orderNo,
+                              amount: s.total,
+                              paymentMethod: s.paymentMethod,
+                              paymentDate: s.createdAt,
+                              payeeOrPayer: s.customerName,
+                              recordedBy: s.cashierName || 'POS Terminal',
+                              timestamp: s.createdAt,
+                              notes: `Sales Order ${s.orderNo} (${s.store})`,
+                            })}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-3xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors shadow-2xs"
+                            title="View Payment Proof"
+                          >
+                            <Icon name="DocumentCheckIcon" size={13} />
+                            View Proof
+                          </button>
+                        ) : (
+                          <span className="text-3xs text-muted-foreground italic">No Proof</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
@@ -1101,17 +1220,21 @@ export default function SalesPage() {
                             onClick={() => handleSendWhatsAppInvoice(s)}
                             className="p-1 rounded-md bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-colors"
                             title="Send WhatsApp Invoice"
+                            aria-label="Send WhatsApp Invoice"
                           >
-                            <Icon name="ChatBubbleOvalLeftEllipsisIcon" size={14} />
+                            <Icon name="WhatsApp" size={14} />
                           </button>
                           {s.status === 'Cancelled' || s.status === 'Refunded' ? (
                             <span className="px-1.5 py-0.5 rounded text-3xs font-bold bg-danger/10 text-danger border border-danger/20">Voided</span>
                           ) : (
                             (currentUser.role === 'Super Admin' || currentUser.role === 'Store Manager') && (
                               <button
-                                onClick={() => setVoidModalOrder(s)}
-                                className="p-1 rounded-md bg-danger/10 text-danger hover:bg-danger hover:text-white transition-colors"
-                                title="Void Invoice & Restock Inventory"
+                                onClick={() => {
+                                  setRefundModalSale(s);
+                                  setRefundMethod(s.paymentMethod || 'Cash');
+                                }}
+                                className="p-1 rounded-md bg-danger/10 text-danger hover:bg-danger hover:text-white transition-colors cursor-pointer"
+                                title="Void / Refund Invoice & Restock Inventory"
                               >
                                 <Icon name="TrashIcon" size={14} />
                               </button>
@@ -1135,85 +1258,31 @@ export default function SalesPage() {
         )}
       </div>
 
-      {/* Quick Customer Register Modal (Requirement 4) */}
-      <Modal
+      {/* Reusable Single-Source-of-Truth Customer Form Modal */}
+      <CustomerFormModal
         open={quickRegModal}
         onClose={() => setQuickRegModal(false)}
-        title="Add New Customer"
-        subtitle="Registers customer into MySQL and auto-selects for active sale"
-        size="md"
-      >
-        <form onSubmit={handleQuickRegisterSubmit} className="space-y-3 py-2 text-xs">
-          <div>
-            <label className="font-bold text-foreground block mb-1">Customer Full Name *</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Ramesh Chandra"
-              value={newCustName}
-              onChange={(e) => setNewCustName(e.target.value)}
-              className="input-field text-xs"
-            />
-          </div>
+        initialPhone={customerPhoneDigits ? `+91 ${customerPhoneDigits}` : undefined}
+        onSuccess={(created) => {
+          const cleanDigits = clean10DigitPhone(created.phone);
+          setSelectedCustomerId(created.id);
+          setCustomerName(created.name);
+          setCustomerPhone(created.phone);
+          setCustomerPhoneDigits(cleanDigits);
+          setCustomerNotFound(false);
+          setLookupDone(true);
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="font-bold text-foreground block mb-1">Mobile Number (+91) *</label>
-              <input
-                type="text"
-                required
-                placeholder="+91 98765 43210"
-                value={newCustPhone}
-                onChange={(e) => setNewCustPhone(e.target.value)}
-                className="input-field text-xs font-mono"
-              />
-            </div>
-            <div>
-              <label className="font-bold text-foreground block mb-1">Email Address (Optional)</label>
-              <input
-                type="email"
-                placeholder="customer@domain.com"
-                value={newCustEmail}
-                onChange={(e) => setNewCustEmail(e.target.value)}
-                className="input-field text-xs"
-              />
-            </div>
-          </div>
+          if (created.gstin) {
+            setGstInvoiceEnabled(true);
+            setCustomerGstin(created.gstin.trim().toUpperCase());
+          }
+          if (created.address) {
+            setCustomerBillingAddress(created.address.trim());
+          }
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="font-bold text-foreground block mb-1">Customer GSTIN (Optional)</label>
-              <input
-                type="text"
-                maxLength={15}
-                placeholder="29ABCDE1234F1Z5"
-                value={newCustGstin}
-                onChange={(e) => setNewCustGstin(e.target.value.toUpperCase())}
-                className="input-field text-xs font-mono uppercase"
-              />
-            </div>
-            <div>
-              <label className="font-bold text-foreground block mb-1">Billing Address (Optional)</label>
-              <input
-                type="text"
-                placeholder="e.g. Indiranagar, Bengaluru"
-                value={newCustAddress}
-                onChange={(e) => setNewCustAddress(e.target.value)}
-                className="input-field text-xs"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-border">
-            <button type="button" onClick={() => setQuickRegModal(false)} className="btn-secondary text-xs">
-              Cancel
-            </button>
-            <button type="submit" className="btn-primary text-xs font-bold">
-              Save & Auto-Select
-            </button>
-          </div>
-        </form>
-      </Modal>
+          setCustomerHistory({ purchases: [], repairs: [] });
+        }}
+      />
 
       {/* Digital Tax Invoice / Receipt Modal with COSKO LOGO ONLY Watermark (Requirement 14, 15, 16) */}
       {receiptModal && (
@@ -1312,6 +1381,33 @@ export default function SalesPage() {
                 <p className="text-base font-extrabold text-foreground pt-1">
                   Total Paid ({receiptModal.paymentMethod}): ₹{receiptModal.total.toLocaleString('en-IN')}
                 </p>
+                {receiptModal.referenceNo && (
+                  <p className="text-xs font-mono text-muted-foreground">
+                    Ref / UTR: <span className="font-semibold text-foreground">{receiptModal.referenceNo}</span>
+                  </p>
+                )}
+                {receiptModal.paymentProofUrl && (
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProof({
+                        url: receiptModal.paymentProofUrl!,
+                        referenceNo: receiptModal.referenceNo || receiptModal.orderNo,
+                        amount: receiptModal.total,
+                        paymentMethod: receiptModal.paymentMethod,
+                        paymentDate: receiptModal.createdAt,
+                        payeeOrPayer: receiptModal.customerName,
+                        recordedBy: receiptModal.cashierName || 'POS Terminal',
+                        timestamp: receiptModal.createdAt,
+                        notes: `Digital Invoice Proof for ${receiptModal.orderNo}`,
+                      })}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors shadow-2xs"
+                    >
+                      <Icon name="DocumentCheckIcon" size={14} />
+                      View / Download Attached Payment Proof
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* UPI Payment QR if enabled */}
@@ -1357,8 +1453,10 @@ export default function SalesPage() {
                   type="button"
                   onClick={() => handleSendWhatsAppInvoice(receiptModal)}
                   className="btn-primary bg-emerald-600 hover:bg-emerald-700 text-white text-xs flex items-center gap-1 font-bold"
+                  title="Send WhatsApp Invoice"
+                  aria-label="Send WhatsApp Invoice"
                 >
-                  <Icon name="ChatBubbleOvalLeftEllipsisIcon" size={14} />
+                  <Icon name="WhatsApp" size={14} />
                   Send WhatsApp Invoice
                 </button>
                 <button type="button" onClick={() => setReceiptModal(null)} className="btn-secondary text-xs">
@@ -1394,46 +1492,121 @@ export default function SalesPage() {
         />
       )}
 
-      {/* Void Sales Order Confirmation Modal */}
-      {voidModalOrder && (
+      {/* Visual Product Search Modal */}
+      {imageSearchOpen && (
+        <VisualSearchModal
+          open={imageSearchOpen}
+          onClose={() => setImageSearchOpen(false)}
+          onAddToCart={(item) => {
+            addToCart(item);
+          }}
+          effectiveStore={effectiveStore}
+          inventory={inventory}
+        />
+      )}
+
+
+
+      {/* Full-Screen Payment Proof Viewer */}
+      <ProofViewerModal
+        proof={selectedProof}
+        onClose={() => setSelectedProof(null)}
+      />
+
+      {/* Void & Refund Modal with Dynamic Refund Payment Method */}
+      {refundModalSale && (
         <Modal
-          open={!!voidModalOrder}
-          onClose={() => setVoidModalOrder(null)}
-          title={`Void Sales Order — ${voidModalOrder.orderNo}`}
+          open={Boolean(refundModalSale)}
+          onClose={() => {
+            if (!isRefunding) setRefundModalSale(null);
+          }}
+          title={`Void / Refund Invoice #${refundModalSale.orderNo}`}
+          subtitle="Record return payout instrument and automatically restore inventory"
+          size="md"
+          zIndex={1150}
         >
-          <div className="space-y-4">
-            <div className="p-3 bg-danger/10 border border-danger/20 rounded-xl flex items-start gap-3">
-              <Icon name="ExclamationTriangleIcon" size={20} className="text-danger flex-shrink-0 mt-0.5" />
-              <div className="text-xs text-foreground space-y-1">
-                <p className="font-bold">Are you sure you want to void this invoice?</p>
-                <p className="text-muted-foreground">
-                  This will mark order <strong>{voidModalOrder.orderNo}</strong> (₹{Number(voidModalOrder.total).toLocaleString('en-IN')}) as Cancelled, immediately restock all sold quantities back into store <strong>{voidModalOrder.store}</strong>, and reverse any customer spend updates in the database.
-                </p>
+          <div className="space-y-4 py-2">
+            <div className="p-3 rounded-xl bg-card border border-border/80 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Customer:</span>
+                <span className="font-bold text-foreground">{refundModalSale.customerName || 'Walk-in Customer'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Store Location:</span>
+                <span className="font-semibold text-foreground">{refundModalSale.store}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Original Payment Method:</span>
+                <span className="font-semibold text-primary">{refundModalSale.paymentMethod}</span>
+              </div>
+              <div className="flex items-center justify-between pt-1 border-t border-border/60">
+                <span className="font-bold text-foreground">Refund Total Amount:</span>
+                <span className="font-extrabold text-danger text-sm font-tabular">
+                  ₹{Number(refundModalSale.total).toLocaleString('en-IN')}
+                </span>
               </div>
             </div>
+
+            <div>
+              <PaymentMethodSelect
+                layout="dropdown"
+                label="Refund Payout Method"
+                required
+                value={refundMethod}
+                onChange={setRefundMethod}
+                modalZIndex={1250}
+              />
+            </div>
+
+            <div className="p-3 rounded-xl bg-danger/5 border border-danger/20 text-xs text-danger space-y-1">
+              <p className="font-bold flex items-center gap-1">
+                <Icon name="ExclamationTriangleIcon" size={14} />
+                <span>Restocking & Accounting Notice</span>
+              </p>
+              <p className="text-2xs text-danger/80">
+                Confirming will mark order {refundModalSale.orderNo} as Refunded, automatically restock all items into {refundModalSale.store}, and log a refund payout via {refundMethod} in the general ledger.
+              </p>
+            </div>
+
             <div className="flex justify-end gap-2 pt-2 border-t border-border">
               <button
-                onClick={() => setVoidModalOrder(null)}
-                className="btn-secondary text-xs px-3 py-1.5"
-                disabled={isVoiding}
+                type="button"
+                disabled={isRefunding}
+                onClick={() => setRefundModalSale(null)}
+                className="btn-secondary text-xs"
               >
-                Close
+                Cancel
               </button>
               <button
+                type="button"
+                disabled={isRefunding}
                 onClick={async () => {
-                  if (!voidModalOrder) return;
-                  setIsVoiding(true);
+                  setIsRefunding(true);
                   try {
-                    await voidSale(voidModalOrder.id);
-                    setVoidModalOrder(null);
+                    const res = await updateSale(refundModalSale.id, {
+                      status: 'Refunded',
+                      paymentMethod: refundMethod,
+                    });
+                    if (res?.success) {
+                      setRefundModalSale(null);
+                    }
                   } finally {
-                    setIsVoiding(false);
+                    setIsRefunding(false);
                   }
                 }}
-                className="btn-danger text-xs px-3 py-1.5 bg-danger text-white rounded-lg hover:bg-danger/90"
-                disabled={isVoiding}
+                className="btn-danger text-xs font-bold gap-1.5 px-4"
               >
-                {isVoiding ? 'Voiding...' : 'Confirm Void & Restock'}
+                {isRefunding ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Processing Refund...</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="ArrowPathIcon" size={14} />
+                    <span>Confirm Void & Refund</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

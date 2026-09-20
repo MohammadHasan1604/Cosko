@@ -219,18 +219,22 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
   { code: 'branding.edit_logo', name: 'Edit Custom Business Logo', category: 'Branding', isProtected: true, minSecurityLevel: 100 },
   { code: 'branding.edit_favicon', name: 'Edit Dynamic Tab Favicon', category: 'Branding', isProtected: true, minSecurityLevel: 100 },
   { code: 'branding.edit_receipt', name: 'Edit Receipt Footer Branding', category: 'Branding', isProtected: true, minSecurityLevel: 100 },
+
+  // Work Activity Tracking
+  { code: 'activity.view', name: 'View Own Work Activity', category: 'Employees', isProtected: false, minSecurityLevel: 10 },
+  { code: 'activity.view_all', name: 'View All Users Work Activity', category: 'Employees', isProtected: true, minSecurityLevel: 100 },
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   'Super Admin': ['ALL_PERMISSIONS'],
-  'Store Manager': ['dashboard.view', 'sales.view', 'sales.create', 'sales.discount', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.pay_credit', 'sales.print_receipt', 'sales.history', 'sales.attach_photo', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'inventory.transfer', 'inventory.history', 'purchases.view', 'purchases.create', 'purchases.edit', 'purchases.receive_grn', 'customers.view', 'customers.add', 'customers.edit', 'vendors.view', 'expenses.view', 'expenses.create', 'accounting.view', 'reports.view', 'employees.view', 'stores.view'],
-  'Department Manager': ['dashboard.view', 'sales.view', 'inventory.view', 'purchases.view', 'vendors.view', 'reports.view'],
-  'Accountant': ['dashboard.view', 'accounting.view', 'accounting.pnl', 'accounting.balance_sheet', 'accounting.gst', 'accounting.margin', 'accounting.export', 'expenses.view', 'expenses.create', 'expenses.approve', 'reports.view'],
-  'Procurement Staff': ['dashboard.view', 'purchases.view', 'purchases.create', 'purchases.edit', 'purchases.receive_grn', 'vendors.view', 'vendors.add', 'vendors.edit', 'inventory.view'],
-  'Inventory Auditor': ['dashboard.view', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'inventory.history', 'purchases.view', 'purchases.receive_grn', 'reports.view'],
-  'Sales Executive': ['sales.view', 'sales.create', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.print_receipt', 'sales.history', 'sales.attach_photo', 'customers.view', 'customers.add'],
-  'POS Cashier': ['sales.view', 'sales.create', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.print_receipt', 'customers.view'],
-  'Employee': ['sales.view'],
+  'Store Manager': ['dashboard.view', 'sales.view', 'sales.create', 'sales.discount', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.pay_credit', 'sales.print_receipt', 'sales.history', 'sales.attach_photo', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'inventory.transfer', 'inventory.history', 'purchases.view', 'purchases.create', 'purchases.edit', 'purchases.receive_grn', 'customers.view', 'customers.add', 'customers.edit', 'vendors.view', 'expenses.view', 'expenses.create', 'accounting.view', 'reports.view', 'employees.view', 'stores.view', 'activity.view'],
+  'Department Manager': ['dashboard.view', 'sales.view', 'inventory.view', 'purchases.view', 'vendors.view', 'reports.view', 'activity.view'],
+  'Accountant': ['dashboard.view', 'accounting.view', 'accounting.pnl', 'accounting.balance_sheet', 'accounting.gst', 'accounting.margin', 'accounting.export', 'expenses.view', 'expenses.create', 'expenses.approve', 'reports.view', 'activity.view'],
+  'Procurement Staff': ['dashboard.view', 'purchases.view', 'purchases.create', 'purchases.edit', 'purchases.receive_grn', 'vendors.view', 'vendors.add', 'vendors.edit', 'inventory.view', 'activity.view'],
+  'Inventory Auditor': ['dashboard.view', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'inventory.history', 'purchases.view', 'purchases.receive_grn', 'reports.view', 'activity.view'],
+  'Sales Executive': ['sales.view', 'sales.create', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.print_receipt', 'sales.history', 'sales.attach_photo', 'customers.view', 'customers.add', 'activity.view'],
+  'POS Cashier': ['sales.view', 'sales.create', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.print_receipt', 'customers.view', 'activity.view'],
+  'Employee': ['sales.view', 'activity.view'],
 };
 
 export class RBACEngine {
@@ -265,6 +269,21 @@ export class RBACEngine {
     }
     if (user.status === 'Inactive') {
       return { allowed: false, reason: 'Deny Access: User account is INACTIVE' };
+    }
+
+    // Non-existent permission check: reject deleted / removed system permissions
+    if (request.requiredPermission && request.requiredPermission !== 'ALL_PERMISSIONS') {
+      const permDef = PERMISSION_CATALOGUE.find((p) => p.code === request.requiredPermission);
+      if (!permDef) {
+        return { allowed: false, reason: `404 Not Found: Permission "${request.requiredPermission}" has been removed from system` };
+      }
+    }
+
+    // ROOT-LEVEL SUPER ADMIN ACCESS BYPASS:
+    // Super Admin accounts always hold full, unrestricted root-level access across every
+    // store, module, page, feature, and action. Access never depends on configurable role permissions.
+    if (user.role === 'Super Admin' || user.securityLevel === 100) {
+      return { allowed: true };
     }
 
     // Step 4: Resource Classification Check
@@ -368,6 +387,11 @@ export class RBACEngine {
    * Resolves permission state for UI toggles: Inherited, Allowed, Denied, Custom Allow, Custom Deny, Protected
    */
   static getPermissionState(user: RBACUser, permissionCode: string): 'Protected' | 'Custom Allow' | 'Custom Deny' | 'Allowed' | 'Denied' {
+    // Super Admin accounts always hold full unrestricted root access across all actions
+    if (user.role === 'Super Admin' || user.securityLevel === 100) {
+      return 'Allowed';
+    }
+
     const isProtected = SUPER_ADMIN_PROTECTED_PERMISSIONS.includes(permissionCode);
     if (isProtected && user.securityLevel < 100) {
       return 'Protected';
