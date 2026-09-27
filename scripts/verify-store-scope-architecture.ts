@@ -228,7 +228,6 @@ async function runSuite() {
         city: 'Kolkata',
         address: 'Salt Lake Sector V',
         managerName: 'Amitabha Ghosh',
-        registersCount: 3,
       }),
     });
     const resCreateRegional = await saveStore(reqCreateRegional);

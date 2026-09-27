@@ -76,7 +76,7 @@ export default function SalesPage() {
   const canViewCost =
     currentUser.role === 'Super Admin' ||
     currentUser.role === 'Store Manager' ||
-    currentUser.role === 'Inventory Auditor';
+    currentUser.role === 'Inventory Manager';
 
   // Customer State - Starts clean, no prefilled customer
   const [customerPhoneDigits, setCustomerPhoneDigits] = useState('');

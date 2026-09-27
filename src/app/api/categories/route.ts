@@ -209,23 +209,25 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE /api/categories
- * Safe Archive or Permanent Delete for unlinked categories
+ * DELETE /api/categories - Delete Approval Workflow
+ * Super Admin: direct archive/delete. Store Manager: creates pending delete request.
  */
 export async function DELETE(req: NextRequest) {
   try {
     const session = getAuthUserFromRequest(req);
 
-    if (!session || (session.role !== 'Super Admin' && session.role !== 'Store Manager')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized: Only Admin or Store Manager can archive or delete categories' },
-        { status: 403 }
-      );
+    if (!session) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (session.securityLevel < 80) {
+      return NextResponse.json({ success: false, message: 'Forbidden: Insufficient security level' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const permanent = searchParams.get('permanent') === 'true';
+    const reason = searchParams.get('reason') || '';
 
     if (!id) {
       return NextResponse.json({ success: false, message: 'Category ID is required' }, { status: 400 });
@@ -240,7 +242,18 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Category already deleted or non-existent' });
     }
 
-    // Check if category is referenced by products
+    // NON-SUPER-ADMIN: delete approval workflow
+    if (session.securityLevel < 100) {
+      if (!reason || reason.trim().length < 3) {
+        return NextResponse.json({ success: false, message: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+      }
+      const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
+      const result = await createDeleteRequest(session, { entityType: 'CATEGORY', entityId: target.id, reason: reason.trim() });
+      if (!result.success) return NextResponse.json({ success: false, message: result.error }, { status: 409 });
+      return NextResponse.json({ success: true, mode: 'pending_approval', deleteRequest: result.deleteRequest, message: `Delete request for category "${target.name}" submitted for Super Admin approval.` });
+    }
+
+    // SUPER ADMIN: Check dependencies
     const [productsLinked, childCategories] = await Promise.all([
       (prisma as any).product.count({
         where: {
@@ -259,8 +272,7 @@ export async function DELETE(req: NextRequest) {
 
     const isReferenced = productsLinked > 0 || childCategories > 0;
 
-    // If referenced or not permanent, safe ARCHIVE
-    if (isReferenced || !permanent || session.role !== 'Super Admin') {
+    if (isReferenced || !permanent) {
       const archived = await (prisma as any).category.update({
         where: { id: target.id },
         data: { status: 'Archived' },
@@ -275,13 +287,16 @@ export async function DELETE(req: NextRequest) {
         category: archived,
         isReferenced,
         message: isReferenced
-          ? `This category is currently in use (${productsLinked} products, ${childCategories} subcategories). Archived safely instead of permanent deletion.`
+          ? `This category is currently in use (${productsLinked} products, ${childCategories} subcategories). Archived safely.`
           : `Category "${archived.name}" archived successfully.`,
       });
     }
 
-    // Hard-delete if safe & requested by Super Admin
-    await (prisma as any).category.delete({ where: { id: target.id } });
+    // Hard-delete
+    await prisma.$transaction(async (tx: any) => {
+      await tx.category.delete({ where: { id: target.id } });
+      await tx.auditLog.create({ data: { module: 'CATEGORIES', action: `HARD_DELETED: Category "${target.name}"`, details: JSON.stringify({ categoryId: target.id, beforeState: target }), userEmail: session.email, userRole: session.role, storeCode: session.store || 'CENTRAL' } });
+    });
 
     invalidateCategoriesCache();
     broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: target.id, name: target.name, action: 'deleted' });
@@ -299,4 +314,3 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
-

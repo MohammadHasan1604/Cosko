@@ -866,7 +866,8 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE /api/purchases - Delete a draft purchase order or cancel/archive received/paid PO
+ * DELETE /api/purchases - Delete Approval Workflow
+ * Draft POs: hard-delete. Received/Paid: cancel/archive. Non-Super-Admin: approval required.
  */
 export async function DELETE(req: NextRequest) {
   try {
@@ -882,6 +883,7 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const reason = searchParams.get('reason') || '';
 
     if (!id) {
       return NextResponse.json({ error: 'Purchase Order ID is required' }, { status: 400 });
@@ -895,9 +897,21 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Purchase Order already deleted or non-existent' });
     }
 
+    // NON-SUPER-ADMIN: delete approval workflow
+    if (user.securityLevel < 100) {
+      if (!reason || reason.trim().length < 3) {
+        return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+      }
+      const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
+      const result = await createDeleteRequest(user, { entityType: 'PURCHASE', entityId: id, reason: reason.trim() });
+      if (!result.success) return NextResponse.json({ error: result.error }, { status: 409 });
+      return NextResponse.json({ success: true, mode: 'pending_approval', deleteRequest: result.deleteRequest, message: `Delete request for purchase order "${existing.poNo}" submitted for Super Admin approval.` });
+    }
+
+    // SUPER ADMIN: existing logic preserved
     const paymentCount = existing.payments?.length || 0;
 
-    // Received or paid POs have impacted inventory and financial ledgers; cancel/archive safely instead of destructive delete
+    // Received or paid POs: cancel/archive
     if (existing.status === 'Received' || existing.status === 'Completed' || paymentCount > 0) {
       const archived = await prisma.$transaction(
         async (tx: any) => {
@@ -927,11 +941,11 @@ export async function DELETE(req: NextRequest) {
         success: true,
         mode: 'archived',
         purchaseOrder: archived,
-        message: `Purchase Bill ${existing.poNo} had ${paymentCount} payment(s) or stock receipts and was safely Cancelled/Archived to preserve accounting ledgers.`,
+        message: `Purchase Bill ${existing.poNo} had ${paymentCount} payment(s) or stock receipts and was safely Cancelled/Archived.`,
       });
     }
 
-    // Hard-delete draft / pending POs with zero payments and zero stock receipts inside atomic transaction
+    // Hard-delete draft POs
     await prisma.$transaction(
       async (tx: any) => {
         await tx.purchaseOrderItem.deleteMany({ where: { poId: id } });
@@ -963,4 +977,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to delete purchase order' }, { status: 500 });
   }
 }
-

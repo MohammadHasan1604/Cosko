@@ -294,7 +294,8 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE /api/vendors - Safe Archive or Permanent Delete for unused vendors
+ * DELETE /api/vendors - Delete Approval Workflow
+ * Super Admin: direct archive/delete. Store Manager: creates pending delete request.
  */
 export async function DELETE(req: NextRequest) {
   try {
@@ -311,6 +312,7 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const permanent = searchParams.get('permanent') === 'true';
+    const reason = searchParams.get('reason') || '';
 
     if (!id) {
       return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 });
@@ -325,10 +327,32 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Vendor already deleted or non-existent' });
     }
 
-    // Check linked purchase orders and financial records
+    // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────
+    if (user.securityLevel < 100) {
+      if (!reason || reason.trim().length < 3) {
+        return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+      }
+      const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
+      const result = await createDeleteRequest(user, {
+        entityType: 'VENDOR',
+        entityId: target.id,
+        reason: reason.trim(),
+      });
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 409 });
+      }
+      return NextResponse.json({
+        success: true,
+        mode: 'pending_approval',
+        deleteRequest: result.deleteRequest,
+        message: `Delete request for vendor "${target.name}" submitted for Super Admin approval.`,
+      });
+    }
+
+    // ─── SUPER ADMIN: Direct delete/archive ─────────────────────────────────
     const poCount = await (prisma as any).purchaseOrder.count({ where: { vendorId: target.id } });
 
-    if (poCount > 0 || !permanent || user.role !== 'Super Admin') {
+    if (poCount > 0 || !permanent) {
       const vendor = await (prisma as any).vendor.update({
         where: { id: target.id },
         data: { status: 'Archived' },
@@ -337,8 +361,8 @@ export async function DELETE(req: NextRequest) {
       await (prisma as any).auditLog.create({
         data: {
           module: 'Vendors',
-          action: 'Archive Vendor',
-          details: `Archived vendor "${target.name}" (${target.code}). Historical purchase orders linked: ${poCount}`,
+          action: `ARCHIVED: Vendor "${target.name}" (${target.code})`,
+          details: JSON.stringify({ vendorId: target.id, poCount }),
           userEmail: user.email || user.name,
           userRole: user.role,
           storeCode: 'CENTRAL',
@@ -353,23 +377,24 @@ export async function DELETE(req: NextRequest) {
         vendor,
         hasHistory: poCount > 0,
         message: poCount > 0
-          ? `Vendor "${target.name}" has ${poCount} linked purchase orders and was safely Archived to protect financial records.`
+          ? `Vendor "${target.name}" has ${poCount} linked purchase orders and was safely Archived.`
           : `Vendor "${target.name}" archived successfully.`,
       });
     }
 
     // Hard delete unused vendor (Super Admin only, zero POs)
-    await (prisma as any).vendor.delete({ where: { id: target.id } });
-
-    await (prisma as any).auditLog.create({
-      data: {
-        module: 'Vendors',
-        action: 'Permanent Delete Vendor',
-        details: `Permanently removed unused vendor "${target.name}" (${target.code}).`,
-        userEmail: user.email || user.name,
-        userRole: user.role,
-        storeCode: 'CENTRAL',
-      },
+    await prisma.$transaction(async (tx: any) => {
+      await tx.vendor.delete({ where: { id: target.id } });
+      await tx.auditLog.create({
+        data: {
+          module: 'Vendors',
+          action: `HARD_DELETED: Vendor "${target.name}" (${target.code})`,
+          details: JSON.stringify({ vendorId: target.id, beforeState: target }),
+          userEmail: user.email || user.name,
+          userRole: user.role,
+          storeCode: 'CENTRAL',
+        },
+      });
     });
 
     broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: target.id, code: target.code, name: target.name, action: 'deleted' });

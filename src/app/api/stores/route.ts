@@ -125,9 +125,6 @@ export async function POST(req: NextRequest) {
             ownerName: ownerVal || null,
             managerName: ownerVal || null,
             phone: body.phone || null,
-            registersCount: body.registersCount !== undefined && body.registersCount !== null && body.registersCount !== ''
-              ? Number(body.registersCount)
-              : 0,
             status: storeStatus,
           },
           update: {
@@ -137,15 +134,6 @@ export async function POST(req: NextRequest) {
             ownerName: ownerVal !== undefined ? (ownerVal || null) : undefined,
             managerName: ownerVal !== undefined ? (ownerVal || null) : undefined,
             phone: body.phone || undefined,
-            registersCount: body.registersCount !== undefined && body.registersCount !== null && body.registersCount !== ''
-              ? Number(body.registersCount)
-              : undefined,
-            skusCount: body.skusCount !== undefined && body.skusCount !== null && body.skusCount !== ''
-              ? Number(body.skusCount)
-              : undefined,
-            monthlyRevenue: body.monthlyRevenue !== undefined && body.monthlyRevenue !== null && body.monthlyRevenue !== ''
-              ? Number(body.monthlyRevenue)
-              : undefined,
             status: upperCode === 'CENTRAL' ? 'Active' : (body.status || undefined),
           },
         });

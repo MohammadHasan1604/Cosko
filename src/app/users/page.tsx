@@ -8,6 +8,7 @@ import { useApp, UserAccount } from '@/context/AppContext';
 import UserFormModal from '@/components/forms/UserFormModal';
 import { RBACEngine, RBACUser, PERMISSION_CATALOGUE, SUPER_ADMIN_PROTECTED_PERMISSIONS, PermissionDefinition, ROLE_SECURITY_LEVELS } from '@/lib/rbacEngine';
 import { toast } from 'sonner';
+import SuperAdminGuard from '@/components/SuperAdminGuard';
 
 export default function UsersPage() {
   const {
@@ -134,12 +135,14 @@ export default function UsersPage() {
   const roleDescriptions = [
     { role: 'Super Admin', level: 100, access: 'Level 100 — Unrestricted enterprise authority, user provisioning, global settings & enterprise audit logs.', badge: 'badge-danger' },
     { role: 'Store Manager', level: 80, access: 'Level 80 — Assigned store sales, inventory CRUD, purchase orders, customer CRM & daily reporting.', badge: 'badge-warning' },
-    { role: 'Inventory Auditor', level: 60, access: 'Level 60 — Inventory stock catalog, FIFO valuation, stock adjustments & goods receiving notes (GRN).', badge: 'badge-neutral' },
+    { role: 'Inventory Manager', level: 60, access: 'Level 60 — Inventory stock catalog, purchases, stock adjustments & goods receiving notes (GRN).', badge: 'badge-neutral' },
     { role: 'Sales Executive', level: 40, access: 'Level 40 — Sales & POS terminal billing checkout, walk-in customer creation, receipt printing & sale photo proof.', badge: 'badge-primary' },
     { role: 'POS Cashier', level: 20, access: 'Level 20 — Sales & POS terminal billing checkout, receipt printing & customer lookup.', badge: 'badge-info' },
+    { role: 'Restricted Employee', level: 10, access: 'Level 10 — Dashboard view only. All other modules denied by default.', badge: 'badge-ghost' },
   ];
 
   return (
+    <SuperAdminGuard moduleName="Users & Roles">
     <AppLayout activeRoute="/users">
       <div className="space-y-6 fade-in">
         <div className="flex items-center justify-between flex-wrap gap-4">
@@ -196,7 +199,7 @@ export default function UsersPage() {
           {/* Mobile User Cards (<md) */}
           <div className="block md:hidden divide-y divide-border">
             {visibleUsers.map((u) => {
-              const level = u.securityLevel || (u.role === 'Super Admin' ? 100 : u.role === 'Store Manager' ? 80 : u.role === 'Inventory Auditor' ? 60 : 20);
+              const level = u.securityLevel || (u.role === 'Super Admin' ? 100 : u.role === 'Store Manager' ? 80 : u.role === 'Inventory Manager' ? 60 : 20);
               const isProtectedSuperAdmin = u.role === 'Super Admin';
               const fullUserRecord = usersList.find((usr) => usr.id === u.id);
               const allowedStores = u.allowedStores || [u.storeScope];
@@ -322,7 +325,7 @@ export default function UsersPage() {
               </thead>
               <tbody className="divide-y divide-border/60 text-xs">
                 {visibleUsers.map((u) => {
-                  const level = u.securityLevel || (u.role === 'Super Admin' ? 100 : u.role === 'Store Manager' ? 80 : u.role === 'Inventory Auditor' ? 60 : 20);
+                  const level = u.securityLevel || (u.role === 'Super Admin' ? 100 : u.role === 'Store Manager' ? 80 : u.role === 'Inventory Manager' ? 60 : 20);
                   const isProtectedSuperAdmin = u.role === 'Super Admin';
                   const fullUserRecord = usersList.find((usr) => usr.id === u.id);
                   const allowedStores = u.allowedStores || [u.storeScope];
@@ -746,5 +749,6 @@ export default function UsersPage() {
         </Modal>
       )}
     </AppLayout>
+    </SuperAdminGuard>
   );
 }

@@ -8,11 +8,11 @@ async function main() {
 
   // 1. STORES / HUBS
   const storesData = [
-    { code: 'CENTRAL', name: 'Central Warehouse & Hub', city: 'Bengaluru', address: 'Plot 42, Electronic City Phase 1', managerName: 'Rohan Sharma', phone: '+91 9876543210', registersCount: 0, skusCount: 450, monthlyRevenue: 0.00 },
-    { code: 'BLR', name: 'Bengaluru Flagship Store', city: 'Bengaluru', address: 'Indiranagar 100ft Road', managerName: 'Ananya Rao', phone: '+91 9876543211', registersCount: 4, skusCount: 380, monthlyRevenue: 1450000.00 },
-    { code: 'HYD', name: 'Hyderabad Tech Hub Store', city: 'Hyderabad', address: 'HITEC City Cyber Towers', managerName: 'Priya Sharma', phone: '+91 9876543212', registersCount: 3, skusCount: 320, monthlyRevenue: 1200000.00 },
-    { code: 'DEL', name: 'Delhi NCR Experience Store', city: 'Delhi', address: 'Connaught Place Block A', managerName: 'Vikram Singh', phone: '+91 9876543213', registersCount: 3, skusCount: 290, monthlyRevenue: 980000.00 },
-    { code: 'MUM', name: 'Mumbai Retail Store', city: 'Mumbai', address: 'Linking Road, Bandra West', managerName: 'Rakesh Patel', phone: '+91 9876543214', registersCount: 2, skusCount: 240, monthlyRevenue: 850000.00 },
+    { code: 'CENTRAL', name: 'Central Warehouse & Hub', city: 'Bengaluru', address: 'Plot 42, Electronic City Phase 1', managerName: 'Rohan Sharma', phone: '+91 9876543210' },
+    { code: 'BLR', name: 'Bengaluru Flagship Store', city: 'Bengaluru', address: 'Indiranagar 100ft Road', managerName: 'Ananya Rao', phone: '+91 9876543211' },
+    { code: 'HYD', name: 'Hyderabad Tech Hub Store', city: 'Hyderabad', address: 'HITEC City Cyber Towers', managerName: 'Priya Sharma', phone: '+91 9876543212' },
+    { code: 'DEL', name: 'Delhi NCR Experience Store', city: 'Delhi', address: 'Connaught Place Block A', managerName: 'Vikram Singh', phone: '+91 9876543213' },
+    { code: 'MUM', name: 'Mumbai Retail Store', city: 'Mumbai', address: 'Linking Road, Bandra West', managerName: 'Rakesh Patel', phone: '+91 9876543214' },
   ];
 
   for (const s of storesData) {

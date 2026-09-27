@@ -17,10 +17,6 @@ model StoreHub {
   ownerName      String?  @map("owner_name") @db.VarChar(128)
   managerName    String?  @map("manager_name") @db.VarChar(128)
   phone          String?  @db.VarChar(32)
-  registersCount Int      @default(0) @map("registers_count")
-  skusCount      Int      @default(0) @map("skus_count")
-  monthlyRevenue Decimal  @default(0.00) @map("monthly_revenue") @db.Decimal(15, 2)
-  monthlyTarget  Decimal? @map("monthly_target") @db.Decimal(15, 2)
   status         String   @default("Active") @db.VarChar(16)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
@@ -50,15 +46,38 @@ model UserAccount {
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
-  storeAssignments UserStoreAssignment[]
+  storeAssignments    UserStoreAssignment[]
   permissionOverrides UserPermissionOverride[]
   workSessions        UserWorkSession[]
   dailyActivities     UserDailyActivity[]
+  sessions            UserSession[]
+  deleteRequests      DeleteRequest[]
+  notifications       Notification[]
+  activityEvents      WorkActivityEvent[]
 
   @@index([role])
   @@index([status])
   @@index([createdAt])
   @@map("users")
+}
+
+// 2B. DATABASE-BACKED SESSIONS — Durable session management, revocation & expiry
+model UserSession {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  tokenHash    String    @unique @map("token_hash") @db.VarChar(128)
+  expiresAt    DateTime  @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  ipAddress    String?   @map("ip_address") @db.VarChar(64)
+  userAgent    String?   @map("user_agent") @db.VarChar(255)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@map("user_sessions")
 }
 
 // 3. USER STORE ASSIGNMENTS
@@ -848,3 +867,78 @@ model UserDailyActivity {
   @@map("user_daily_activity")
 }
 
+// 22. DELETE APPROVAL WORKFLOW
+model DeleteRequest {
+  id                String    @id @default(uuid())
+  requesterId       String    @map("requester_id")
+  requesterRole     String    @map("requester_role") @db.VarChar(32)
+  requesterStore    String    @map("requester_store") @db.VarChar(16)
+  entityType        String    @map("entity_type") @db.VarChar(32)  // INVENTORY, CUSTOMER, VENDOR, CATEGORY, PURCHASE, EXPENSE, REPAIR, BRAND, UNIT, CATEGORY_TYPE, PAYMENT_METHOD
+  entityId          String    @map("entity_id") @db.VarChar(64)
+  entityName        String    @map("entity_name") @db.VarChar(255)
+  reason            String    @db.VarChar(500)
+  beforeStateJson   String    @map("before_state_json") @db.LongText
+  dependencyImpact  String?   @map("dependency_impact") @db.Text    // JSON: {salesCount, poCount, repairCount, ...}
+  financialImpact   String?   @map("financial_impact") @db.Text     // JSON: {outstandingBalance, totalSpent, ...}
+  status            String    @default("PENDING") @db.VarChar(16)  // PENDING, APPROVED, REJECTED, EXPIRED
+  executionMode     String?   @map("execution_mode") @db.VarChar(16) // ARCHIVE, HARD_DELETE
+  reviewedBy        String?   @map("reviewed_by") @db.VarChar(128)
+  reviewedAt        DateTime? @map("reviewed_at")
+  rejectionReason   String?   @map("rejection_reason") @db.VarChar(500)
+  auditLogId        String?   @map("audit_log_id") @db.VarChar(64)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  requester UserAccount @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId, status], name: "unique_pending_delete")
+  @@index([requesterId])
+  @@index([status])
+  @@index([entityType])
+  @@index([createdAt])
+  @@map("delete_requests")
+}
+
+// 23. PERSISTENT IN-APP NOTIFICATIONS
+model Notification {
+  id                 String   @id @default(uuid())
+  userId             String   @map("user_id")
+  title              String   @db.VarChar(255)
+  message            String   @db.Text
+  type               String   @default("info") @db.VarChar(16)   // info, warning, success, danger
+  category           String   @default("SYSTEM") @db.VarChar(32) // DELETE_REQUEST, DELETE_APPROVED, DELETE_REJECTED, SYSTEM
+  relatedEntityType  String?  @map("related_entity_type") @db.VarChar(32)
+  relatedEntityId    String?  @map("related_entity_id") @db.VarChar(64)
+  actionUrl          String?  @map("action_url") @db.VarChar(255)
+  isRead             Boolean  @default(false) @map("is_read")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([category])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// 24. WORK ACTIVITY EVENT LOG (Immutable Server-Timestamped Events)
+model WorkActivityEvent {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  sessionId       String?  @map("session_id") @db.VarChar(64)
+  eventType       String   @map("event_type") @db.VarChar(32)  // LOGIN, LOGOUT, SESSION_START, SESSION_END, HEARTBEAT_ACTIVE, HEARTBEAT_IDLE, VISIBILITY_HIDDEN, VISIBILITY_VISIBLE, TAB_FOCUS, TAB_BLUR, BREAK_START, BREAK_END, MIDNIGHT_ROLLOVER, CRASH_RECOVERY
+  serverTimestamp  DateTime @default(now()) @map("server_timestamp")
+  clientTimestamp  DateTime? @map("client_timestamp")
+  metadataJson    String?  @map("metadata_json") @db.Text  // JSON: {path, tabId, device, ip, userAgent, ...}
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([eventType])
+  @@index([serverTimestamp])
+  @@index([userId, serverTimestamp])
+  @@map("work_activity_events")
+}

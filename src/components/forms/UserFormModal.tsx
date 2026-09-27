@@ -17,14 +17,15 @@ interface UserFormModalProps {
 // 🔒 STRICT RBAC: Super Admin is completely removed from role options.
 // Only exactly ONE protected Super Admin exists in the system.
 const AVAILABLE_ROLES: Array<{
-  role: 'Store Manager' | 'Inventory Auditor' | 'Sales Executive' | 'POS Cashier';
+  role: 'Store Manager' | 'Inventory Manager' | 'Sales Executive' | 'POS Cashier' | 'Restricted Employee';
   level: number;
   desc: string;
 }> = [
   { role: 'Store Manager', level: 80, desc: 'Full Store Operations, Staff & Inventory Control' },
-  { role: 'Inventory Auditor', level: 60, desc: 'Stock Adjustments, Transfers & Catalog Master' },
+  { role: 'Inventory Manager', level: 60, desc: 'Stock Adjustments, Purchases & Catalog Master' },
   { role: 'Sales Executive', level: 40, desc: 'Customer Consultations & POS Sales Operations' },
   { role: 'POS Cashier', level: 20, desc: 'Billing, Checkout Registers & Quick Sales' },
+  { role: 'Restricted Employee', level: 10, desc: 'Dashboard view only — restricted access' },
 ];
 
 export default function UserFormModal({
@@ -41,7 +42,7 @@ export default function UserFormModal({
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<'Store Manager' | 'Inventory Auditor' | 'Sales Executive' | 'POS Cashier'>('Store Manager');
+  const [role, setRole] = useState<'Store Manager' | 'Inventory Manager' | 'Sales Executive' | 'POS Cashier' | 'Restricted Employee'>('Store Manager');
   // Single source of truth for store access: assignedStores
   const [assignedStores, setAssignedStores] = useState<string[]>(['BLR']);
   const [storeSearch, setStoreSearch] = useState('');

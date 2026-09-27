@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     const session = token ? verifySessionToken(token) : null;
 
-    if (!session || !session.id) {
+    if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ success: false, message: 'Unauthorized: Active session required' }, { status: 401 });
     }
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     // Lookup user in MySQL
     const user = await prisma.userAccount.findUnique({
-      where: { id: session.id },
+      where: { id: session.user.id },
       include: { storeAssignments: true },
     });
 
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     // Commit new password and reset mustChangePassword flag
     const updatedUser = await prisma.userAccount.update({
-      where: { id: session.id },
+      where: { id: session.user.id },
       data: {
         passwordHash: newPasswordHash,
         mustChangePassword: false,

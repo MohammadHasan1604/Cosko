@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 
 /**
  * GET /api/audit-logs - Retrieve audit logs
+ * REQUIRES: Super Admin only — enterprise audit is a privileged operation
  */
 export async function GET(req: NextRequest) {
   try {
@@ -12,17 +13,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Audit log access requires security level 80+' }, { status: 403 });
+    // Super Admin only — audit logs are a privileged, enterprise-level feature
+    if (user.role !== 'Super Admin') {
+      return NextResponse.json({ error: 'Forbidden: Audit log access is restricted to Super Admin only' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
     const limit = Math.min(parseInt(searchParams.get('limit') || '200'), 500);
     const module = searchParams.get('module');
+    const storeCode = searchParams.get('store');
 
     const whereClause: any = {};
     if (module) {
       whereClause.module = module;
+    }
+    if (storeCode && storeCode !== 'All Stores' && storeCode !== 'ALL') {
+      whereClause.storeCode = storeCode;
     }
 
     const logs = await (prisma as any).auditLog.findMany({
@@ -43,6 +49,8 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/audit-logs - Create audit log entry
+ * SECURITY: userEmail, userRole, and ipAddress are always derived from the session.
+ * Client cannot spoof audit log attribution.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -57,14 +65,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Module and action are required' }, { status: 400 });
     }
 
+    // SECURITY: Always use session-derived values — never trust client-supplied userEmail/userRole
     const log = await (prisma as any).auditLog.create({
       data: {
         module: body.module,
         action: body.action,
         details: body.details || '',
-        userEmail: body.userEmail || user.email || user.name,
-        userRole: body.userRole || user.role,
-        storeCode: body.storeCode || 'CENTRAL',
+        userEmail: user.email || user.name,  // from session, NOT body
+        userRole: user.role,                  // from session, NOT body
+        storeCode: body.storeCode || user.store || 'CENTRAL',
       },
     });
 

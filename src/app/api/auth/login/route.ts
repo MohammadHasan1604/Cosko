@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { comparePassword, signSessionToken, isValidAuthOrigin } from '@/lib/auth';
+import { comparePassword, signSessionToken, isValidAuthOrigin, hashToken } from '@/lib/auth';
 import { checkRateLimit, recordFailedAttempt, clearRateLimit, getClientIp } from '@/lib/rateLimit';
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
@@ -197,20 +197,53 @@ export async function POST(req: NextRequest) {
       mustChangePassword: user.mustChangePassword || false,
     };
 
+    // 9. Create database-backed session record
+    let dbSessionId: string | undefined;
     const token = signSessionToken(sessionUser);
+    const tokenDigest = hashToken(token);
+    const expiresAt = new Date(Date.now() + SESSION_COOKIE_MAX_AGE * 1000);
 
+    try {
+      const dbSession = await (prisma as any).userSession.create({
+        data: {
+          userId: user.id,
+          tokenHash: tokenDigest,
+          expiresAt,
+          ipAddress: clientIp,
+          userAgent: req.headers.get('user-agent')?.substring(0, 255) || null,
+        },
+      });
+      dbSessionId = dbSession.id;
+    } catch (sessionErr) {
+      console.warn('Could not create DB session record (session will still work via JWT):', sessionErr);
+    }
+
+    // Re-sign with session ID if we got one
+    const finalToken = dbSessionId ? signSessionToken({ ...sessionUser, sessionId: dbSessionId }, dbSessionId) : token;
+    const finalTokenHash = dbSessionId ? hashToken(finalToken) : tokenDigest;
+
+    // Update the token hash if we re-signed
+    if (dbSessionId && finalTokenHash !== tokenDigest) {
+      try {
+        await (prisma as any).userSession.update({
+          where: { id: dbSessionId },
+          data: { tokenHash: finalTokenHash },
+        });
+      } catch {}
+    }
+
+    // 10. Return response — token is ONLY in the HttpOnly cookie, NOT in the response body
     const response = NextResponse.json({
       success: true,
       user: sessionUser,
-      token,
       mustChangePassword: sessionUser.mustChangePassword,
     });
 
     // Set secure HttpOnly 30-day session cookie
-    response.cookies.set('cosko_session', token, {
+    response.cookies.set('cosko_session', finalToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
       maxAge: SESSION_COOKIE_MAX_AGE, // 30 days
       path: '/',
     });

@@ -368,9 +368,6 @@ export interface StoreHub {
   owner: string;
   manager?: string;
   phone: string;
-  registers?: number;
-  skusCount?: number;
-  monthlyRevenue?: number;
   status: 'Active' | 'Inactive';
   createdAt?: string;
 }
@@ -386,7 +383,7 @@ export interface UserAccount {
   email: string;
   phone?: string;
   password?: string;
-  role: 'Super Admin' | 'Store Manager' | 'POS Cashier' | 'Inventory Auditor' | 'Department Manager' | 'Accountant' | 'Procurement Staff' | 'Sales Executive' | 'Employee';
+  role: 'Super Admin' | 'Store Manager' | 'Inventory Manager' | 'Sales Executive' | 'POS Cashier' | 'Restricted Employee';
   securityLevel?: number;
   store: string;
   status: 'Active' | 'Inactive' | 'Suspended';
@@ -818,7 +815,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     id: '',
     name: 'Unauthenticated User',
     email: '',
-    role: 'Employee' as const,
+    role: 'Restricted Employee' as const,
     store: '',
     avatar: 'UN',
     shiftStatus: 'On Leave' as const,
@@ -977,8 +974,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         address: s.address,
         owner: s.ownerName || s.managerName || '',
         manager: s.ownerName || s.managerName || '',
-        phone: s.phone || '', registers: s.registersCount,
-        skusCount: s.skusCount, monthlyRevenue: Number(s.monthlyRevenue) || 0,
+        phone: s.phone || '',
         status: s.status,
         createdAt: s.createdAt,
       })));
@@ -1843,9 +1839,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           owner: res.store.ownerName || res.store.managerName || '',
           manager: res.store.ownerName || res.store.managerName || '',
           phone: res.store.phone || '',
-          registers: res.store.registersCount ?? 0,
-          skusCount: res.store.skusCount ?? 0,
-          monthlyRevenue: Number(res.store.monthlyRevenue) || 0,
           status: res.store.status,
           createdAt: res.store.createdAt,
         };

@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     }
 
     // RBAC: Require security level >= 80 (Store Manager+) for financial reports
-    if ((user.securityLevel || 0) < 80 && user.role !== 'Super Admin' && user.role !== 'Store Manager' && user.role !== 'Accountant') {
+    if ((user.securityLevel || 0) < 60 && user.role !== 'Super Admin' && user.role !== 'Store Manager') {
       return NextResponse.json({ error: 'Insufficient permissions for financial reports' }, { status: 403 });
     }
 

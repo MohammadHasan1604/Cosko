@@ -29,6 +29,9 @@ const MODELS_WITH_CREATED_AT = new Set([
   'legacyDataSourceConfig',
   'financialLedgerEntry',
   'idempotencyRecord',
+  'deleteRequest',
+  'notification',
+  'workActivityEvent',
 ]);
 
 function createPrismaClient() {

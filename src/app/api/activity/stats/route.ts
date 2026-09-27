@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { buildUserActivitySummary, formatHHMMSS, getLocalDateString } from '@/lib/services/activityCalculationService';
 
-function getLocalDateString(date: Date, timezone = 'Asia/Kolkata'): string {
-  try {
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    return formatter.format(date);
-  } catch {
-    return date.toISOString().split('T')[0];
-  }
-}
-
+/**
+ * GET /api/activity/stats - Phase 2 activity stats using activityCalculationService
+ * 
+ * Uses server-calculated durations. Shows HH:MM:SS precision.
+ * Includes anomaly detection and disclaimer about browser activity.
+ * Enforces strict RBAC: non-admin sees only their own data.
+ */
 function computeDateRange(range: string, customStart?: string, customEnd?: string, timezone = 'Asia/Kolkata') {
   const now = new Date();
   const todayStr = getLocalDateString(now, timezone);
@@ -31,8 +25,7 @@ function computeDateRange(range: string, customStart?: string, customEnd?: strin
   }
 
   if (range === 'this_week') {
-    // Current week starting Monday
-    const dayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon ...
+    const dayOfWeek = now.getDay();
     const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     const monday = new Date(now.getTime() - diffToMonday * 24 * 60 * 60 * 1000);
     return {
@@ -129,102 +122,12 @@ export async function GET(req: NextRequest) {
       orderBy: { name: 'asc' },
     });
 
-    const userIds = users.map((u) => u.id);
-
-    // Fetch Daily Activity records for the date range
-    const dailyRecords = await prisma.userDailyActivity.findMany({
-      where: {
-        userId: { in: userIds },
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      orderBy: { date: 'desc' },
-    });
-
-    // Fetch recent live sessions to determine live status (online / idle / offline)
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
-
-    const recentSessions = await prisma.userWorkSession.findMany({
-      where: {
-        userId: { in: userIds },
-        lastActiveAt: { gte: fiveMinutesAgo },
-        isClosed: false,
-      },
-      orderBy: { lastActiveAt: 'desc' },
-    });
-
-    const liveStatusMap = new Map<string, { status: 'ONLINE' | 'IDLE' | 'OFFLINE'; lastActiveAt: Date }>();
-
-    for (const sess of recentSessions) {
-      if (!liveStatusMap.has(sess.userId)) {
-        const isOnline = new Date(sess.lastActiveAt).getTime() >= twoMinutesAgo.getTime();
-        liveStatusMap.set(sess.userId, {
-          status: isOnline ? 'ONLINE' : 'IDLE',
-          lastActiveAt: sess.lastActiveAt,
-        });
-      }
-    }
-
-    // Build user stats
-    const userStats = users.map((u) => {
-      const userDaily = dailyRecords.filter((d) => d.userId === u.id);
-      const totalActiveSeconds = userDaily.reduce((acc, curr) => acc + (curr.activeSeconds || 0), 0);
-      const totalIdleSeconds = userDaily.reduce((acc, curr) => acc + (curr.idleSeconds || 0), 0);
-      const sessionsCount = userDaily.reduce((acc, curr) => acc + (curr.sessionsCount || 0), 0);
-
-      // Working days = count of distinct days where activeSeconds > 60s
-      const workingDays = userDaily.filter((d) => (d.activeSeconds || 0) >= 60).length;
-
-      // First login in range
-      const firstLogin = userDaily.length > 0
-        ? userDaily.reduce((earliest, curr) => curr.firstLogin < earliest ? curr.firstLogin : earliest, userDaily[0].firstLogin)
-        : u.lastLogin;
-
-      // Last activity in range
-      const lastActivity = userDaily.length > 0
-        ? userDaily.reduce((latest, curr) => curr.lastActivity > latest ? curr.lastActivity : latest, userDaily[0].lastActivity)
-        : u.lastLogin;
-
-      const live = liveStatusMap.get(u.id);
-
-      const dailyBreakdown = userDaily.map((d) => ({
-        date: d.date,
-        activeSeconds: d.activeSeconds,
-        activeMinutes: Math.floor(d.activeSeconds / 60),
-        activeHours: (d.activeSeconds / 3600).toFixed(1),
-        idleMinutes: Math.floor(d.idleSeconds / 60),
-        firstLogin: d.firstLogin,
-        lastActivity: d.lastActivity,
-        sessionsCount: d.sessionsCount,
-      }));
-
-      return {
-        userId: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        storeScope: u.storeScope,
-        avatarUrl: u.avatarUrl,
-        accountStatus: u.status,
-        liveStatus: live ? live.status : 'OFFLINE',
-        totalActiveSeconds,
-        totalWorkingMinutes: Math.floor(totalActiveSeconds / 60),
-        totalWorkingHours: (totalActiveSeconds / 3600).toFixed(1),
-        totalIdleMinutes: Math.floor(totalIdleSeconds / 60),
-        workingDays,
-        firstLogin,
-        lastActivity: live ? live.lastActiveAt : lastActivity,
-        sessionsCount,
-        dailyBreakdown,
-      };
-    });
+    // Use the centralized activity calculation service
+    const userStats = await buildUserActivitySummary(users, startDate, endDate, timezone);
 
     // Compute aggregate summary metrics
     const totalTeamActiveSeconds = userStats.reduce((acc, u) => acc + u.totalActiveSeconds, 0);
-    const totalTeamSessions = userStats.reduce((acc, u) => acc + u.sessionsCount, 0);
+    const totalTeamSessions = userStats.reduce((acc, u) => acc + u.sessionCount, 0);
     const activeStaffTodayCount = userStats.filter((u) => u.liveStatus === 'ONLINE').length;
     const totalWorkingDaysAllUsers = userStats.reduce((acc, u) => acc + u.workingDays, 0);
     const averageDailyHours = totalWorkingDaysAllUsers > 0
@@ -238,12 +141,22 @@ export async function GET(req: NextRequest) {
       summary: {
         totalWorkingMinutes: Math.floor(totalTeamActiveSeconds / 60),
         totalWorkingHours: (totalTeamActiveSeconds / 3600).toFixed(1),
+        formattedTotalActive: formatHHMMSS(totalTeamActiveSeconds),
         totalSessions: totalTeamSessions,
         activeStaffOnline: activeStaffTodayCount,
         averageDailyHours,
         totalUsersCount: userStats.length,
       },
-      users: userStats,
+      users: userStats.map(u => ({
+        ...u,
+        formattedActiveTotal: formatHHMMSS(u.totalActiveSeconds),
+        formattedIdleTotal: formatHHMMSS(u.totalIdleSeconds),
+        formattedAuthenticatedTotal: formatHHMMSS(u.totalAuthenticatedSeconds),
+        totalWorkingMinutes: Math.floor(u.totalActiveSeconds / 60),
+        totalWorkingHours: (u.totalActiveSeconds / 3600).toFixed(1),
+        totalIdleMinutes: Math.floor(u.totalIdleSeconds / 60),
+      })),
+      disclaimer: 'Browser activity tracking measures tab visibility and heartbeat responsiveness. It does not prove physical presence or productive work output.',
       isSuperAdmin,
     });
   } catch (err: any) {

@@ -50,7 +50,6 @@ async function runTests() {
       address: 'Indiranagar 100ft Rd',
       ownerName: 'Vikram Malhotra',
       managerName: 'Vikram Malhotra',
-      registersCount: 3,
       status: 'Active',
     },
   });

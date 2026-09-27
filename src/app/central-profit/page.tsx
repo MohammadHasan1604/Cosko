@@ -8,6 +8,7 @@ import StoreFormModal from '@/components/forms/StoreFormModal';
 import NumericInput from '@/components/ui/NumericInput';
 import { useApp, StockTransferRecord, InventoryItem } from '@/context/AppContext';
 import { toast } from 'sonner';
+import SuperAdminGuard from '@/components/SuperAdminGuard';
 import {
   calculateTransferLineItem,
   formatTransferINR,
@@ -280,6 +281,7 @@ export default function CentralProfitPage() {
   };
 
   return (
+    <SuperAdminGuard moduleName="Central Profit">
     <AppLayout activeRoute="/central-profit">
       <div className="space-y-6 fade-in">
         {/* Page Header & Primary Actions */}
@@ -989,5 +991,6 @@ export default function CentralProfitPage() {
         />
       )}
     </AppLayout>
+    </SuperAdminGuard>
   );
 }

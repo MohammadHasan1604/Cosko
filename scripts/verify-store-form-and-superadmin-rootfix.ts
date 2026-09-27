@@ -54,30 +54,12 @@ async function runVerification() {
     });
 
     assert(
-      createdStore.code === testStoreCode && createdStore.registersCount === 0 && createdStore.skusCount === 0,
+      createdStore.code === testStoreCode && createdStore.status === 'Active',
       '1.1 Store Created Cleanly Without Requiring Registers/SKUs/Target Revenue',
-      `Created with defaults: registersCount=${createdStore.registersCount}, skusCount=${createdStore.skusCount}`
+      `Created with defaults: code=${createdStore.code}, status=${createdStore.status}`
     );
 
-    // 1.2 Simulate existing production data with legacy numbers populated
-    await prisma.storeHub.update({
-      where: { code: testStoreCode },
-      data: {
-        registersCount: 5,
-        skusCount: 420,
-        monthlyRevenue: 1500000.0,
-      },
-    });
-
-    const populatedStore = await prisma.storeHub.findUnique({ where: { code: testStoreCode } });
-    assert(
-      populatedStore?.registersCount === 5 && populatedStore?.skusCount === 420 && Number(populatedStore?.monthlyRevenue) === 1500000.0,
-      '1.2 Production Data Simulation Setup',
-      'Set registers=5, skus=420, monthlyRevenue=1500000.00'
-    );
-
-    // 1.3 Edit store details (name, city, address, owner) WITHOUT passing registers, skusCount, or monthlyRevenue
-    // Simulating PUT /api/stores payload with undefined registersCount/skusCount/monthlyRevenue
+    // 1.2 Simulate editing store details
     const updatedStore = await prisma.storeHub.update({
       where: { code: testStoreCode },
       data: {
@@ -85,18 +67,15 @@ async function runVerification() {
         city: 'Mysuru',
         address: 'New Commercial Complex',
         ownerName: 'Arjun V. Rao',
-        // registersCount, skusCount, monthlyRevenue omitted (undefined)
       },
     });
 
     assert(
       updatedStore.name === 'Updated Clean Store Branch' &&
       updatedStore.city === 'Mysuru' &&
-      updatedStore.registersCount === 5 &&
-      updatedStore.skusCount === 420 &&
-      Number(updatedStore.monthlyRevenue) === 1500000.0,
-      '1.3 Store Update Safely Preserves Existing Production Data in DB',
-      `Values intact: registersCount=${updatedStore.registersCount}, skusCount=${updatedStore.skusCount}, monthlyRevenue=${updatedStore.monthlyRevenue}`
+      updatedStore.ownerName === 'Arjun V. Rao',
+      '1.2 Store Update Safely Updates Store Details in DB',
+      `Values intact: name=${updatedStore.name}, city=${updatedStore.city}`
     );
 
     // Cleanup

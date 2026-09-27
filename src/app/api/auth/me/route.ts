@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifySessionToken, isSessionRevoked } from '@/lib/auth';
+import { verifySessionToken, hashToken } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
@@ -8,20 +8,49 @@ export async function GET(request: NextRequest) {
     const cookieToken = request.cookies.get('cosko_session')?.value;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : cookieToken;
 
-    if (!token || isSessionRevoked(token)) {
+    if (!token) {
       return NextResponse.json(
         { authenticated: false, reason: 'Unauthenticated: No active session token provided' },
         { status: 401 }
       );
     }
 
-    const sessionUser = verifySessionToken(token);
-    if (!sessionUser || !sessionUser.id) {
+    // Cryptographic JWT verification
+    const sessionResult = verifySessionToken(token);
+    if (!sessionResult || !sessionResult.user || !sessionResult.user.id) {
       return NextResponse.json(
         { authenticated: false, reason: 'Unauthenticated: Invalid or expired session' },
         { status: 401 }
       );
     }
+
+    // Check DB-backed session for revocation
+    const tokenDigest = hashToken(token);
+    try {
+      const dbSession = await (prisma as any).userSession.findUnique({
+        where: { tokenHash: tokenDigest },
+      });
+      if (dbSession) {
+        if (dbSession.revokedAt) {
+          return NextResponse.json(
+            { authenticated: false, reason: 'Session has been revoked. Please log in again.' },
+            { status: 401 }
+          );
+        }
+        if (dbSession.expiresAt < new Date()) {
+          return NextResponse.json(
+            { authenticated: false, reason: 'Session has expired. Please log in again.' },
+            { status: 401 }
+          );
+        }
+      }
+      // If no DB session found, JWT is still valid (graceful for sessions created before migration)
+    } catch (sessionCheckErr) {
+      // DB session check failed — allow JWT-only auth as fallback to avoid blocking users during migration
+      console.warn('DB session check failed (allowing JWT-only):', sessionCheckErr);
+    }
+
+    const sessionUser = sessionResult.user;
 
     // Verify against MySQL database for authoritative live status
     const dbUser = await prisma.userAccount.findFirst({

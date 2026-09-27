@@ -184,7 +184,8 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE /api/customers - Safe Archive or Permanent Delete for unused customers
+ * DELETE /api/customers - Delete Approval Workflow
+ * Super Admin: direct archive/delete. Store Manager: creates pending delete request.
  */
 export async function DELETE(req: NextRequest) {
   try {
@@ -201,6 +202,7 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const permanent = searchParams.get('permanent') === 'true';
+    const reason = searchParams.get('reason') || '';
 
     if (!id) {
       return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
@@ -211,7 +213,29 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Customer already deleted or non-existent' });
     }
 
-    // Check historical dependencies
+    // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────
+    if (user.securityLevel < 100) {
+      if (!reason || reason.trim().length < 3) {
+        return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+      }
+      const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
+      const result = await createDeleteRequest(user, {
+        entityType: 'CUSTOMER',
+        entityId: id,
+        reason: reason.trim(),
+      });
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 409 });
+      }
+      return NextResponse.json({
+        success: true,
+        mode: 'pending_approval',
+        deleteRequest: result.deleteRequest,
+        message: `Delete request for customer "${target.name}" submitted for Super Admin approval.`,
+      });
+    }
+
+    // ─── SUPER ADMIN: Direct delete/archive ─────────────────────────────────
     const [salesCount, repairCount] = await Promise.all([
       (prisma as any).salesOrder.count({ where: { customerId: target.id } }),
       (prisma as any).repairEnquiry.count({ where: { customerId: target.id } }),
@@ -219,10 +243,21 @@ export async function DELETE(req: NextRequest) {
 
     const hasHistory = salesCount > 0 || repairCount > 0 || Number(target.totalSpent) > 0 || Number(target.creditBalance) > 0;
 
-    if (hasHistory || !permanent || user.role !== 'Super Admin') {
+    if (hasHistory || !permanent) {
       const customer = await (prisma as any).customer.update({
         where: { id: target.id },
         data: { status: 'Archived' },
+      });
+
+      await (prisma as any).auditLog.create({
+        data: {
+          module: 'CUSTOMERS',
+          action: `ARCHIVED: Customer "${target.name}"`,
+          details: JSON.stringify({ customerId: target.id, salesCount, repairCount, totalSpent: target.totalSpent }),
+          userEmail: user.email,
+          userRole: user.role,
+          storeCode: user.store || 'CENTRAL',
+        },
       });
 
       broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: target.id, name: target.name, action: 'archived' });
@@ -238,10 +273,20 @@ export async function DELETE(req: NextRequest) {
       });
     }
 
-    // Hard-delete only for completely unused customers by Super Admin wrapped in atomic transaction
+    // Hard-delete only for completely unused customers by Super Admin
     await prisma.$transaction(async (tx: any) => {
       await tx.customerExternalLink.deleteMany({ where: { coskoCustomerId: target.id } });
       await tx.customer.delete({ where: { id: target.id } });
+      await tx.auditLog.create({
+        data: {
+          module: 'CUSTOMERS',
+          action: `HARD_DELETED: Customer "${target.name}"`,
+          details: JSON.stringify({ customerId: target.id, beforeState: target }),
+          userEmail: user.email,
+          userRole: user.role,
+          storeCode: user.store || 'CENTRAL',
+        },
+      });
     }, { maxWait: 15000, timeout: 45000 });
 
     broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: target.id, name: target.name, action: 'deleted' });
@@ -256,5 +301,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to archive/delete customer' }, { status: 500 });
   }
 }
-
-

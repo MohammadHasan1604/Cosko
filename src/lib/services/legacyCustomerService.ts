@@ -241,7 +241,7 @@ export async function searchCustomerWithLegacyBridge(
     );
 
     // Apply Field-Level Security: Redact internal technician notes for Sales Roles
-    const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Auditor'].includes(userRole);
+    const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Manager'].includes(userRole);
     const safeRepairs = legacyRepairs.map((r) => {
       // Store isolation: If repair is from another store and user is not Super Admin, check visibility
       const isSameStore = userRole === 'Super Admin' || r.storeCode === userStore;
@@ -394,7 +394,7 @@ export async function getLegacyRepairsList(filters: {
   }
 
   // Redact notes if user is not Manager or Super Admin
-  const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Auditor'].includes(userRole);
+  const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Manager'].includes(userRole);
   return list.map((r) => ({
     ...r,
     technicianNotes: isManagerOrAdmin ? r.technicianNotes : null,
@@ -411,7 +411,7 @@ export async function getLegacyRepairById(ticketIdOrNo: string, userRole: string
   );
   if (!repair) return null;
 
-  const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Auditor'].includes(userRole);
+  const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Manager'].includes(userRole);
   return {
     ...repair,
     technicianNotes: isManagerOrAdmin ? repair.technicianNotes : null,

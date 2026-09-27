@@ -51,7 +51,7 @@ async function runFullSyncVerification() {
       assert(!!token, 'Auth JWT token generated successfully');
 
       const payload = verifySessionToken(token);
-      assert(payload?.id === superAdmin.id && payload?.email === superAdmin.email, 'Token verified with server AUTH_SECRET');
+      assert(payload?.user?.id === superAdmin.id && payload?.user?.email === superAdmin.email, 'Token verified with server AUTH_SECRET');
     }
 
     // ------------------------------------------------------------------------

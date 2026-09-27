@@ -44,7 +44,7 @@ export default function InventoryHeader() {
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">Inventory & Movement Ledger</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            {activeSKUsCount} {selectedStore === 'All Stores' ? 'Catalog SKUs' : 'Store SKUs'} · Active Scope: <span className="font-semibold text-foreground">{selectedStore === 'All Stores' ? 'All Locations (Consolidated)' : selectedStore}</span> · Real-time stock tracking
+            {activeSKUsCount} {selectedStore === 'All Stores' ? 'Products (All Locations)' : 'Products'} · Active Scope: <span className="font-semibold text-foreground">{selectedStore === 'All Stores' ? 'All Locations (Consolidated)' : selectedStore}</span> · Real-time stock tracking
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

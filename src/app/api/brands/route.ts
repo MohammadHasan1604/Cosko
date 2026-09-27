@@ -175,8 +175,16 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const authUser = await getAuthUserFromRequest(req);
+    if (!authUser) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+    if (authUser.securityLevel < 80) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Insufficient permissions' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const reason = searchParams.get('reason') || '';
 
     if (!id) {
       return NextResponse.json(
@@ -185,14 +193,31 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    await prisma.brand.delete({ where: { id } });
+    const existing = await prisma.brand.findUnique({ where: { id } }).catch(() => null);
+    if (!existing) {
+      return NextResponse.json({ success: true, message: 'Brand already deleted or non-existent' });
+    }
+
+    // NON-SUPER-ADMIN: delete approval workflow
+    if (authUser.securityLevel < 100) {
+      if (!reason || reason.trim().length < 3) {
+        return NextResponse.json({ success: false, error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+      }
+      const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
+      const result = await createDeleteRequest(authUser, { entityType: 'BRAND', entityId: id, reason: reason.trim() });
+      if (!result.success) return NextResponse.json({ success: false, error: result.error }, { status: 409 });
+      return NextResponse.json({ success: true, mode: 'pending_approval', deleteRequest: result.deleteRequest, message: `Delete request for brand "${existing.name}" submitted for Super Admin approval.` });
+    }
+
+    // SUPER ADMIN: direct delete
+    await prisma.$transaction(async (tx: any) => {
+      await tx.brand.delete({ where: { id } });
+      await tx.auditLog.create({ data: { module: 'BRANDS', action: `DELETED: Brand "${existing.name}"`, details: JSON.stringify({ brandId: id, beforeState: existing }), userEmail: authUser.email, userRole: authUser.role, storeCode: authUser.store || 'CENTRAL' } });
+    });
 
     broadcastRealtimeEvent('brands', 'BRAND_DELETED', { id });
 
-    return NextResponse.json({
-      success: true,
-      message: 'Brand deleted successfully',
-    });
+    return NextResponse.json({ success: true, message: 'Brand deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting brand:', error);
     return NextResponse.json(
@@ -201,3 +226,4 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
+

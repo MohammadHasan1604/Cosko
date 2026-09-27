@@ -15,13 +15,10 @@ export type SecurityLevel = 100 | 80 | 60 | 40 | 20 | 10;
 export type UserRole =
   | 'Super Admin'
   | 'Store Manager'
-  | 'Department Manager'
-  | 'Accountant'
-  | 'Procurement Staff'
-  | 'Inventory Auditor'
+  | 'Inventory Manager'
   | 'Sales Executive'
   | 'POS Cashier'
-  | 'Employee';
+  | 'Restricted Employee';
 
 export type ResourceClassification =
   | 'PUBLIC'
@@ -35,7 +32,7 @@ export type ResourceClassification =
 export interface PermissionDefinition {
   code: string;
   name: string;
-  category: 'Dashboard' | 'Sales' | 'Inventory' | 'Purchases' | 'Customers' | 'Vendors' | 'Expenses' | 'Accounting' | 'Reports' | 'Employees' | 'Stores' | 'Users & Roles' | 'Audit Logs' | 'Settings' | 'Branding';
+  category: 'Dashboard' | 'Sales' | 'Inventory' | 'Purchases' | 'Customers' | 'Vendors' | 'Expenses' | 'Accounting' | 'Reports' | 'Employees' | 'Stores' | 'Users & Roles' | 'Audit Logs' | 'Settings' | 'Branding' | 'Delete Approval' | 'System';
   isProtected: boolean;
   minSecurityLevel: SecurityLevel;
 }
@@ -76,14 +73,40 @@ export interface ResourceRequest {
 export const ROLE_SECURITY_LEVELS: Record<UserRole, SecurityLevel> = {
   'Super Admin': 100,
   'Store Manager': 80,
-  'Department Manager': 60,
-  'Accountant': 60,
-  'Procurement Staff': 60,
-  'Inventory Auditor': 60,
+  'Inventory Manager': 60,
   'Sales Executive': 40,
   'POS Cashier': 20,
-  'Employee': 10,
+  'Restricted Employee': 10,
 };
+
+/**
+ * Modules restricted to Super Admin only (Level 100).
+ * These modules MUST NOT be accessible via navigation, API, or direct URL by any other role.
+ */
+export const SUPER_ADMIN_ONLY_MODULES = [
+  'Stock Transfers',
+  'Central Profit',
+  'Work Activity',
+  'Audit Logs',
+  'Stores',
+  'Users & Roles',
+  'Settings',
+] as const;
+
+/**
+ * Check if caller can manage a target role based on the security hierarchy.
+ * A user can only manage roles with a LOWER security level than their own.
+ */
+export function canManageRole(callerLevel: number, targetLevel: number): boolean {
+  return callerLevel > targetLevel;
+}
+
+/**
+ * Returns the maximum security level a caller can assign to users they create or modify.
+ */
+export function getMaxAssignableLevel(callerLevel: number): number {
+  return Math.max(10, callerLevel - 1);
+}
 
 /**
  * PROTECTED PERMISSIONS — ABSOLUTE SECURITY BOUNDARY
@@ -223,18 +246,23 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
   // Work Activity Tracking
   { code: 'activity.view', name: 'View Own Work Activity', category: 'Employees', isProtected: false, minSecurityLevel: 10 },
   { code: 'activity.view_all', name: 'View All Users Work Activity', category: 'Employees', isProtected: true, minSecurityLevel: 100 },
+
+  // Delete Approval Workflow
+  { code: 'delete_requests.view', name: 'View Own Delete Requests', category: 'Delete Approval', isProtected: false, minSecurityLevel: 80 },
+  { code: 'delete_requests.create', name: 'Submit Delete Request', category: 'Delete Approval', isProtected: false, minSecurityLevel: 80 },
+  { code: 'delete_requests.review', name: 'Approve / Reject Delete Requests', category: 'Delete Approval', isProtected: true, minSecurityLevel: 100 },
+
+  // Notifications
+  { code: 'notifications.view', name: 'View Notifications', category: 'System', isProtected: false, minSecurityLevel: 10 },
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   'Super Admin': ['ALL_PERMISSIONS'],
-  'Store Manager': ['dashboard.view', 'sales.view', 'sales.create', 'sales.discount', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.pay_credit', 'sales.print_receipt', 'sales.history', 'sales.attach_photo', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'inventory.transfer', 'inventory.history', 'purchases.view', 'purchases.create', 'purchases.edit', 'purchases.receive_grn', 'customers.view', 'customers.add', 'customers.edit', 'vendors.view', 'expenses.view', 'expenses.create', 'accounting.view', 'reports.view', 'employees.view', 'stores.view', 'activity.view'],
-  'Department Manager': ['dashboard.view', 'sales.view', 'inventory.view', 'purchases.view', 'vendors.view', 'reports.view', 'activity.view'],
-  'Accountant': ['dashboard.view', 'accounting.view', 'accounting.pnl', 'accounting.balance_sheet', 'accounting.gst', 'accounting.margin', 'accounting.export', 'expenses.view', 'expenses.create', 'expenses.approve', 'reports.view', 'activity.view'],
-  'Procurement Staff': ['dashboard.view', 'purchases.view', 'purchases.create', 'purchases.edit', 'purchases.receive_grn', 'vendors.view', 'vendors.add', 'vendors.edit', 'inventory.view', 'activity.view'],
-  'Inventory Auditor': ['dashboard.view', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'inventory.history', 'purchases.view', 'purchases.receive_grn', 'reports.view', 'activity.view'],
-  'Sales Executive': ['sales.view', 'sales.create', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.print_receipt', 'sales.history', 'sales.attach_photo', 'customers.view', 'customers.add', 'activity.view'],
+  'Store Manager': ['dashboard.view', 'sales.view', 'sales.create', 'sales.discount', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.pay_credit', 'sales.print_receipt', 'sales.history', 'sales.attach_photo', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'inventory.transfer', 'inventory.history', 'purchases.view', 'purchases.create', 'purchases.edit', 'purchases.receive_grn', 'customers.view', 'customers.add', 'customers.edit', 'vendors.view', 'expenses.view', 'expenses.create', 'accounting.view', 'reports.view', 'employees.view', 'stores.view', 'activity.view', 'delete_requests.view', 'delete_requests.create', 'notifications.view'],
+  'Inventory Manager': ['dashboard.view', 'inventory.view', 'inventory.add', 'inventory.edit', 'inventory.adjust', 'inventory.history', 'purchases.view', 'purchases.create', 'purchases.edit', 'purchases.receive_grn', 'vendors.view', 'vendors.add', 'vendors.edit', 'reports.view', 'activity.view'],
+  'Sales Executive': ['dashboard.view', 'sales.view', 'sales.create', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.print_receipt', 'sales.history', 'sales.attach_photo', 'customers.view', 'customers.add', 'activity.view'],
   'POS Cashier': ['sales.view', 'sales.create', 'sales.pay_cash', 'sales.pay_upi', 'sales.pay_card', 'sales.print_receipt', 'customers.view', 'activity.view'],
-  'Employee': ['sales.view', 'activity.view'],
+  'Restricted Employee': ['dashboard.view', 'activity.view'],
 };
 
 export class RBACEngine {

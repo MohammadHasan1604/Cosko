@@ -90,7 +90,7 @@ async function verifyCleanDbState() {
     });
 
     const verifiedSession = verifySessionToken(sessionToken);
-    assert(verifiedSession?.email === 'cosko@gmail.com' && verifiedSession?.role === 'Super Admin', 'Session token is signed with server secret and verified');
+    assert(verifiedSession?.user?.email === 'cosko@gmail.com' && verifiedSession?.user?.role === 'Super Admin', 'Session token is signed with server secret and verified');
 
     // 4. Persistence Lifecycle Test (Create, Verify, Delete, Return to Clean)
     console.log('\n--- Test Group 4: Persistence Lifecycle & Cleanup Test ---');

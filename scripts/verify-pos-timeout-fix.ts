@@ -60,6 +60,8 @@ async function main() {
     discountAmount: 100,
     paymentMethod: 'UPI',
     cashierName: 'Timeout Test Suite',
+    paymentProofUrl: '/uploads/payment-proofs/test-proof.png',
+    referenceNo: 'POS-TEST-REF-1',
   });
   const duration1 = Date.now() - t0;
   console.log(`Checkout executed in ${duration1}ms (Well below 5000ms threshold)`);
@@ -118,6 +120,8 @@ async function main() {
       ],
       paymentMethod: pm,
       cashierName: 'Timeout Test Suite',
+      paymentProofUrl: '/uploads/payment-proofs/test-proof.png',
+      referenceNo: `POS-TEST-${pm}-REF`,
     });
 
     const finPM = await prisma.financialLedgerEntry.findMany({

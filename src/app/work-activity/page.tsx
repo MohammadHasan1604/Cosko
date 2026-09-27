@@ -6,6 +6,7 @@ import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
+import SuperAdminGuard from '@/components/SuperAdminGuard';
 
 type PeriodFilter = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom' | 'all_time';
 
@@ -220,6 +221,7 @@ export default function WorkActivityPage() {
   };
 
   return (
+    <SuperAdminGuard moduleName="Work Activity">
     <AppLayout activeRoute="/work-activity">
       <div className="space-y-6 fade-in">
         {/* Top Header */}
@@ -768,5 +770,6 @@ export default function WorkActivityPage() {
         </Modal>
       )}
     </AppLayout>
+    </SuperAdminGuard>
   );
 }

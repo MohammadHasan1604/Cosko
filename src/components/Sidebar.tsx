@@ -40,7 +40,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   const lowStockCount = inventory.filter((i) => i.qtyOnHand <= i.reorderPt).length;
   const pendingPOCount = purchases.filter((p) => p.status === 'Sent' || p.status === 'Draft').length;
 
-  // Strict RBAC Navigation Group Filtering
+  // Strict RBAC Navigation — Super Admin-only modules enforced per requirements
   const roleAllowedHrefs: Record<string, string[]> = {
     'Super Admin': [
       '/dashboard', '/sales', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/customers',
@@ -48,18 +48,21 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
       '/reports', '/employees', '/stores', '/users', '/work-activity', '/audit-logs', '/settings'
     ],
     'Store Manager': [
-      '/dashboard', '/sales', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/customers',
-      '/vendors', '/expenses', '/accounting', '/central-profit',
-      '/reports', '/employees', '/work-activity'
+      '/dashboard', '/sales', '/inventory-management', '/categories', '/purchases', '/customers',
+      '/vendors', '/expenses', '/accounting',
+      '/reports', '/employees'
     ],
-    'Inventory Auditor': [
-      '/dashboard', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/vendors', '/reports', '/work-activity'
-    ],
-    'POS Cashier': [
-      '/sales', '/customers', '/work-activity'
+    'Inventory Manager': [
+      '/dashboard', '/inventory-management', '/categories', '/purchases', '/vendors', '/reports'
     ],
     'Sales Executive': [
-      '/sales', '/customers', '/work-activity'
+      '/dashboard', '/sales', '/customers'
+    ],
+    'POS Cashier': [
+      '/sales', '/customers'
+    ],
+    'Restricted Employee': [
+      '/dashboard'
     ],
   };
 

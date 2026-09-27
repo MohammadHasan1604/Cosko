@@ -346,7 +346,8 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE /api/expenses - Delete an expense record atomically with ledger clean
+ * DELETE /api/expenses - Delete Approval Workflow
+ * Super Admin: direct delete with ledger cleanup. Store Manager: creates pending delete request.
  */
 export async function DELETE(req: NextRequest) {
   try {
@@ -362,6 +363,7 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const reason = searchParams.get('reason') || '';
 
     if (!id) {
       return NextResponse.json({ error: 'Expense ID is required' }, { status: 400 });
@@ -375,6 +377,29 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Expense already removed' });
     }
 
+    // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────
+    if (user.securityLevel < 100) {
+      if (!reason || reason.trim().length < 3) {
+        return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+      }
+      const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
+      const result = await createDeleteRequest(user, {
+        entityType: 'EXPENSE',
+        entityId: target.id,
+        reason: reason.trim(),
+      });
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 409 });
+      }
+      return NextResponse.json({
+        success: true,
+        mode: 'pending_approval',
+        deleteRequest: result.deleteRequest,
+        message: `Delete request for expense "${target.expenseNo}" submitted for Super Admin approval.`,
+      });
+    }
+
+    // ─── SUPER ADMIN: Direct delete with ledger cleanup ─────────────────────
     await prisma.$transaction(async (tx: any) => {
       await tx.financialLedgerEntry.deleteMany({
         where: {
@@ -383,6 +408,16 @@ export async function DELETE(req: NextRequest) {
         },
       });
       await tx.expense.delete({ where: { id: target.id } });
+      await tx.auditLog.create({
+        data: {
+          module: 'EXPENSES',
+          action: `DELETED: Expense "${target.expenseNo}" (₹${target.amount})`,
+          details: JSON.stringify({ expenseId: target.id, beforeState: target }),
+          userEmail: user.email,
+          userRole: user.role,
+          storeCode: target.storeCode || user.store || 'CENTRAL',
+        },
+      });
     }, { maxWait: 15000, timeout: 45000 });
 
     broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id: target.id, action: 'deleted' });
@@ -393,3 +428,4 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to delete expense' }, { status: 500 });
   }
 }
+

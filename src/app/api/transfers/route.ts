@@ -17,6 +17,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Super Admin only — Stock Transfers is a privileged module
+    if (user.role !== 'Super Admin') {
+      return NextResponse.json({ error: 'Forbidden: Stock Transfers is restricted to Super Admin only' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const store = searchParams.get('store');
 
@@ -98,9 +103,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Role check: Only Super Admin and Store Managers can create transfers
-    if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient security level for stock transfer' }, { status: 403 });
+    // Super Admin only — Stock Transfers is a privileged module
+    if (user.role !== 'Super Admin') {
+      return NextResponse.json({ error: 'Forbidden: Stock Transfers is restricted to Super Admin only' }, { status: 403 });
     }
 
     const body: CreateTransferInput = await req.json();
@@ -182,8 +187,8 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to modify stock transfers' }, { status: 403 });
+    if (user.role !== 'Super Admin') {
+      return NextResponse.json({ error: 'Forbidden: Stock Transfers is restricted to Super Admin only' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -326,8 +331,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient security level' }, { status: 403 });
+    if (user.role !== 'Super Admin') {
+      return NextResponse.json({ error: 'Forbidden: Stock Transfers is restricted to Super Admin only' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);

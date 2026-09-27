@@ -7,6 +7,7 @@ import { useApp, StoreHub, InventoryItem } from '@/context/AppContext';
 import StoreFormModal from '@/components/forms/StoreFormModal';
 import StockTransferModal from '@/components/forms/StockTransferModal';
 import { toast } from 'sonner';
+import SuperAdminGuard from '@/components/SuperAdminGuard';
 
 export default function StoresPage() {
   const { storesList, addStoreHub, updateStoreHub, deleteStoreHub, setSelectedStore, inventory, transferStock, currentUser } = useApp();
@@ -34,6 +35,7 @@ export default function StoresPage() {
 
 
   return (
+    <SuperAdminGuard moduleName="Store Management">
     <AppLayout activeRoute="/stores">
       <div className="space-y-6 fade-in">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -218,5 +220,6 @@ export default function StoresPage() {
         onSuccess={() => setTransferModal(false)}
       />
     </AppLayout>
+    </SuperAdminGuard>
   );
 }

@@ -235,7 +235,7 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE /api/repairs - Delete a repair ticket from MySQL
+ * DELETE /api/repairs - Delete Approval Workflow
  */
 export async function DELETE(req: NextRequest) {
   try {
@@ -251,6 +251,7 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const reason = searchParams.get('reason') || '';
 
     if (!id) {
       return NextResponse.json({ error: 'Repair ID is required' }, { status: 400 });
@@ -264,15 +265,28 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Ticket already removed' });
     }
 
-    await prisma.repairEnquiry.delete({
-      where: { id: target.id },
+    // NON-SUPER-ADMIN: delete approval workflow
+    if (user.securityLevel < 100) {
+      if (!reason || reason.trim().length < 3) {
+        return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+      }
+      const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
+      const result = await createDeleteRequest(user, { entityType: 'REPAIR', entityId: target.id, reason: reason.trim() });
+      if (!result.success) return NextResponse.json({ error: result.error }, { status: 409 });
+      return NextResponse.json({ success: true, mode: 'pending_approval', deleteRequest: result.deleteRequest, message: `Delete request for repair ticket "${target.ticketNo}" submitted for Super Admin approval.` });
+    }
+
+    // SUPER ADMIN: direct delete
+    await prisma.$transaction(async (tx: any) => {
+      await tx.repairEnquiry.delete({ where: { id: target.id } });
+      await tx.auditLog.create({ data: { module: 'REPAIRS', action: `DELETED: Repair ticket "${target.ticketNo}"`, details: JSON.stringify({ repairId: target.id, beforeState: target }), userEmail: user.email, userRole: user.role, storeCode: user.store || 'CENTRAL' } });
     });
 
     broadcastRealtimeEvent('repairs', 'REPAIR_UPDATED', { id: target.id, action: 'deleted' });
-
     return NextResponse.json({ success: true, message: `Repair ticket ${target.ticketNo} deleted successfully` });
   } catch (error: any) {
     console.error('API /api/repairs DELETE error:', error);
     return NextResponse.json({ error: error.message || 'Failed to delete repair ticket' }, { status: 500 });
   }
 }
+

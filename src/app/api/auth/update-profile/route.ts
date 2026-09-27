@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     const token = req.cookies.get('cosko_session')?.value;
     const session = token ? verifySessionToken(token) : null;
 
-    if (!session || !session.id) {
+    if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
 
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     const updatedUser = await prisma.userAccount.update({
-      where: { id: session.id },
+      where: { id: session.user.id },
       data: {
         ...(name ? { name: name.trim() } : {}),
         ...(phone !== undefined ? { phone: phone ? phone.trim() : null } : {}),

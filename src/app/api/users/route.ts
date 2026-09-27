@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, email, password, role, store, phone, status, securityLevel } = body;
+    const { name, email, password, phone, store, status } = body;
 
     if (!email || !name) {
       return NextResponse.json({ success: false, error: 'Name and email are required' }, { status: 400 });
@@ -93,16 +93,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Password is required to provision a new account' }, { status: 400 });
     }
 
+    // Whitelist allowed roles and map to security levels — prevent mass assignment
+    const ROLE_LEVEL_MAP: Record<string, number> = {
+      'Store Manager': 80,
+      'Inventory Manager': 60,
+      'Sales Executive': 40,
+      'POS Cashier': 20,
+      'Restricted Employee': 10,
+    };
+
+    const requestedRole = body.role || 'POS Cashier';
+    const requestedLevel = body.securityLevel !== undefined ? Number(body.securityLevel) : undefined;
+
     // 🔒 STRICT SUPER ADMIN SINGLETON: No user can create another Super Admin
-    if (role === 'Super Admin' || Number(securityLevel) === 100) {
+    if (requestedRole === 'Super Admin' || requestedLevel === 100) {
       return NextResponse.json(
         { success: false, error: 'Forbidden: System enforces exactly ONE protected Super Admin. Creating additional Super Admin accounts is prohibited.' },
         { status: 403 }
       );
     }
 
+    // 🔒 LEVEL CEILING: Caller cannot create users at or above their own level
+    const targetLevel = ROLE_LEVEL_MAP[requestedRole] || requestedLevel || 20;
+    if (authUser.role !== 'Super Admin' && targetLevel >= authUser.securityLevel) {
+      return NextResponse.json(
+        { success: false, error: `Forbidden: You cannot create users at or above your own security level (${authUser.securityLevel}). Maximum assignable level: ${authUser.securityLevel - 1}.` },
+        { status: 403 }
+      );
+    }
+
+    // Validate role is in the allowed set
+    if (!ROLE_LEVEL_MAP[requestedRole]) {
+      return NextResponse.json(
+        { success: false, error: `Invalid role: "${requestedRole}". Allowed roles: ${Object.keys(ROLE_LEVEL_MAP).join(', ')}` },
+        { status: 400 }
+      );
+    }
+
     const cleanEmail = email.toLowerCase().trim();
-    const level = securityLevel || (role === 'Store Manager' ? 80 : role === 'Inventory Auditor' ? 60 : role === 'Sales Executive' ? 40 : 20);
+    const role = requestedRole;
+    const level = ROLE_LEVEL_MAP[role];
 
     const existing = await prisma.userAccount.findUnique({
       where: { email: cleanEmail },
@@ -207,31 +237,30 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const {
-      id,
-      email,
-      name,
-      role,
-      store,
-      status,
-      securityLevel,
-      password,
-      shiftStatus,
-      allowedStores,
-      assignedStores,
-      overrides,
-    } = body;
+    const { id, email, name, store, status, password, shiftStatus, allowedStores, assignedStores, overrides } = body;
+
+    // Whitelist allowed roles — prevent mass assignment
+    const ROLE_LEVEL_MAP: Record<string, number> = {
+      'Store Manager': 80,
+      'Inventory Manager': 60,
+      'Sales Executive': 40,
+      'POS Cashier': 20,
+      'Restricted Employee': 10,
+    };
 
     const targetUser = await prisma.userAccount.findFirst({
-      where: id ? { id } : { email: email.toLowerCase().trim() },
+      where: id ? { id } : { email: email?.toLowerCase().trim() },
     });
 
     if (!targetUser) {
       return NextResponse.json({ success: false, error: 'User account not found' }, { status: 404 });
     }
 
+    const requestedRole = body.role;
+    const requestedLevel = body.securityLevel !== undefined ? Number(body.securityLevel) : undefined;
+
     // 🔒 STRICT SUPER ADMIN SINGLETON: Cannot promote any user to Super Admin
-    if (targetUser.role !== 'Super Admin' && (role === 'Super Admin' || Number(securityLevel) === 100)) {
+    if (targetUser.role !== 'Super Admin' && (requestedRole === 'Super Admin' || requestedLevel === 100)) {
       return NextResponse.json({
         success: false,
         error: 'Forbidden: System enforces exactly ONE protected Super Admin. Promoting accounts to Super Admin is prohibited.',
@@ -246,13 +275,23 @@ export async function PUT(req: NextRequest) {
       if (targetUser.storeScope && !callerAllowed.includes(targetUser.storeScope)) {
         return NextResponse.json({ success: false, error: 'Forbidden: You cannot modify users outside your assigned stores' }, { status: 403 });
       }
+      // 🔒 LEVEL CEILING: Cannot change role to same or higher level
+      if (requestedRole && ROLE_LEVEL_MAP[requestedRole] !== undefined) {
+        if (ROLE_LEVEL_MAP[requestedRole] >= authUser.securityLevel) {
+          return NextResponse.json({ success: false, error: `Forbidden: You cannot assign role "${requestedRole}" (level ${ROLE_LEVEL_MAP[requestedRole]}) at or above your own level (${authUser.securityLevel}).` }, { status: 403 });
+        }
+      }
     }
 
     const updateData: any = {};
     if (name) updateData.name = name.trim();
-    if (role && targetUser.role !== 'Super Admin') updateData.role = role;
+    if (requestedRole && targetUser.role !== 'Super Admin') {
+      if (ROLE_LEVEL_MAP[requestedRole]) {
+        updateData.role = requestedRole;
+        updateData.securityLevel = ROLE_LEVEL_MAP[requestedRole];
+      }
+    }
     if (status) updateData.status = status;
-    if (securityLevel !== undefined && targetUser.role !== 'Super Admin') updateData.securityLevel = Number(securityLevel);
     if (shiftStatus) updateData.shiftStatus = shiftStatus;
 
     // 🔒 Protected Super Admin preserves role and All Stores scope unconditionally

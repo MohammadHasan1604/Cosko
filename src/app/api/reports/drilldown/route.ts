@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if ((user.securityLevel || 0) < 80 && user.role !== 'Super Admin' && user.role !== 'Store Manager' && user.role !== 'Accountant') {
+    if ((user.securityLevel || 0) < 60 && user.role !== 'Super Admin' && user.role !== 'Store Manager') {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 

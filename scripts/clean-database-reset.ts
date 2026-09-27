@@ -62,18 +62,18 @@ async function cleanDatabaseReset() {
 
       // 3. Ensure Core 5 Store Hubs exist and are active
       const coreStores = [
-        { code: 'CENTRAL', name: 'COSKO Central Warehouse & Owner Stock', city: 'Bengaluru', address: 'Central Hub, Bengaluru', registersCount: 0, skusCount: 0, monthlyRevenue: 0 },
-        { code: 'BLR', name: 'Bengaluru Central Hub', city: 'Bengaluru', address: 'Indiranagar 100ft Rd, Bengaluru', registersCount: 4, skusCount: 0, monthlyRevenue: 0 },
-        { code: 'HYD', name: 'Hyderabad Warehouse & Outlet', city: 'Hyderabad', address: 'Hitech City Phase 2, Hyderabad', registersCount: 3, skusCount: 0, monthlyRevenue: 0 },
-        { code: 'DEL', name: 'Delhi NCR Fulfillment Center', city: 'Delhi', address: 'Okhla Industrial Area Ph-III, New Delhi', registersCount: 5, skusCount: 0, monthlyRevenue: 0 },
-        { code: 'MUM', name: 'Mumbai Commercial Hub', city: 'Mumbai', address: 'Bandra Kurla Complex, Mumbai', registersCount: 4, skusCount: 0, monthlyRevenue: 0 },
+        { code: 'CENTRAL', name: 'COSKO Central Warehouse & Owner Stock', city: 'Bengaluru', address: 'Central Hub, Bengaluru' },
+        { code: 'BLR', name: 'Bengaluru Central Hub', city: 'Bengaluru', address: 'Indiranagar 100ft Rd, Bengaluru' },
+        { code: 'HYD', name: 'Hyderabad Warehouse & Outlet', city: 'Hyderabad', address: 'Hitech City Phase 2, Hyderabad' },
+        { code: 'DEL', name: 'Delhi NCR Fulfillment Center', city: 'Delhi', address: 'Okhla Industrial Area Ph-III, New Delhi' },
+        { code: 'MUM', name: 'Mumbai Commercial Hub', city: 'Mumbai', address: 'Bandra Kurla Complex, Mumbai' },
       ];
 
       for (const st of coreStores) {
         await tx.storeHub.upsert({
           where: { code: st.code },
-          update: { name: st.name, city: st.city, address: st.address, registersCount: st.registersCount, skusCount: 0, monthlyRevenue: 0, status: 'Active' },
-          create: { code: st.code, name: st.name, city: st.city, address: st.address, registersCount: st.registersCount, skusCount: 0, monthlyRevenue: 0, status: 'Active' },
+          update: { name: st.name, city: st.city, address: st.address, status: 'Active' },
+          create: { code: st.code, name: st.name, city: st.city, address: st.address, status: 'Active' },
         });
       }
 

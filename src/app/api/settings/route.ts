@@ -86,13 +86,23 @@ function invalidateSettingsCache() {
 
 /**
  * GET /api/settings - Retrieve all settings (branding + system) from MySQL
+ * REQUIRES: Authenticated Super Admin — contains GSTIN, UPI, security config
  */
 export async function GET(req: NextRequest) {
   try {
+    // SECURITY: Settings contain sensitive business data (GSTIN, UPI, bank details, security config)
+    const user = getAuthUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required to access settings' }, { status: 401 });
+    }
+    if (user.role !== 'Super Admin') {
+      return NextResponse.json({ error: 'Forbidden: Only Super Admin can access system settings' }, { status: 403 });
+    }
+
     const forceFresh = req.nextUrl.searchParams.get('fresh') === 'true';
     if (!forceFresh && cachedSettingsPayload && Date.now() - lastSettingsCacheTime < SETTINGS_CACHE_TTL) {
       return NextResponse.json(cachedSettingsPayload, {
-        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
+        headers: { 'Cache-Control': 'private, no-store, no-cache, must-revalidate' },
       });
     }
 
@@ -164,7 +174,7 @@ export async function GET(req: NextRequest) {
     lastSettingsCacheTime = Date.now();
 
     return NextResponse.json(payload, {
-      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
+      headers: { 'Cache-Control': 'private, no-store, no-cache, must-revalidate' },
     });
   } catch (error: any) {
     console.error('API /api/settings GET error:', error);

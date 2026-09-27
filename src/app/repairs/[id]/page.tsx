@@ -36,7 +36,7 @@ export default function RepairDetailPage() {
     if (ticketId) fetchDetail();
   }, [ticketId]);
 
-  const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Auditor'].includes(currentUser.role);
+  const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Manager'].includes(currentUser.role);
 
   return (
     <AppLayout activeRoute="/repairs">

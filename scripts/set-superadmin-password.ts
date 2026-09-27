@@ -25,13 +25,13 @@ async function setSuperAdminPassword() {
   console.log(`✅ Super Admin (${updated.name} - ${updated.email}) updated successfully!`);
   console.log(`✅ Role: ${updated.role}, Security Level: ${updated.securityLevel}`);
   console.log(`✅ Password verification test: ${verified ? 'SUCCESS (Password matches hash)' : 'FAILED'}`);
+  await prisma.$disconnect();
+  process.exit(0);
 }
 
 setSuperAdminPassword()
-  .catch((err) => {
+  .catch(async (err) => {
     console.error('Failed to update Super Admin password:', err);
-    process.exit(1);
-  })
-  .finally(async () => {
     await prisma.$disconnect();
+    process.exit(1);
   });

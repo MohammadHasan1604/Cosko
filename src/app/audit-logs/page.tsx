@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useApp } from '@/context/AppContext';
+import SuperAdminGuard from '@/components/SuperAdminGuard';
 
 export default function AuditLogsPage() {
   const { auditLogs } = useApp();
@@ -13,6 +14,7 @@ export default function AuditLogsPage() {
     : auditLogs.filter((l) => l.module === filterModule);
 
   return (
+    <SuperAdminGuard moduleName="Audit Logs">
     <AppLayout activeRoute="/audit-logs">
       <div className="space-y-6 fade-in">
         {/* Page Header */}
@@ -95,5 +97,6 @@ export default function AuditLogsPage() {
         </div>
       </div>
     </AppLayout>
+    </SuperAdminGuard>
   );
 }

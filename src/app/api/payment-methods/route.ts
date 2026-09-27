@@ -193,8 +193,17 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const authUser = await getAuthUserFromRequest(req);
+    if (!authUser) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (authUser.securityLevel < 80) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Insufficient permissions' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const reason = searchParams.get('reason') || '';
 
     if (!id) {
       return NextResponse.json(
@@ -218,7 +227,42 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    await prisma.paymentMethod.delete({ where: { id } });
+    // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────
+    if (authUser.securityLevel < 100) {
+      if (!reason || reason.trim().length < 3) {
+        return NextResponse.json({ success: false, error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+      }
+      const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
+      const result = await createDeleteRequest(authUser, {
+        entityType: 'PAYMENT_METHOD',
+        entityId: id,
+        reason: reason.trim(),
+      });
+      if (!result.success) {
+        return NextResponse.json({ success: false, error: result.error }, { status: 409 });
+      }
+      return NextResponse.json({
+        success: true,
+        mode: 'pending_approval',
+        deleteRequest: result.deleteRequest,
+        message: `Delete request for payment method "${existing.name}" submitted for Super Admin approval.`,
+      });
+    }
+
+    // ─── SUPER ADMIN: Direct delete ─────────────────────────────────────────
+    await prisma.$transaction(async (tx: any) => {
+      await tx.paymentMethod.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: {
+          module: 'PAYMENT_METHODS',
+          action: `DELETED: Payment method "${existing.name}" (${existing.code})`,
+          details: JSON.stringify({ paymentMethodId: id, beforeState: existing }),
+          userEmail: authUser.email,
+          userRole: authUser.role,
+          storeCode: authUser.store || 'CENTRAL',
+        },
+      });
+    });
 
     invalidateCache();
     broadcastRealtimeEvent('payment-methods', 'PAYMENT_METHOD_DELETED', { id });
@@ -235,3 +279,4 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
+

@@ -25,32 +25,33 @@ interface AppLayoutProps {
 
 const superAdminOnly = ['Super Admin'];
 const managerRoles = ['Super Admin', 'Store Manager'];
-const auditorRoles = ['Super Admin', 'Store Manager', 'Inventory Auditor'];
-const cashierRoles = ['Super Admin', 'Store Manager', 'POS Cashier', 'Sales Executive'];
-const allRoles = ['Super Admin', 'Store Manager', 'Department Manager', 'Accountant', 'Procurement Staff', 'Inventory Auditor', 'Sales Executive', 'POS Cashier', 'Employee'];
+const inventoryRoles = ['Super Admin', 'Store Manager', 'Inventory Manager'];
+const cashierRoles = ['Super Admin', 'Store Manager', 'Sales Executive', 'POS Cashier'];
+const allRoles = ['Super Admin', 'Store Manager', 'Inventory Manager', 'Sales Executive', 'POS Cashier', 'Restricted Employee'];
 
 const routePermissions: Record<string, string[]> = {
-  '/dashboard': managerRoles,
+  '/dashboard': allRoles,
   '/sales': cashierRoles,
-  '/inventory-management': auditorRoles,
-  '/categories': auditorRoles,
-  '/purchases': auditorRoles,
+  '/inventory-management': inventoryRoles,
+  '/categories': inventoryRoles,
+  '/purchases': inventoryRoles,
   '/customers': cashierRoles,
   '/customers/existing': cashierRoles,
   '/customers/360': cashierRoles,
   '/repairs': cashierRoles,
-  '/vendors': auditorRoles,
+  '/vendors': inventoryRoles,
   '/expenses': managerRoles,
   '/accounting': managerRoles,
-  '/central-profit': managerRoles,
-  '/reports': auditorRoles,
+  '/central-profit': superAdminOnly,
+  '/reports': inventoryRoles,
   '/employees': managerRoles,
   '/stores': superAdminOnly,
   '/users': superAdminOnly,
-  '/work-activity': allRoles,
+  '/work-activity': superAdminOnly,
   '/audit-logs': superAdminOnly,
   '/settings': superAdminOnly,
   '/settings/data-connections': superAdminOnly,
+  '/stock-transfers': superAdminOnly,
 };
 
 export default function AppLayout({ children, activeRoute }: AppLayoutProps) {

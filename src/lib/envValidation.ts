@@ -48,8 +48,19 @@ export function validateEnvironment(): EnvValidationResult {
     warnings.push('DATABASE_URL is not set. Application requires a valid MySQL connection string.');
   }
 
+  const INSECURE_DEFAULT = 'cosko_enterprise_jwt_secret_key_production_2026_change_in_prod';
   if (!authConfigured) {
-    warnings.push('AUTH_SECRET is not set. A default fallback is being used. Set AUTH_SECRET in production environment variables.');
+    if (process.env.NODE_ENV === 'production') {
+      warnings.push('FATAL: AUTH_SECRET is not set. Production MUST have a strong, unique secret. Application will refuse to authenticate.');
+    } else {
+      warnings.push('AUTH_SECRET is not set. Authentication will not work. Set AUTH_SECRET in your .env file.');
+    }
+  } else if (authSecret === INSECURE_DEFAULT) {
+    if (process.env.NODE_ENV === 'production') {
+      warnings.push('FATAL: AUTH_SECRET is set to the insecure default value. Generate a strong random secret for production.');
+    } else {
+      warnings.push('WARNING: AUTH_SECRET is set to the insecure default. Generate a strong random secret before deploying.');
+    }
   }
 
   return {

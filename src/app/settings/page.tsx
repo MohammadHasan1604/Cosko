@@ -9,6 +9,7 @@ import { useApp, PaymentMethodItem } from '@/context/AppContext';
 import { toast } from 'sonner';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import PaymentMethodModal from '@/components/forms/PaymentMethodModal';
+import SuperAdminGuard from '@/components/SuperAdminGuard';
 
 // GSTIN Regex: 2 digit state code + 10-char PAN + 1 entity code + Z + 1 checksum
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -340,6 +341,7 @@ export default function SettingsPage() {
   };
 
   return (
+    <SuperAdminGuard moduleName="Settings">
     <AppLayout activeRoute="/settings">
       <div className="space-y-6 fade-in max-w-5xl">
         {/* Page Header */}
@@ -1677,5 +1679,6 @@ export default function SettingsPage() {
         zIndex={1200}
       />
     </AppLayout>
+    </SuperAdminGuard>
   );
 }

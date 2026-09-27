@@ -1,5 +1,5 @@
 import { prisma } from '../src/lib/db';
-import { hashPassword, comparePassword, signSessionToken, verifySessionToken, revokeSession, isSessionRevoked } from '../src/lib/auth';
+import { hashPassword, comparePassword, signSessionToken, verifySessionToken, hashToken } from '../src/lib/auth';
 import { checkRateLimit, recordFailedAttempt, clearRateLimit } from '../src/lib/rateLimit';
 
 async function runAuthSecuritySuite() {
@@ -85,8 +85,8 @@ async function runAuthSecuritySuite() {
     assert(!!token && token.split('.').length === 3, 'JWT session token formatted with 3 parts (header.payload.signature)');
 
     const decoded = verifySessionToken(token);
-    assert(decoded?.id === superAdmin!.id && decoded?.email === superAdmin!.email, 'Session token decodes and verifies against server secret');
-    assert(decoded?.mustChangePassword === true, 'Session token carries mustChangePassword flag');
+    assert(decoded?.user?.id === superAdmin!.id && decoded?.user?.email === superAdmin!.email, 'Session token decodes and verifies against server secret');
+    assert(decoded?.user?.mustChangePassword === true, 'Session token carries mustChangePassword flag');
 
     // ------------------------------------------------------------------------
     // 6. RATE LIMITING & BRUTE FORCE PROTECTION
@@ -181,14 +181,31 @@ async function runAuthSecuritySuite() {
     });
 
     // ------------------------------------------------------------------------
-    // 9. SESSION REVOCATION / LOGOUT
+    // 9. SESSION REVOCATION / LOGOUT (DB-BACKED)
     // ------------------------------------------------------------------------
     console.log('\n--- Test Group 9: Session Revocation & Invalidation ---');
     const activeToken = signSessionToken(sessionUser);
-    assert(!isSessionRevoked(activeToken), 'Token is valid before logout');
+    const tokenHash = hashToken(activeToken);
 
-    revokeSession(activeToken);
-    assert(isSessionRevoked(activeToken), 'Token is marked revoked after logout');
+    // Create DB session
+    const dbSess = await (prisma as any).userSession.create({
+      data: {
+        userId: superAdmin!.id,
+        tokenHash,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+    assert(dbSess.revokedAt === null, 'Token is valid before logout');
+
+    // Revoke DB session
+    await (prisma as any).userSession.update({
+      where: { id: dbSess.id },
+      data: { revokedAt: new Date() },
+    });
+    const revokedSess = await (prisma as any).userSession.findUnique({
+      where: { id: dbSess.id },
+    });
+    assert(revokedSess?.revokedAt !== null, 'Token is marked revoked after logout');
 
     // ------------------------------------------------------------------------
     // 10. ATOMIC TRANSACTION USER PROVISIONING

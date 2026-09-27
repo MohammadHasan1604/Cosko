@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     }
 
     const cleanEmail = email.toLowerCase().trim();
-    const level = securityLevel || (role === 'Store Manager' ? 80 : role === 'Inventory Auditor' ? 60 : role === 'Sales Executive' ? 40 : 20);
+    const level = securityLevel || (role === 'Store Manager' ? 80 : role === 'Inventory Manager' ? 60 : role === 'Sales Executive' ? 40 : 20);
 
     const existing = await prisma.userAccount.findUnique({
       where: { email: cleanEmail },

@@ -458,7 +458,8 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE /api/inventory - Safe Archive or Permanent Delete for unused products
+ * DELETE /api/inventory - Delete Approval Workflow
+ * Super Admin: direct archive/delete. Store Manager: creates pending delete request.
  */
 export async function DELETE(req: NextRequest) {
   try {
@@ -475,18 +476,18 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const permanent = searchParams.get('permanent') === 'true';
+    const reason = searchParams.get('reason') || '';
 
     if (!id) {
       return NextResponse.json({ error: 'Product ID or SKU is required' }, { status: 400 });
     }
 
-    // Try finding by id first, then by sku
+    // Try finding by id first, then by sku, then by inventory id
     let target = await prisma.product.findUnique({ where: { id } }).catch(() => null);
     if (!target) {
       target = await prisma.product.findFirst({ where: { sku: id } });
     }
     if (!target) {
-      // Check if id is an inventory id
       const inv = await prisma.inventory.findUnique({ where: { id } }).catch(() => null);
       if (inv) {
         target = await prisma.product.findUnique({ where: { id: inv.productId } });
@@ -494,7 +495,6 @@ export async function DELETE(req: NextRequest) {
     }
     if (!target && id.includes('-')) {
       const parts = id.split('-');
-      // Standard UUID is 5 segments: 8-4-4-4-12. If store or UNASSIGNED was appended, parts.length > 5
       if (parts.length > 5) {
         const candidateUuid = parts.slice(0, 5).join('-');
         target = await prisma.product.findUnique({ where: { id: candidateUuid } }).catch(() => null);
@@ -508,7 +508,29 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Product already deleted or non-existent' });
     }
 
-    // Check historical dependencies
+    // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────
+    if (user.securityLevel < 100) {
+      if (!reason || reason.trim().length < 3) {
+        return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+      }
+      const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
+      const result = await createDeleteRequest(user, {
+        entityType: 'INVENTORY',
+        entityId: target.id,
+        reason: reason.trim(),
+      });
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 409 });
+      }
+      return NextResponse.json({
+        success: true,
+        mode: 'pending_approval',
+        deleteRequest: result.deleteRequest,
+        message: `Delete request for product "${target.name}" submitted for Super Admin approval.`,
+      });
+    }
+
+    // ─── SUPER ADMIN: Direct delete/archive ─────────────────────────────────
     const [salesCount, poCount, transferCount, ledgerCount] = await Promise.all([
       prisma.salesOrderItem.count({ where: { productId: target.id } }),
       prisma.purchaseOrderItem.count({ where: { productId: target.id } }),
@@ -518,11 +540,21 @@ export async function DELETE(req: NextRequest) {
 
     const hasHistory = (salesCount + poCount + transferCount + ledgerCount) > 0;
 
-    // If product has historical records, NEVER hard-delete. Must ARCHIVE.
-    if (hasHistory || !permanent || user.role !== 'Super Admin') {
+    if (hasHistory || !permanent) {
       const product = await prisma.product.update({
         where: { id: target.id },
         data: { status: 'archived' },
+      });
+
+      await (prisma as any).auditLog.create({
+        data: {
+          module: 'INVENTORY',
+          action: `ARCHIVED: Product "${target.name}" (${target.sku})`,
+          details: JSON.stringify({ productId: target.id, salesCount, poCount, transferCount, ledgerCount }),
+          userEmail: user.email,
+          userRole: user.role,
+          storeCode: user.store || 'CENTRAL',
+        },
       });
 
       broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { productId: target.id, sku: target.sku, action: 'archived' });
@@ -538,10 +570,20 @@ export async function DELETE(req: NextRequest) {
       });
     }
 
-    // Permanent hard-delete for unused products with 0 history by Super Admin wrapped in atomic transaction
+    // Hard-delete for unused products by Super Admin
     await prisma.$transaction(async (tx: any) => {
       await tx.inventory.deleteMany({ where: { productId: target.id } });
       await tx.product.delete({ where: { id: target.id } });
+      await tx.auditLog.create({
+        data: {
+          module: 'INVENTORY',
+          action: `HARD_DELETED: Product "${target.name}" (${target.sku})`,
+          details: JSON.stringify({ productId: target.id, beforeState: target }),
+          userEmail: user.email,
+          userRole: user.role,
+          storeCode: user.store || 'CENTRAL',
+        },
+      });
     }, { maxWait: 15000, timeout: 45000 });
 
     broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { productId: target.id, sku: target.sku, action: 'deleted' });
@@ -556,3 +598,4 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to archive/delete product' }, { status: 500 });
   }
 }
+

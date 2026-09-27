@@ -248,9 +248,6 @@ export const MySQLDataService = {
       phone: store.phone,
       status: store.status,
     };
-    if (store.registers !== undefined && store.registers !== null && store.registers !== '') {
-      payload.registersCount = Number(store.registers);
-    }
     return apiCall('/api/stores', 'POST', payload);
   },
 

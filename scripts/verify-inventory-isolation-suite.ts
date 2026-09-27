@@ -80,9 +80,6 @@ async function runInventoryIsolationSuite() {
         city: 'Chennai',
         address: 'Anna Salai, Chennai',
         status: 'Active',
-        registersCount: 3,
-        skusCount: 0,
-        monthlyRevenue: 0,
       },
       update: { status: 'Active' },
     });

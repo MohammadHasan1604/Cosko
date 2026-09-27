@@ -1,14 +1,35 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
-const AUTH_SECRET = process.env.AUTH_SECRET || 'cosko_enterprise_jwt_secret_key_production_2026_change_in_prod';
+// ─── SECURITY: No fallback secret. Production MUST set AUTH_SECRET. ───
+const AUTH_SECRET = process.env.AUTH_SECRET;
+if (!AUTH_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: AUTH_SECRET environment variable is required in production. Refusing to start with missing secret.');
+  }
+  console.warn('⚠️  WARNING: AUTH_SECRET is not set. Authentication will fail. Set AUTH_SECRET in your .env file.');
+}
+
+// Reject the known insecure default even if set
+const INSECURE_DEFAULT = 'cosko_enterprise_jwt_secret_key_production_2026_change_in_prod';
+function getSecret(): string {
+  if (!AUTH_SECRET) {
+    throw new Error('AUTH_SECRET is not configured. Cannot sign or verify tokens.');
+  }
+  if (AUTH_SECRET === INSECURE_DEFAULT && process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: AUTH_SECRET is set to the insecure default value. Generate a strong random secret for production.');
+  }
+  return AUTH_SECRET;
+}
+
 const BCRYPT_SALT_ROUNDS = 12;
 
 export interface SessionUser {
   id: string;
   name: string;
   email: string;
-  role: 'Super Admin' | 'Store Manager' | 'Department Manager' | 'Accountant' | 'Procurement Staff' | 'Inventory Auditor' | 'Sales Executive' | 'POS Cashier' | 'Employee';
+  role: 'Super Admin' | 'Store Manager' | 'Inventory Manager' | 'Sales Executive' | 'POS Cashier' | 'Restricted Employee';
   securityLevel: number;
   store: string;
   allowedStores?: string[];
@@ -16,6 +37,7 @@ export interface SessionUser {
   shiftStatus: 'On Shift' | 'On Leave';
   avatarUrl?: string;
   mustChangePassword?: boolean;
+  sessionId?: string; // DB session ID for revocation checks
 }
 
 /**
@@ -35,72 +57,35 @@ export async function comparePassword(password: string, hash: string): Promise<b
 export const verifyPassword = comparePassword;
 
 /**
- * Signs a JWT session token for authenticated user
+ * Hash a token for database storage (non-reversible, for revocation lookup)
  */
-export function signSessionToken(user: SessionUser): string {
-  return jwt.sign({ user }, AUTH_SECRET, { expiresIn: '30d' });
-}
-
-export function createSession(userId: string, storeScope: string, securityLevel: number) {
-  const user: SessionUser = {
-    id: userId,
-    name: 'User',
-    email: 'user@cosko.com',
-    role: securityLevel === 100 ? 'Super Admin' : securityLevel === 80 ? 'Store Manager' : 'Employee',
-    securityLevel,
-    store: storeScope,
-    avatar: 'US',
-    shiftStatus: 'On Shift',
-    mustChangePassword: false,
-  };
-  const token = jwt.sign({ user, nonce: Math.random() + '_' + Date.now() }, AUTH_SECRET, { expiresIn: '30d' });
-  return { token, userId, storeScope, securityLevel };
+export function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
 /**
- * Verifies and decodes a JWT session token
+ * Signs a JWT session token for authenticated user.
+ * The token includes a sessionId for DB-backed revocation.
  */
-export function verifySessionToken(token: string): SessionUser | null {
+export function signSessionToken(user: SessionUser, sessionId?: string): string {
+  const secret = getSecret();
+  return jwt.sign({ user, sid: sessionId }, secret, { expiresIn: '30d' });
+}
+
+/**
+ * Verifies and decodes a JWT session token cryptographically.
+ * Returns null on any failure (expired, tampered, invalid signature).
+ */
+export function verifySessionToken(token: string): { user: SessionUser; sid?: string } | null {
   try {
-    const decoded = jwt.verify(token, AUTH_SECRET) as { user: SessionUser };
-    return decoded.user || null;
+    const secret = getSecret();
+    const decoded = jwt.verify(token, secret) as { user: SessionUser; sid?: string };
+    if (!decoded.user || !decoded.user.id) return null;
+    return { user: decoded.user, sid: decoded.sid };
   } catch {
     return null;
   }
 }
-
-const revokedTokens = new Set<string>();
-
-export function revokeSession(token: string): boolean {
-  revokedTokens.add(token);
-  return true;
-}
-
-export function isSessionRevoked(token: string): boolean {
-  return revokedTokens.has(token);
-}
-
-export function verifySession(token: string) {
-  if (!token || isSessionRevoked(token)) {
-    return { valid: false, session: undefined, reason: 'Session has been revoked or is invalid' };
-  }
-  const user = verifySessionToken(token);
-  if (!user) {
-    return { valid: false, session: undefined, reason: 'Invalid or expired session token' };
-  }
-  return {
-    valid: true,
-    session: {
-      userId: user.id,
-      storeScope: user.store,
-      securityLevel: user.securityLevel,
-      role: user.role,
-      user,
-    },
-  };
-}
-
-export { checkRateLimit, recordFailedAttempt, clearRateLimit } from './rateLimit';
 
 /**
  * Validates request Origin and Referer against allowed domains to mitigate CSRF attacks.
@@ -112,7 +97,7 @@ export function isValidAuthOrigin(req: Request): boolean {
   const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
 
   if (!origin && !referer) {
-    // Non-browser or server-to-server request
+    // Non-browser or server-to-server request — allow (API clients, curl, etc.)
     return true;
   }
 
@@ -130,8 +115,8 @@ export function isValidAuthOrigin(req: Request): boolean {
         return true;
       }
     }
-    // Allow localhost during dev
-    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+    // Allow localhost during dev only
+    if (process.env.NODE_ENV !== 'production' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
       return true;
     }
   } catch {}
@@ -140,7 +125,8 @@ export function isValidAuthOrigin(req: Request): boolean {
 }
 
 /**
- * Resolves session user from HTTP Request cookies, headers, or active authenticated session context.
+ * Resolves session user from HTTP Request cookies or Authorization header.
+ * Performs cryptographic JWT verification — not length checks.
  */
 export function getAuthUserFromRequest(req: any): SessionUser | null {
   try {
@@ -155,9 +141,9 @@ export function getAuthUserFromRequest(req: any): SessionUser | null {
     }
 
     if (token) {
-      const user = verifySessionToken(token);
-      if (user && !isSessionRevoked(token)) {
-        return user;
+      const result = verifySessionToken(token);
+      if (result && result.user) {
+        return { ...result.user, sessionId: result.sid };
       }
     }
 
@@ -166,3 +152,25 @@ export function getAuthUserFromRequest(req: any): SessionUser | null {
     return null;
   }
 }
+
+/**
+ * Extract raw token from request (for session DB lookups)
+ */
+export function getRawTokenFromRequest(req: any): string | null {
+  try {
+    let token = req.cookies?.get?.('cosko_session')?.value;
+    if (!token && req.headers?.get) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      } else {
+        token = req.headers.get('x-session-token');
+      }
+    }
+    return token || null;
+  } catch {
+    return null;
+  }
+}
+
+export { checkRateLimit, recordFailedAttempt, clearRateLimit } from './rateLimit';

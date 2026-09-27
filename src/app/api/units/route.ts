@@ -153,29 +153,46 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const authUser = await getAuthUserFromRequest(req);
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id');
-
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'Unit ID is required' },
-        { status: 400 }
-      );
+    if (!authUser) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+    if (authUser.securityLevel < 80) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Insufficient permissions' }, { status: 403 });
     }
 
-    await prisma.unit.delete({ where: { id } });
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    const reason = searchParams.get('reason') || '';
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Unit ID is required' }, { status: 400 });
+    }
+
+    const existing = await prisma.unit.findUnique({ where: { id } }).catch(() => null);
+    if (!existing) {
+      return NextResponse.json({ success: true, message: 'Unit already deleted or non-existent' });
+    }
+
+    if (authUser.securityLevel < 100) {
+      if (!reason || reason.trim().length < 3) {
+        return NextResponse.json({ success: false, error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+      }
+      const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
+      const result = await createDeleteRequest(authUser, { entityType: 'UNIT', entityId: id, reason: reason.trim() });
+      if (!result.success) return NextResponse.json({ success: false, error: result.error }, { status: 409 });
+      return NextResponse.json({ success: true, mode: 'pending_approval', deleteRequest: result.deleteRequest, message: `Delete request for unit "${existing.name}" submitted for Super Admin approval.` });
+    }
+
+    await prisma.$transaction(async (tx: any) => {
+      await tx.unit.delete({ where: { id } });
+      await tx.auditLog.create({ data: { module: 'UNITS', action: `DELETED: Unit "${existing.name}"`, details: JSON.stringify({ unitId: id, beforeState: existing }), userEmail: authUser.email, userRole: authUser.role, storeCode: authUser.store || 'CENTRAL' } });
+    });
 
     broadcastRealtimeEvent('units', 'UNIT_DELETED', { id });
-
-    return NextResponse.json({
-      success: true,
-      message: 'Unit deleted successfully',
-    });
+    return NextResponse.json({ success: true, message: 'Unit deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting unit:', error);
-    return NextResponse.json(
-      { success: false, error: error.message || 'Failed to delete unit' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error.message || 'Failed to delete unit' }, { status: 500 });
   }
 }
+

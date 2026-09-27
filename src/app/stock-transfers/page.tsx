@@ -6,6 +6,7 @@ import Modal from '@/components/ui/Modal';
 import StockTransferModal from '@/components/forms/StockTransferModal';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
+import SuperAdminGuard from '@/components/SuperAdminGuard';
 import {
   calculateTransferLineItem,
   formatTransferINR,
@@ -52,6 +53,7 @@ export default function StockTransfersPage() {
   }, [stockTransfers, storeFilter, searchQuery, currentUser.role, currentUser.store]);
 
   return (
+    <SuperAdminGuard moduleName="Stock Transfers">
     <AppLayout activeRoute="/stock-transfers">
       <div className="space-y-6 fade-in">
         {/* Page Header */}
@@ -338,5 +340,6 @@ export default function StockTransfersPage() {
 
 
     </AppLayout>
+    </SuperAdminGuard>
   );
 }

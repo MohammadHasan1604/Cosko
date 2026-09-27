@@ -6,25 +6,28 @@ async function bootstrapSuperAdmin() {
   console.log('🔒 COSKO ENTERPRISE — SECURE SUPER ADMIN BOOTSTRAP PROTOCOL');
   console.log('===============================================================\n');
 
-  // Read bootstrap parameters securely from environment variables or command-line args
+  // SECURITY: Read bootstrap parameters from environment variables ONLY — no hardcoded defaults
   const email = (
     process.env.BOOTSTRAP_SUPERADMIN_EMAIL ||
     process.argv[2] ||
-    'cosko@gmail.com'
+    ''
   ).toLowerCase().trim();
 
   const tempPassword =
     process.env.BOOTSTRAP_SUPERADMIN_PASSWORD ||
     process.argv[3] ||
-    'Cosko2026@InitialAdmin';
+    '';
 
   if (!email || !email.includes('@')) {
     console.error('❌ Error: Valid Super Admin email address is required.');
+    console.error('   Set BOOTSTRAP_SUPERADMIN_EMAIL environment variable or pass as first argument.');
     process.exit(1);
   }
 
-  if (!tempPassword || tempPassword.length < 8) {
-    console.error('❌ Error: Super Admin initial password must be at least 8 characters.');
+  if (!tempPassword || tempPassword.length < 12) {
+    console.error('❌ Error: Super Admin initial password must be at least 12 characters.');
+    console.error('   Set BOOTSTRAP_SUPERADMIN_PASSWORD environment variable or pass as second argument.');
+    console.error('   No default password is provided for security.');
     process.exit(1);
   }
 

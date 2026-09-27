@@ -278,21 +278,22 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE /api/category-types
+ * DELETE /api/category-types - Delete Approval Workflow
  * Deletes a Category Type with STRICT dependency protection
  */
 export async function DELETE(req: NextRequest) {
   try {
     const session = getAuthUserFromRequest(req);
-    if (!session || (session.role !== 'Super Admin' && session.role !== 'Store Manager')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized: Only Admin or Store Manager can delete Category Types' },
-        { status: 403 }
-      );
+    if (!session) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+    if (session.securityLevel < 80) {
+      return NextResponse.json({ success: false, message: 'Forbidden: Insufficient security level' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
     let id = searchParams.get('id');
+    const reason = searchParams.get('reason') || '';
 
     if (!id) {
       const body = await req.json().catch(() => ({}));
@@ -303,47 +304,46 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Category Type ID is required' }, { status: 400 });
     }
 
-    const targetType = await (prisma as any).categoryType.findUnique({
-      where: { id },
-    });
-
+    const targetType = await (prisma as any).categoryType.findUnique({ where: { id } });
     if (!targetType) {
       return NextResponse.json({ success: false, message: 'Category Type not found' }, { status: 404 });
     }
 
-    // Dependency Protection: Check if any Category currently uses this type
-    const categoryCount = await (prisma as any).category.count({
-      where: { categoryType: targetType.name },
-    });
-
-    if (categoryCount > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'DEPENDENCY_PROTECTED',
-          message: `Cannot delete Category Type "${targetType.name}" because ${categoryCount} categor${categoryCount === 1 ? 'y is' : 'ies are'} assigned to it. Please reassign or delete those categories first.`,
-          categoryCount,
-        },
-        { status: 400 }
-      );
+    // NON-SUPER-ADMIN: delete approval workflow
+    if (session.securityLevel < 100) {
+      if (!reason || reason.trim().length < 3) {
+        return NextResponse.json({ success: false, message: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+      }
+      const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
+      const result = await createDeleteRequest(session, { entityType: 'CATEGORY_TYPE', entityId: id, reason: reason.trim() });
+      if (!result.success) return NextResponse.json({ success: false, message: result.error }, { status: 409 });
+      return NextResponse.json({ success: true, mode: 'pending_approval', deleteRequest: result.deleteRequest, message: `Delete request for category type "${targetType.name}" submitted for Super Admin approval.` });
     }
 
-    await (prisma as any).categoryType.delete({
-      where: { id },
+    // SUPER ADMIN: Dependency Protection
+    const categoryCount = await (prisma as any).category.count({ where: { categoryType: targetType.name } });
+
+    if (categoryCount > 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'DEPENDENCY_PROTECTED',
+        message: `Cannot delete Category Type "${targetType.name}" because ${categoryCount} categor${categoryCount === 1 ? 'y is' : 'ies are'} assigned to it.`,
+        categoryCount,
+      }, { status: 400 });
+    }
+
+    await prisma.$transaction(async (tx: any) => {
+      await tx.categoryType.delete({ where: { id } });
+      await tx.auditLog.create({ data: { module: 'CATEGORY_TYPES', action: `DELETED: Category Type "${targetType.name}"`, details: JSON.stringify({ categoryTypeId: id, beforeState: targetType }), userEmail: session.email, userRole: session.role, storeCode: session.store || 'CENTRAL' } });
     });
 
     invalidateCategoryTypesCache();
     broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_DELETED', { id, name: targetType.name });
 
-    return NextResponse.json({
-      success: true,
-      message: `Category Type "${targetType.name}" deleted successfully`,
-    });
+    return NextResponse.json({ success: true, message: `Category Type "${targetType.name}" deleted successfully` });
   } catch (error: any) {
     console.error('Error deleting category type:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to delete category type', error: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: 'Failed to delete category type', error: error.message }, { status: 500 });
   }
 }
+
