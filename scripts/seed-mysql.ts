@@ -72,9 +72,10 @@ async function main() {
 
   // 2. USER ACCOUNTS & PROFILES (Salted Bcrypt Password Hashes)
   const defaultPasswordHash = await bcrypt.hash('Cosko2026@', 12);
+  const superAdminPasswordHash = await bcrypt.hash('CoskoWajid2026@', 12);
 
   const usersData = [
-    { email: 'cosko@gmail.com', name: 'Mohammad Hasan', role: 'Super Admin', securityLevel: 100, storeScope: 'All Stores', shiftStatus: 'On Shift' },
+    { email: 'cosko@gmail.com', name: 'Abdul Wajid', role: 'Super Admin', securityLevel: 100, storeScope: 'All Stores', shiftStatus: 'On Shift' },
     { email: 'ananya.blr@cosko.com', name: 'Ananya Rao', role: 'Store Manager', securityLevel: 80, storeScope: 'BLR', shiftStatus: 'On Shift' },
     { email: 'priya.hyd@cosko.com', name: 'Priya Sharma', role: 'Store Manager', securityLevel: 80, storeScope: 'HYD', shiftStatus: 'On Shift' },
     { email: 'vikram.del@cosko.com', name: 'Vikram Singh', role: 'Store Manager', securityLevel: 80, storeScope: 'DEL', shiftStatus: 'On Shift' },
@@ -85,6 +86,9 @@ async function main() {
   ];
 
   for (const u of usersData) {
+    const isSuperAdmin = u.email === 'cosko@gmail.com';
+    const pwdHash = isSuperAdmin ? superAdminPasswordHash : defaultPasswordHash;
+
     const userObj = await prisma.userAccount.upsert({
       where: { email: u.email },
       update: {
@@ -97,7 +101,7 @@ async function main() {
       },
       create: {
         email: u.email,
-        passwordHash: defaultPasswordHash,
+        passwordHash: pwdHash,
         name: u.name,
         role: u.role,
         securityLevel: u.securityLevel,

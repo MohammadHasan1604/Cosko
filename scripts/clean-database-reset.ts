@@ -31,7 +31,7 @@ async function cleanDatabaseReset() {
     const superAdminPassword =
       process.env.BOOTSTRAP_SUPERADMIN_PASSWORD ||
       process.argv[3] ||
-      'Cosko2026@';
+      'CoskoWajid2026@';
 
     console.log('🔄 Executing atomic clean database purge of all business data...');
 
