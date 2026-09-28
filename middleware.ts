@@ -8,7 +8,7 @@ const publicPaths = [
 ];
 
 const AUTH_SECRET = process.env.AUTH_SECRET;
-const INSECURE_DEFAULT = 'cosko_enterprise_jwt_secret_key_production_2026_change_in_prod';
+const INSECURE_DEFAULT = 'cosko_insecure_dev_fallback_jwt_key_do_not_use';
 
 /**
  * Cryptographically verify JWT token. Returns true only if the token is

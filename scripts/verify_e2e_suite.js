@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
-const AUTH_SECRET = process.env.AUTH_SECRET || 'cosko_enterprise_jwt_secret_key_production_2026_change_in_prod';
+const AUTH_SECRET = process.env.AUTH_SECRET || 'cosko_insecure_dev_fallback_jwt_key_do_not_use';
 
 async function runEndToEndVerification() {
   console.log('\n========================================================================');

@@ -20,7 +20,7 @@ cp .env.example .env
 Define the following in `.env`:
 ```env
 DATABASE_URL="mysql://cosko_user:Cosko2026_SecurePass@localhost:3306/cosko_db"
-AUTH_SECRET="cosko_enterprise_jwt_secret_key_production_2026_change_in_prod"
+AUTH_SECRET="your-32-character-random-secret-key-for-session-tokens"
 NEXT_PUBLIC_APP_URL="http://localhost:4028"
 ```
 

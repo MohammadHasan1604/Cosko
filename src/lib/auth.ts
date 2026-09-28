@@ -12,7 +12,7 @@ if (!AUTH_SECRET) {
 }
 
 // Reject the known insecure default even if set
-const INSECURE_DEFAULT = 'cosko_enterprise_jwt_secret_key_production_2026_change_in_prod';
+const INSECURE_DEFAULT = 'cosko_insecure_dev_fallback_jwt_key_do_not_use';
 function getSecret(): string {
   if (!AUTH_SECRET) {
     throw new Error('AUTH_SECRET is not configured. Cannot sign or verify tokens.');
