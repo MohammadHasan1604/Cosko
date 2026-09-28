@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
+import BottomSheet from '@/components/ui/BottomSheet';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
 
@@ -29,6 +30,10 @@ export default function DashboardFilters() {
     storesList,
   } = useApp();
 
+  // Mobile filter sheet
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+
+  // Desktop dropdowns
   const [storeOpen, setStoreOpen] = useState(false);
   const [rangeOpen, setRangeOpen] = useState(false);
 
@@ -65,6 +70,7 @@ export default function DashboardFilters() {
 
   const handleSelectRange = (range: string) => {
     setRangeOpen(false);
+    setFilterSheetOpen(false);
     if (range === 'Custom Range') {
       const now = new Date();
       if (!startDate) {
@@ -110,202 +116,287 @@ export default function DashboardFilters() {
       ? `${customDateRange.start} → ${customDateRange.end}`
       : datePeriod;
 
+  const activeFilterCount = (selectedStore !== 'All Stores' ? 1 : 0) + (datePeriod !== 'This Month' ? 1 : 0);
+
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {/* Store selector */}
-      <div className="relative">
+    <>
+      {/* ─── Mobile: Compact filter trigger ─── */}
+      <div className="flex items-center gap-1.5 md:hidden">
         <button
-          onClick={() => { setStoreOpen((v) => !v); setRangeOpen(false); }}
-          className="h-9 inline-flex items-center gap-2 px-3 rounded-xl border border-border/80 bg-card/90 hover:bg-muted/50 text-xs font-semibold text-foreground hover:border-primary/40 transition-all duration-150 shadow-xs active:scale-[0.98]"
+          onClick={() => setFilterSheetOpen(true)}
+          className="btn-outline text-xs px-3 gap-1.5"
+          aria-label="Open filters"
         >
-          <Icon name="MapPinIcon" size={14} className="text-primary/80 flex-shrink-0" />
-          <span className="max-w-[180px] truncate">
-            {selectedStore === 'All Stores' ? 'All Stores (Consolidated)' : selectedStore}
-          </span>
-          {currentUser.role !== 'Super Admin' && (
-            <span className="badge-warning text-3xs px-1.5 py-0.5">Assigned</span>
+          <Icon name="FunnelIcon" size={14} />
+          <span>Filters</span>
+          {activeFilterCount > 0 && (
+            <span className="w-4 h-4 rounded-full bg-primary text-white text-3xs font-bold flex items-center justify-center">
+              {activeFilterCount}
+            </span>
           )}
-          <Icon name="ChevronDownIcon" size={13} className="text-muted-foreground ml-0.5 flex-shrink-0" />
         </button>
-        {storeOpen && (
-          <div className="absolute right-0 top-full mt-1.5 w-72 bg-card/98 backdrop-blur-md border border-border/80 rounded-2xl shadow-dropdown z-30 py-2 fade-in">
-            {/* Section 1: Reporting Scope */}
-            <div className="px-3 pb-1 pt-0.5">
-              <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                Enterprise Reporting Scope
-              </span>
-              <button
-                onClick={() => handleSelectStore('All Stores')}
-                disabled={currentUser.role !== 'Super Admin'}
-                className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-colors duration-100 flex items-center justify-between ${
-                  currentUser.role !== 'Super Admin'
-                    ? 'text-muted-foreground/50 opacity-60 cursor-not-allowed'
-                    : selectedStore === 'All Stores'
-                    ? 'bg-primary/10 text-primary font-bold'
-                    : 'text-foreground hover:bg-muted font-medium'
-                }`}
-              >
-                <div>
-                  <span className="block font-semibold">All Stores (Consolidated View)</span>
-                  <span className="text-3xs text-muted-foreground">Aggregated reporting only</span>
-                </div>
-                {currentUser.role !== 'Super Admin' ? (
-                  <Icon name="LockClosedIcon" size={13} className="text-muted-foreground flex-shrink-0" />
-                ) : selectedStore === 'All Stores' ? (
-                  <Icon name="CheckIcon" size={14} className="text-primary flex-shrink-0" />
-                ) : null}
-              </button>
-            </div>
-
-            <div className="my-1.5 border-t border-border/60" />
-
-            {/* Section 2: Physical Stores */}
-            <div className="px-3 pt-0.5">
-              <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                Physical Store Locations & Warehouses
-              </span>
-              <div className="space-y-0.5 max-h-52 overflow-y-auto scrollbar-thin">
-                {sortedStores.map((st) => {
-                  const assignedStore = (currentUser.store && currentUser.store !== 'All Stores') ? currentUser.store : 'CENTRAL';
-                  const isLocked = currentUser.role !== 'Super Admin' && st.code !== assignedStore;
-                  const isCentral = st.code === 'CENTRAL';
-                  const isSelected = selectedStore === st.code;
-
-                  return (
-                    <button
-                      key={`store-${st.code}`}
-                      onClick={() => handleSelectStore(st.code)}
-                      disabled={isLocked}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-colors duration-100 flex items-center justify-between ${
-                        isLocked
-                          ? 'text-muted-foreground/50 opacity-60 cursor-not-allowed'
-                          : isSelected
-                          ? 'bg-primary/10 text-primary font-bold'
-                          : 'text-foreground hover:bg-muted font-medium'
-                      }`}
-                    >
-                      <div className="min-w-0 pr-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold truncate">{st.code} — {st.name}</span>
-                          {isCentral && (
-                            <span className="text-3xs bg-amber-500/15 text-amber-600 dark:text-amber-400 px-1.5 py-0.2 rounded font-bold">
-                              Permanent
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-3xs text-muted-foreground block truncate">{st.city}</span>
-                      </div>
-                      {isLocked ? (
-                        <Icon name="LockClosedIcon" size={13} className="text-muted-foreground flex-shrink-0" />
-                      ) : isSelected ? (
-                        <Icon name="CheckIcon" size={14} className="text-primary flex-shrink-0" />
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
+        <button onClick={handleExport} className="btn-ghost btn-icon-sm" aria-label="Export report">
+          <Icon name="ArrowDownTrayIcon" size={15} />
+        </button>
       </div>
 
-      {/* Date range selector */}
-      <div className="relative">
-        <button
-          onClick={() => { setRangeOpen((v) => !v); setStoreOpen(false); }}
-          className="h-9 inline-flex items-center gap-2 px-3 rounded-xl border border-border/80 bg-card/90 hover:bg-muted/50 text-xs font-semibold text-foreground hover:border-primary/40 transition-all duration-150 shadow-xs active:scale-[0.98]"
-        >
-          <Icon name="CalendarDaysIcon" size={14} className="text-primary/80 flex-shrink-0" />
-          <span className="max-w-[210px] truncate">{displayDatePeriod}</span>
-          <Icon name="ChevronDownIcon" size={13} className="text-muted-foreground ml-0.5 flex-shrink-0" />
-        </button>
-        {rangeOpen && (
-          <div className="absolute right-0 top-full mt-1.5 w-52 bg-card/98 backdrop-blur-md border border-border/80 rounded-2xl shadow-dropdown z-30 py-1.5 fade-in">
-            {dateRanges.map((r) => {
-              const isSelected = datePeriod === r;
-              return (
+      {/* ─── Desktop: Inline filter controls ─── */}
+      <div className="hidden md:flex items-center gap-2">
+        {/* Store selector */}
+        <div className="relative">
+          <button
+            onClick={() => { setStoreOpen((v) => !v); setRangeOpen(false); }}
+            className="h-8 inline-flex items-center gap-1.5 px-2.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground hover:border-slate-300 transition-all shadow-2xs"
+          >
+            <Icon name="MapPinIcon" size={13} className="text-primary flex-shrink-0" />
+            <span className="max-w-[160px] truncate">
+              {selectedStore === 'All Stores' ? 'All Stores' : selectedStore}
+            </span>
+            <Icon name="ChevronDownIcon" size={12} className="text-muted-foreground flex-shrink-0" />
+          </button>
+          {storeOpen && (
+            <div className="absolute right-0 top-full mt-1 w-64 bg-card border border-border rounded-xl shadow-dropdown z-30 py-1.5 fade-in">
+              <div className="px-2.5 pb-1 pt-0.5">
+                <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                  Reporting Scope
+                </span>
                 <button
-                  key={`range-${r}`}
-                  onClick={() => handleSelectRange(r)}
-                  className={`w-full text-left px-3.5 py-2 text-xs transition-colors duration-100 flex items-center justify-between rounded-lg mx-1 w-[calc(100%-8px)] ${
-                    isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-foreground hover:bg-muted'
+                  onClick={() => handleSelectStore('All Stores')}
+                  disabled={currentUser.role !== 'Super Admin'}
+                  className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center justify-between ${
+                    currentUser.role !== 'Super Admin'
+                      ? 'text-muted-foreground/50 opacity-60 cursor-not-allowed'
+                      : selectedStore === 'All Stores'
+                      ? 'bg-primary/8 text-primary font-bold'
+                      : 'text-foreground hover:bg-muted font-medium'
                   }`}
                 >
-                  <span>{r}</span>
-                  {isSelected && <Icon name="CheckIcon" size={14} className="text-primary" />}
+                  <div>
+                    <span className="block font-semibold">All Stores (Consolidated)</span>
+                    <span className="text-3xs text-muted-foreground">Aggregated reporting</span>
+                  </div>
+                  {currentUser.role !== 'Super Admin' ? (
+                    <Icon name="LockClosedIcon" size={12} className="text-muted-foreground flex-shrink-0" />
+                  ) : selectedStore === 'All Stores' ? (
+                    <Icon name="CheckIcon" size={13} className="text-primary flex-shrink-0" />
+                  ) : null}
                 </button>
-              );
-            })}
-          </div>
-        )}
+              </div>
+
+              <div className="my-1 border-t border-border/60" />
+
+              <div className="px-2.5 pt-0.5">
+                <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                  Store Locations
+                </span>
+                <div className="space-y-0.5 max-h-48 overflow-y-auto scrollbar-thin">
+                  {sortedStores.map((st) => {
+                    const assignedStore = (currentUser.store && currentUser.store !== 'All Stores') ? currentUser.store : 'CENTRAL';
+                    const isLocked = currentUser.role !== 'Super Admin' && st.code !== assignedStore;
+                    const isSelected = selectedStore === st.code;
+
+                    return (
+                      <button
+                        key={`store-${st.code}`}
+                        onClick={() => handleSelectStore(st.code)}
+                        disabled={isLocked}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${
+                          isLocked
+                            ? 'text-muted-foreground/50 opacity-60 cursor-not-allowed'
+                            : isSelected
+                            ? 'bg-primary/8 text-primary font-bold'
+                            : 'text-foreground hover:bg-muted font-medium'
+                        }`}
+                      >
+                        <span className="truncate">{st.code} — {st.name}</span>
+                        {isLocked ? (
+                          <Icon name="LockClosedIcon" size={12} className="text-muted-foreground flex-shrink-0" />
+                        ) : isSelected ? (
+                          <Icon name="CheckIcon" size={13} className="text-primary flex-shrink-0" />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Date range selector */}
+        <div className="relative">
+          <button
+            onClick={() => { setRangeOpen((v) => !v); setStoreOpen(false); }}
+            className="h-8 inline-flex items-center gap-1.5 px-2.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground hover:border-slate-300 transition-all shadow-2xs"
+          >
+            <Icon name="CalendarDaysIcon" size={13} className="text-primary flex-shrink-0" />
+            <span className="max-w-[180px] truncate">{displayDatePeriod}</span>
+            <Icon name="ChevronDownIcon" size={12} className="text-muted-foreground flex-shrink-0" />
+          </button>
+          {rangeOpen && (
+            <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-xl shadow-dropdown z-30 py-1 fade-in">
+              {dateRanges.map((r) => {
+                const isSelected = datePeriod === r;
+                return (
+                  <button
+                    key={`range-${r}`}
+                    onClick={() => handleSelectRange(r)}
+                    className={`w-full text-left px-3 py-1.5 text-xs rounded-lg mx-0.5 flex items-center justify-between ${
+                      isSelected ? 'bg-primary/8 text-primary font-bold' : 'text-foreground hover:bg-muted'
+                    }`}
+                    style={{ width: 'calc(100% - 4px)' }}
+                  >
+                    <span>{r}</span>
+                    {isSelected && <Icon name="CheckIcon" size={13} className="text-primary" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Export */}
+        <button onClick={handleExport} className="btn-secondary h-8 px-3 text-xs font-semibold gap-1.5">
+          <Icon name="ArrowDownTrayIcon" size={13} />
+          Export
+        </button>
       </div>
 
-      {/* Export */}
-      <button onClick={handleExport} className="btn-secondary h-9 px-3.5 text-xs font-semibold gap-1.5 shadow-xs">
-        <Icon name="ArrowDownTrayIcon" size={14} />
-        Export Report
-      </button>
+      {/* ─── Mobile: Filter Bottom Sheet ─── */}
+      <BottomSheet
+        open={filterSheetOpen}
+        onClose={() => setFilterSheetOpen(false)}
+        title="Dashboard Filters"
+        footer={
+          <button onClick={() => setFilterSheetOpen(false)} className="btn-primary w-full">
+            Apply Filters
+          </button>
+        }
+      >
+        <div className="space-y-5">
+          {/* Store scope */}
+          <div>
+            <label className="label-text">Store Scope</label>
+            <div className="space-y-1">
+              <button
+                onClick={() => { handleSelectStore('All Stores'); }}
+                disabled={currentUser.role !== 'Super Admin'}
+                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between border ${
+                  currentUser.role !== 'Super Admin'
+                    ? 'text-muted-foreground opacity-50 cursor-not-allowed border-border/40'
+                    : selectedStore === 'All Stores'
+                    ? 'bg-primary/8 text-primary font-semibold border-primary/20'
+                    : 'text-foreground border-border/60 active:bg-muted'
+                }`}
+              >
+                <span>All Stores (Consolidated)</span>
+                {selectedStore === 'All Stores' && <Icon name="CheckIcon" size={16} className="text-primary" />}
+              </button>
+              {sortedStores.map((st) => {
+                const assignedStore = (currentUser.store && currentUser.store !== 'All Stores') ? currentUser.store : 'CENTRAL';
+                const isLocked = currentUser.role !== 'Super Admin' && st.code !== assignedStore;
+                const isSelected = selectedStore === st.code;
+                return (
+                  <button
+                    key={`mstore-${st.code}`}
+                    onClick={() => handleSelectStore(st.code)}
+                    disabled={isLocked}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between border ${
+                      isLocked
+                        ? 'text-muted-foreground opacity-50 cursor-not-allowed border-border/40'
+                        : isSelected
+                        ? 'bg-primary/8 text-primary font-semibold border-primary/20'
+                        : 'text-foreground border-border/60 active:bg-muted'
+                    }`}
+                  >
+                    <span>{st.code} — {st.name}</span>
+                    {isSelected && <Icon name="CheckIcon" size={16} className="text-primary" />}
+                    {isLocked && <Icon name="LockClosedIcon" size={14} className="text-muted-foreground" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Date range */}
+          <div>
+            <label className="label-text">Date Period</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {dateRanges.map((r) => (
+                <button
+                  key={`mrange-${r}`}
+                  onClick={() => handleSelectRange(r)}
+                  className={`px-3 py-2.5 rounded-lg text-sm text-left border ${
+                    datePeriod === r
+                      ? 'bg-primary/8 text-primary font-semibold border-primary/20'
+                      : 'text-foreground border-border/60 active:bg-muted'
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </BottomSheet>
 
       {/* Custom Date Range Modal */}
       <Modal
         open={customModalOpen}
         onClose={() => setCustomModalOpen(false)}
-        title="Select Custom Date Range"
-        subtitle="Filter all dashboard KPIs, charts, and metrics for a specific time window"
+        title="Custom Date Range"
+        subtitle="Filter all dashboard metrics for a specific time window"
         size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setCustomModalOpen(false)}
+              className="btn-secondary text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={(e: any) => handleApplyCustomRange(e)}
+              className="btn-primary text-xs gap-1.5"
+            >
+              <Icon name="CheckIcon" size={13} />
+              Apply Range
+            </button>
+          </div>
+        }
       >
         <form onSubmit={handleApplyCustomRange} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1.5">
-                Start Date
-              </label>
+              <label className="label-text">Start Date</label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 required
-                className="input-field w-full text-xs font-medium"
+                className="input-field text-sm"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1.5">
-                End Date
-              </label>
+              <label className="label-text">End Date</label>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 required
-                className="input-field w-full text-xs font-medium"
+                className="input-field text-sm"
               />
             </div>
           </div>
 
-          <div className="p-3 bg-muted/40 rounded-xl border border-border/50 text-2xs text-muted-foreground space-y-1">
-            <p className="font-semibold text-foreground">Active Filter Scope</p>
-            <p>Store Scope: <span className="font-semibold text-primary">{selectedStore}</span></p>
-            <p>Changing date window immediately recalculates all revenue, profit, payables, and ranking analytics.</p>
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-            <button
-              type="button"
-              onClick={() => setCustomModalOpen(false)}
-              className="btn-secondary text-xs px-3 py-1.5"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn-primary text-xs px-4 py-1.5 gap-1.5"
-            >
-              <Icon name="CheckIcon" size={13} />
-              Apply Custom Filter
-            </button>
+          <div className="p-3 bg-muted/30 rounded-lg border border-border/50 text-xs text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground">Active Scope</p>
+            <p>Store: <span className="font-semibold text-primary">{selectedStore}</span></p>
           </div>
         </form>
       </Modal>
-    </div>
+    </>
   );
 }

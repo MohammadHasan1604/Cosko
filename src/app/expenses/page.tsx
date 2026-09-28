@@ -53,11 +53,11 @@ export default function ExpensesPage() {
 
   return (
     <AppLayout activeRoute="/expenses">
-      <div className="space-y-6 fade-in">
+      <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Operating Expenses</h1>
+            <h1 className="page-title">Operating Expenses</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Store operating expenses, utility bills, rent, logistics, and approval status.
             </p>

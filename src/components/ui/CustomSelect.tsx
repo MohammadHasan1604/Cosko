@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
 import Icon from '@/components/ui/AppIcon';
 
 export interface SelectOption {
@@ -27,6 +27,7 @@ export interface CustomSelectProps {
   addNewLabel?: string;
   onAddNew?: (initialSearch?: string) => void;
   allowClear?: boolean;
+  error?: string;
 }
 
 export default function CustomSelect({
@@ -44,13 +45,26 @@ export default function CustomSelect({
   addNewLabel,
   onAddNew,
   allowClear = false,
+  error,
 }: CustomSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const triggerId = useId();
+  const listboxId = useId();
 
   const selectedOption = options.find((opt) => opt.value === value);
+
+  const filteredOptions = searchable && search.trim()
+    ? options.filter((opt) =>
+        opt.label.toLowerCase().includes(search.toLowerCase()) ||
+        opt.sublabel?.toLowerCase().includes(search.toLowerCase()) ||
+        opt.value.toLowerCase().includes(search.toLowerCase())
+      )
+    : options;
 
   // Close on outside click
   useEffect(() => {
@@ -74,29 +88,70 @@ export default function CustomSelect({
     }
     if (!open) {
       setSearch('');
+      setActiveIndex(-1);
     }
   }, [open, searchable]);
 
-  // Keyboard navigation (Escape to close)
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (open && e.key === 'Escape') {
-        setOpen(false);
+  // Keyboard navigation
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setOpen(true);
       }
+      return;
     }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open]);
 
-  const filteredOptions = searchable && search.trim()
-    ? options.filter((opt) =>
-        opt.label.toLowerCase().includes(search.toLowerCase()) ||
-        opt.sublabel?.toLowerCase().includes(search.toLowerCase()) ||
-        opt.value.toLowerCase().includes(search.toLowerCase())
-      )
-    : options;
+    switch (e.key) {
+      case 'Escape':
+        e.preventDefault();
+        setOpen(false);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        setActiveIndex(prev => {
+          const next = prev + 1;
+          return next >= filteredOptions.length ? 0 : next;
+        });
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setActiveIndex(prev => {
+          const next = prev - 1;
+          return next < 0 ? filteredOptions.length - 1 : next;
+        });
+        break;
+      case 'Home':
+        e.preventDefault();
+        setActiveIndex(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        setActiveIndex(filteredOptions.length - 1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (activeIndex >= 0 && activeIndex < filteredOptions.length) {
+          const opt = filteredOptions[activeIndex];
+          if (!opt.disabled) {
+            onChange(opt.value);
+            setOpen(false);
+          }
+        }
+        break;
+    }
+  }, [open, filteredOptions, activeIndex, onChange]);
 
-  const heightClass = size === 'sm' ? 'h-8 text-xs' : 'h-[38px] text-xs sm:text-sm';
+  // Scroll active option into view
+  useEffect(() => {
+    if (activeIndex >= 0 && listRef.current) {
+      const activeEl = listRef.current.querySelector(`[data-index="${activeIndex}"]`);
+      activeEl?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIndex]);
+
+  const heightClass = size === 'sm' ? 'text-xs' : 'text-sm';
+  const minH = size === 'sm' ? '32px' : '38px';
 
   const handleAddNewClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -110,19 +165,28 @@ export default function CustomSelect({
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       {label && (
-        <label className="text-xs font-bold text-foreground block mb-1">
+        <label htmlFor={triggerId} className="label-text">
           {label} {required && <span className="text-danger">*</span>}
         </label>
       )}
 
       {/* Trigger Button */}
       <button
+        id={triggerId}
         type="button"
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
-        className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg border border-border bg-card text-foreground font-medium transition-all duration-150 shadow-2xs hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${heightClass} ${
-          open ? 'border-primary ring-2 ring-primary/20' : ''
-        }`}
+        onKeyDown={handleKeyDown}
+        role="combobox"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-controls={open ? listboxId : undefined}
+        aria-activedescendant={activeIndex >= 0 ? `${listboxId}-opt-${activeIndex}` : undefined}
+        aria-invalid={error ? 'true' : undefined}
+        className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg border bg-card text-foreground font-medium shadow-2xs cursor-pointer ${heightClass} ${
+          error ? 'border-danger ring-1 ring-danger/20' : open ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-slate-300'
+        } focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary disabled:opacity-50 disabled:cursor-not-allowed`}
+        style={{ minHeight: minH }}
       >
         <span className="truncate text-left flex items-center gap-1.5 min-w-0">
           {selectedOption?.icon && (
@@ -147,6 +211,8 @@ export default function CustomSelect({
               }}
               className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
               title="Clear selection"
+              role="button"
+              aria-label="Clear selection"
             >
               <Icon name="XMarkIcon" size={12} />
             </span>
@@ -154,19 +220,25 @@ export default function CustomSelect({
           <Icon
             name="ChevronDownIcon"
             size={14}
-            className={`text-muted-foreground transition-transform duration-200 ${
+            className={`text-muted-foreground transition-transform duration-150 ${
               open ? 'rotate-180 text-primary' : ''
             }`}
           />
         </div>
       </button>
 
+      {/* Error text */}
+      {error && <p className="error-text" role="alert">{error}</p>}
+
       {/* Dropdown Menu */}
       {open && (
-        <div className="absolute left-0 right-0 z-[70] mt-1.5 bg-card rounded-xl border border-border shadow-dropdown p-1.5 fade-in max-h-72 overflow-hidden flex flex-col min-w-[220px]">
+        <div
+          className="absolute left-0 right-0 z-[70] mt-1 bg-card rounded-xl border border-border shadow-dropdown p-1 fade-in max-h-72 overflow-hidden flex flex-col min-w-[200px]"
+          role="presentation"
+        >
           {/* Search Header */}
           {searchable && (
-            <div className="p-1 border-b border-border/80 mb-1">
+            <div className="p-1 border-b border-border/60 mb-0.5">
               <div className="relative">
                 <Icon
                   name="MagnifyingGlassIcon"
@@ -178,20 +250,22 @@ export default function CustomSelect({
                   type="text"
                   placeholder={searchPlaceholder}
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full h-7 pl-7 pr-2 text-xs rounded-md border border-border bg-muted/40 focus:outline-none focus:border-primary focus:bg-card text-foreground"
+                  onChange={(e) => { setSearch(e.target.value); setActiveIndex(-1); }}
+                  onKeyDown={handleKeyDown}
+                  className="w-full h-8 pl-7 pr-2 text-xs rounded-lg border border-border bg-muted/30 focus:outline-none focus:border-primary focus:bg-card text-foreground"
+                  aria-label="Search options"
                 />
               </div>
             </div>
           )}
 
-          {/* Prominent "+ Add New [Entity]" Action Button inside dropdown */}
+          {/* Add New button */}
           {onAddNew && (
-            <div className="p-1 border-b border-border/70 mb-1">
+            <div className="p-0.5 border-b border-border/50 mb-0.5">
               <button
                 type="button"
                 onClick={handleAddNewClick}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold text-primary hover:bg-primary/10 transition-colors text-left cursor-pointer border border-primary/20 bg-primary/5"
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold text-primary hover:bg-primary/8 transition-colors text-left cursor-pointer"
               >
                 <Icon name="PlusCircleIcon" size={15} className="text-primary flex-shrink-0" />
                 <span className="truncate">{addNewLabel || '+ Add New Record'}</span>
@@ -200,7 +274,7 @@ export default function CustomSelect({
           )}
 
           {/* Options List */}
-          <div className="overflow-y-auto scrollbar-thin space-y-0.5 max-h-52 pr-0.5">
+          <div ref={listRef} className="overflow-y-auto scrollbar-thin space-y-0.5 max-h-52 pr-0.5" role="listbox" id={listboxId}>
             {filteredOptions.length === 0 ? (
               <div className="py-4 text-center text-xs text-muted-foreground space-y-2">
                 <p>No matching records</p>
@@ -216,20 +290,29 @@ export default function CustomSelect({
                 )}
               </div>
             ) : (
-              filteredOptions.map((option) => {
+              filteredOptions.map((option, index) => {
                 const isSelected = option.value === value;
+                const isActive = index === activeIndex;
                 return (
                   <button
                     key={option.value}
+                    id={`${listboxId}-opt-${index}`}
+                    data-index={index}
                     type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    aria-disabled={option.disabled}
                     disabled={option.disabled}
                     onClick={() => {
                       onChange(option.value);
                       setOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left cursor-pointer ${
-                      isSelected
-                        ? 'bg-primary/10 text-primary font-semibold'
+                    onMouseEnter={() => setActiveIndex(index)}
+                    className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs transition-colors text-left cursor-pointer ${
+                      isActive
+                        ? 'bg-primary/8 text-foreground'
+                        : isSelected
+                        ? 'bg-primary/8 text-primary font-semibold'
                         : 'text-foreground hover:bg-muted font-normal'
                     } ${option.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >

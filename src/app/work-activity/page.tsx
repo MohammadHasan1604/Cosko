@@ -223,7 +223,7 @@ export default function WorkActivityPage() {
   return (
     <SuperAdminGuard moduleName="Work Activity">
     <AppLayout activeRoute="/work-activity">
-      <div className="space-y-6 fade-in">
+      <div className="space-y-4 md:space-y-6 fade-in">
         {/* Top Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
@@ -231,7 +231,7 @@ export default function WorkActivityPage() {
               <span className="p-2 rounded-xl bg-primary/10 text-primary">
                 <Icon name="ClockIcon" size={22} />
               </span>
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+              <h1 className="page-title">
                 Work Activity & Time Tracking
               </h1>
             </div>

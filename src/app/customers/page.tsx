@@ -207,37 +207,28 @@ export default function CustomersPage() {
 
   return (
     <AppLayout activeRoute="/customers">
-      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-        {/* Header and Quick Navigation */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-primary/10 text-primary border border-primary/20">
-                Customer 360 & CRM Suite
-              </span>
-              <span className="text-xs text-muted-foreground">Unified Master + Legacy Connected</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mt-1">
-              Customer Management
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Manage live retail customer profiles, credit ledgers, and seamless historical links to legacy service records.
+      <div className="space-y-4 md:space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Customers</h1>
+            <p className="page-subtitle">
+              {customers.length} accounts · CRM & credit management
             </p>
           </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setRegisterModal(true)}
-              className="btn-primary gap-2 text-xs sm:text-sm font-semibold shadow-xs"
-            >
-              <Icon name="UserPlusIcon" size={16} />
-              <span>Register Customer</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setRegisterModal(true)}
+            className="btn-primary text-xs gap-1.5 flex-shrink-0"
+          >
+            <Icon name="UserPlusIcon" size={14} />
+            <span className="hidden sm:inline">Register</span>
+            <span className="sm:hidden">Add</span>
+          </button>
         </div>
 
         {/* CRM Segment Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
+        {/* Segment chips - horizontal scroll */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 pb-1">
           {crmSegments.map((segment) => {
             const count = segment === 'All Customers'
               ? customers.length
@@ -248,14 +239,11 @@ export default function CustomersPage() {
               <button
                 key={segment}
                 onClick={() => setSelectedSegment(segment)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 border ${
-                  isSelected
-                    ? 'bg-primary text-primary-foreground border-primary shadow-xs'
-                    : 'bg-card border-border/80 text-muted-foreground hover:text-foreground hover:bg-muted/40 hover:border-border'
-                }`}
+                className={`filter-chip ${isSelected ? '' : ''}`}
+                data-active={isSelected ? 'true' : 'false'}
               >
                 <span>{segment}</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-3xs font-mono font-bold ${isSelected ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                <span className={`text-3xs font-mono font-bold ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
                   {count}
                 </span>
               </button>
@@ -263,44 +251,43 @@ export default function CustomersPage() {
           })}
         </div>
 
-        {/* Deep Search Input */}
-        <div className="card p-3.5 sm:p-4 shadow-xs">
-          <div className="relative">
-            <Icon name="MagnifyingGlassIcon" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search across customers, mobile (+91 98765 43210), invoices (CS26BLR...), repairs..."
-              value={deepSearchQuery}
-              onChange={(e) => setDeepSearchQuery(e.target.value)}
-              className="input-field pl-10 pr-4 text-xs font-medium"
-            />
-          </div>
+        {/* Search Input */}
+        <div className="relative">
+          <Icon name="MagnifyingGlassIcon" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search customers, phone, invoices, repairs..."
+            value={deepSearchQuery}
+            onChange={(e) => setDeepSearchQuery(e.target.value)}
+            className="input-field pl-9 text-sm"
+          />
         </div>
 
         {/* Customer Directory Table */}
+        {/* Mobile: Card List | Desktop: Table */}
         <div className="card overflow-hidden">
-          <div className="p-4 sm:p-5 border-b border-border/80 flex items-center justify-between">
-            <h2 className="text-sm sm:text-base font-extrabold text-foreground flex items-center gap-2">
-              <Icon name="UsersIcon" size={18} className="text-primary" />
-              <span>Customer Master Directory</span>
-              <span className="badge-neutral text-3xs font-semibold">
-                {filteredCustomers.length} active
+          <div className="px-3 md:px-5 py-3 border-b border-border/60 flex items-center justify-between">
+            <h2 className="section-header flex items-center gap-2">
+              <span>Directory</span>
+              <span className="badge-neutral text-3xs">
+                {filteredCustomers.length}
               </span>
             </h2>
           </div>
 
-          <div className="overflow-x-auto scrollbar-thin">
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto scrollbar-thin">
             <table className="w-full text-left text-xs min-w-[850px]">
               <thead>
-                <tr className="table-header">
-                  <th className="px-4 py-3">Customer Name</th>
-                  <th className="px-4 py-3">Mobile Number</th>
-                  <th className="px-4 py-3">City / Store</th>
-                  <th className="px-4 py-3">CRM Segment</th>
-                  <th className="px-4 py-3 text-right font-tabular">Total Spend</th>
-                  <th className="px-4 py-3 text-right font-tabular">Credit Balance</th>
-                  <th className="px-4 py-3 text-center">Legacy Link</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                <tr>
+                  <th className="table-header">Customer Name</th>
+                  <th className="table-header">Mobile Number</th>
+                  <th className="table-header">City / Store</th>
+                  <th className="table-header">CRM Segment</th>
+                  <th className="table-header text-right font-tabular">Total Spend</th>
+                  <th className="table-header text-right font-tabular">Credit Balance</th>
+                  <th className="table-header text-center">Legacy Link</th>
+                  <th className="table-header text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -392,6 +379,43 @@ export default function CustomersPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: Card list */}
+          <div className="md:hidden divide-y divide-border/60">
+            {filteredCustomers.length === 0 ? (
+              <div className="empty-state">
+                <p className="empty-state-title">No customers found</p>
+                <p className="empty-state-text">Try adjusting your search or filters</p>
+              </div>
+            ) : (
+              filteredCustomers.map((cust) => {
+                const tag = getCustomerSegmentTag(cust);
+                return (
+                  <div
+                    key={`m-${cust.id}`}
+                    className="record-item"
+                    onClick={() => setCrmViewCustomer(cust)}
+                  >
+                    <div className="record-avatar bg-primary/10 text-primary">
+                      {cust.name.charAt(0)}
+                    </div>
+                    <div className="record-content">
+                      <p className="record-title">{cust.name}</p>
+                      <p className="record-subtitle">{cust.phone} · {cust.city}</p>
+                    </div>
+                    <div className="record-meta">
+                      <p className="record-value">₹{cust.totalSpend.toLocaleString('en-IN')}</p>
+                      {(cust.creditBalance || 0) > 0 && (
+                        <p className="text-2xs text-danger font-semibold mt-0.5">
+                          ₹{cust.creditBalance?.toLocaleString('en-IN')} due
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 

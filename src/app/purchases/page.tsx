@@ -54,25 +54,26 @@ export default function PurchasesPage() {
 
   return (
     <AppLayout activeRoute="/purchases">
-      <div className="space-y-6 fade-in">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Purchases & Goods Receiving</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Multi-product purchase orders, supplier fulfillment, Goods Received Notes (GRN), and inventory receiving.
+      <div className="space-y-4 md:space-y-6 fade-in">
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Purchases</h1>
+            <p className="page-subtitle">
+              Purchase orders, GRN & supplier fulfillment
             </p>
           </div>
-          <button onClick={() => setCreatePoModal(true)} className="btn-primary gap-2 font-bold">
-            <Icon name="PlusIcon" size={18} />
-            Create Purchase Order
+          <button onClick={() => setCreatePoModal(true)} className="btn-primary gap-1.5 text-xs flex-shrink-0">
+            <Icon name="PlusIcon" size={14} />
+            <span className="hidden sm:inline">Create PO</span>
+            <span className="sm:hidden">New</span>
           </button>
         </div>
 
         {/* Purchase Orders Directory */}
         <div className="card overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <h3 className="text-sm sm:text-base font-bold text-foreground">Purchase Orders Directory</h3>
-            <span className="text-xs text-muted-foreground">{filteredPurchases.length} total orders</span>
+          <div className="px-3 md:px-4 py-3 border-b border-border/60 flex items-center justify-between">
+            <h3 className="section-header">Orders</h3>
+            <span className="badge-neutral text-3xs">{filteredPurchases.length}</span>
           </div>
 
           {/* Mobile PO Cards (<md) */}

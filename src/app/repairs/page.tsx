@@ -144,10 +144,10 @@ export default function RepairsPage() {
               </span>
               <span className="text-xs text-muted-foreground">Real-time MySQL Synchronized</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mt-1">
+            <h1 className="page-title">
               Repairs & Service Management
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="page-subtitle">
               Directly query, track, log, and bridge device repair records with COSKO retail sales and Customer 360.
             </p>
           </div>

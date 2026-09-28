@@ -51,15 +51,18 @@ export default function GlobalSearchModal() {
     : [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-foreground/30 backdrop-blur-sm fade-in">
-      <div className="bg-card border border-border w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] slide-down">
+    <div
+      className="fixed inset-0 z-50 flex items-start md:items-start md:justify-center md:pt-16 bg-foreground/30 backdrop-blur-sm fade-in"
+      onClick={(e) => { if (e.target === e.currentTarget) setSearchOpen(false); }}
+    >
+      <div className="bg-card w-full h-full md:h-auto md:border md:border-border md:max-w-2xl md:rounded-2xl md:shadow-2xl overflow-hidden flex flex-col md:max-h-[80vh] md:mx-4">
         {/* Search Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/30">
-          <Icon name="MagnifyingGlassIcon" size={20} className="text-primary flex-shrink-0" />
+        <div className="flex items-center gap-3 px-4 md:px-5 py-3 md:py-4 border-b border-border bg-muted/30">
+          <Icon name="MagnifyingGlassIcon" size={18} className="text-primary flex-shrink-0" />
           <input
             autoFocus
             type="text"
-            placeholder="Search products by SKU/barcode, customers, orders, or pages..."
+            placeholder="Search products, customers, orders..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"

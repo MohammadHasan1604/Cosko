@@ -11,10 +11,13 @@ export default function NotificationsDrawer() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-foreground/20 backdrop-blur-xs fade-in">
-      <div className="w-full max-w-md bg-card border-l border-border h-full flex flex-col shadow-2xl slide-left">
+    <div
+      className="fixed inset-0 z-50 flex justify-end bg-foreground/20 backdrop-blur-sm fade-in"
+      onClick={(e) => { if (e.target === e.currentTarget) setNotificationsOpen(false); }}
+    >
+      <div className="w-full md:max-w-md bg-card border-l border-border h-full flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-4 md:px-5 py-3 md:py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <Icon name="BellIcon" size={20} className="text-primary" />
             <h2 className="text-base font-bold text-foreground">Notifications</h2>

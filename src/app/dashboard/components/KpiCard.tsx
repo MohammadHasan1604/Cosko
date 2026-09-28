@@ -98,60 +98,90 @@ export default function KpiCard({
       onKeyDown={handleKeyDown}
       tabIndex={isClickable ? 0 : undefined}
       role={isClickable ? 'button' : undefined}
-      className={`rounded-xl border shadow-card h-full p-5 flex flex-col justify-between transition-all duration-200 select-none ${
-        isPrimary ? 'bg-primary border-primary' : 'bg-card border-border'
+      aria-label={isClickable ? `${label}: ${value}. ${drillDownLabel || 'Click to drill down'}` : undefined}
+      className={`rounded-xl border shadow-card h-full flex transition-all select-none ${
+        isHero ? 'p-4 md:p-5 flex-col justify-between' : 'p-3 md:p-4 flex-row items-center gap-3 md:flex-col md:items-stretch md:gap-0'
+      } ${
+        isPrimary ? 'bg-primary border-primary' : 'bg-card border-border/80'
       } ${
         isClickable
-          ? 'cursor-pointer hover:border-primary/70 hover:shadow-card-hover hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-primary/40'
-          : 'hover:shadow-card-hover'
+          ? 'cursor-pointer hover:border-primary/60 hover:shadow-card-hover active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40'
+          : ''
       }`}
     >
-      {/* Top row */}
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="min-w-0 flex-1">
-          <p className={`text-xs font-semibold uppercase tracking-wider mb-1.5 truncate ${isPrimary ? 'text-blue-200' : 'text-muted-foreground'}`}>
-            {label}
-          </p>
+      {/* Compact mobile layout for non-hero cards: icon + value inline */}
+      {!isHero ? (
+        <>
+          {/* Icon - visible on all sizes */}
+          <div className={`w-9 h-9 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${cfg.iconBg} md:mb-3`}>
+            <Icon name={icon as Parameters<typeof Icon>[0]['name']} size={18} className={cfg.iconColor} />
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <p className={`text-2xs md:text-xs font-semibold uppercase tracking-wider truncate ${isPrimary ? 'text-blue-200' : 'text-muted-foreground'}`}>
+              {label}
+            </p>
+            <p className={`metric-value text-base md:text-xl ${isPrimary ? 'text-white' : 'text-foreground'} truncate tracking-tight mt-0.5 md:mt-1`}>
+              {value}
+            </p>
+            {/* Trend + change - visible on tablet+ or as subtext on mobile */}
+            <div className="flex items-center gap-1 mt-1">
+              <Icon
+                name={trendCfg.icon as Parameters<typeof Icon>[0]['name']}
+                size={11}
+                className={isPrimary ? 'text-blue-200' : trendCfg.colorClass}
+              />
+              <span className={`text-2xs font-semibold ${isPrimary ? 'text-blue-200' : trendCfg.colorClass}`}>
+                {change}
+              </span>
+            </div>
+          </div>
+
+          {/* Drill-down affordance */}
           {isClickable && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClick?.();
-              }}
-              className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 hover:bg-primary/20 active:bg-primary/30 px-2 py-0.5 rounded-full border border-primary/25 transition-all shadow-2xs group cursor-pointer"
-            >
-              <span>{drillDownLabel || 'Drill down'}</span>
-              <Icon name="ArrowRightIcon" size={10} className="stroke-[2.5] group-hover:translate-x-0.5 transition-transform" />
-            </button>
+            <div className="flex-shrink-0 md:mt-2">
+              <span className="text-2xs font-medium text-primary hidden md:inline-flex items-center gap-1">
+                {drillDownLabel || 'Details'} <Icon name="ChevronRightIcon" size={10} />
+              </span>
+              <Icon name="ChevronRightIcon" size={14} className="text-muted-foreground md:hidden" />
+            </div>
           )}
-        </div>
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${cfg.iconBg} ${isClickable ? 'group-hover:scale-110 transition-transform' : ''}`}>
-          <Icon name={icon as Parameters<typeof Icon>[0]['name']} size={18} className={cfg.iconColor} />
-        </div>
-      </div>
+        </>
+      ) : (
+        /* Hero card layout - unchanged for desktop, compact for mobile */
+        <>
+          <div className="flex items-start justify-between gap-3 mb-2 md:mb-3">
+            <div className="min-w-0 flex-1">
+              <p className={`text-2xs md:text-xs font-semibold uppercase tracking-wider mb-1 truncate ${isPrimary ? 'text-blue-200' : 'text-muted-foreground'}`}>
+                {label}
+              </p>
+            </div>
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${cfg.iconBg}`}>
+              <Icon name={icon as Parameters<typeof Icon>[0]['name']} size={18} className={cfg.iconColor} />
+            </div>
+          </div>
 
-      {/* Value */}
-      <div className="min-w-0">
-        <p className={`metric-value ${isHero ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'} ${isPrimary ? 'text-white' : 'text-foreground'} truncate tracking-tight`}>
-          {value}
-        </p>
-
-        {/* Change row */}
-        <div className="flex items-center gap-1.5 mt-2">
-          <Icon
-            name={trendCfg.icon as Parameters<typeof Icon>[0]['name']}
-            size={13}
-            className={isPrimary ? 'text-blue-200' : trendCfg.colorClass}
-          />
-          <span className={`text-xs font-semibold ${isPrimary ? 'text-blue-200' : trendCfg.colorClass}`}>
-            {change}
-          </span>
-          <span className={`text-xs ${isPrimary ? 'text-blue-300' : 'text-muted-foreground'}`}>
-            {subtext}
-          </span>
-        </div>
-      </div>
+          <div className="min-w-0">
+            <p className={`metric-value text-xl md:text-2xl lg:text-3xl ${isPrimary ? 'text-white' : 'text-foreground'} truncate tracking-tight`}>
+              {value}
+            </p>
+            <div className="flex items-center gap-1.5 mt-1.5 md:mt-2">
+              <Icon
+                name={trendCfg.icon as Parameters<typeof Icon>[0]['name']}
+                size={13}
+                className={isPrimary ? 'text-blue-200' : trendCfg.colorClass}
+              />
+              <span className={`text-xs font-semibold ${isPrimary ? 'text-blue-200' : trendCfg.colorClass}`}>
+                {change}
+              </span>
+              <span className={`text-xs hidden sm:inline ${isPrimary ? 'text-blue-300' : 'text-muted-foreground'}`}>
+                {subtext}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

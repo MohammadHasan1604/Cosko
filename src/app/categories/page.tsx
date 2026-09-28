@@ -85,7 +85,7 @@ export default function CategoriesPage() {
 
   return (
     <AppLayout activeRoute="/categories">
-      <div className="space-y-6 fade-in">
+      <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -94,7 +94,7 @@ export default function CategoriesPage() {
               <Icon name="ChevronRightIcon" size={12} />
               <span className="text-foreground font-medium">Catalog Management</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Category Master & Taxonomy</h1>
+            <h1 className="page-title">Category Master & Taxonomy</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">
               Manage product & service taxonomy across Mobile & Devices, EV, Home Appliances, and Spare Parts.
             </p>

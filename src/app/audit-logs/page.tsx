@@ -16,11 +16,11 @@ export default function AuditLogsPage() {
   return (
     <SuperAdminGuard moduleName="Audit Logs">
     <AppLayout activeRoute="/audit-logs">
-      <div className="space-y-6 fade-in">
+      <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">System Audit Logs & Security Trail</h1>
+            <h1 className="page-title">System Audit Logs & Security Trail</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Immutable audit trail recording all user transactions, stock adjustments, role changes, and IP addresses.
             </p>

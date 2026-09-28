@@ -271,29 +271,21 @@ export default function KpiBentoGrid() {
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4 gap-4">
-        <div className="sm:col-span-2 lg:col-span-2">
-          <KpiCard {...kpiCards[0]} />
-        </div>
-        <div className="lg:col-span-1">
-          <KpiCard {...kpiCards[1]} />
-        </div>
-        <div className="lg:col-span-1">
-          <KpiCard {...kpiCards[2]} />
-        </div>
+      {/* Hero KPI - full width on mobile */}
+      <div className="mb-3 md:mb-4">
+        <KpiCard {...kpiCards[0]} />
+      </div>
 
-        <div className="lg:col-span-1">
-          <KpiCard {...kpiCards[3]} />
-        </div>
-        <div className="lg:col-span-1">
-          <KpiCard {...kpiCards[4]} />
-        </div>
-        <div className="lg:col-span-1">
-          <KpiCard {...kpiCards[5]} />
-        </div>
-        <div className="lg:col-span-1">
-          <KpiCard {...kpiCards[6]} />
-        </div>
+      {/* Secondary KPIs - 2-col mobile, 4-col desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+        {kpiCards.slice(1).map((kpi) => (
+          <KpiCard key={kpi.id} {...kpi} />
+        ))}
+      </div>
+
+      {/* Stores KPI (8th card) */}
+      <div className="mt-3 md:mt-4">
+        <KpiCard {...kpiCards[kpiCards.length - 1]} />
       </div>
 
       {/* Vendor Payables Drill-Down Modal */}

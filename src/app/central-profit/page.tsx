@@ -283,12 +283,12 @@ export default function CentralProfitPage() {
   return (
     <SuperAdminGuard moduleName="Central Profit">
     <AppLayout activeRoute="/central-profit">
-      <div className="space-y-6 fade-in">
+      <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header & Primary Actions */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Central Profit & Stock Distribution</h1>
+              <h1 className="page-title">Central Profit & Stock Distribution</h1>
               <span className="badge-primary text-2xs uppercase tracking-wider">CENTRAL WAREHOUSE</span>
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">

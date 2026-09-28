@@ -228,11 +228,11 @@ export default function VendorsPage() {
 
   return (
     <AppLayout activeRoute="/vendors">
-      <div className="space-y-6 fade-in">
+      <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Vendor & Supplier Management</h1>
+            <h1 className="page-title">Vendor & Supplier Management</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               100% database-reconciled procurement payables, overdue bills drill-down, and atomic payment processing.
             </p>

@@ -152,7 +152,7 @@ export default function ExistingCustomersPage() {
 
   return (
     <AppLayout activeRoute="/customers">
-      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+      <div className="space-y-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -162,7 +162,7 @@ export default function ExistingCustomersPage() {
               </span>
               <span className="text-xs text-muted-foreground">Historical Bridge Layer</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mt-1">
+            <h1 className="page-title">
               Existing / Historical Customers
             </h1>
             <p className="text-sm text-muted-foreground">

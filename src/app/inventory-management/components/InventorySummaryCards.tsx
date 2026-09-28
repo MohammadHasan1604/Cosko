@@ -130,16 +130,16 @@ export default function InventorySummaryCards({ categoryFilter, storeScope }: In
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="flex gap-2 overflow-x-auto scrollbar-none md:grid md:grid-cols-5 md:gap-3 -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 pb-1 md:pb-0">
       {summaryCards.map((card) => (
-        <div key={card.id} className="card p-4 flex items-center gap-3.5">
-          <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${card.bg}`}>
-            <Icon name={card.icon as Parameters<typeof Icon>[0]['name']} size={20} className={card.color} />
+        <div key={card.id} className="card p-3 md:p-4 flex items-center gap-3 min-w-[150px] md:min-w-0 flex-shrink-0 md:flex-shrink">
+          <div className={`w-9 h-9 md:w-11 md:h-11 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 ${card.bg}`}>
+            <Icon name={card.icon as Parameters<typeof Icon>[0]['name']} size={18} className={card.color} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-2xs font-bold text-muted-foreground uppercase tracking-wider truncate">{card.label}</p>
-            <p className="text-lg font-bold text-foreground font-tabular mt-0.5 truncate">{card.value}</p>
-            <p className="text-3xs text-muted-foreground truncate">{card.sub}</p>
+            <p className="text-3xs md:text-2xs font-bold text-muted-foreground uppercase tracking-wider truncate">{card.label}</p>
+            <p className="text-base md:text-lg font-bold text-foreground font-tabular mt-0.5 truncate">{card.value}</p>
+            <p className="text-3xs text-muted-foreground truncate hidden md:block">{card.sub}</p>
           </div>
         </div>
       ))}

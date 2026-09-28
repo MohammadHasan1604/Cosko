@@ -206,7 +206,7 @@ export default function DataConnectionsPage() {
 
   return (
     <AppLayout activeRoute="/settings">
-      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto fade-in">
+      <div className="space-y-6 max-w-5xl mx-auto fade-in">
         {/* Breadcrumb Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -216,14 +216,14 @@ export default function DataConnectionsPage() {
               <span className="text-foreground font-medium">Data Connections</span>
             </div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              <h1 className="page-title">
                 External Data Connections
               </h1>
               <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-primary/10 text-primary border border-primary/20">
                 Super Admin Only
               </span>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="page-subtitle">
               Securely configure read-only database connections to query historical customer and service records without modifying legacy sources.
             </p>
           </div>

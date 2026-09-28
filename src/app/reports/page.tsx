@@ -189,11 +189,11 @@ export default function ReportsPage() {
 
   return (
     <AppLayout activeRoute="/reports">
-      <div className="space-y-6 fade-in">
+      <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header + Filters */}
         <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Executive Analytics & Reports</h1>
+            <h1 className="page-title">Executive Analytics & Reports</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Consolidated analytics derived from source-of-truth transactions. All figures reconcile with Sales, Purchases & Accounting.
             </p>

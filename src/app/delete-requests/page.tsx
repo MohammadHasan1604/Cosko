@@ -149,7 +149,7 @@ export default function DeleteRequestsPage() {
   return (
     <SuperAdminGuard moduleName="Delete Request Management">
       <AppLayout activeRoute="/delete-requests">
-        <div className="space-y-6 fade-in">
+        <div className="space-y-4 md:space-y-6 fade-in">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>

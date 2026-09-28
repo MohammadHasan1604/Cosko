@@ -55,7 +55,7 @@ export default function StockTransfersPage() {
   return (
     <SuperAdminGuard moduleName="Stock Transfers">
     <AppLayout activeRoute="/stock-transfers">
-      <div className="space-y-6 fade-in">
+      <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -64,7 +64,7 @@ export default function StockTransfersPage() {
               <Icon name="ChevronRightIcon" size={12} />
               <span className="text-foreground font-medium">Inter-Store Movements</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Stock Transfer Center</h1>
+            <h1 className="page-title">Stock Transfer Center</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Execute atomic inventory transfers between Central Warehouse and retail stores with real-time profit tracking.
             </p>

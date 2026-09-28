@@ -29,7 +29,7 @@ export default function LowStockAlerts() {
   return (
     <div className="card h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+      <div className="flex items-center justify-between px-3 md:px-5 py-3 md:py-4 border-b border-border">
         <div>
           <h2 className="section-header">Stock Alerts</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -55,7 +55,7 @@ export default function LowStockAlerts() {
           </div>
         ) : (
           alerts.map((alert) => (
-            <div key={alert.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors duration-100">
+            <div key={alert.id} className="flex items-center gap-3 px-3 md:px-4 py-2.5 md:py-3 hover:bg-muted/50 transition-colors">
               <div
                 className={`w-2 h-2 rounded-full flex-shrink-0 ${alert.severity === 'out-of-stock' ? 'bg-danger' : 'bg-warning'}`}
               />
@@ -76,7 +76,7 @@ export default function LowStockAlerts() {
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-3 border-t border-border">
+      <div className="px-3 md:px-5 py-2.5 md:py-3 border-t border-border">
         <Link
           href="/inventory-management"
           className="flex items-center justify-center gap-1.5 text-xs font-semibold text-primary hover:underline"

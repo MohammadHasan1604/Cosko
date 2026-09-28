@@ -10,7 +10,7 @@ export default function InventoryManagementPage() {
 
   return (
     <AppLayout activeRoute="/inventory-management">
-      <div className="space-y-6 fade-in">
+      <div className="space-y-4 md:space-y-6 fade-in">
         <InventoryHeader />
         <InventorySummaryCards categoryFilter={categoryFilter} />
         <InventoryTable categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} />

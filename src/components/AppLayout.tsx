@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import BottomNav from './BottomNav';
 import GlobalSearchModal from './GlobalSearchModal';
 import NotificationsDrawer from './NotificationsDrawer';
 import StoreSelectorModal from './StoreSelectorModal';
@@ -12,7 +13,6 @@ import ForcePasswordChangeModal from './ForcePasswordChangeModal';
 import AppErrorBoundary from './AppErrorBoundary';
 import ScrollManager from './ScrollManager';
 import Icon from '@/components/ui/AppIcon';
-import AppLogo from '@/components/ui/AppLogo';
 import CoskoLogo from '@/components/ui/CoskoLogo';
 import GlobalConfirmationModal from '@/components/ui/GlobalConfirmationModal';
 import ActivityTracker from './ActivityTracker';
@@ -52,6 +52,7 @@ const routePermissions: Record<string, string[]> = {
   '/settings': superAdminOnly,
   '/settings/data-connections': superAdminOnly,
   '/stock-transfers': superAdminOnly,
+  '/delete-requests': superAdminOnly,
 };
 
 export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
@@ -94,7 +95,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
     }
   }, [branding.appName, branding.logoUrl, branding.faviconUrl]);
 
-  // 1. Auth Loading State: Render clean loading skeleton while verifying session
+  // 1. Auth Loading State
   if (authStatus === 'AUTH_LOADING') {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -107,7 +108,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
     );
   }
 
-  // 2. Unauthenticated State: Prevent rendering UI before redirect
+  // 2. Unauthenticated State
   if (authStatus === 'UNAUTHENTICATED') {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -119,14 +120,15 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
     );
   }
 
-  // Route Permission Check: Verify current user role against allowed roles for this route (Super Admin always authorized)
+  // Route Permission Check
   const allowedRoles = activeRoute ? routePermissions[activeRoute] : undefined;
   const isAuthorized = currentUser.role === 'Super Admin' || !allowedRoles || (currentUser.role && allowedRoles.includes(currentUser.role));
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-[100dvh] bg-background overflow-hidden">
       <ActivityTracker />
-      {/* Mobile overlay */}
+
+      {/* Mobile sidebar overlay */}
       {mobileSidebarOpen && (
         <div
           className="fixed inset-0 bg-foreground/20 z-40 lg:hidden"
@@ -134,7 +136,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Desktop Sidebar */}
       <Sidebar
         collapsed={sidebarCollapsed}
         mobileOpen={mobileSidebarOpen}
@@ -142,9 +144,9 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
         activeRoute={activeRoute}
       />
 
-      {/* Main content */}
+      {/* Main content area */}
       <div
-        className={`flex flex-col flex-1 min-w-0 content-transition transition-all duration-300 ml-0 ${
+        className={`flex flex-col flex-1 min-w-0 content-transition transition-all duration-250 ml-0 ${
           sidebarCollapsed ? 'lg:ml-[var(--sidebar-collapsed-width)]' : 'lg:ml-[var(--sidebar-width)]'
         }`}
       >
@@ -156,13 +158,18 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
         />
 
         {/* Page content */}
-        <main id="main-scroll-area" className="flex-1 overflow-y-auto p-4 lg:p-6 pb-12">
+        <main
+          id="main-scroll-area"
+          className="flex-1 overflow-y-auto px-page py-4 lg:py-5 pb-bottomnav lg:pb-6"
+        >
           <Suspense fallback={null}>
             <ScrollManager />
           </Suspense>
           {isAuthorized ? (
             <AppErrorBoundary>
-              {children}
+              <div className="max-w-page mx-auto">
+                {children}
+              </div>
             </AppErrorBoundary>
           ) : (
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center p-6 card">
@@ -177,6 +184,9 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
           )}
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNav />
 
       {/* Global Modals & Drawers */}
       <GlobalSearchModal />
