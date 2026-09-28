@@ -566,16 +566,16 @@ export default function SalesPage() {
 
   return (
     <AppLayout activeRoute="/sales">
-      <div className="space-y-4 sm:space-y-6 fade-in">
+      <div className="space-y-4 md:space-y-6 fade-in">
         {/* Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-card/75 backdrop-blur-md border border-border/80 shadow-xs">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-lg sm:text-xl font-extrabold text-foreground tracking-tight">POS Checkout Terminal</h1>
-              <span className="badge-primary text-3xs font-mono font-bold px-2 py-0.5 rounded-full">{effectiveStore} Store</span>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <div className="flex items-center gap-2">
+              <h1 className="page-title">POS Terminal</h1>
+              <span className="badge-primary text-3xs font-mono font-bold px-1.5 py-0.5 rounded-full">{effectiveStore}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Cashier: <strong className="text-foreground font-semibold">{activeEmployeeName}</strong> · Standard Invoicing Engine (CS26)
+            <p className="page-subtitle">
+              Cashier: <strong className="text-foreground font-semibold">{activeEmployeeName}</strong>
             </p>
           </div>
 

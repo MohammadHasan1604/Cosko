@@ -230,27 +230,26 @@ export default function VendorsPage() {
     <AppLayout activeRoute="/vendors">
       <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="page-title">Vendor & Supplier Management</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              100% database-reconciled procurement payables, overdue bills drill-down, and atomic payment processing.
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Vendors</h1>
+            <p className="page-subtitle">
+              Supplier payables, bills & payment processing
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setOnboardModal(true)}
-              className="btn-primary gap-2 text-xs sm:text-sm font-semibold shadow-xs"
-            >
-              <Icon name="PlusIcon" size={18} />
-              Onboard Supplier
-            </button>
-          </div>
+          <button
+            onClick={() => setOnboardModal(true)}
+            className="btn-primary gap-1.5 text-xs flex-shrink-0"
+          >
+            <Icon name="PlusIcon" size={14} />
+            <span className="hidden sm:inline">Onboard Supplier</span>
+            <span className="sm:hidden">Add</span>
+          </button>
         </div>
 
         {/* High-Level Financial KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="card p-4 border border-border">
+        <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 md:grid md:grid-cols-4 md:gap-3 pb-1 md:pb-0">
+          <div className="card p-3 md:p-4 border border-border min-w-[170px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <div className="flex items-center justify-between">
               <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Active Suppliers</span>
               <span className="p-2 rounded-xl bg-primary/10 text-primary">
@@ -263,7 +262,7 @@ export default function VendorsPage() {
             </p>
           </div>
 
-          <div className="card p-4 border border-border">
+          <div className="card p-3 md:p-4 border border-border min-w-[170px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <div className="flex items-center justify-between">
               <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Total Procurement Billed</span>
               <span className="p-2 rounded-xl bg-info/10 text-info">
@@ -276,7 +275,7 @@ export default function VendorsPage() {
             <p className="text-3xs text-muted-foreground mt-1">Across all verified purchase orders</p>
           </div>
 
-          <div className="card p-4 border border-border">
+          <div className="card p-3 md:p-4 border border-border min-w-[170px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <div className="flex items-center justify-between">
               <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Settled Payments</span>
               <span className="p-2 rounded-xl bg-positive/10 text-positive">

@@ -55,37 +55,38 @@ export default function ExpensesPage() {
     <AppLayout activeRoute="/expenses">
       <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="page-title">Operating Expenses</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Store operating expenses, utility bills, rent, logistics, and approval status.
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Expenses</h1>
+            <p className="page-subtitle">
+              Store operating costs & approvals
             </p>
           </div>
-
-          <button onClick={() => setModalOpen(true)} className="btn-primary gap-2 text-xs sm:text-sm font-semibold shadow-xs">
-            <Icon name="PlusIcon" size={16} />
-            Log New Expense
+          <button onClick={() => setModalOpen(true)} className="btn-primary gap-1.5 text-xs flex-shrink-0">
+            <Icon name="PlusIcon" size={14} />
+            <span className="hidden sm:inline">Log Expense</span>
+            <span className="sm:hidden">Add</span>
           </button>
         </div>
 
         {/* Expenses Summary Card */}
-        <div className="card p-5 bg-gradient-to-r from-primary/10 via-info/5 to-card flex items-center justify-between border border-border/80">
+        <div className="card p-3 md:p-5 bg-gradient-to-r from-primary/8 via-info/5 to-card flex items-center justify-between border border-border/60">
           <div>
-            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Logged Expenses</p>
-            <h2 className="text-2xl font-extrabold text-foreground font-tabular mt-1">₹{totalExpense.toLocaleString('en-IN')}</h2>
+            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Expenses</p>
+            <h2 className="text-xl md:text-2xl font-extrabold text-foreground font-tabular mt-1">₹{totalExpense.toLocaleString('en-IN')}</h2>
             <p className="text-3xs text-muted-foreground mt-0.5">
-              {filteredExpenses.length} approved transactions in active store scope ({selectedStore})
+              {filteredExpenses.length} transactions · {selectedStore}
             </p>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-primary text-white flex items-center justify-center font-bold text-base shadow-xs">
+          <div className="w-9 h-9 md:w-11 md:h-11 rounded-xl bg-primary text-white flex items-center justify-center font-bold text-sm">
             ₹
           </div>
         </div>
 
         {/* Table */}
         <div className="card overflow-hidden">
-          <div className="overflow-x-auto scrollbar-thin">
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto scrollbar-thin">
             <table className="w-full text-left min-w-[750px] text-xs">
               <thead>
                 <tr className="table-header">
@@ -166,6 +167,33 @@ export default function ExpensesPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: Card list */}
+          <div className="md:hidden divide-y divide-border/60">
+            {filteredExpenses.length === 0 ? (
+              <div className="empty-state">
+                <p className="empty-state-title">No expenses</p>
+                <p className="empty-state-text">Tap "Add" to log a new expense</p>
+              </div>
+            ) : (
+              filteredExpenses.map((exp) => (
+                <div key={`m-exp-${exp.id}`} className="record-item" onClick={() => handleOpenEdit(exp)}>
+                  <div className="record-avatar bg-primary/10 text-primary">
+                    ₹
+                  </div>
+                  <div className="record-content">
+                    <p className="record-title">{exp.category}</p>
+                    <p className="record-subtitle">{exp.description}</p>
+                    <p className="text-3xs text-muted-foreground mt-0.5">{exp.date} · {exp.store}</p>
+                  </div>
+                  <div className="record-meta">
+                    <p className="record-value">₹{exp.amount.toLocaleString('en-IN')}</p>
+                    <span className="badge-success text-3xs">{exp.status}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
