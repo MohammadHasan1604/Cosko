@@ -225,44 +225,34 @@ export default function WorkActivityPage() {
     <AppLayout activeRoute="/work-activity">
       <div className="space-y-4 md:space-y-6 fade-in">
         {/* Top Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="p-2 rounded-xl bg-primary/10 text-primary">
-                <Icon name="ClockIcon" size={22} />
-              </span>
-              <h1 className="page-title">
-                Work Activity & Time Tracking
-              </h1>
-            </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              Centralized active usage tracking with 2-minute idle detection, session telemetry, and daily attendance breakdown.
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Work Activity</h1>
+            <p className="page-subtitle">Time tracking & session telemetry</p>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
               onClick={fetchStats}
               disabled={loading}
-              className="btn-secondary text-xs sm:text-sm gap-1.5 cursor-pointer"
-              title="Refresh activity telemetry"
+              className="btn-secondary btn-sm gap-1"
+              title="Refresh"
             >
-              <Icon name="ArrowPathIcon" size={16} className={loading ? 'animate-spin' : ''} />
-              Refresh
+              <Icon name="ArrowPathIcon" size={14} className={loading ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Refresh</span>
             </button>
 
             <button
               onClick={handleExportCSV}
               disabled={exporting || loading}
-              className="btn-primary text-xs sm:text-sm gap-1.5 cursor-pointer"
+              className="btn-primary btn-sm gap-1"
             >
               {exporting ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                <Icon name="ArrowDownTrayIcon" size={16} />
+                <Icon name="ArrowDownTrayIcon" size={14} />
               )}
-              Export Report (CSV)
+              <span className="hidden sm:inline">Export</span>
             </button>
           </div>
         </div>

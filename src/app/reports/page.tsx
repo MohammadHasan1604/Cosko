@@ -191,15 +191,15 @@ export default function ReportsPage() {
     <AppLayout activeRoute="/reports">
       <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header + Filters */}
-        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-          <div>
-            <h1 className="page-title">Executive Analytics & Reports</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Consolidated analytics derived from source-of-truth transactions. All figures reconcile with Sales, Purchases & Accounting.
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Reports</h1>
+            <p className="page-subtitle">Analytics & reconciled financials</p>
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+        {/* Filter Controls */}
+        <div className="flex flex-wrap items-center gap-2">
             {/* Store Filter (SUPER ADMIN ONLY) */}
             {currentUser.role === 'Super Admin' && (
               <select
@@ -207,7 +207,7 @@ export default function ReportsPage() {
                 onChange={(e) => setReportStore(e.target.value)}
                 className="input-field text-xs py-2 px-3"
               >
-                <option value="All Stores">All Stores (Consolidated View)</option>
+                <option value="All Stores">All Stores</option>
                 {storesList.map((s) => (
                   <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
                 ))}
@@ -256,14 +256,13 @@ export default function ReportsPage() {
             </select>
 
             {/* Export Buttons */}
-            <button onClick={() => handleExport(activeTab)} className="btn-secondary text-xs gap-1.5 py-2">
-              <Icon name="ArrowDownTrayIcon" size={14} /> Export Report
+            <button onClick={() => handleExport(activeTab)} className="btn-secondary btn-sm gap-1">
+              <Icon name="ArrowDownTrayIcon" size={13} /> <span className="hidden sm:inline">Export</span>
             </button>
-            <button onClick={() => handleExport('all')} className="btn-primary text-xs gap-1.5 py-2">
-              <Icon name="ArrowDownTrayIcon" size={14} /> Export All
+            <button onClick={() => handleExport('all')} className="btn-primary btn-sm gap-1">
+              <Icon name="ArrowDownTrayIcon" size={13} /> <span className="hidden sm:inline">All</span>
             </button>
           </div>
-        </div>
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-1 border-b border-border pb-1 overflow-x-auto">

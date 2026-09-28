@@ -57,30 +57,19 @@ export default function StockTransfersPage() {
     <AppLayout activeRoute="/stock-transfers">
       <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-              <span>Operations</span>
-              <Icon name="ChevronRightIcon" size={12} />
-              <span className="text-foreground font-medium">Inter-Store Movements</span>
-            </div>
-            <h1 className="page-title">Stock Transfer Center</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Execute atomic inventory transfers between Central Warehouse and retail stores with real-time profit tracking.
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Stock Transfers</h1>
+            <p className="page-subtitle">Inter-store inventory movements</p>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setCreateModalOpen(true);
-              }}
-              className="btn-primary gap-1.5 text-xs sm:text-sm font-bold shadow-sm"
-            >
-              <Icon name="PlusIcon" size={16} />
-              New Stock Transfer
-            </button>
-          </div>
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="btn-primary gap-1.5 text-xs flex-shrink-0"
+          >
+            <Icon name="PlusIcon" size={14} />
+            <span className="hidden sm:inline">New Transfer</span>
+            <span className="sm:hidden">New</span>
+          </button>
         </div>
 
         {/* Filters and Controls */}

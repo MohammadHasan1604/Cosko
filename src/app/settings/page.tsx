@@ -343,37 +343,26 @@ export default function SettingsPage() {
   return (
     <SuperAdminGuard moduleName="Settings">
     <AppLayout activeRoute="/settings">
-      <div className="space-y-6 fade-in max-w-5xl">
+      <div className="space-y-4 md:space-y-6 fade-in max-w-5xl">
         {/* Page Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="page-title">Store & System Settings</h1>
-            <p className="page-subtitle">
-              White-label branding, India GST tax profile, custom invoice designer, security policies, and automated alerts.
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Settings</h1>
+            <p className="page-subtitle">Branding, GST, invoicing & system config</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             {!isSuperAdmin && (
-              <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                Read-Only (Super Admin Required)
-              </span>
+              <span className="badge-warning text-3xs">Read-Only</span>
             )}
             <button
               type="button"
               onClick={reloadSettings}
-              className="btn-secondary text-xs flex items-center gap-1.5"
-              title="Refresh settings from database"
+              className="btn-secondary btn-sm gap-1"
+              title="Refresh settings"
             >
-              <Icon name="ArrowPathIcon" size={14} />
-              Sync DB
+              <Icon name="ArrowPathIcon" size={13} />
+              <span className="hidden sm:inline">Sync</span>
             </button>
-            <Link
-              href="/settings/data-connections"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all shadow-xs"
-            >
-              <Icon name="CircleStackIcon" size={15} />
-              <span>Legacy Data Connections</span>
-            </Link>
           </div>
         </div>
 

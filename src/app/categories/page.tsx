@@ -87,39 +87,24 @@ export default function CategoriesPage() {
     <AppLayout activeRoute="/categories">
       <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-              <span>{branding.appName}</span>
-              <Icon name="ChevronRightIcon" size={12} />
-              <span className="text-foreground font-medium">Catalog Management</span>
-            </div>
-            <h1 className="page-title">Category Master & Taxonomy</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              Manage product & service taxonomy across Mobile & Devices, EV, Home Appliances, and Spare Parts.
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Categories</h1>
+            <p className="page-subtitle">Product taxonomy & catalog types</p>
           </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setCreateTypeOpen(true)}
-              className="btn-secondary gap-1.5 text-xs font-semibold py-2"
-            >
-              <Icon name="PlusCircleIcon" size={14} className="text-primary" />
-              + Add New Type
-            </button>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
               type="button"
               onClick={() => setManageTypesOpen(true)}
-              className="btn-secondary gap-1.5 text-xs font-semibold py-2"
+              className="btn-secondary btn-sm gap-1 hidden sm:inline-flex"
             >
-              <Icon name="Cog6ToothIcon" size={14} />
-              Manage Types
+              <Icon name="Cog6ToothIcon" size={13} />
+              Types
             </button>
-            <button onClick={handleOpenAddModal} className="btn-primary gap-1.5 text-xs sm:text-sm font-bold">
-              <Icon name="PlusIcon" size={15} />
-              Add Category
+            <button onClick={handleOpenAddModal} className="btn-primary btn-sm gap-1">
+              <Icon name="PlusIcon" size={14} />
+              <span className="hidden sm:inline">Add</span>
+              <span className="sm:hidden">+</span>
             </button>
           </div>
         </div>

@@ -42,22 +42,20 @@ export default function EmployeesPage() {
   return (
     <AppLayout activeRoute="/employees">
       <div className="space-y-4 md:space-y-6 fade-in">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="page-title">Employee Roster & Attendance</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Staff management, shift schedules, active location assignments, and login credential provisioning backed by MySQL.
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Employees</h1>
+            <p className="page-subtitle">Staff roster, shifts & assignments</p>
           </div>
-
-          <button onClick={() => setAddModal(true)} className="btn-primary gap-2 self-start sm:self-auto text-xs sm:text-sm">
-            <Icon name="UserPlusIcon" size={18} />
-            Register Team Member
+          <button onClick={() => setAddModal(true)} className="btn-primary gap-1.5 text-xs flex-shrink-0">
+            <Icon name="UserPlusIcon" size={14} />
+            <span className="hidden sm:inline">Add Member</span>
+            <span className="sm:hidden">Add</span>
           </button>
         </div>
 
         {/* Employee Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {filteredEmployees.map((emp) => (
             <div key={`emp-card-${emp.id}`} className="card p-4 space-y-3 relative">
               <div className="flex items-start justify-between">

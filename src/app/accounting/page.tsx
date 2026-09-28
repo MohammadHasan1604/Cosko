@@ -293,24 +293,16 @@ export default function AccountingPage() {
 
   return (
     <AppLayout activeRoute="/accounting">
-      <div className="space-y-6 fade-in pb-12">
+      <div className="space-y-4 md:space-y-6 fade-in pb-12">
         {/* Header & Global Filters */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-card/60 backdrop-blur-md p-5 rounded-2xl border border-border shadow-xs">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-primary/10 rounded-xl text-primary">
-                <Icon name="DocumentTextIcon" size={24} />
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-                  Enterprise Financial & Profitability P&L
-                </h1>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                  Consolidated multi-store statements, internal transfer eliminations, and general ledger journal.
-                </p>
-              </div>
-            </div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Accounting</h1>
+            <p className="page-subtitle">P&L, ledger & financial statements</p>
           </div>
+        </div>
+
+        <div className="card p-3 md:p-4 space-y-3">
 
           {/* Action Bar & Controls */}
           <div className="flex flex-wrap items-center gap-2.5">

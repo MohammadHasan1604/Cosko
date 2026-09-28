@@ -145,39 +145,36 @@ export default function UsersPage() {
     <SuperAdminGuard moduleName="Users & Roles">
     <AppLayout activeRoute="/users">
       <div className="space-y-4 md:space-y-6 fade-in">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="page-title">User Accounts & Security Hierarchy</h1>
-            <p className="page-subtitle">
-              Simple Super Admin Permission Controls, Action ON/OFF Toggles, Store Scope Switches & Security Hierarchy.
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Users & Roles</h1>
+            <p className="page-subtitle">Accounts, permissions & security hierarchy</p>
           </div>
-
-          <button onClick={() => setInviteModal(true)} className="btn-primary gap-2">
-            <Icon name="UserPlusIcon" size={18} />
-            Provision New User
+          <button onClick={() => setInviteModal(true)} className="btn-primary gap-1.5 text-xs flex-shrink-0">
+            <Icon name="UserPlusIcon" size={14} />
+            <span className="hidden sm:inline">Add User</span>
+            <span className="sm:hidden">Add</span>
           </button>
         </div>
 
         {/* Security Level Matrix Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 md:grid md:grid-cols-5 md:gap-3 pb-1 md:pb-0">
           {roleDescriptions.map((rd) => (
-            <div key={`matrix-${rd.role}`} className="card p-4 space-y-2 border-l-4" style={{ borderColor: rd.level === 100 ? 'var(--danger)' : rd.level === 80 ? 'var(--warning)' : 'var(--primary)' }}>
+            <div key={`matrix-${rd.role}`} className="card p-3 md:p-4 space-y-1.5 border-l-4 min-w-[160px] md:min-w-0 flex-shrink-0 md:flex-shrink" style={{ borderColor: rd.level === 100 ? 'var(--danger)' : rd.level === 80 ? 'var(--warning)' : 'var(--primary)' }}>
               <div className="flex items-center justify-between">
-                <span className={`${rd.badge} text-2xs`}>Level {rd.level}</span>
+                <span className={`${rd.badge} text-2xs`}>Lvl {rd.level}</span>
                 <span className="text-3xs font-bold uppercase text-muted-foreground">{rd.role}</span>
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">{rd.access}</p>
+              <p className="text-2xs md:text-xs text-muted-foreground leading-relaxed">{rd.access}</p>
             </div>
           ))}
         </div>
 
         {/* Filter Bar & User Roster */}
         <div className="card overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
+          <div className="px-3 md:px-4 py-3 border-b border-border/60 flex flex-col md:flex-row md:items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-foreground">Authorized System Accounts</h3>
-              <p className="text-2xs text-muted-foreground">Server-Side Verified Security Hierarchy & Account Status Controls</p>
+              <h3 className="section-header">Accounts</h3>
             </div>
 
             {/* Status Filter Tabs */}

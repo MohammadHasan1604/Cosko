@@ -38,30 +38,28 @@ export default function StoresPage() {
     <SuperAdminGuard moduleName="Store Management">
     <AppLayout activeRoute="/stores">
       <div className="space-y-4 md:space-y-6 fade-in">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="page-title">Multi-Store Locations Hubs</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Manage store outlets, register terminals, store owners, edit/delete hub locations, and inter-store transfers.
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Stores</h1>
+            <p className="page-subtitle">Multi-location hubs & transfers</p>
           </div>
-
-          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-            <button onClick={() => setTransferModal(true)} className="btn-secondary gap-1.5 text-xs sm:text-sm">
-              <Icon name="ArrowsRightLeftIcon" size={16} />
-              Inter-Store Stock Transfer
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button onClick={() => setTransferModal(true)} className="btn-secondary btn-sm gap-1">
+              <Icon name="ArrowsRightLeftIcon" size={14} />
+              <span className="hidden sm:inline">Transfer</span>
             </button>
             {currentUser.role === 'Super Admin' && (
-              <button onClick={() => setAddStoreModal(true)} className="btn-primary gap-1.5 text-xs sm:text-sm">
-                <Icon name="PlusIcon" size={18} />
-                Add New Store Hub
+              <button onClick={() => setAddStoreModal(true)} className="btn-primary btn-sm gap-1">
+                <Icon name="PlusIcon" size={14} />
+                <span className="hidden sm:inline">Add Store</span>
+                <span className="sm:hidden">Add</span>
               </button>
             )}
           </div>
         </div>
 
         {/* Store Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
           {storesList.map((s) => {
             const isCentral = s.code === 'CENTRAL';
             return (
