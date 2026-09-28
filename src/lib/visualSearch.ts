@@ -1,6 +1,6 @@
 /**
  * Visual Search & Perceptual Image Fingerprinting Engine
- * 
+ *
  * Provides client and server visual feature extraction:
  * 1. Perceptual Difference Hashing (dHash) - Grayscale structural gradient matrix
  * 2. Color Histogram Vector (RGB/HSV distribution) - Dominant color & palette matching
@@ -83,13 +83,9 @@ export function extractClientVisualFeature(
 
         // Luminance = 0.299R + 0.587G + 0.114B
         const lumLeft =
-          0.299 * imgData[idxLeft] +
-          0.587 * imgData[idxLeft + 1] +
-          0.114 * imgData[idxLeft + 2];
+          0.299 * imgData[idxLeft] + 0.587 * imgData[idxLeft + 1] + 0.114 * imgData[idxLeft + 2];
         const lumRight =
-          0.299 * imgData[idxRight] +
-          0.587 * imgData[idxRight + 1] +
-          0.114 * imgData[idxRight + 2];
+          0.299 * imgData[idxRight] + 0.587 * imgData[idxRight + 1] + 0.114 * imgData[idxRight + 2];
 
         dHash += lumLeft > lumRight ? '1' : '0';
       }
@@ -114,8 +110,7 @@ export function extractClientVisualFeature(
     // Normalize color bins
     const normalizedColorHist = bins.map((val) => val / totalPixels);
 
-    const origWidth =
-      'naturalWidth' in imgOrCanvas ? imgOrCanvas.naturalWidth : imgOrCanvas.width;
+    const origWidth = 'naturalWidth' in imgOrCanvas ? imgOrCanvas.naturalWidth : imgOrCanvas.width;
     const origHeight =
       'naturalHeight' in imgOrCanvas ? imgOrCanvas.naturalHeight : imgOrCanvas.height;
     const aspectRatio = origHeight > 0 ? origWidth / origHeight : 1;
@@ -135,10 +130,7 @@ export function extractClientVisualFeature(
  * Calculate composite match confidence between two visual feature vectors.
  * Returns score between 0 and 100.
  */
-export function calculateMatchConfidence(
-  query: VisualFeature,
-  target: VisualFeature
-): number {
+export function calculateMatchConfidence(query: VisualFeature, target: VisualFeature): number {
   if (!query || !target) return 0;
 
   // 1. dHash similarity (Hamming distance out of 64 bits)
@@ -156,7 +148,7 @@ export function calculateMatchConfidence(
   // dHash carries 60% weight (shape & structural gradient)
   // Color carries 35% weight (dominant color matching)
   // Aspect ratio carries 5% weight
-  const composite = 0.60 * dHashSim + 0.35 * colorSim + 0.05 * arSim;
+  const composite = 0.6 * dHashSim + 0.35 * colorSim + 0.05 * arSim;
 
   return Math.round(composite * 100);
 }

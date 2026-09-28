@@ -447,7 +447,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   // =========================================================================
   // CATEGORY 19: SUPER ADMIN PROFILE & PASSWORD SECURITY
   // =========================================================================
-  const adminPasswordRaw = 'Cosko2026@';
+  const adminPasswordRaw = process.env.TEST_ADMIN_PASSWORD || 'TestPassword123!';
   const adminHashed = await hashPassword(adminPasswordRaw);
   const isValidPassAttempt = await verifyPassword(adminPasswordRaw, adminHashed);
   const isInvalidPassAttempt = await verifyPassword('WrongPassword123!', adminHashed);
