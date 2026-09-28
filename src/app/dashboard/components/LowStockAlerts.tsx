@@ -9,7 +9,8 @@ import { useApp } from '@/context/AppContext';
 export default function LowStockAlerts() {
   const { inventory, selectedStore } = useApp();
 
-  const filteredInv = selectedStore === 'All Stores' ? inventory : inventory.filter((i) => i.store === selectedStore);
+  const filteredInv =
+    selectedStore === 'All Stores' ? inventory : inventory.filter((i) => i.store === selectedStore);
 
   const alerts = filteredInv
     .filter((item) => item.qtyOnHand <= (item.reorderPt || 5) || item.qtyOnHand === 0)
@@ -20,7 +21,9 @@ export default function LowStockAlerts() {
       store: item.store || 'BLR',
       qty: item.qtyOnHand,
       reorder: item.reorderPt || 10,
-      severity: (item.qtyOnHand === 0 ? 'out-of-stock' : 'low-stock') as 'out-of-stock' | 'low-stock',
+      severity: (item.qtyOnHand === 0 ? 'out-of-stock' : 'low-stock') as
+        | 'out-of-stock'
+        | 'low-stock',
     }));
 
   const outOfStockCount = alerts.filter((a) => a.severity === 'out-of-stock').length;
@@ -51,17 +54,24 @@ export default function LowStockAlerts() {
               <Icon name="CheckCircleIcon" size={20} className="text-positive" />
             </div>
             <p className="text-xs font-medium text-foreground">All stock levels optimal</p>
-            <p className="text-2xs text-muted-foreground mt-1 max-w-[200px]">No out-of-stock or low-stock items detected in the system.</p>
+            <p className="text-2xs text-muted-foreground mt-1 max-w-[200px]">
+              No out-of-stock or low-stock items detected in the system.
+            </p>
           </div>
         ) : (
           alerts.map((alert) => (
-            <div key={alert.id} className="flex items-center gap-3 px-3 md:px-4 py-2.5 md:py-3 hover:bg-muted/50 transition-colors">
+            <div
+              key={alert.id}
+              className="flex items-center gap-3 px-3 md:px-4 py-2.5 md:py-3 hover:bg-muted/50 transition-colors"
+            >
               <div
                 className={`w-2 h-2 rounded-full flex-shrink-0 ${alert.severity === 'out-of-stock' ? 'bg-danger' : 'bg-warning'}`}
               />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-foreground truncate">{alert.name}</p>
-                <p className="text-2xs text-muted-foreground mt-0.5">{alert.sku} · {alert.store}</p>
+                <p className="text-2xs text-muted-foreground mt-0.5">
+                  {alert.sku} · {alert.store}
+                </p>
               </div>
               <div className="text-right flex-shrink-0">
                 <StatusBadge

@@ -41,7 +41,16 @@ export default function PurchaseOrderFormModal({
   onSuccess,
   zIndex = 100,
 }: PurchaseOrderFormModalProps) {
-  const { vendors, inventory, storesList, paymentMethods, addPurchase, updatePurchase, refreshAllData, confirmAction } = useApp();
+  const {
+    vendors,
+    inventory,
+    storesList,
+    paymentMethods,
+    addPurchase,
+    updatePurchase,
+    refreshAllData,
+    confirmAction,
+  } = useApp();
 
   // PO Header Details
   const [vendorName, setVendorName] = useState('');
@@ -67,8 +76,9 @@ export default function PurchaseOrderFormModal({
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
   const [storeModalOpen, setStoreModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
-  const [activeItemIndexForProductCreate, setActiveItemIndexForProductCreate] = useState<number | null>(null);
-
+  const [activeItemIndexForProductCreate, setActiveItemIndexForProductCreate] = useState<
+    number | null
+  >(null);
 
   const isEdit = Boolean(purchase);
 
@@ -159,42 +169,61 @@ export default function PurchaseOrderFormModal({
         setVendorName(purchase.vendorName || '');
         setStore(purchase.store || 'CENTRAL');
         setInvoiceNo(purchase.invoiceNo || '');
-        setOrderDate(purchase.createdAt ? new Date(purchase.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+        setOrderDate(
+          purchase.createdAt
+            ? new Date(purchase.createdAt).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0]
+        );
         setExpectedDate(purchase.expectedDate || '');
         setDueDate(purchase.dueDate || '');
         setStatus((purchase.status as any) || 'Ordered');
-        const realPaid = purchase.payments && purchase.payments.length > 0
-          ? purchase.payments.reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0)
-          : (purchase.paidAmount !== undefined && purchase.paidAmount !== null ? Number(purchase.paidAmount) : 0);
+        const realPaid =
+          purchase.payments && purchase.payments.length > 0
+            ? purchase.payments.reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0)
+            : purchase.paidAmount !== undefined && purchase.paidAmount !== null
+              ? Number(purchase.paidAmount)
+              : 0;
         setPaidAmount(realPaid > 0 ? realPaid : '');
         setPaymentStatus(purchase.paymentStatus || 'Unpaid');
         setNotes(purchase.notes || '');
 
         if (purchase.items && purchase.items.length > 0) {
-          const loadedItems: PurchaseOrderLineItem[] = purchase.items.map((it: any, index: number) => {
-            const matchedInv = inventory.find((inv) => (inv.productId && inv.productId === it.productId) || inv.sku === it.sku);
-            const prodId = it.productId || it.itemId || matchedInv?.productId || matchedInv?.id || '';
-            const sku = it.sku || matchedInv?.sku || '';
-            const name = it.name || matchedInv?.name || 'Item';
-            const qtyVal = Number(it.qty) || 1;
-            const unitCostVal = Number(it.unitCost) || Number(matchedInv?.costPrice) || 0;
-            const taxRateVal = it.taxRate !== undefined ? Number(it.taxRate) : matchedInv?.taxRate || 0;
-            const discountVal = it.discount !== undefined && it.discount !== null ? Number(it.discount) : '';
-            const { taxAmount, lineTotal } = calculateLineItem(qtyVal, unitCostVal, taxRateVal, discountVal);
+          const loadedItems: PurchaseOrderLineItem[] = purchase.items.map(
+            (it: any, index: number) => {
+              const matchedInv = inventory.find(
+                (inv) => (inv.productId && inv.productId === it.productId) || inv.sku === it.sku
+              );
+              const prodId =
+                it.productId || it.itemId || matchedInv?.productId || matchedInv?.id || '';
+              const sku = it.sku || matchedInv?.sku || '';
+              const name = it.name || matchedInv?.name || 'Item';
+              const qtyVal = Number(it.qty) || 1;
+              const unitCostVal = Number(it.unitCost) || Number(matchedInv?.costPrice) || 0;
+              const taxRateVal =
+                it.taxRate !== undefined ? Number(it.taxRate) : matchedInv?.taxRate || 0;
+              const discountVal =
+                it.discount !== undefined && it.discount !== null ? Number(it.discount) : '';
+              const { taxAmount, lineTotal } = calculateLineItem(
+                qtyVal,
+                unitCostVal,
+                taxRateVal,
+                discountVal
+              );
 
-            return {
-              id: it.id || `po-it-${index}-${Date.now()}`,
-              productId: prodId,
-              sku,
-              name,
-              qty: qtyVal,
-              unitCost: unitCostVal,
-              taxRate: taxRateVal,
-              taxAmount,
-              discount: discountVal,
-              lineTotal: it.lineTotal ? Number(it.lineTotal) : lineTotal,
-            };
-          });
+              return {
+                id: it.id || `po-it-${index}-${Date.now()}`,
+                productId: prodId,
+                sku,
+                name,
+                qty: qtyVal,
+                unitCost: unitCostVal,
+                taxRate: taxRateVal,
+                taxAmount,
+                discount: discountVal,
+                lineTotal: it.lineTotal ? Number(it.lineTotal) : lineTotal,
+              };
+            }
+          );
           setItems(loadedItems);
         } else {
           setItems([createEmptyLineItem()]);
@@ -251,7 +280,8 @@ export default function PurchaseOrderFormModal({
     } else if (paymentStatus === 'Unpaid') {
       computedPaid = 0;
     } else {
-      computedPaid = typeof paidAmount === 'number' ? paidAmount : parseFloat(String(paidAmount)) || 0;
+      computedPaid =
+        typeof paidAmount === 'number' ? paidAmount : parseFloat(String(paidAmount)) || 0;
     }
 
     const remaining = Math.max(0, Math.round((grandTotal - computedPaid) * 100) / 100);
@@ -275,20 +305,24 @@ export default function PurchaseOrderFormModal({
       setPaidAmount('');
     } else {
       // Partial: default to half or current
-      setPaidAmount(financials.grandTotal > 0 ? Math.round((financials.grandTotal / 2) * 100) / 100 : '');
+      setPaidAmount(
+        financials.grandTotal > 0 ? Math.round((financials.grandTotal / 2) * 100) / 100 : ''
+      );
     }
   };
 
   // Line Item Update handler
-  const updateItemField = (
-    index: number,
-    fields: Partial<PurchaseOrderLineItem>
-  ) => {
+  const updateItemField = (index: number, fields: Partial<PurchaseOrderLineItem>) => {
     setItems((prev) => {
       const updated = [...prev];
       const current = { ...updated[index], ...fields };
 
-      const calc = calculateLineItem(current.qty, current.unitCost, current.taxRate, current.discount);
+      const calc = calculateLineItem(
+        current.qty,
+        current.unitCost,
+        current.taxRate,
+        current.discount
+      );
       updated[index] = {
         ...current,
         taxAmount: calc.taxAmount,
@@ -314,23 +348,35 @@ export default function PurchaseOrderFormModal({
     }
 
     // Find catalog product
-    const product = inventory.find((i) => (i.productId && i.productId === selectedProductId) || i.id === selectedProductId);
+    const product = inventory.find(
+      (i) => (i.productId && i.productId === selectedProductId) || i.id === selectedProductId
+    );
     if (!product) return;
 
     // Check if this product/SKU is already on ANOTHER line item
     const duplicateIndex = items.findIndex(
-      (it, idx) => idx !== index && ((it.productId && it.productId === product.productId) || (it.sku && it.sku === product.sku))
+      (it, idx) =>
+        idx !== index &&
+        ((it.productId && it.productId === product.productId) || (it.sku && it.sku === product.sku))
     );
 
     if (duplicateIndex !== -1) {
       // Intelligent duplicate merge! Increment quantity on the existing line item
       const existingRow = items[duplicateIndex];
       const currentQtyOnExisting = typeof existingRow.qty === 'number' ? existingRow.qty : 1;
-      const addingQty = typeof items[index].qty === 'number' && items[index].qty > 0 ? (items[index].qty as number) : 1;
+      const addingQty =
+        typeof items[index].qty === 'number' && items[index].qty > 0
+          ? (items[index].qty as number)
+          : 1;
       const newMergedQty = currentQtyOnExisting + addingQty;
 
       // Update existing row
-      const calc = calculateLineItem(newMergedQty, existingRow.unitCost, existingRow.taxRate, existingRow.discount);
+      const calc = calculateLineItem(
+        newMergedQty,
+        existingRow.unitCost,
+        existingRow.taxRate,
+        existingRow.discount
+      );
       const updatedItems = [...items];
       updatedItems[duplicateIndex] = {
         ...existingRow,
@@ -347,12 +393,15 @@ export default function PurchaseOrderFormModal({
       }
 
       setItems(updatedItems);
-      toast.info(`"${product.name}" (${product.sku}) is already in this order. Merged quantity to ${newMergedQty}!`);
+      toast.info(
+        `"${product.name}" (${product.sku}) is already in this order. Merged quantity to ${newMergedQty}!`
+      );
       return;
     }
 
     // Normal assignment
-    const qtyVal = typeof items[index].qty === 'number' && items[index].qty > 0 ? items[index].qty : 1;
+    const qtyVal =
+      typeof items[index].qty === 'number' && items[index].qty > 0 ? items[index].qty : 1;
     const costVal = Number(product.costPrice) || 0;
     const taxVal = Number(product.taxRate) || 0;
     const discVal = items[index].discount;
@@ -404,7 +453,10 @@ export default function PurchaseOrderFormModal({
     const prodId = newProduct.productId || newProduct.id;
     const costVal = Number(newProduct.costPrice) || 0;
     const taxVal = Number(newProduct.taxRate) || 0;
-    const currentQty = typeof items[targetIndex]?.qty === 'number' && items[targetIndex].qty > 0 ? items[targetIndex].qty : 1;
+    const currentQty =
+      typeof items[targetIndex]?.qty === 'number' && items[targetIndex].qty > 0
+        ? items[targetIndex].qty
+        : 1;
     const currentDisc = items[targetIndex]?.discount || '';
     const calc = calculateLineItem(currentQty, costVal, taxVal, currentDisc);
 
@@ -460,7 +512,9 @@ export default function PurchaseOrderFormModal({
         return;
       }
       if (typeof it.unitCost !== 'number' || it.unitCost < 0) {
-        toast.error(`Line item #${i + 1} (${it.name || it.sku}) unit cost must be a valid non-negative number`);
+        toast.error(
+          `Line item #${i + 1} (${it.name || it.sku}) unit cost must be a valid non-negative number`
+        );
         return;
       }
     }
@@ -482,14 +536,21 @@ export default function PurchaseOrderFormModal({
       }));
 
       // If creating new PO with initial payment, enforce mandatory proof & UTR
-      if (!isEdit && (paymentStatus === 'Partial' || paymentStatus === 'Paid' || financials.paidAmount > 0)) {
+      if (
+        !isEdit &&
+        (paymentStatus === 'Partial' || paymentStatus === 'Paid' || financials.paidAmount > 0)
+      ) {
         if (!paymentRef.trim()) {
-          toast.error('Payment Reference / UTR number is mandatory when recording advance payment.');
+          toast.error(
+            'Payment Reference / UTR number is mandatory when recording advance payment.'
+          );
           setIsSubmitting(false);
           return;
         }
         if (!paymentProof) {
-          toast.error('Payment proof is mandatory! Please upload receipt/screenshot for upfront payment.');
+          toast.error(
+            'Payment proof is mandatory! Please upload receipt/screenshot for upfront payment.'
+          );
           setIsSubmitting(false);
           return;
         }
@@ -523,24 +584,46 @@ export default function PurchaseOrderFormModal({
 
       const confirmed = await confirmAction({
         actionType: 'purchase',
-        title: isEdit ? `Confirm Purchase Order Update #${purchase?.poNo}` : 'Confirm New Purchase Order',
-        subtitle: 'Please review the supplier, store location, line items, and financial breakdown.',
+        title: isEdit
+          ? `Confirm Purchase Order Update #${purchase?.poNo}`
+          : 'Confirm New Purchase Order',
+        subtitle:
+          'Please review the supplier, store location, line items, and financial breakdown.',
         confirmLabel: isEdit ? 'Confirm & Update PO' : 'Confirm & Place PO',
         summaryItems: [
           { label: 'Vendor / Supplier', value: vendorName.trim() },
           { label: 'Destination Store', value: store },
-          { label: 'Line Items', value: `${formattedItems.reduce((acc, it) => acc + it.qty, 0)} units (${formattedItems.length} SKUs)` },
+          {
+            label: 'Line Items',
+            value: `${formattedItems.reduce((acc, it) => acc + it.qty, 0)} units (${formattedItems.length} SKUs)`,
+          },
           { label: 'Order Status', value: status },
           { label: 'Payment Status', value: paymentStatus },
           { label: 'Subtotal', value: `₹${financials.subtotal.toLocaleString('en-IN')}` },
-          ...(financials.totalTax > 0 ? [{ label: 'Taxes', value: `₹${financials.totalTax.toLocaleString('en-IN')}` }] : []),
-          ...(financials.totalDiscount > 0 ? [{ label: 'Discount', value: `-₹${financials.totalDiscount.toLocaleString('en-IN')}` }] : []),
-          { label: 'Grand Total Value', value: `₹${financials.grandTotal.toLocaleString('en-IN')}`, highlighted: true },
-          ...(financials.paidAmount > 0 ? [{ label: 'Paid Amount', value: `₹${financials.paidAmount.toLocaleString('en-IN')}` }] : []),
+          ...(financials.totalTax > 0
+            ? [{ label: 'Taxes', value: `₹${financials.totalTax.toLocaleString('en-IN')}` }]
+            : []),
+          ...(financials.totalDiscount > 0
+            ? [
+                {
+                  label: 'Discount',
+                  value: `-₹${financials.totalDiscount.toLocaleString('en-IN')}`,
+                },
+              ]
+            : []),
+          {
+            label: 'Grand Total Value',
+            value: `₹${financials.grandTotal.toLocaleString('en-IN')}`,
+            highlighted: true,
+          },
+          ...(financials.paidAmount > 0
+            ? [{ label: 'Paid Amount', value: `₹${financials.paidAmount.toLocaleString('en-IN')}` }]
+            : []),
         ],
-        warningMessage: status === 'Received'
-          ? 'Status is set to Received. Once confirmed, physical inventory on hand will immediately be increased in the warehouse.'
-          : 'This purchase order will be created and committed to the vendor ledger.',
+        warningMessage:
+          status === 'Received'
+            ? 'Status is set to Received. Once confirmed, physical inventory on hand will immediately be increased in the warehouse.'
+            : 'This purchase order will be created and committed to the vendor ledger.',
       });
 
       if (!confirmed) {
@@ -622,7 +705,9 @@ export default function PurchaseOrderFormModal({
 
             <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="text-2xs font-bold text-foreground block mb-1">Invoice / Ref No (Optional)</label>
+                <label className="text-2xs font-bold text-foreground block mb-1">
+                  Invoice / Ref No (Optional)
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. INV-98214"
@@ -644,7 +729,9 @@ export default function PurchaseOrderFormModal({
 
             <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="text-2xs font-bold text-foreground block mb-1">Expected Delivery Date</label>
+                <label className="text-2xs font-bold text-foreground block mb-1">
+                  Expected Delivery Date
+                </label>
                 <input
                   type="date"
                   value={expectedDate}
@@ -653,7 +740,9 @@ export default function PurchaseOrderFormModal({
                 />
               </div>
               <div>
-                <label className="text-2xs font-bold text-foreground block mb-1">Payment Due Date</label>
+                <label className="text-2xs font-bold text-foreground block mb-1">
+                  Payment Due Date
+                </label>
                 <input
                   type="date"
                   value={dueDate}
@@ -681,16 +770,14 @@ export default function PurchaseOrderFormModal({
                   className="btn-secondary h-7 text-2xs py-0 px-2.5 gap-1 text-primary border-primary/30 hover:bg-primary/10 font-bold"
                   title="Open Master Product Form to create a new SKU"
                 >
-                  <Icon name="PlusCircleIcon" size={13} />
-                  + Add New Product
+                  <Icon name="PlusCircleIcon" size={13} />+ Add New Product
                 </button>
                 <button
                   type="button"
                   onClick={handleAddLineItem}
                   className="btn-primary h-7 text-2xs py-0 px-2.5 gap-1 font-bold"
                 >
-                  <Icon name="PlusIcon" size={13} />
-                  + Add Row
+                  <Icon name="PlusIcon" size={13} />+ Add Row
                 </button>
               </div>
             </div>
@@ -759,7 +846,9 @@ export default function PurchaseOrderFormModal({
                               type="text"
                               placeholder="SKU Code"
                               value={item.sku}
-                              onChange={(e) => updateItemField(index, { sku: e.target.value.toUpperCase() })}
+                              onChange={(e) =>
+                                updateItemField(index, { sku: e.target.value.toUpperCase() })
+                              }
                               className="input-field text-2xs h-7 font-mono"
                             />
                           </div>
@@ -784,7 +873,9 @@ export default function PurchaseOrderFormModal({
                             allowDecimals={false}
                             placeholder="Qty"
                             value={item.qty}
-                            onChange={(val) => updateItemField(index, { qty: val !== '' ? Number(val) : '' })}
+                            onChange={(val) =>
+                              updateItemField(index, { qty: val !== '' ? Number(val) : '' })
+                            }
                             className="text-xs h-7 text-center font-tabular font-bold w-14"
                           />
                           <button
@@ -808,7 +899,9 @@ export default function PurchaseOrderFormModal({
                           allowDecimals={true}
                           placeholder="0.00"
                           value={item.unitCost}
-                          onChange={(val) => updateItemField(index, { unitCost: val !== '' ? Number(val) : '' })}
+                          onChange={(val) =>
+                            updateItemField(index, { unitCost: val !== '' ? Number(val) : '' })
+                          }
                           className="text-xs h-8 font-tabular font-semibold"
                         />
                       </td>
@@ -817,7 +910,9 @@ export default function PurchaseOrderFormModal({
                       <td className="px-3 py-2.5">
                         <select
                           value={item.taxRate}
-                          onChange={(e) => updateItemField(index, { taxRate: Number(e.target.value) || 0 })}
+                          onChange={(e) =>
+                            updateItemField(index, { taxRate: Number(e.target.value) || 0 })
+                          }
                           className="input-field text-xs h-8 font-medium text-center"
                         >
                           <option value={0}>0%</option>
@@ -836,14 +931,20 @@ export default function PurchaseOrderFormModal({
                           allowDecimals={true}
                           placeholder="0"
                           value={item.discount}
-                          onChange={(val) => updateItemField(index, { discount: val !== '' ? Number(val) : '' })}
+                          onChange={(val) =>
+                            updateItemField(index, { discount: val !== '' ? Number(val) : '' })
+                          }
                           className="text-xs h-8 font-tabular text-center"
                         />
                       </td>
 
                       {/* Calculated Line Total */}
                       <td className="px-3 py-2.5 text-right font-tabular font-extrabold text-foreground">
-                        ₹{item.lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ₹
+                        {item.lineTotal.toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                         {item.taxAmount > 0 && (
                           <span className="block text-3xs font-normal text-muted-foreground">
                             (Tax: ₹{item.taxAmount.toFixed(2)})
@@ -873,7 +974,9 @@ export default function PurchaseOrderFormModal({
               {items.map((item, index) => (
                 <div key={`m-item-${item.id}`} className="p-3 space-y-2.5 bg-card">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-2xs font-bold text-muted-foreground font-mono">Item #{index + 1}</span>
+                    <span className="text-2xs font-bold text-muted-foreground font-mono">
+                      Item #{index + 1}
+                    </span>
                     <button
                       type="button"
                       onClick={() => handleRemoveLineItem(index)}
@@ -884,7 +987,9 @@ export default function PurchaseOrderFormModal({
                   </div>
 
                   <div>
-                    <label className="text-3xs font-bold text-foreground block mb-1">Catalog Product / SKU</label>
+                    <label className="text-3xs font-bold text-foreground block mb-1">
+                      Catalog Product / SKU
+                    </label>
                     <div className="flex items-center gap-1.5">
                       <select
                         value={item.productId || ''}
@@ -910,7 +1015,9 @@ export default function PurchaseOrderFormModal({
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-3xs font-bold text-foreground block mb-1">Quantity</label>
+                      <label className="text-3xs font-bold text-foreground block mb-1">
+                        Quantity
+                      </label>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
@@ -926,7 +1033,9 @@ export default function PurchaseOrderFormModal({
                           min={1}
                           allowDecimals={false}
                           value={item.qty}
-                          onChange={(val) => updateItemField(index, { qty: val !== '' ? Number(val) : '' })}
+                          onChange={(val) =>
+                            updateItemField(index, { qty: val !== '' ? Number(val) : '' })
+                          }
                           className="text-xs h-7 text-center font-tabular font-bold flex-1"
                         />
                         <button
@@ -943,13 +1052,17 @@ export default function PurchaseOrderFormModal({
                     </div>
 
                     <div>
-                      <label className="text-3xs font-bold text-foreground block mb-1">Unit Cost (₹)</label>
+                      <label className="text-3xs font-bold text-foreground block mb-1">
+                        Unit Cost (₹)
+                      </label>
                       <NumericInput
                         min={0}
                         step="0.01"
                         allowDecimals={true}
                         value={item.unitCost}
-                        onChange={(val) => updateItemField(index, { unitCost: val !== '' ? Number(val) : '' })}
+                        onChange={(val) =>
+                          updateItemField(index, { unitCost: val !== '' ? Number(val) : '' })
+                        }
                         className="text-xs h-7 font-tabular font-semibold"
                       />
                     </div>
@@ -957,10 +1070,14 @@ export default function PurchaseOrderFormModal({
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-3xs font-bold text-foreground block mb-1">GST Tax Rate</label>
+                      <label className="text-3xs font-bold text-foreground block mb-1">
+                        GST Tax Rate
+                      </label>
                       <select
                         value={item.taxRate}
-                        onChange={(e) => updateItemField(index, { taxRate: Number(e.target.value) || 0 })}
+                        onChange={(e) =>
+                          updateItemField(index, { taxRate: Number(e.target.value) || 0 })
+                        }
                         className="input-field text-xs h-7 font-medium"
                       >
                         <option value={0}>0%</option>
@@ -972,13 +1089,17 @@ export default function PurchaseOrderFormModal({
                     </div>
 
                     <div>
-                      <label className="text-3xs font-bold text-foreground block mb-1">Discount (₹)</label>
+                      <label className="text-3xs font-bold text-foreground block mb-1">
+                        Discount (₹)
+                      </label>
                       <NumericInput
                         min={0}
                         step="0.01"
                         allowDecimals={true}
                         value={item.discount}
-                        onChange={(val) => updateItemField(index, { discount: val !== '' ? Number(val) : '' })}
+                        onChange={(val) =>
+                          updateItemField(index, { discount: val !== '' ? Number(val) : '' })
+                        }
                         className="text-xs h-7 font-tabular"
                       />
                     </div>
@@ -987,7 +1108,11 @@ export default function PurchaseOrderFormModal({
                   <div className="flex items-center justify-between pt-1 border-t border-border/40 text-xs">
                     <span className="text-muted-foreground font-semibold">Row Total:</span>
                     <span className="font-extrabold font-tabular text-foreground">
-                      ₹{item.lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₹
+                      {item.lineTotal.toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </span>
                   </div>
                 </div>
@@ -1001,8 +1126,7 @@ export default function PurchaseOrderFormModal({
                 onClick={handleAddLineItem}
                 className="text-primary hover:underline text-2xs font-bold inline-flex items-center gap-1 cursor-pointer"
               >
-                <Icon name="PlusCircleIcon" size={13} />
-                + Add Another Line Item
+                <Icon name="PlusCircleIcon" size={13} />+ Add Another Line Item
               </button>
               <span className="text-3xs text-muted-foreground">
                 Total Products: <strong className="text-foreground">{items.length}</strong>
@@ -1018,21 +1142,27 @@ export default function PurchaseOrderFormModal({
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60">
-                <span className="text-2xs text-muted-foreground block font-medium">Items Subtotal</span>
+                <span className="text-2xs text-muted-foreground block font-medium">
+                  Items Subtotal
+                </span>
                 <span className="text-sm font-bold text-foreground font-tabular">
                   ₹{financials.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
               <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60">
-                <span className="text-2xs text-muted-foreground block font-medium">Total Discount</span>
+                <span className="text-2xs text-muted-foreground block font-medium">
+                  Total Discount
+                </span>
                 <span className="text-sm font-bold text-foreground font-tabular">
                   ₹{financials.totalDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
               <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60">
-                <span className="text-2xs text-muted-foreground block font-medium">Total GST / Tax</span>
+                <span className="text-2xs text-muted-foreground block font-medium">
+                  Total GST / Tax
+                </span>
                 <span className="text-sm font-bold text-foreground font-tabular">
                   ₹{financials.totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
@@ -1049,7 +1179,9 @@ export default function PurchaseOrderFormModal({
             {/* Payment & Status Control */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-border">
               <div>
-                <label className="text-2xs font-bold text-foreground block mb-1">PO Fulfillment Status</label>
+                <label className="text-2xs font-bold text-foreground block mb-1">
+                  PO Fulfillment Status
+                </label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
@@ -1062,7 +1194,9 @@ export default function PurchaseOrderFormModal({
               </div>
 
               <div>
-                <label className="text-2xs font-bold text-foreground block mb-1">Payment Status</label>
+                <label className="text-2xs font-bold text-foreground block mb-1">
+                  Payment Status
+                </label>
                 <select
                   value={paymentStatus}
                   onChange={(e) => handlePaymentStatusChange(e.target.value as any)}
@@ -1076,7 +1210,9 @@ export default function PurchaseOrderFormModal({
               </div>
 
               <div>
-                <label className="text-2xs font-bold text-foreground block mb-1">Paid Amount (₹)</label>
+                <label className="text-2xs font-bold text-foreground block mb-1">
+                  Paid Amount (₹)
+                </label>
                 <NumericInput
                   min={0}
                   max={financials.grandTotal}
@@ -1084,7 +1220,10 @@ export default function PurchaseOrderFormModal({
                   allowDecimals={true}
                   value={paidAmount}
                   onChange={(val) => setPaidAmount(val)}
-                  disabled={paymentStatus !== 'Partial' || (isEdit && Boolean(purchase?.payments && purchase.payments.length > 0))}
+                  disabled={
+                    paymentStatus !== 'Partial' ||
+                    (isEdit && Boolean(purchase?.payments && purchase.payments.length > 0))
+                  }
                   className="text-xs font-tabular h-8 font-semibold disabled:opacity-60"
                   placeholder={paymentStatus === 'Paid' ? String(financials.grandTotal) : '0.00'}
                 />
@@ -1095,9 +1234,16 @@ export default function PurchaseOrderFormModal({
             {isEdit && purchase?.payments && purchase.payments.length > 0 && (
               <div className="p-2.5 rounded-lg bg-info/10 border border-info/30 text-2xs text-foreground flex items-center justify-between">
                 <span>
-                  Payments for this bill are managed via <strong>{purchase.payments.length} verified transaction(s)</strong>. Total Paid: <strong className="text-emerald-600">₹{(purchase.paidAmount || 0).toLocaleString('en-IN')}</strong>.
+                  Payments for this bill are managed via{' '}
+                  <strong>{purchase.payments.length} verified transaction(s)</strong>. Total Paid:{' '}
+                  <strong className="text-emerald-600">
+                    ₹{(purchase.paidAmount || 0).toLocaleString('en-IN')}
+                  </strong>
+                  .
                 </span>
-                <span className="text-muted-foreground text-3xs italic">Use &quot;Record Payment&quot; on the purchases list to add tranches.</span>
+                <span className="text-muted-foreground text-3xs italic">
+                  Use &quot;Record Payment&quot; on the purchases list to add tranches.
+                </span>
               </div>
             )}
 
@@ -1109,7 +1255,9 @@ export default function PurchaseOrderFormModal({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
-                    <label className="text-3xs font-semibold text-muted-foreground block mb-0.5">Method</label>
+                    <label className="text-3xs font-semibold text-muted-foreground block mb-0.5">
+                      Method
+                    </label>
                     <PaymentMethodSelect
                       value={paymentMethod}
                       onChange={(val) => setPaymentMethod(val)}
@@ -1118,7 +1266,9 @@ export default function PurchaseOrderFormModal({
                     />
                   </div>
                   <div>
-                    <label className="text-3xs font-semibold text-muted-foreground block mb-0.5">Reference / UTR # *</label>
+                    <label className="text-3xs font-semibold text-muted-foreground block mb-0.5">
+                      Reference / UTR # *
+                    </label>
                     <input
                       type="text"
                       required
@@ -1129,7 +1279,9 @@ export default function PurchaseOrderFormModal({
                     />
                   </div>
                   <div>
-                    <label className="text-3xs font-semibold text-muted-foreground block mb-0.5">Payment Remarks</label>
+                    <label className="text-3xs font-semibold text-muted-foreground block mb-0.5">
+                      Payment Remarks
+                    </label>
                     <input
                       type="text"
                       placeholder="e.g. Upfront advance payment"
@@ -1152,7 +1304,9 @@ export default function PurchaseOrderFormModal({
             )}
 
             <div className="flex items-center justify-between text-xs pt-2 border-t border-border/60">
-              <span className="text-muted-foreground font-semibold">Remaining Payable Balance:</span>
+              <span className="text-muted-foreground font-semibold">
+                Remaining Payable Balance:
+              </span>
               <span
                 className={`font-extrabold font-tabular text-sm ${
                   financials.remainingAmount > 0 ? 'text-danger' : 'text-success'
@@ -1165,7 +1319,9 @@ export default function PurchaseOrderFormModal({
 
           {/* Notes & Comments */}
           <div>
-            <label className="text-2xs font-bold text-foreground block mb-1">Order Notes / Delivery Instructions (Optional)</label>
+            <label className="text-2xs font-bold text-foreground block mb-1">
+              Order Notes / Delivery Instructions (Optional)
+            </label>
             <input
               type="text"
               placeholder="e.g. Deliver to rear loading bay; fragile electronic components"
@@ -1176,12 +1332,23 @@ export default function PurchaseOrderFormModal({
           </div>
 
           {/* Validation Warning when Upfront Payment Proof is Missing */}
-          {!isEdit && (paymentStatus === 'Partial' || paymentStatus === 'Paid' || financials.paidAmount > 0) && (!paymentProof || !paymentRef.trim()) && (
-            <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-3xs font-semibold">
-              <Icon name="ExclamationTriangleIcon" size={14} className="shrink-0 text-amber-600" />
-              <span>Advance Payment requires Payment Proof upload and Reference / UTR No before saving.</span>
-            </div>
-          )}
+          {!isEdit &&
+            (paymentStatus === 'Partial' ||
+              paymentStatus === 'Paid' ||
+              financials.paidAmount > 0) &&
+            (!paymentProof || !paymentRef.trim()) && (
+              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-3xs font-semibold">
+                <Icon
+                  name="ExclamationTriangleIcon"
+                  size={14}
+                  className="shrink-0 text-amber-600"
+                />
+                <span>
+                  Advance Payment requires Payment Proof upload and Reference / UTR No before
+                  saving.
+                </span>
+              </div>
+            )}
 
           {/* Footer Actions */}
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
@@ -1199,7 +1366,9 @@ export default function PurchaseOrderFormModal({
               disabled={
                 isSubmitting ||
                 (!isEdit &&
-                  (paymentStatus === 'Partial' || paymentStatus === 'Paid' || financials.paidAmount > 0) &&
+                  (paymentStatus === 'Partial' ||
+                    paymentStatus === 'Paid' ||
+                    financials.paidAmount > 0) &&
                   (!paymentProof || !paymentRef.trim()))
               }
             >

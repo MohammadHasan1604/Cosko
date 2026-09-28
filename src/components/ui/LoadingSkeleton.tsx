@@ -5,9 +5,7 @@ interface SkeletonProps {
 }
 
 export function Skeleton({ className = '' }: SkeletonProps) {
-  return (
-    <div className={`skeleton-wave rounded-md ${className}`} />
-  );
+  return <div className={`skeleton-wave rounded-md ${className}`} />;
 }
 
 export function KpiCardSkeleton() {
@@ -36,7 +34,5 @@ export function TableRowSkeleton({ cols = 8 }: { cols?: number }) {
 }
 
 export function ChartSkeleton({ height = 240 }: { height?: number }) {
-  return (
-    <div className="w-full rounded-lg skeleton-wave" style={{ height }} />
-  );
+  return <div className="w-full rounded-lg skeleton-wave" style={{ height }} />;
 }

@@ -33,11 +33,16 @@ export function validateEnvironment(): EnvValidationResult {
           maskedHost = 'localhost (Local Dev Only)';
           isHostedDb = false;
           if (process.env.NODE_ENV === 'production') {
-            warnings.push('CRITICAL: DATABASE_URL is pointing to localhost in production mode. Netlify serverless functions cannot connect to localhost. Use a hosted MySQL database.');
+            warnings.push(
+              'CRITICAL: DATABASE_URL is pointing to localhost in production mode. Netlify serverless functions cannot connect to localhost. Use a hosted MySQL database.'
+            );
           }
         } else {
           // Mask intermediate characters: db.xyz...com -> db.x***.com
-          maskedHost = host.length > 8 ? `${host.substring(0, 4)}***${host.substring(host.length - 4)}` : '***';
+          maskedHost =
+            host.length > 8
+              ? `${host.substring(0, 4)}***${host.substring(host.length - 4)}`
+              : '***';
           isHostedDb = true;
         }
       }
@@ -51,15 +56,23 @@ export function validateEnvironment(): EnvValidationResult {
   const INSECURE_DEFAULT = 'cosko_insecure_dev_fallback_jwt_key_do_not_use';
   if (!authConfigured) {
     if (process.env.NODE_ENV === 'production') {
-      warnings.push('FATAL: AUTH_SECRET is not set. Production MUST have a strong, unique secret. Application will refuse to authenticate.');
+      warnings.push(
+        'FATAL: AUTH_SECRET is not set. Production MUST have a strong, unique secret. Application will refuse to authenticate.'
+      );
     } else {
-      warnings.push('AUTH_SECRET is not set. Authentication will not work. Set AUTH_SECRET in your .env file.');
+      warnings.push(
+        'AUTH_SECRET is not set. Authentication will not work. Set AUTH_SECRET in your .env file.'
+      );
     }
   } else if (authSecret === INSECURE_DEFAULT) {
     if (process.env.NODE_ENV === 'production') {
-      warnings.push('FATAL: AUTH_SECRET is set to the insecure default value. Generate a strong random secret for production.');
+      warnings.push(
+        'FATAL: AUTH_SECRET is set to the insecure default value. Generate a strong random secret for production.'
+      );
     } else {
-      warnings.push('WARNING: AUTH_SECRET is set to the insecure default. Generate a strong random secret before deploying.');
+      warnings.push(
+        'WARNING: AUTH_SECRET is set to the insecure default. Generate a strong random secret before deploying.'
+      );
     }
   }
 

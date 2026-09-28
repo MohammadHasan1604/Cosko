@@ -47,7 +47,10 @@ export default function BrandModal({
         setName(initialName);
         setCode(
           initialName
-            ? initialName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32)
+            ? initialName
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .slice(0, 32)
             : ''
         );
         setDescription('');
@@ -59,7 +62,10 @@ export default function BrandModal({
   const handleNameChange = (val: string) => {
     setName(val);
     if (!isEdit) {
-      const generated = val.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32);
+      const generated = val
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .slice(0, 32);
       setCode(generated);
     }
   };
@@ -75,9 +81,7 @@ export default function BrandModal({
     }
 
     if (!isEdit) {
-      const duplicate = brands.find(
-        (b) => b.name.toLowerCase() === cleanName.toLowerCase()
-      );
+      const duplicate = brands.find((b) => b.name.toLowerCase() === cleanName.toLowerCase());
       if (duplicate) {
         toast.info(`Brand "${cleanName}" already exists. Selecting it.`);
         if (onSuccess) onSuccess(duplicate.name, duplicate);
@@ -88,7 +92,10 @@ export default function BrandModal({
 
     const cleanCode =
       code.trim().toLowerCase() ||
-      cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32);
+      cleanName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .slice(0, 32);
 
     const confirmed = await confirmAction({
       actionType: isEdit ? 'update' : 'create',
@@ -145,8 +152,18 @@ export default function BrandModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? `Edit Brand: ${brand?.name}` : quickMode ? '+ Add New Brand' : 'Create Brand Record'}
-      subtitle={isEdit ? `Code: ${brand?.code}` : 'Centralized brand registry for product inventory & catalog'}
+      title={
+        isEdit
+          ? `Edit Brand: ${brand?.name}`
+          : quickMode
+            ? '+ Add New Brand'
+            : 'Create Brand Record'
+      }
+      subtitle={
+        isEdit
+          ? `Code: ${brand?.code}`
+          : 'Centralized brand registry for product inventory & catalog'
+      }
       size={quickMode ? 'sm' : 'md'}
       zIndex={zIndex}
     >
@@ -170,7 +187,8 @@ export default function BrandModal({
         {/* Code */}
         <div>
           <label className="text-xs font-bold text-foreground block mb-1">
-            Brand Slug / Code <span className="text-3xs text-muted-foreground font-normal">(Auto-generated)</span>
+            Brand Slug / Code{' '}
+            <span className="text-3xs text-muted-foreground font-normal">(Auto-generated)</span>
           </label>
           <input
             type="text"
@@ -184,7 +202,8 @@ export default function BrandModal({
         {/* Description */}
         <div>
           <label className="text-xs font-bold text-foreground block mb-1">
-            Description <span className="text-3xs text-muted-foreground font-normal">(Optional)</span>
+            Description{' '}
+            <span className="text-3xs text-muted-foreground font-normal">(Optional)</span>
           </label>
           <textarea
             rows={2}

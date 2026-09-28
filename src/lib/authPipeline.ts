@@ -1,9 +1,9 @@
 /**
  * COSKO Authoritative Server-Side Authentication Pipeline
- * 
+ *
  * SINGLE SOURCE OF TRUTH for all API route authentication and authorization.
  * Every protected API/action MUST call authenticateRequest() which verifies:
- * 
+ *
  * 1. Valid authenticated session (HttpOnly cookie or Bearer token)
  * 2. Cryptographically valid JWT (signed with AUTH_SECRET)
  * 3. DB UserSession exists
@@ -14,9 +14,9 @@
  * 8. Current role/securityLevel comes from DB (not JWT cache)
  * 9. Assigned stores come from DB
  * 10. Current permissions come from DB
- * 
+ *
  * Production FAILS CLOSED - any check failure returns null.
- * 
+ *
  * NEVER trusts:
  * - localStorage tokens
  * - x-user-role headers
@@ -25,10 +25,19 @@
  * - client-supplied securityLevel
  */
 
+import crypto from 'crypto';
 import { NextRequest } from 'next/server';
 import { verifySessionToken, hashToken } from './auth';
 import { prisma } from './db';
-import { RBACEngine, ROLE_SECURITY_LEVELS, PERMISSION_CATALOGUE, SUPER_ADMIN_PROTECTED_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, type UserRole, type SecurityLevel } from './rbacEngine';
+import {
+  RBACEngine,
+  ROLE_SECURITY_LEVELS,
+  PERMISSION_CATALOGUE,
+  SUPER_ADMIN_PROTECTED_PERMISSIONS,
+  DEFAULT_ROLE_PERMISSIONS,
+  type UserRole,
+  type SecurityLevel,
+} from './rbacEngine';
 
 export interface AuthenticatedUser {
   id: string;
@@ -76,10 +85,10 @@ function extractToken(req: NextRequest | Request): string | null {
 
 /**
  * AUTHORITATIVE SERVER-SIDE AUTHENTICATION PIPELINE
- * 
+ *
  * Must be called by every protected API route. Returns the fully validated
  * user with DB-authoritative role, permissions, and store assignments.
- * 
+ *
  * Returns { user: null, error, status } on any failure (fail closed).
  */
 export async function authenticateRequest(req: NextRequest | Request): Promise<AuthResult> {
@@ -98,7 +107,7 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
   // Step 3-5: DB session verification (exists, not revoked, not expired)
   const tokenDigest = hashToken(token);
   let dbSessionId: string | null = null;
-  
+
   try {
     const dbSession = await (prisma as any).userSession.findUnique({
       where: { tokenHash: tokenDigest },
@@ -120,7 +129,11 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
         });
         if (sidSession) {
           if (sidSession.revokedAt) {
-            return { user: null, error: 'Session has been revoked. Please log in again.', status: 401 };
+            return {
+              user: null,
+              error: 'Session has been revoked. Please log in again.',
+              status: 401,
+            };
           }
           if (sidSession.expiresAt < new Date()) {
             return { user: null, error: 'Session has expired. Please log in again.', status: 401 };
@@ -173,9 +186,12 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
     allowedStores.push(dbUser.storeScope);
   }
 
-  const effectiveStore = dbUser.role === 'Super Admin'
-    ? (dbUser.storeScope || 'All Stores')
-    : ((dbUser.storeScope && dbUser.storeScope !== 'All Stores') ? dbUser.storeScope : (allowedStores[0] || 'BLR'));
+  const effectiveStore =
+    dbUser.role === 'Super Admin'
+      ? dbUser.storeScope || 'All Stores'
+      : dbUser.storeScope && dbUser.storeScope !== 'All Stores'
+        ? dbUser.storeScope
+        : allowedStores[0] || 'BLR';
 
   const dbRole = dbUser.role as UserRole;
   const dbSecurityLevel = (ROLE_SECURITY_LEVELS[dbRole] ?? dbUser.securityLevel) as SecurityLevel;
@@ -195,9 +211,14 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
     role: dbRole,
     securityLevel: dbSecurityLevel,
     store: effectiveStore,
-    allowedStores: dbRole === 'Super Admin'
-      ? (allowedStores.length > 0 ? allowedStores : ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'])
-      : (allowedStores.length > 0 ? allowedStores : [effectiveStore]),
+    allowedStores:
+      dbRole === 'Super Admin'
+        ? allowedStores.length > 0
+          ? allowedStores
+          : ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM']
+        : allowedStores.length > 0
+          ? allowedStores
+          : [effectiveStore],
     status: dbUser.status,
     shiftStatus: dbUser.shiftStatus || 'On Shift',
     avatarUrl: dbUser.avatarUrl || undefined,
@@ -214,7 +235,11 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
  * Check if the authenticated user has a specific permission.
  * Uses the centralized RBACEngine for evaluation.
  */
-export function hasPermission(user: AuthenticatedUser, permissionCode: string, targetStore?: string): boolean {
+export function hasPermission(
+  user: AuthenticatedUser,
+  permissionCode: string,
+  targetStore?: string
+): boolean {
   if (user.role === 'Super Admin' || user.securityLevel === 100) {
     return true;
   }
@@ -290,7 +315,10 @@ export async function createAuditLog(
  * Invalidate all active sessions for a user.
  * Called on: deactivate, suspend, password reset, password change.
  */
-export async function invalidateUserSessions(userId: string, excludeSessionId?: string): Promise<void> {
+export async function invalidateUserSessions(
+  userId: string,
+  excludeSessionId?: string
+): Promise<void> {
   try {
     const whereClause: any = {
       userId,
@@ -313,7 +341,6 @@ export async function invalidateUserSessions(userId: string, excludeSessionId?: 
  * NEVER uses a hardcoded default.
  */
 export function generateSecureTemporaryPassword(): string {
-  const crypto = require('crypto');
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
   const bytes = crypto.randomBytes(16);
   let password = '';

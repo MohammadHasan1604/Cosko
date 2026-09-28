@@ -12,18 +12,24 @@ export default function InventoryHeader() {
   const [ledgerModalOpen, setLedgerModalOpen] = useState(false);
 
   const handleExport = () => {
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + ["SKU,Name,Brand,Category,Store,QtyOnHand,CostPrice,SellingPrice"]
-        .concat(inventory.map(i => `${i.sku},"${i.name}",${i.brand},${i.category},${i.store},${i.qtyOnHand},${i.costPrice},${i.sellingPrice}`))
-        .join("\n");
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      ['SKU,Name,Brand,Category,Store,QtyOnHand,CostPrice,SellingPrice']
+        .concat(
+          inventory.map(
+            (i) =>
+              `${i.sku},"${i.name}",${i.brand},${i.category},${i.store},${i.qtyOnHand},${i.costPrice},${i.sellingPrice}`
+          )
+        )
+        .join('\n');
     const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `inventory_export_${selectedStore}_${Date.now()}.csv`);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `inventory_export_${selectedStore}_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success("Inventory exported as CSV");
+    toast.success('Inventory exported as CSV');
   };
 
   const activeSKUsCount = React.useMemo(() => {
@@ -45,20 +51,34 @@ export default function InventoryHeader() {
           </div>
           <h1 className="page-title">Inventory</h1>
           <p className="page-subtitle">
-            {activeSKUsCount} {selectedStore === 'All Stores' ? 'products (all locations)' : 'products'} · <span className="font-semibold text-foreground">{selectedStore === 'All Stores' ? 'All Stores' : selectedStore}</span>
+            {activeSKUsCount}{' '}
+            {selectedStore === 'All Stores' ? 'products (all locations)' : 'products'} ·{' '}
+            <span className="font-semibold text-foreground">
+              {selectedStore === 'All Stores' ? 'All Stores' : selectedStore}
+            </span>
           </p>
         </div>
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <button onClick={() => setLedgerModalOpen(true)} className="btn-outline text-xs gap-1.5 hidden md:inline-flex">
+          <button
+            onClick={() => setLedgerModalOpen(true)}
+            className="btn-outline text-xs gap-1.5 hidden md:inline-flex"
+          >
             <Icon name="QueueListIcon" size={14} />
             Ledger ({inventoryLedger.length})
           </button>
-          <button onClick={handleExport} className="btn-ghost btn-icon-sm md:hidden" aria-label="Export CSV">
+          <button
+            onClick={handleExport}
+            className="btn-ghost btn-icon-sm md:hidden"
+            aria-label="Export CSV"
+          >
             <Icon name="ArrowUpTrayIcon" size={15} />
           </button>
-          <button onClick={handleExport} className="btn-ghost gap-1.5 text-xs hidden md:inline-flex">
+          <button
+            onClick={handleExport}
+            className="btn-ghost gap-1.5 text-xs hidden md:inline-flex"
+          >
             <Icon name="ArrowUpTrayIcon" size={14} />
             Export CSV
           </button>
@@ -99,21 +119,40 @@ export default function InventoryHeader() {
                 {inventoryLedger.map((entry) => (
                   <tr key={`led-row-${entry.id}`} className="table-row">
                     <td className="table-cell text-3xs text-muted-foreground whitespace-nowrap">
-                      {new Date(entry.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(entry.createdAt).toLocaleString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </td>
                     <td className="table-cell">
-                      <span className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
-                        entry.movementType === 'PURCHASE' ? 'bg-success/15 text-success' :
-                        entry.movementType === 'TRANSFER_IN' ? 'bg-info/15 text-info' :
-                        entry.movementType === 'TRANSFER_OUT' ? 'bg-warning/15 text-warning' :
-                        entry.movementType === 'SALE' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
-                      }`}>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
+                          entry.movementType === 'PURCHASE'
+                            ? 'bg-success/15 text-success'
+                            : entry.movementType === 'TRANSFER_IN'
+                              ? 'bg-info/15 text-info'
+                              : entry.movementType === 'TRANSFER_OUT'
+                                ? 'bg-warning/15 text-warning'
+                                : entry.movementType === 'SALE'
+                                  ? 'bg-primary/15 text-primary'
+                                  : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
                         {entry.movementType}
                       </span>
                     </td>
-                    <td className="table-cell font-semibold text-foreground">{entry.productName} <span className="text-3xs text-muted-foreground font-mono">({entry.sku})</span></td>
+                    <td className="table-cell font-semibold text-foreground">
+                      {entry.productName}{' '}
+                      <span className="text-3xs text-muted-foreground font-mono">
+                        ({entry.sku})
+                      </span>
+                    </td>
                     <td className="table-cell font-bold text-foreground">{entry.storeCode}</td>
-                    <td className={`table-cell text-right font-extrabold ${entry.quantity > 0 ? 'text-success' : 'text-danger'}`}>
+                    <td
+                      className={`table-cell text-right font-extrabold ${entry.quantity > 0 ? 'text-success' : 'text-danger'}`}
+                    >
                       {entry.quantity > 0 ? `+${entry.quantity}` : entry.quantity}
                     </td>
                     <td className="table-cell text-right">₹{entry.unitCost}</td>
@@ -132,25 +171,44 @@ export default function InventoryHeader() {
             {inventoryLedger.map((entry) => (
               <div key={`led-card-${entry.id}`} className="py-3 px-1">
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
-                    entry.movementType === 'PURCHASE' ? 'bg-success/15 text-success' :
-                    entry.movementType === 'TRANSFER_IN' ? 'bg-info/15 text-info' :
-                    entry.movementType === 'TRANSFER_OUT' ? 'bg-warning/15 text-warning' :
-                    entry.movementType === 'SALE' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
-                  }`}>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
+                      entry.movementType === 'PURCHASE'
+                        ? 'bg-success/15 text-success'
+                        : entry.movementType === 'TRANSFER_IN'
+                          ? 'bg-info/15 text-info'
+                          : entry.movementType === 'TRANSFER_OUT'
+                            ? 'bg-warning/15 text-warning'
+                            : entry.movementType === 'SALE'
+                              ? 'bg-primary/15 text-primary'
+                              : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
                     {entry.movementType}
                   </span>
-                  <span className={`text-sm font-bold font-tabular ${entry.quantity > 0 ? 'text-success' : 'text-danger'}`}>
+                  <span
+                    className={`text-sm font-bold font-tabular ${entry.quantity > 0 ? 'text-success' : 'text-danger'}`}
+                  >
                     {entry.quantity > 0 ? `+${entry.quantity}` : entry.quantity}
                   </span>
                 </div>
-                <p className="text-sm font-semibold text-foreground truncate">{entry.productName}</p>
+                <p className="text-sm font-semibold text-foreground truncate">
+                  {entry.productName}
+                </p>
                 <div className="flex items-center justify-between mt-1 text-2xs text-muted-foreground">
-                  <span>{entry.storeCode} · {entry.referenceNo}</span>
+                  <span>
+                    {entry.storeCode} · {entry.referenceNo}
+                  </span>
                   <span className="font-tabular">₹{entry.unitCost}</span>
                 </div>
                 <p className="text-3xs text-muted-foreground mt-0.5">
-                  {new Date(entry.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · {entry.createdBy}
+                  {new Date(entry.createdAt).toLocaleString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}{' '}
+                  · {entry.createdBy}
                 </p>
               </div>
             ))}

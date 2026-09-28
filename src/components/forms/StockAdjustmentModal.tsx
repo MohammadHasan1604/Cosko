@@ -116,7 +116,8 @@ export default function StockAdjustmentModal({
         { label: 'Resulting Stock On Hand', value: `${newQty} units`, highlighted: true },
         { label: 'Reason', value: data.reason || 'Manual Adjustment' },
       ],
-      warningMessage: 'This will immediately update current physical inventory and append an entry to the inventory audit ledger.',
+      warningMessage:
+        'This will immediately update current physical inventory and append an entry to the inventory audit ledger.',
     });
 
     if (!confirmed) return;
@@ -149,7 +150,9 @@ export default function StockAdjustmentModal({
         <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/40 border border-border">
           <div className="text-center">
             <p className="text-3xs text-muted-foreground uppercase font-semibold">Current Qty</p>
-            <p className="text-2xl font-bold text-foreground font-tabular mt-0.5">{item.qtyOnHand}</p>
+            <p className="text-2xl font-bold text-foreground font-tabular mt-0.5">
+              {item.qtyOnHand}
+            </p>
           </div>
           <Icon name="ArrowRightIcon" size={18} className="text-muted-foreground flex-shrink-0" />
           <div className="text-center">
@@ -159,8 +162,8 @@ export default function StockAdjustmentModal({
                 getNewQty() === 0
                   ? 'text-danger'
                   : getNewQty() < item.qtyOnHand
-                  ? 'text-amber-500'
-                  : 'text-emerald-500'
+                    ? 'text-amber-500'
+                    : 'text-emerald-500'
               }`}
             >
               {getNewQty()}
@@ -199,8 +202,8 @@ export default function StockAdjustmentModal({
                     type === 'add'
                       ? 'PlusCircleIcon'
                       : type === 'remove'
-                      ? 'MinusCircleIcon'
-                      : 'PencilSquareIcon'
+                        ? 'MinusCircleIcon'
+                        : 'PencilSquareIcon'
                   }
                   size={15}
                 />
@@ -218,8 +221,8 @@ export default function StockAdjustmentModal({
             {adjustmentType === 'set'
               ? 'Set Exact Quantity To'
               : adjustmentType === 'add'
-              ? 'Units to Add to Stock'
-              : 'Units to Deduct from Stock'}{' '}
+                ? 'Units to Add to Stock'
+                : 'Units to Deduct from Stock'}{' '}
             <span className="text-danger">*</span>
           </label>
           <NumericInput
@@ -254,7 +257,8 @@ export default function StockAdjustmentModal({
         {/* Notes */}
         <div>
           <label className="text-xs font-bold text-foreground block mb-1">
-            Audit Notes / Remarks <span className="text-muted-foreground font-normal">(Optional)</span>
+            Audit Notes / Remarks{' '}
+            <span className="text-muted-foreground font-normal">(Optional)</span>
           </label>
           <input
             type="text"

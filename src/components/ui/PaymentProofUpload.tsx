@@ -44,7 +44,8 @@ export default function PaymentProofUpload({
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   const isPdf = value
-    ? value.toLowerCase().endsWith('.pdf') || (fileMeta?.mimeType && fileMeta.mimeType.includes('pdf'))
+    ? value.toLowerCase().endsWith('.pdf') ||
+      (fileMeta?.mimeType && fileMeta.mimeType.includes('pdf'))
     : false;
 
   const handleFileProcess = async (file: File) => {
@@ -193,15 +194,19 @@ export default function PaymentProofUpload({
             isDragging
               ? 'border-primary bg-primary/10 scale-[0.99]'
               : error
-              ? 'border-danger/60 bg-danger/5'
-              : 'border-border/80 hover:border-primary/50 bg-muted/20'
+                ? 'border-danger/60 bg-danger/5'
+                : 'border-border/80 hover:border-primary/50 bg-muted/20'
           } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
         >
           {isUploading ? (
             <div className="py-4 flex flex-col items-center justify-center gap-2">
               <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs font-semibold text-foreground">Uploading payment proof securely...</p>
-              <p className="text-3xs text-muted-foreground">Validating file & generating permanent storage key</p>
+              <p className="text-xs font-semibold text-foreground">
+                Uploading payment proof securely...
+              </p>
+              <p className="text-3xs text-muted-foreground">
+                Validating file & generating permanent storage key
+              </p>
             </div>
           ) : (
             <div className="space-y-2.5">
@@ -283,7 +288,9 @@ export default function PaymentProofUpload({
               <p className="text-xs font-semibold text-foreground truncate mt-0.5 max-w-[240px]">
                 {fileMeta?.filename || value.split('/').pop() || 'Payment_Proof_Record'}
               </p>
-              <p className="text-3xs text-emerald-600 font-medium">Permanently stored & linked to database</p>
+              <p className="text-3xs text-emerald-600 font-medium">
+                Permanently stored & linked to database
+              </p>
             </div>
           </div>
 
@@ -343,7 +350,9 @@ export default function PaymentProofUpload({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-2 border-b border-border">
-              <span className="text-xs font-bold text-foreground">Attached Payment Proof Preview</span>
+              <span className="text-xs font-bold text-foreground">
+                Attached Payment Proof Preview
+              </span>
               <button
                 type="button"
                 onClick={() => setPreviewZoomOpen(false)}
@@ -354,7 +363,11 @@ export default function PaymentProofUpload({
             </div>
             <div className="overflow-auto max-h-[70vh] flex items-center justify-center p-2 bg-muted/20">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={value} alt="Payment Proof" className="max-w-full max-h-[65vh] object-contain rounded-lg" />
+              <img
+                src={value}
+                alt="Payment Proof"
+                className="max-w-full max-h-[65vh] object-contain rounded-lg"
+              />
             </div>
             <div className="p-2 border-t border-border flex justify-end gap-2">
               <a

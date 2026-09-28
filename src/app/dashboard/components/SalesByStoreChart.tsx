@@ -1,7 +1,16 @@
 'use client';
 
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 import { useApp } from '@/context/AppContext';
 import { isWithinDatePeriod } from '@/lib/dateUtils';
 
@@ -32,17 +41,25 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   );
 };
 
-const barColors = ['var(--primary)', 'var(--accent)', 'var(--positive)', 'var(--warning)', 'var(--info)'];
+const barColors = [
+  'var(--primary)',
+  'var(--accent)',
+  'var(--positive)',
+  'var(--warning)',
+  'var(--info)',
+];
 
 export default function SalesByStoreChart() {
   const { sales, storesList, selectedStore, datePeriod, customDateRange } = useApp();
 
   // Filter sales by active date period & validity
   const validPeriodSales = sales.filter((s) => {
-    return isWithinDatePeriod(s.createdAt, datePeriod, customDateRange) &&
+    return (
+      isWithinDatePeriod(s.createdAt, datePeriod, customDateRange) &&
       s.status !== 'Refunded' &&
       s.status !== 'Cancelled' &&
-      s.status !== 'Voided';
+      s.status !== 'Voided'
+    );
   });
 
   const storeSalesMap: Record<string, number> = {};
@@ -83,13 +100,7 @@ export default function SalesByStoreChart() {
           {data.map((entry, idx) => {
             const isHighlight = selectedStore === 'All Stores' || entry.isSelected;
             const color = isHighlight ? barColors[idx % barColors.length] : 'var(--muted)';
-            return (
-              <Cell
-                key={`bar-cell-${idx}`}
-                fill={color}
-                opacity={isHighlight ? 1 : 0.4}
-              />
-            );
+            return <Cell key={`bar-cell-${idx}`} fill={color} opacity={isHighlight ? 1 : 0.4} />;
           })}
         </Bar>
       </BarChart>

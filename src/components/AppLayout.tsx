@@ -27,7 +27,14 @@ const superAdminOnly = ['Super Admin'];
 const managerRoles = ['Super Admin', 'Store Manager'];
 const inventoryRoles = ['Super Admin', 'Store Manager', 'Inventory Manager'];
 const cashierRoles = ['Super Admin', 'Store Manager', 'Sales Executive', 'POS Cashier'];
-const allRoles = ['Super Admin', 'Store Manager', 'Inventory Manager', 'Sales Executive', 'POS Cashier', 'Restricted Employee'];
+const allRoles = [
+  'Super Admin',
+  'Store Manager',
+  'Inventory Manager',
+  'Sales Executive',
+  'POS Cashier',
+  'Restricted Employee',
+];
 
 const routePermissions: Record<string, string[]> = {
   '/dashboard': allRoles,
@@ -38,7 +45,6 @@ const routePermissions: Record<string, string[]> = {
   '/customers': cashierRoles,
   '/customers/existing': cashierRoles,
   '/customers/360': cashierRoles,
-  '/repairs': cashierRoles,
   '/vendors': inventoryRoles,
   '/expenses': managerRoles,
   '/accounting': managerRoles,
@@ -102,7 +108,9 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
         <div className="flex flex-col items-center gap-3">
           <CoskoLogo size={36} showText />
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mt-2" />
-          <p className="text-xs font-semibold text-muted-foreground">Verifying COSKO Authenticated Session...</p>
+          <p className="text-xs font-semibold text-muted-foreground">
+            Verifying COSKO Authenticated Session...
+          </p>
         </div>
       </div>
     );
@@ -114,7 +122,9 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-2">
           <CoskoLogo size={36} showText />
-          <p className="text-xs font-semibold text-muted-foreground mt-2">Redirecting to Login...</p>
+          <p className="text-xs font-semibold text-muted-foreground mt-2">
+            Redirecting to Login...
+          </p>
         </div>
       </div>
     );
@@ -122,7 +132,10 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
 
   // Route Permission Check
   const allowedRoles = activeRoute ? routePermissions[activeRoute] : undefined;
-  const isAuthorized = currentUser.role === 'Super Admin' || !allowedRoles || (currentUser.role && allowedRoles.includes(currentUser.role));
+  const isAuthorized =
+    currentUser.role === 'Super Admin' ||
+    !allowedRoles ||
+    (currentUser.role && allowedRoles.includes(currentUser.role));
 
   return (
     <div className="flex h-[100dvh] bg-background overflow-hidden">
@@ -147,7 +160,9 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
       {/* Main content area */}
       <div
         className={`flex flex-col flex-1 min-w-0 content-transition transition-all duration-250 ml-0 ${
-          sidebarCollapsed ? 'lg:ml-[var(--sidebar-collapsed-width)]' : 'lg:ml-[var(--sidebar-width)]'
+          sidebarCollapsed
+            ? 'lg:ml-[var(--sidebar-collapsed-width)]'
+            : 'lg:ml-[var(--sidebar-width)]'
         }`}
       >
         {/* Topbar */}
@@ -167,9 +182,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
           </Suspense>
           {isAuthorized ? (
             <AppErrorBoundary>
-              <div className="max-w-page mx-auto">
-                {children}
-              </div>
+              <div className="max-w-page mx-auto">{children}</div>
             </AppErrorBoundary>
           ) : (
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center p-6 card">
@@ -178,7 +191,9 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
               </div>
               <h2 className="text-lg font-bold text-foreground">Access Denied (403 Forbidden)</h2>
               <p className="text-xs text-muted-foreground mt-1 max-w-md">
-                Your role <strong className="text-foreground">({currentUser.role})</strong> does not have permission to access <code className="text-primary font-bold">{activeRoute}</code>.
+                Your role <strong className="text-foreground">({currentUser.role})</strong> does not
+                have permission to access{' '}
+                <code className="text-primary font-bold">{activeRoute}</code>.
               </p>
             </div>
           )}

@@ -12,10 +12,13 @@ export async function GET(req: NextRequest) {
   const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : cookieToken;
 
   if (!token) {
-    return new Response(JSON.stringify({ error: 'Unauthorized: Authentication required for realtime events' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized: Authentication required for realtime events' }),
+      {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
   }
 
   const sessionResult = verifySessionToken(token);
@@ -35,7 +38,11 @@ export async function GET(req: NextRequest) {
   const encoder = new TextEncoder();
 
   // Send initial SSE connection message
-  writer.write(encoder.encode(`data: ${JSON.stringify({ type: 'CONNECTED', timestamp: new Date().toISOString() })}\n\n`));
+  writer.write(
+    encoder.encode(
+      `data: ${JSON.stringify({ type: 'CONNECTED', timestamp: new Date().toISOString() })}\n\n`
+    )
+  );
 
   const handleEvent = (message: RealtimeMessage) => {
     try {
@@ -63,7 +70,7 @@ export async function GET(req: NextRequest) {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
     },
   });
 }

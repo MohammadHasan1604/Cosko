@@ -73,7 +73,9 @@ export default function KpiBentoGrid() {
       const isValid = s.status !== 'Refunded' && s.status !== 'Cancelled' && s.status !== 'Voided';
       if (!s.createdAt) return false;
       const t = new Date(s.createdAt).getTime();
-      return isStore && isValid && t >= prevDateRange.start.getTime() && t <= prevDateRange.end.getTime();
+      return (
+        isStore && isValid && t >= prevDateRange.start.getTime() && t <= prevDateRange.end.getTime()
+      );
     });
 
     const totalRevenue = filteredSales.reduce((acc, s) => acc + (s.total || 0), 0);
@@ -95,12 +97,17 @@ export default function KpiBentoGrid() {
       if (s.grossProfit !== undefined && s.grossProfit !== null && !isNaN(Number(s.grossProfit))) {
         return acc + Number(s.grossProfit);
       }
-      const saleCost = s.totalCost !== undefined && s.totalCost !== null && !isNaN(Number(s.totalCost))
-        ? Number(s.totalCost)
-        : (s.items?.reduce((itemAcc, it) => {
-            const unitCost = (it.itemId && invCostMap.get(it.itemId)) || (it.sku && invCostMap.get(it.sku)) || (it.name && invCostMap.get(it.name)) || 0;
-            return itemAcc + (unitCost * it.qty);
-          }, 0) || 0);
+      const saleCost =
+        s.totalCost !== undefined && s.totalCost !== null && !isNaN(Number(s.totalCost))
+          ? Number(s.totalCost)
+          : s.items?.reduce((itemAcc, it) => {
+              const unitCost =
+                (it.itemId && invCostMap.get(it.itemId)) ||
+                (it.sku && invCostMap.get(it.sku)) ||
+                (it.name && invCostMap.get(it.name)) ||
+                0;
+              return itemAcc + unitCost * it.qty;
+            }, 0) || 0;
       return acc + Math.max(0, (s.total || 0) - saleCost);
     }, 0);
 
@@ -119,10 +126,14 @@ export default function KpiBentoGrid() {
     const netProfit = grossProfit - totalExp;
 
     // Inventory Asset Value (point-in-time balance in store scope)
-    const filteredInv = selectedStore === 'All Stores'
-      ? inventory
-      : inventory.filter((i) => i.store === selectedStore);
-    const invValue = filteredInv.reduce((acc, i) => acc + (i.costPrice || 0) * (i.qtyOnHand || 0), 0);
+    const filteredInv =
+      selectedStore === 'All Stores'
+        ? inventory
+        : inventory.filter((i) => i.store === selectedStore);
+    const invValue = filteredInv.reduce(
+      (acc, i) => acc + (i.costPrice || 0) * (i.qtyOnHand || 0),
+      0
+    );
 
     // Customer Receivables (outstanding customer credit balance)
     const receivablesTotal = customers.reduce((acc, c) => acc + (c.creditBalance || 0), 0);
@@ -133,20 +144,25 @@ export default function KpiBentoGrid() {
       const isStore = matchStore(p.store);
       const isNotCancelled = p.status !== 'Cancelled' && p.status !== 'Archived';
       const isUnpaid = p.paymentStatus !== 'Paid';
-      const rem = p.remainingAmount !== undefined ? p.remainingAmount : (p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0));
+      const rem =
+        p.remainingAmount !== undefined
+          ? p.remainingAmount
+          : p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0);
       return isStore && isNotCancelled && isUnpaid && rem > 0.005;
     });
 
     const payablesTotal = activePendingBills.reduce((acc, p) => {
-      const rem = p.remainingAmount !== undefined ? p.remainingAmount : Math.max(0, p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0));
+      const rem =
+        p.remainingAmount !== undefined
+          ? p.remainingAmount
+          : Math.max(0, p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0));
       return acc + rem;
     }, 0);
     const pendingBillsCount = activePendingBills.length;
 
     // Active Outlets count
-    const activeOutletsCount = selectedStore === 'All Stores'
-      ? storesList.filter((s) => s.status === 'Active').length
-      : 1;
+    const activeOutletsCount =
+      selectedStore === 'All Stores' ? storesList.filter((s) => s.status === 'Active').length : 1;
 
     return {
       filteredSales,
@@ -168,7 +184,18 @@ export default function KpiBentoGrid() {
       pendingBillsCount,
       activeOutletsCount,
     };
-  }, [sales, inventory, expenses, purchases, customers, storesList, selectedStore, datePeriod, customDateRange, invCostMap]);
+  }, [
+    sales,
+    inventory,
+    expenses,
+    purchases,
+    customers,
+    storesList,
+    selectedStore,
+    datePeriod,
+    customDateRange,
+    invCostMap,
+  ]);
 
   const displayPeriodLabel =
     datePeriod === 'Custom Range' && customDateRange?.start && customDateRange?.end
@@ -262,7 +289,10 @@ export default function KpiBentoGrid() {
       value: selectedStore === 'All Stores' ? `${activeOutletsCount} Outlets` : selectedStore,
       change: `${usersList.length} staff`,
       trend: 'neutral' as const,
-      subtext: storesList.map((s) => s.code).slice(0, 4).join(' · '),
+      subtext: storesList
+        .map((s) => s.code)
+        .slice(0, 4)
+        .join(' · '),
       icon: 'MapPinIcon',
       variant: 'normal' as const,
       color: 'info' as const,
@@ -289,10 +319,7 @@ export default function KpiBentoGrid() {
       </div>
 
       {/* Vendor Payables Drill-Down Modal */}
-      <PendingVendorBillsModal
-        open={vendorModalOpen}
-        onClose={() => setVendorModalOpen(false)}
-      />
+      <PendingVendorBillsModal open={vendorModalOpen} onClose={() => setVendorModalOpen(false)} />
     </>
   );
 }

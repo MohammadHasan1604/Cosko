@@ -14,52 +14,65 @@ interface DrilldownModalProps {
   endDate?: string;
 }
 
-export default function DrilldownModal({ isOpen, onClose, title, type, id, store, period, startDate, endDate }: DrilldownModalProps) {
+export default function DrilldownModal({
+  isOpen,
+  onClose,
+  title,
+  type,
+  id,
+  store,
+  period,
+  startDate,
+  endDate,
+}: DrilldownModalProps) {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
 
-  const fetchData = useCallback(async (p: number) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        type,
-        id,
-        store,
-        period,
-        page: String(p),
-        limit: '50',
-      });
-      if (startDate) params.set('startDate', startDate);
-      if (endDate) params.set('endDate', endDate);
-
-      let token = '';
+  const fetchData = useCallback(
+    async (p: number) => {
+      setLoading(true);
       try {
-        const saved = localStorage.getItem('cosko_active_session');
-        if (saved) token = JSON.parse(saved).token || '';
-      } catch {}
+        const params = new URLSearchParams({
+          type,
+          id,
+          store,
+          period,
+          page: String(p),
+          limit: '50',
+        });
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
 
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+        let token = '';
+        try {
+          const saved = localStorage.getItem('cosko_active_session');
+          if (saved) token = JSON.parse(saved).token || '';
+        } catch {}
 
-      const res = await fetch(`/api/reports/drilldown?${params.toString()}`, {
-        credentials: 'include',
-        headers,
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setRecords(data.records || []);
-        setTotalPages(data.totalPages || 1);
-        setTotalRecords(data.totalRecords || 0);
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`/api/reports/drilldown?${params.toString()}`, {
+          credentials: 'include',
+          headers,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setRecords(data.records || []);
+          setTotalPages(data.totalPages || 1);
+          setTotalRecords(data.totalRecords || 0);
+        }
+      } catch (err) {
+        console.error('Drilldown fetch error:', err);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Drilldown fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [type, id, store, period, startDate, endDate]);
+    },
+    [type, id, store, period, startDate, endDate]
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -85,7 +98,8 @@ export default function DrilldownModal({ isOpen, onClose, title, type, id, store
     }
   };
 
-  const fmt = (v: number) => v?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00';
+  const fmt = (v: number) =>
+    v?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -99,10 +113,14 @@ export default function DrilldownModal({ isOpen, onClose, title, type, id, store
           <div>
             <h2 className="text-base font-bold text-foreground">{title}</h2>
             <p className="text-2xs text-muted-foreground mt-0.5">
-              {totalRecords} record{totalRecords !== 1 ? 's' : ''} found · Page {page} of {totalPages}
+              {totalRecords} record{totalRecords !== 1 ? 's' : ''} found · Page {page} of{' '}
+              {totalPages}
             </p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+          >
             <Icon name="XMarkIcon" size={20} />
           </button>
         </div>
@@ -136,16 +154,28 @@ export default function DrilldownModal({ isOpen, onClose, title, type, id, store
               <tbody className="divide-y divide-border text-xs">
                 {records.map((r: any, i: number) => (
                   <tr key={i} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-3 py-2.5 font-mono text-2xs font-bold text-primary">{r.orderNo}</td>
-                    <td className="px-3 py-2.5"><span className="badge-info text-3xs">{r.store}</span></td>
+                    <td className="px-3 py-2.5 font-mono text-2xs font-bold text-primary">
+                      {r.orderNo}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className="badge-info text-3xs">{r.store}</span>
+                    </td>
                     <td className="px-3 py-2.5">{r.customer}</td>
                     <td className="px-3 py-2.5 text-muted-foreground">{r.cashier}</td>
-                    <td className="px-3 py-2.5 text-muted-foreground font-mono text-2xs">{new Date(r.date).toLocaleDateString('en-IN')}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground font-mono text-2xs">
+                      {new Date(r.date).toLocaleDateString('en-IN')}
+                    </td>
                     <td className="px-3 py-2.5 text-right font-tabular font-bold">{r.qty}</td>
                     <td className="px-3 py-2.5 text-right font-tabular">₹{fmt(r.unitPrice)}</td>
-                    <td className="px-3 py-2.5 text-right font-tabular text-muted-foreground">₹{fmt(r.unitCost)}</td>
-                    <td className="px-3 py-2.5 text-right font-tabular font-bold">₹{fmt(r.lineTotal)}</td>
-                    <td className="px-3 py-2.5 text-right font-tabular font-bold text-success">₹{fmt(r.lineProfit)}</td>
+                    <td className="px-3 py-2.5 text-right font-tabular text-muted-foreground">
+                      ₹{fmt(r.unitCost)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-tabular font-bold">
+                      ₹{fmt(r.lineTotal)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-tabular font-bold text-success">
+                      ₹{fmt(r.lineProfit)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -168,15 +198,35 @@ export default function DrilldownModal({ isOpen, onClose, title, type, id, store
               <tbody className="divide-y divide-border text-xs">
                 {records.map((r: any, i: number) => (
                   <tr key={i} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-3 py-2.5 font-mono text-2xs font-bold text-primary">{r.poNo}</td>
+                    <td className="px-3 py-2.5 font-mono text-2xs font-bold text-primary">
+                      {r.poNo}
+                    </td>
                     <td className="px-3 py-2.5 font-mono text-2xs">{r.invoiceNo || '—'}</td>
-                    <td className="px-3 py-2.5"><span className="badge-info text-3xs">{r.store}</span></td>
-                    <td className="px-3 py-2.5 text-muted-foreground font-mono text-2xs">{new Date(r.orderDate).toLocaleDateString('en-IN')}</td>
-                    <td className="px-3 py-2.5"><span className={`text-3xs font-bold px-2 py-0.5 rounded-full ${r.status === 'Received' || r.status === 'Completed' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>{r.status}</span></td>
-                    <td className="px-3 py-2.5 text-right font-tabular font-bold">{r.totalUnits}</td>
-                    <td className="px-3 py-2.5 text-right font-tabular font-bold">₹{fmt(r.totalCost)}</td>
-                    <td className="px-3 py-2.5 text-right font-tabular text-success font-semibold">₹{fmt(r.paidAmount)}</td>
-                    <td className="px-3 py-2.5 text-right font-tabular text-danger font-semibold">₹{fmt(Math.max(0, r.totalCost - r.paidAmount - (r.creditAmount || 0)))}</td>
+                    <td className="px-3 py-2.5">
+                      <span className="badge-info text-3xs">{r.store}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground font-mono text-2xs">
+                      {new Date(r.orderDate).toLocaleDateString('en-IN')}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={`text-3xs font-bold px-2 py-0.5 rounded-full ${r.status === 'Received' || r.status === 'Completed' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}
+                      >
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-tabular font-bold">
+                      {r.totalUnits}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-tabular font-bold">
+                      ₹{fmt(r.totalCost)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-tabular text-success font-semibold">
+                      ₹{fmt(r.paidAmount)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-tabular text-danger font-semibold">
+                      ₹{fmt(Math.max(0, r.totalCost - r.paidAmount - (r.creditAmount || 0)))}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -199,14 +249,28 @@ export default function DrilldownModal({ isOpen, onClose, title, type, id, store
               <tbody className="divide-y divide-border text-xs">
                 {records.map((r: any, i: number) => (
                   <tr key={i} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-3 py-2.5 font-mono text-2xs font-bold text-primary">{r.orderNo}</td>
-                    <td className="px-3 py-2.5"><span className="badge-info text-3xs">{r.store}</span></td>
+                    <td className="px-3 py-2.5 font-mono text-2xs font-bold text-primary">
+                      {r.orderNo}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className="badge-info text-3xs">{r.store}</span>
+                    </td>
                     <td className="px-3 py-2.5">{r.customer}</td>
-                    {type === 'overview-sales' && <td className="px-3 py-2.5 text-muted-foreground">{r.cashier}</td>}
-                    <td className="px-3 py-2.5"><span className="badge-secondary text-3xs">{r.paymentMethod}</span></td>
-                    <td className="px-3 py-2.5 text-muted-foreground font-mono text-2xs">{new Date(r.date).toLocaleDateString('en-IN')}</td>
-                    <td className="px-3 py-2.5 text-right font-tabular font-bold">₹{fmt(r.grandTotal)}</td>
-                    <td className="px-3 py-2.5 text-right font-tabular font-bold text-success">₹{fmt(r.grossProfit)}</td>
+                    {type === 'overview-sales' && (
+                      <td className="px-3 py-2.5 text-muted-foreground">{r.cashier}</td>
+                    )}
+                    <td className="px-3 py-2.5">
+                      <span className="badge-secondary text-3xs">{r.paymentMethod}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground font-mono text-2xs">
+                      {new Date(r.date).toLocaleDateString('en-IN')}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-tabular font-bold">
+                      ₹{fmt(r.grandTotal)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-tabular font-bold text-success">
+                      ₹{fmt(r.grossProfit)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

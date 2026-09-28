@@ -101,47 +101,58 @@ export async function POST(req: NextRequest) {
         extractEntityId: (d) => d?.customer?.id,
       },
       async () => {
-        const customer = await prisma.$transaction(async (tx: any) => {
-          const existingCustomer = await tx.customer.findFirst({
-            where: { normalizedPhone },
-          });
+        const customer = await prisma.$transaction(
+          async (tx: any) => {
+            const existingCustomer = await tx.customer.findFirst({
+              where: { normalizedPhone },
+            });
 
-          if (existingCustomer) {
-            return tx.customer.update({
-              where: { id: existingCustomer.id },
+            if (existingCustomer) {
+              return tx.customer.update({
+                where: { id: existingCustomer.id },
+                data: {
+                  name: body.name,
+                  email: body.email || undefined,
+                  address: body.address || undefined,
+                  city: body.city || undefined,
+                  status: 'Active',
+                },
+              });
+            }
+
+            return tx.customer.create({
               data: {
                 name: body.name,
-                email: body.email || undefined,
-                address: body.address || undefined,
-                city: body.city || undefined,
+                phone: body.phone,
+                normalizedPhone,
+                email: body.email || null,
+                address: body.address || null,
+                city: body.city || user.store,
+                totalSpent: body.totalSpend || 0,
+                creditBalance: body.creditBalance || 0,
                 status: 'Active',
               },
             });
-          }
+          },
+          { maxWait: 15000, timeout: 45000 }
+        );
 
-          return tx.customer.create({
-            data: {
-              name: body.name,
-              phone: body.phone,
-              normalizedPhone,
-              email: body.email || null,
-              address: body.address || null,
-              city: body.city || user.store,
-              totalSpent: body.totalSpend || 0,
-              creditBalance: body.creditBalance || 0,
-              status: 'Active',
-            },
-          });
-        }, { maxWait: 15000, timeout: 45000 });
-
-        broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: customer.id, name: customer.name, phone: customer.phone, action: 'saved' });
+        broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', {
+          id: customer.id,
+          name: customer.name,
+          phone: customer.phone,
+          action: 'saved',
+        });
 
         return { status: 201, data: { success: true, customer } };
       }
     );
   } catch (error: any) {
     console.error('API /api/customers POST error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to save customer' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to save customer' },
+      { status: 500 }
+    );
   }
 }
 
@@ -165,7 +176,9 @@ export async function PUT(req: NextRequest) {
       where: { id: body.id },
       data: {
         ...(body.name ? { name: body.name } : {}),
-        ...(body.phone ? { phone: body.phone, normalizedPhone: normalizeMobileNumber(body.phone) } : {}),
+        ...(body.phone
+          ? { phone: body.phone, normalizedPhone: normalizeMobileNumber(body.phone) }
+          : {}),
         ...(body.email !== undefined ? { email: body.email || null } : {}),
         ...(body.city ? { city: body.city } : {}),
         ...(body.address !== undefined ? { address: body.address || null } : {}),
@@ -174,12 +187,20 @@ export async function PUT(req: NextRequest) {
       },
     });
 
-    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: customer.id, name: customer.name, phone: customer.phone, action: 'updated' });
+    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', {
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      action: 'updated',
+    });
 
     return NextResponse.json({ success: true, customer });
   } catch (error: any) {
     console.error('API /api/customers PUT error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to update customer' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to update customer' },
+      { status: 500 }
+    );
   }
 }
 
@@ -196,7 +217,10 @@ export async function DELETE(req: NextRequest) {
     const user = auth.user;
 
     if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient security level' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient security level' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -210,13 +234,19 @@ export async function DELETE(req: NextRequest) {
 
     const target = await (prisma as any).customer.findUnique({ where: { id } }).catch(() => null);
     if (!target) {
-      return NextResponse.json({ success: true, message: 'Customer already deleted or non-existent' });
+      return NextResponse.json({
+        success: true,
+        message: 'Customer already deleted or non-existent',
+      });
     }
 
     // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────
     if (user.securityLevel < 100) {
       if (!reason || reason.trim().length < 3) {
-        return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'A reason for deletion is required (minimum 3 characters)' },
+          { status: 400 }
+        );
       }
       const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
       const result = await createDeleteRequest(user as any, {
@@ -241,7 +271,11 @@ export async function DELETE(req: NextRequest) {
       (prisma as any).repairEnquiry.count({ where: { customerId: target.id } }),
     ]);
 
-    const hasHistory = salesCount > 0 || repairCount > 0 || Number(target.totalSpent) > 0 || Number(target.creditBalance) > 0;
+    const hasHistory =
+      salesCount > 0 ||
+      repairCount > 0 ||
+      Number(target.totalSpent) > 0 ||
+      Number(target.creditBalance) > 0;
 
     if (hasHistory || !permanent) {
       const customer = await (prisma as any).customer.update({
@@ -253,14 +287,23 @@ export async function DELETE(req: NextRequest) {
         data: {
           module: 'CUSTOMERS',
           action: `ARCHIVED: Customer "${target.name}"`,
-          details: JSON.stringify({ customerId: target.id, salesCount, repairCount, totalSpent: target.totalSpent }),
+          details: JSON.stringify({
+            customerId: target.id,
+            salesCount,
+            repairCount,
+            totalSpent: target.totalSpent,
+          }),
           userEmail: user.email,
           userRole: user.role,
           storeCode: user.store || 'CENTRAL',
         },
       });
 
-      broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: target.id, name: target.name, action: 'archived' });
+      broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', {
+        id: target.id,
+        name: target.name,
+        action: 'archived',
+      });
 
       return NextResponse.json({
         success: true,
@@ -274,22 +317,29 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Hard-delete only for completely unused customers by Super Admin
-    await prisma.$transaction(async (tx: any) => {
-      await tx.customerExternalLink.deleteMany({ where: { coskoCustomerId: target.id } });
-      await tx.customer.delete({ where: { id: target.id } });
-      await tx.auditLog.create({
-        data: {
-          module: 'CUSTOMERS',
-          action: `HARD_DELETED: Customer "${target.name}"`,
-          details: JSON.stringify({ customerId: target.id, beforeState: target }),
-          userEmail: user.email,
-          userRole: user.role,
-          storeCode: user.store || 'CENTRAL',
-        },
-      });
-    }, { maxWait: 15000, timeout: 45000 });
+    await prisma.$transaction(
+      async (tx: any) => {
+        await tx.customerExternalLink.deleteMany({ where: { coskoCustomerId: target.id } });
+        await tx.customer.delete({ where: { id: target.id } });
+        await tx.auditLog.create({
+          data: {
+            module: 'CUSTOMERS',
+            action: `HARD_DELETED: Customer "${target.name}"`,
+            details: JSON.stringify({ customerId: target.id, beforeState: target }),
+            userEmail: user.email,
+            userRole: user.role,
+            storeCode: user.store || 'CENTRAL',
+          },
+        });
+      },
+      { maxWait: 15000, timeout: 45000 }
+    );
 
-    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', { id: target.id, name: target.name, action: 'deleted' });
+    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', {
+      id: target.id,
+      name: target.name,
+      action: 'deleted',
+    });
 
     return NextResponse.json({
       success: true,
@@ -298,6 +348,9 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /api/customers DELETE error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to archive/delete customer' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to archive/delete customer' },
+      { status: 500 }
+    );
   }
 }

@@ -43,13 +43,15 @@ export async function GET(req: NextRequest) {
       return c;
     });
 
-    const filtered = linkStatus === 'All'
-      ? mergedList
-      : mergedList.filter((c) => c.linkStatus === linkStatus);
+    const filtered =
+      linkStatus === 'All' ? mergedList : mergedList.filter((c) => c.linkStatus === linkStatus);
 
-    return NextResponse.json({ success: true, customers: filtered }, {
-      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
-    });
+    return NextResponse.json(
+      { success: true, customers: filtered },
+      {
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+      }
+    );
   } catch (error: any) {
     console.error('API /api/customers/legacy/link GET error:', error);
     return NextResponse.json({ error: 'Failed to retrieve legacy customer list' }, { status: 500 });
@@ -68,7 +70,10 @@ export async function POST(req: NextRequest) {
     const user = auth.user;
 
     if (user.securityLevel < 60) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to link customer records' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient permissions to link customer records' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
@@ -101,7 +106,8 @@ export async function POST(req: NextRequest) {
         where: { id: existing.id },
         data: {
           linkStatus: newStatus,
-          coskoCustomerId: newStatus === 'UNLINKED' ? null : (resolvedCoskoId || existing.coskoCustomerId),
+          coskoCustomerId:
+            newStatus === 'UNLINKED' ? null : resolvedCoskoId || existing.coskoCustomerId,
           verifiedBy: user.name,
           verifiedAt: new Date(),
         },
@@ -125,11 +131,17 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: action === 'unlink' ? 'Customer identity unlinked successfully in MySQL' : 'Customer identity link verified successfully in MySQL',
+      message:
+        action === 'unlink'
+          ? 'Customer identity unlinked successfully in MySQL'
+          : 'Customer identity link verified successfully in MySQL',
       link,
     });
   } catch (error: any) {
     console.error('API /api/customers/legacy/link POST error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to update link status' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to update link status' },
+      { status: 500 }
+    );
   }
 }

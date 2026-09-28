@@ -98,13 +98,29 @@ export default function DeleteRequestsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PENDING':
-        return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">⏳ Pending</span>;
+        return (
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">
+            ⏳ Pending
+          </span>
+        );
       case 'APPROVED':
-        return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/15 text-green-400 border border-green-500/30">✓ Approved</span>;
+        return (
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/15 text-green-400 border border-green-500/30">
+            ✓ Approved
+          </span>
+        );
       case 'REJECTED':
-        return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400 border border-red-500/30">✗ Rejected</span>;
+        return (
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400 border border-red-500/30">
+            ✗ Rejected
+          </span>
+        );
       default:
-        return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/15 text-gray-400">{status}</span>;
+        return (
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/15 text-gray-400">
+            {status}
+          </span>
+        );
     }
   };
 
@@ -155,13 +171,15 @@ export default function DeleteRequestsPage() {
             <div className="page-header">
               <h1 className="page-title flex items-center gap-1.5">
                 Delete Requests
-                {pendingCount > 0 && (
-                  <span className="badge-danger text-3xs">{pendingCount}</span>
-                )}
+                {pendingCount > 0 && <span className="badge-danger text-3xs">{pendingCount}</span>}
               </h1>
               <p className="page-subtitle">Review & approve pending deletions</p>
             </div>
-            <button onClick={() => fetchRequests()} className="btn-secondary btn-sm gap-1 flex-shrink-0" disabled={loading}>
+            <button
+              onClick={() => fetchRequests()}
+              className="btn-secondary btn-sm gap-1 flex-shrink-0"
+              disabled={loading}
+            >
               <Icon name="ArrowPathIcon" size={13} className={loading ? 'animate-spin' : ''} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
@@ -181,7 +199,9 @@ export default function DeleteRequestsPage() {
               >
                 {f === 'ALL' ? 'All Requests' : f.charAt(0) + f.slice(1).toLowerCase()}
                 {f === 'PENDING' && pendingCount > 0 && (
-                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-red-500 text-white">{pendingCount}</span>
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-red-500 text-white">
+                    {pendingCount}
+                  </span>
                 )}
               </button>
             ))}
@@ -195,7 +215,9 @@ export default function DeleteRequestsPage() {
           ) : filteredRequests.length === 0 ? (
             <div className="text-center py-20 text-muted-foreground">
               <Icon name="InboxIcon" size={48} className="mx-auto mb-3 opacity-40" />
-              <p className="text-sm">No delete requests {statusFilter !== 'ALL' ? `with status "${statusFilter}"` : ''}</p>
+              <p className="text-sm">
+                No delete requests {statusFilter !== 'ALL' ? `with status "${statusFilter}"` : ''}
+              </p>
             </div>
           ) : (
             <div className="grid gap-3">
@@ -209,11 +231,17 @@ export default function DeleteRequestsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <div className="p-2 rounded-lg bg-red-500/10 shrink-0">
-                          <Icon name={getEntityIcon(req.entityType)} size={20} className="text-red-400" />
+                          <Icon
+                            name={getEntityIcon(req.entityType)}
+                            size={20}
+                            className="text-red-400"
+                          />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm text-foreground truncate">{req.entityName}</span>
+                            <span className="font-semibold text-sm text-foreground truncate">
+                              {req.entityName}
+                            </span>
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground uppercase tracking-wide">
                               {req.entityType.replace(/_/g, ' ')}
                             </span>
@@ -228,7 +256,9 @@ export default function DeleteRequestsPage() {
                             <span className="mx-1">•</span>
                             <span>{formatDate(req.createdAt)}</span>
                           </p>
-                          <p className="text-xs text-foreground/80 mt-1.5 italic">&ldquo;{req.reason}&rdquo;</p>
+                          <p className="text-xs text-foreground/80 mt-1.5 italic">
+                            &ldquo;{req.reason}&rdquo;
+                          </p>
 
                           {deps && deps.hasFinancialHistory && (
                             <div className="mt-2 p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
@@ -258,7 +288,10 @@ export default function DeleteRequestsPage() {
                         {req.status === 'PENDING' && currentUser.role === 'Super Admin' && (
                           <>
                             <button
-                              onClick={() => { setReviewModal(req); setReviewNotes(''); }}
+                              onClick={() => {
+                                setReviewModal(req);
+                                setReviewNotes('');
+                              }}
                               className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/15 text-green-400 hover:bg-green-500/25 border border-green-500/30 transition-all"
                               disabled={actionLoading === req.id}
                             >
@@ -306,12 +339,15 @@ export default function DeleteRequestsPage() {
                 <div className="col-span-2">
                   <p className="text-muted-foreground text-xs">Requester</p>
                   <p className="font-medium text-xs">
-                    {selectedRequest.requesterEmail} ({selectedRequest.requesterRole}, {selectedRequest.requesterStore})
+                    {selectedRequest.requesterEmail} ({selectedRequest.requesterRole},{' '}
+                    {selectedRequest.requesterStore})
                   </p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-muted-foreground text-xs">Reason</p>
-                  <p className="italic text-foreground/80">&ldquo;{selectedRequest.reason}&rdquo;</p>
+                  <p className="italic text-foreground/80">
+                    &ldquo;{selectedRequest.reason}&rdquo;
+                  </p>
                 </div>
               </div>
 
@@ -328,13 +364,19 @@ export default function DeleteRequestsPage() {
                 <div>
                   <p className="text-muted-foreground text-xs mb-1">Before-State Snapshot</p>
                   <pre className="text-xs bg-muted p-3 rounded-lg overflow-auto max-h-40 whitespace-pre-wrap">
-                    {JSON.stringify(JSON.parse(selectedRequest.beforeStateSnapshot || '{}'), null, 2)}
+                    {JSON.stringify(
+                      JSON.parse(selectedRequest.beforeStateSnapshot || '{}'),
+                      null,
+                      2
+                    )}
                   </pre>
                 </div>
               )}
 
               <div className="flex justify-end">
-                <button onClick={() => setSelectedRequest(null)} className="btn-secondary text-sm">Close</button>
+                <button onClick={() => setSelectedRequest(null)} className="btn-secondary text-sm">
+                  Close
+                </button>
               </div>
             </div>
           </Modal>
@@ -345,20 +387,24 @@ export default function DeleteRequestsPage() {
           <Modal open onClose={() => setReviewModal(null)} title="Approve Delete Request">
             <div className="space-y-4">
               <p className="text-sm text-foreground">
-                You are about to approve the deletion of <strong>{reviewModal.entityName}</strong> ({reviewModal.entityType.replace(/_/g, ' ')}).
+                You are about to approve the deletion of <strong>{reviewModal.entityName}</strong> (
+                {reviewModal.entityType.replace(/_/g, ' ')}).
               </p>
               {(() => {
                 const deps = parseDependency(reviewModal.dependencyAnalysis);
                 return deps?.hasFinancialHistory ? (
                   <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                     <p className="text-xs text-yellow-400 font-medium">
-                      ⚠️ This record has financial history. It will be soft-deleted/archived rather than permanently removed.
+                      ⚠️ This record has financial history. It will be soft-deleted/archived rather
+                      than permanently removed.
                     </p>
                   </div>
                 ) : null;
               })()}
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">Review Notes (optional)</label>
+                <label className="text-xs text-muted-foreground block mb-1">
+                  Review Notes (optional)
+                </label>
                 <textarea
                   value={reviewNotes}
                   onChange={(e) => setReviewNotes(e.target.value)}
@@ -368,7 +414,9 @@ export default function DeleteRequestsPage() {
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <button onClick={() => setReviewModal(null)} className="btn-secondary text-sm">Cancel</button>
+                <button onClick={() => setReviewModal(null)} className="btn-secondary text-sm">
+                  Cancel
+                </button>
                 <button
                   onClick={() => handleAction(reviewModal.id, 'approve')}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-500 transition-colors"

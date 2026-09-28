@@ -8,6 +8,7 @@ import Modal from '@/components/ui/Modal';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { StorageService } from '@/lib/storageService';
 
 export default function UserProfileModal() {
   const {
@@ -59,12 +60,14 @@ export default function UserProfileModal() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      updateProfileAvatar(result);
-    };
-    reader.readAsDataURL(file);
+    StorageService.uploadFile('branding', file, file.name)
+      .then((res) => {
+        if (res.url) {
+          updateProfileAvatar(res.url);
+          toast.success('Avatar updated successfully!');
+        }
+      })
+      .catch((err) => toast.error('Failed to upload avatar: ' + err.message));
   };
 
   const handleRemoveAvatar = () => {
@@ -131,7 +134,9 @@ export default function UserProfileModal() {
             type="button"
             onClick={() => setActiveTab('profile')}
             className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'profile' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+              activeTab === 'profile'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <Icon name="UserIcon" size={13} />
@@ -141,7 +146,9 @@ export default function UserProfileModal() {
             type="button"
             onClick={() => setActiveTab('password')}
             className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'password' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+              activeTab === 'password'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <Icon name="KeyIcon" size={13} />
@@ -157,14 +164,23 @@ export default function UserProfileModal() {
                 <div className="relative group">
                   <div className="w-14 h-14 rounded-2xl bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-primary font-extrabold text-lg shadow-sm overflow-hidden">
                     {currentUser.avatarUrl ? (
-                      <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-full h-full object-cover" />
+                      <img
+                        src={currentUser.avatarUrl}
+                        alt={currentUser.name}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       currentUser.avatar
                     )}
                   </div>
                   <label className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity text-white text-3xs font-bold text-center p-1">
                     <Icon name="CameraIcon" size={16} />
-                    <input type="file" accept="image/png, image/jpeg, image/webp, image/svg+xml" onChange={handleAvatarUpload} className="hidden" />
+                    <input
+                      type="file"
+                      accept="image/png, image/jpeg, image/webp, image/svg+xml"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                    />
                   </label>
                 </div>
 
@@ -183,10 +199,18 @@ export default function UserProfileModal() {
                 <label className="btn-secondary text-3xs py-1 px-2.5 gap-1 inline-flex items-center cursor-pointer">
                   <Icon name="ArrowUpTrayIcon" size={12} />
                   Change Photo
-                  <input type="file" accept="image/png, image/jpeg, image/webp, image/svg+xml" onChange={handleAvatarUpload} className="hidden" />
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/webp, image/svg+xml"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                  />
                 </label>
                 {currentUser.avatarUrl && (
-                  <button onClick={handleRemoveAvatar} className="text-3xs text-danger hover:underline block ml-auto font-semibold">
+                  <button
+                    onClick={handleRemoveAvatar}
+                    className="text-3xs text-danger hover:underline block ml-auto font-semibold"
+                  >
                     Remove Photo
                   </button>
                 )}
@@ -197,16 +221,22 @@ export default function UserProfileModal() {
             <div className="p-4 rounded-2xl border border-border bg-card flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
               <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-bold text-foreground">Duty Shift Status</p>
-                <p className="text-3xs text-muted-foreground mt-0.5">Toggle whether you are actively on shift or on leave</p>
+                <p className="text-3xs text-muted-foreground mt-0.5">
+                  Toggle whether you are actively on shift or on leave
+                </p>
               </div>
 
               <div className="flex items-center gap-2.5 flex-shrink-0">
-                <span className={`px-2.5 py-1 rounded-full text-3xs font-extrabold transition-colors flex items-center gap-1.5 ${
-                  currentUser.shiftStatus === 'On Shift'
-                    ? 'bg-success/15 text-success border border-success/30'
-                    : 'bg-warning/15 text-warning border border-warning/30'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${currentUser.shiftStatus === 'On Shift' ? 'bg-success animate-pulse' : 'bg-warning'}`} />
+                <span
+                  className={`px-2.5 py-1 rounded-full text-3xs font-extrabold transition-colors flex items-center gap-1.5 ${
+                    currentUser.shiftStatus === 'On Shift'
+                      ? 'bg-success/15 text-success border border-success/30'
+                      : 'bg-warning/15 text-warning border border-warning/30'
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${currentUser.shiftStatus === 'On Shift' ? 'bg-success animate-pulse' : 'bg-warning'}`}
+                  />
                   {currentUser.shiftStatus}
                 </span>
 
@@ -221,12 +251,19 @@ export default function UserProfileModal() {
             </div>
 
             {/* Editable Profile Information */}
-            <form onSubmit={handleSaveProfile} className="p-3.5 rounded-xl border border-border bg-card space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Profile Information</h4>
-              
+            <form
+              onSubmit={handleSaveProfile}
+              className="p-3.5 rounded-xl border border-border bg-card space-y-3"
+            >
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Profile Information
+              </h4>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-3xs font-bold text-muted-foreground block mb-1">Display Name</label>
+                  <label className="text-3xs font-bold text-muted-foreground block mb-1">
+                    Display Name
+                  </label>
                   <input
                     type="text"
                     required
@@ -237,7 +274,9 @@ export default function UserProfileModal() {
                 </div>
 
                 <div>
-                  <label className="text-3xs font-bold text-muted-foreground block mb-1">Contact Phone</label>
+                  <label className="text-3xs font-bold text-muted-foreground block mb-1">
+                    Contact Phone
+                  </label>
                   <input
                     type="text"
                     value={editPhone}
@@ -270,7 +309,9 @@ export default function UserProfileModal() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Security Level:</span>
-                <span className="font-bold text-primary">{currentUser.role === 'Super Admin' ? 'Level 100 (Owner)' : 'Level 20'}</span>
+                <span className="font-bold text-primary">
+                  {currentUser.role === 'Super Admin' ? 'Level 100 (Owner)' : 'Level 20'}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Active Database:</span>
@@ -282,17 +323,23 @@ export default function UserProfileModal() {
           </>
         ) : (
           /* Secure Change Password Flow */
-          <form onSubmit={handleChangePassword} className="p-4 rounded-xl border border-border bg-card space-y-3.5">
+          <form
+            onSubmit={handleChangePassword}
+            className="p-4 rounded-xl border border-border bg-card space-y-3.5"
+          >
             <div>
               <p className="text-xs font-bold text-foreground">Secure Password Update</p>
               <p className="text-3xs text-muted-foreground">
-                Passwords are authenticated against your MySQL credential hash. Minimum 8 characters.
+                Passwords are authenticated against your MySQL credential hash. Minimum 8
+                characters.
               </p>
             </div>
 
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Current Password *</label>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  Current Password *
+                </label>
                 <div className="relative">
                   <input
                     type={showCurrentPass ? 'text' : 'password'}
@@ -314,7 +361,9 @@ export default function UserProfileModal() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">New Password *</label>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  New Password *
+                </label>
                 <div className="relative">
                   <input
                     type={showNewPass ? 'text' : 'password'}
@@ -335,7 +384,9 @@ export default function UserProfileModal() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Confirm New Password *</label>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  Confirm New Password *
+                </label>
                 <input
                   type="password"
                   required

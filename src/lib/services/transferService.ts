@@ -95,8 +95,12 @@ export async function executeStockTransfer(input: CreateTransferInput) {
         }),
       ]);
 
-      const sourceInvMap = new Map<string, any>(sourceInventories.map((inv: any) => [inv.productId, inv]));
-      const destInvMap = new Map<string, any>(destInventories.map((inv: any) => [inv.productId, inv]));
+      const sourceInvMap = new Map<string, any>(
+        sourceInventories.map((inv: any) => [inv.productId, inv])
+      );
+      const destInvMap = new Map<string, any>(
+        destInventories.map((inv: any) => [inv.productId, inv])
+      );
 
       // 2. Pre-verify all items have sufficient stock before making any updates
       for (const item of preparedItems) {
@@ -168,7 +172,12 @@ export async function executeStockTransfer(input: CreateTransferInput) {
         inventoryUpdates.push(
           tx.inventory.upsert({
             where: { productId_storeCode: { productId: item.productId, storeCode: destStore } },
-            create: { productId: item.productId, storeCode: destStore, qtyOnHand: newDestQty, reorderPt: 5 },
+            create: {
+              productId: item.productId,
+              storeCode: destStore,
+              qtyOnHand: newDestQty,
+              reorderPt: 5,
+            },
             update: { qtyOnHand: newDestQty },
           })
         );
@@ -302,7 +311,11 @@ export async function executeStockTransfer(input: CreateTransferInput) {
 
   // 7. Fire realtime broadcasts AFTER transaction commit
   try {
-    broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', { transferNo, sourceStore, destStore });
+    broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', {
+      transferNo,
+      sourceStore,
+      destStore,
+    });
     broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: sourceStore });
     broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: destStore });
   } catch (socketErr) {

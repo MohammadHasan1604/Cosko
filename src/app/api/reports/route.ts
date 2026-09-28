@@ -20,8 +20,15 @@ export async function GET(req: NextRequest) {
     const user = auth.user;
 
     // RBAC: Require security level >= 80 (Store Manager+) for financial reports
-    if ((user.securityLevel || 0) < 60 && user.role !== 'Super Admin' && user.role !== 'Store Manager') {
-      return NextResponse.json({ error: 'Insufficient permissions for financial reports' }, { status: 403 });
+    if (
+      (user.securityLevel || 0) < 60 &&
+      user.role !== 'Super Admin' &&
+      user.role !== 'Store Manager'
+    ) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions for financial reports' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -43,16 +50,22 @@ export async function GET(req: NextRequest) {
     // Store isolation
     let storeFilter: string | undefined;
     if (user.role !== 'Super Admin') {
-      const allowed = user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
+      const allowed =
+        user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
       if (requestedStore === 'All Stores' || requestedStore === 'ALL') {
         return NextResponse.json(
-          { error: 'Forbidden: Consolidated reporting across all stores is restricted to Super Admin only' },
+          {
+            error:
+              'Forbidden: Consolidated reporting across all stores is restricted to Super Admin only',
+          },
           { status: 403 }
         );
       }
       if (requestedStore && !allowed.includes(requestedStore)) {
         return NextResponse.json(
-          { error: `Forbidden: Cross-store and consolidated reporting is restricted to Super Admin only` },
+          {
+            error: `Forbidden: Cross-store and consolidated reporting is restricted to Super Admin only`,
+          },
           { status: 403 }
         );
       }
@@ -88,16 +101,18 @@ export async function GET(req: NextRequest) {
     }
 
     // Non-blocking Audit Log
-    prisma.auditLog.create({
-      data: {
-        module: 'Reports',
-        action: `VIEW_REPORT_${report.toUpperCase()}`,
-        details: `Generated ${report} report: ${period}, Store: ${storeFilter || 'All Stores'}`,
-        userEmail: user.email,
-        userRole: user.role,
-        storeCode: storeFilter || 'ALL',
-      },
-    }).catch(() => {});
+    prisma.auditLog
+      .create({
+        data: {
+          module: 'Reports',
+          action: `VIEW_REPORT_${report.toUpperCase()}`,
+          details: `Generated ${report} report: ${period}, Store: ${storeFilter || 'All Stores'}`,
+          userEmail: user.email,
+          userRole: user.role,
+          storeCode: storeFilter || 'ALL',
+        },
+      })
+      .catch(() => {});
 
     return NextResponse.json(
       { success: true, data, meta },
@@ -125,7 +140,10 @@ function getServerDateRange(
     case 'Today':
       return { start: new Date(y, m, d, 0, 0, 0, 0), end: new Date(y, m, d, 23, 59, 59, 999) };
     case 'Yesterday':
-      return { start: new Date(y, m, d - 1, 0, 0, 0, 0), end: new Date(y, m, d - 1, 23, 59, 59, 999) };
+      return {
+        start: new Date(y, m, d - 1, 0, 0, 0, 0),
+        end: new Date(y, m, d - 1, 23, 59, 59, 999),
+      };
     case 'Last 7 Days':
       return { start: new Date(y, m, d - 6, 0, 0, 0, 0), end: new Date(y, m, d, 23, 59, 59, 999) };
     case 'Last 30 Days':
@@ -133,7 +151,10 @@ function getServerDateRange(
     case 'This Week': {
       const day = now.getDay();
       const diffToMonday = (day === 0 ? -6 : 1) - day;
-      return { start: new Date(y, m, d + diffToMonday, 0, 0, 0, 0), end: new Date(y, m, d + diffToMonday + 6, 23, 59, 59, 999) };
+      return {
+        start: new Date(y, m, d + diffToMonday, 0, 0, 0, 0),
+        end: new Date(y, m, d + diffToMonday + 6, 23, 59, 59, 999),
+      };
     }
     case 'This Month':
       return { start: new Date(y, m, 1, 0, 0, 0, 0), end: new Date(y, m + 1, 0, 23, 59, 59, 999) };
@@ -141,7 +162,10 @@ function getServerDateRange(
       return { start: new Date(y, m - 1, 1, 0, 0, 0, 0), end: new Date(y, m, 0, 23, 59, 59, 999) };
     case 'This Quarter': {
       const qi = Math.floor(m / 3);
-      return { start: new Date(y, qi * 3, 1, 0, 0, 0, 0), end: new Date(y, qi * 3 + 3, 0, 23, 59, 59, 999) };
+      return {
+        start: new Date(y, qi * 3, 1, 0, 0, 0, 0),
+        end: new Date(y, qi * 3 + 3, 0, 23, 59, 59, 999),
+      };
     }
     case 'This Year':
       return { start: new Date(y, 0, 1, 0, 0, 0, 0), end: new Date(y, 11, 31, 23, 59, 59, 999) };
@@ -182,7 +206,13 @@ async function getOverviewReport(start: Date, end: Date, storeFilter?: string) {
   // Sales aggregation
   const salesAgg = await prisma.salesOrder.aggregate({
     where: salesWhere,
-    _sum: { grandTotal: true, grossProfit: true, totalCost: true, taxAmount: true, discountAmount: true },
+    _sum: {
+      grandTotal: true,
+      grossProfit: true,
+      totalCost: true,
+      taxAmount: true,
+      discountAmount: true,
+    },
     _count: { id: true },
   });
 
@@ -254,7 +284,17 @@ async function getSupplierReport(start: Date, end: Date, storeFilter?: string) {
   const purchases = await prisma.purchaseOrder.findMany({
     where: poWhere,
     include: {
-      vendor: { select: { id: true, code: true, name: true, phone: true, contactPerson: true, email: true, categories: true } },
+      vendor: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          phone: true,
+          contactPerson: true,
+          email: true,
+          categories: true,
+        },
+      },
       items: { select: { qtyOrdered: true, unitCost: true, lineTotal: true } },
       payments: { select: { amount: true } },
     },
@@ -285,7 +325,10 @@ async function getSupplierReport(start: Date, end: Date, storeFilter?: string) {
     v.totalOrders++;
     const poTotal = Number(po.totalCost) || 0;
     const poCredit = Number(po.creditAmount) || 0;
-    const poPaid = po.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) || (Number(po.paidAmount) || 0);
+    const poPaid =
+      po.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) ||
+      Number(po.paidAmount) ||
+      0;
     v.totalSpend += poTotal;
     v.totalPaid += poPaid;
     v.totalCredits += poCredit;
@@ -295,7 +338,7 @@ async function getSupplierReport(start: Date, end: Date, storeFilter?: string) {
     }
   }
 
-  const suppliers = Array.from(vendorMap.values()).map(v => ({
+  const suppliers = Array.from(vendorMap.values()).map((v) => ({
     ...v,
     avgUnitPrice: v.totalUnits > 0 ? Math.round((v.totalSpend / v.totalUnits) * 100) / 100 : 0,
     totalSpend: Math.round(v.totalSpend * 100) / 100,
@@ -307,14 +350,17 @@ async function getSupplierReport(start: Date, end: Date, storeFilter?: string) {
   suppliers.sort((a, b) => b.totalSpend - a.totalSpend);
 
   // Totals
-  const totals = suppliers.reduce((acc, s) => ({
-    totalOrders: acc.totalOrders + s.totalOrders,
-    totalUnits: acc.totalUnits + s.totalUnits,
-    totalSpend: acc.totalSpend + s.totalSpend,
-    totalPaid: acc.totalPaid + s.totalPaid,
-    totalCredits: acc.totalCredits + s.totalCredits,
-    totalPending: acc.totalPending + s.totalPending,
-  }), { totalOrders: 0, totalUnits: 0, totalSpend: 0, totalPaid: 0, totalCredits: 0, totalPending: 0 });
+  const totals = suppliers.reduce(
+    (acc, s) => ({
+      totalOrders: acc.totalOrders + s.totalOrders,
+      totalUnits: acc.totalUnits + s.totalUnits,
+      totalSpend: acc.totalSpend + s.totalSpend,
+      totalPaid: acc.totalPaid + s.totalPaid,
+      totalCredits: acc.totalCredits + s.totalCredits,
+      totalPending: acc.totalPending + s.totalPending,
+    }),
+    { totalOrders: 0, totalUnits: 0, totalSpend: 0, totalPaid: 0, totalCredits: 0, totalPending: 0 }
+  );
 
   return { suppliers, totals, recordCount: suppliers.length };
 }
@@ -365,23 +411,27 @@ async function getProductReport(start: Date, end: Date, storeFilter?: string) {
     p.totalProfit += Number(item.lineProfit) || 0;
   }
 
-  const products = Array.from(productMap.values()).map(p => ({
+  const products = Array.from(productMap.values()).map((p) => ({
     ...p,
     totalRevenue: Math.round(p.totalRevenue * 100) / 100,
     totalCost: Math.round(p.totalCost * 100) / 100,
     totalProfit: Math.round(p.totalProfit * 100) / 100,
-    grossMarginPct: p.totalRevenue > 0 ? Math.round((p.totalProfit / p.totalRevenue) * 1000) / 10 : 0,
+    grossMarginPct:
+      p.totalRevenue > 0 ? Math.round((p.totalProfit / p.totalRevenue) * 1000) / 10 : 0,
   }));
 
   // Default sort by revenue desc
   products.sort((a, b) => b.totalRevenue - a.totalRevenue);
 
-  const totals = products.reduce((acc, p) => ({
-    unitsSold: acc.unitsSold + p.unitsSold,
-    totalRevenue: acc.totalRevenue + p.totalRevenue,
-    totalCost: acc.totalCost + p.totalCost,
-    totalProfit: acc.totalProfit + p.totalProfit,
-  }), { unitsSold: 0, totalRevenue: 0, totalCost: 0, totalProfit: 0 });
+  const totals = products.reduce(
+    (acc, p) => ({
+      unitsSold: acc.unitsSold + p.unitsSold,
+      totalRevenue: acc.totalRevenue + p.totalRevenue,
+      totalCost: acc.totalCost + p.totalCost,
+      totalProfit: acc.totalProfit + p.totalProfit,
+    }),
+    { unitsSold: 0, totalRevenue: 0, totalCost: 0, totalProfit: 0 }
+  );
 
   return { products, totals, recordCount: products.length };
 }
@@ -431,7 +481,7 @@ async function getEmployeeReport(start: Date, end: Date, storeFilter?: string) {
     if (s.customerPhone) e.customers.add(s.customerPhone);
   }
 
-  const employees = Array.from(empMap.values()).map(e => ({
+  const employees = Array.from(empMap.values()).map((e) => ({
     employeeName: e.employeeName,
     stores: Array.from(e.stores) as string[],
     invoices: e.invoices,
@@ -444,12 +494,15 @@ async function getEmployeeReport(start: Date, end: Date, storeFilter?: string) {
 
   employees.sort((a, b) => b.totalRevenue - a.totalRevenue);
 
-  const totals = employees.reduce((acc, e) => ({
-    invoices: acc.invoices + e.invoices,
-    customerCount: acc.customerCount + e.customerCount,
-    totalRevenue: acc.totalRevenue + e.totalRevenue,
-    totalGrossProfit: acc.totalGrossProfit + e.totalGrossProfit,
-  }), { invoices: 0, customerCount: 0, totalRevenue: 0, totalGrossProfit: 0 });
+  const totals = employees.reduce(
+    (acc, e) => ({
+      invoices: acc.invoices + e.invoices,
+      customerCount: acc.customerCount + e.customerCount,
+      totalRevenue: acc.totalRevenue + e.totalRevenue,
+      totalGrossProfit: acc.totalGrossProfit + e.totalGrossProfit,
+    }),
+    { invoices: 0, customerCount: 0, totalRevenue: 0, totalGrossProfit: 0 }
+  );
 
   return { employees, totals, recordCount: employees.length };
 }

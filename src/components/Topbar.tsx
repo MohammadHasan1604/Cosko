@@ -10,7 +10,15 @@ interface TopbarProps {
 }
 
 export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProps) {
-  const { setSearchOpen, setNotificationsOpen, setUserProfileOpen, notifications, currentUser, selectedStore, branding } = useApp();
+  const {
+    setSearchOpen,
+    setNotificationsOpen,
+    setUserProfileOpen,
+    notifications,
+    currentUser,
+    selectedStore,
+    branding,
+  } = useApp();
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
@@ -45,8 +53,12 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
           </span>
           <span className="text-3xs bg-primary/8 text-primary px-1.5 py-0.5 rounded-md font-bold truncate max-w-[80px]">
             {currentUser.role !== 'Super Admin'
-              ? (currentUser.store || 'Store')
-              : selectedStore === 'All Stores' ? 'All' : selectedStore === 'CENTRAL' ? 'HQ' : selectedStore}
+              ? currentUser.store || 'Store'
+              : selectedStore === 'All Stores'
+                ? 'All'
+                : selectedStore === 'CENTRAL'
+                  ? 'HQ'
+                  : selectedStore}
           </span>
         </div>
 
@@ -58,10 +70,10 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
             {currentUser.role !== 'Super Admin'
               ? `${currentUser.store || selectedStore} Store`
               : selectedStore === 'All Stores'
-              ? 'All Stores (Consolidated)'
-              : selectedStore === 'CENTRAL'
-              ? 'Central Warehouse'
-              : `${selectedStore} Store`}
+                ? 'All Stores (Consolidated)'
+                : selectedStore === 'CENTRAL'
+                  ? 'Central Warehouse'
+                  : `${selectedStore} Store`}
           </span>
         </div>
       </div>
@@ -75,9 +87,15 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
           onClick={() => setSearchOpen(true)}
           className="flex items-center gap-2 h-8 px-3 rounded-lg border border-border/80 bg-muted/30 hover:bg-muted text-xs text-muted-foreground hover:text-foreground hover:border-slate-300 transition-all w-56 xl:w-64 shadow-2xs group cursor-pointer"
         >
-          <Icon name="MagnifyingGlassIcon" size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+          <Icon
+            name="MagnifyingGlassIcon"
+            size={14}
+            className="text-muted-foreground group-hover:text-primary transition-colors"
+          />
           <span className="flex-1 text-left truncate">Search products, orders...</span>
-          <kbd className="text-3xs bg-card px-1.5 py-0.5 rounded border border-border font-mono shadow-2xs">⌘K</kbd>
+          <kbd className="text-3xs bg-card px-1.5 py-0.5 rounded border border-border font-mono shadow-2xs">
+            ⌘K
+          </kbd>
         </button>
       </div>
 
@@ -114,7 +132,11 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
         >
           <div className="relative">
             {currentUser.avatarUrl ? (
-              <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-7 h-7 rounded-full object-cover border border-border flex-shrink-0" />
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.name}
+                className="w-7 h-7 rounded-full object-cover border border-border flex-shrink-0"
+              />
             ) : (
               <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                 {currentUser.avatar}
@@ -128,10 +150,16 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
             />
           </div>
           <div className="hidden lg:block text-left">
-            <p className="text-xs font-semibold text-foreground leading-tight truncate max-w-[120px]">{currentUser.name}</p>
+            <p className="text-xs font-semibold text-foreground leading-tight truncate max-w-[120px]">
+              {currentUser.name}
+            </p>
             <p className="text-3xs text-muted-foreground leading-tight">{currentUser.role}</p>
           </div>
-          <Icon name="ChevronDownIcon" size={12} className="text-muted-foreground hidden lg:block" />
+          <Icon
+            name="ChevronDownIcon"
+            size={12}
+            className="text-muted-foreground hidden lg:block"
+          />
         </button>
       </div>
     </header>

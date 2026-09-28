@@ -60,7 +60,9 @@ export default function VisualSearchModal({
       stopCamera();
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraError('Camera API is not supported on this device/browser. Please upload an image.');
+        setCameraError(
+          'Camera API is not supported on this device/browser. Please upload an image.'
+        );
         setActiveTab('upload');
         return;
       }
@@ -83,7 +85,9 @@ export default function VisualSearchModal({
     } catch (err: any) {
       console.warn('Camera access denied or device unavailable:', err);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setCameraError('Camera permission was denied. Please allow camera access in your browser settings or use file upload.');
+        setCameraError(
+          'Camera permission was denied. Please allow camera access in your browser settings or use file upload.'
+        );
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         setCameraError('No camera found on this device. Please use file upload.');
       } else {
@@ -486,7 +490,8 @@ export default function VisualSearchModal({
 
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-foreground">
-                      Drag & drop product photo here, or <span className="text-primary underline">browse files</span>
+                      Drag & drop product photo here, or{' '}
+                      <span className="text-primary underline">browse files</span>
                     </p>
                     <p className="text-3xs text-muted-foreground">
                       Supports Camera photos, Gallery, Laptop upload (JPG, PNG, WebP up to 10MB)
@@ -529,7 +534,8 @@ export default function VisualSearchModal({
                       )}
                     </div>
                     <p className="text-3xs text-muted-foreground">
-                      Comparing against real catalog database for store: <strong>{effectiveStore}</strong>
+                      Comparing against real catalog database for store:{' '}
+                      <strong>{effectiveStore}</strong>
                     </p>
                   </div>
                 </div>
@@ -578,13 +584,16 @@ export default function VisualSearchModal({
                       const isOutOfStock = item.qtyOnHand <= 0;
 
                       // Color-code confidence badge
-                      let confColor = 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+                      let confColor =
+                        'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
                       let confLabel = 'High Match';
                       if (item.confidence < 70) {
-                        confColor = 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30';
+                        confColor =
+                          'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30';
                         confLabel = 'Moderate Match';
                       } else if (item.confidence < 85) {
-                        confColor = 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30';
+                        confColor =
+                          'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30';
                         confLabel = 'Strong Match';
                       }
 
@@ -603,14 +612,20 @@ export default function VisualSearchModal({
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                                 />
                               ) : (
-                                <Icon name="PhotoIcon" size={24} className="text-muted-foreground/40" />
+                                <Icon
+                                  name="PhotoIcon"
+                                  size={24}
+                                  className="text-muted-foreground/40"
+                                />
                               )}
                             </div>
 
                             {/* Product Details */}
                             <div className="flex-1 min-w-0 space-y-1">
                               <div className="flex items-center justify-between gap-1">
-                                <span className={`px-1.5 py-0.5 rounded-md text-3xs font-mono font-bold border ${confColor}`}>
+                                <span
+                                  className={`px-1.5 py-0.5 rounded-md text-3xs font-mono font-bold border ${confColor}`}
+                                >
                                   {item.confidence}% {confLabel}
                                 </span>
                                 <span className="text-3xs font-mono px-1 py-0.5 rounded bg-muted/60 text-muted-foreground">
@@ -633,7 +648,9 @@ export default function VisualSearchModal({
                                 </span>
                                 <span
                                   className={`text-3xs font-bold ${
-                                    isOutOfStock ? 'text-danger' : 'text-emerald-600 dark:text-emerald-400'
+                                    isOutOfStock
+                                      ? 'text-danger'
+                                      : 'text-emerald-600 dark:text-emerald-400'
                                   }`}
                                 >
                                   {isOutOfStock ? 'Out of stock' : `${item.qtyOnHand} in stock`}
@@ -652,12 +669,16 @@ export default function VisualSearchModal({
                                 isAdded
                                   ? 'bg-emerald-600 text-white shadow-xs'
                                   : isOutOfStock
-                                  ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                                  : 'btn-primary'
+                                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                                    : 'btn-primary'
                               }`}
                             >
                               <Icon name={isAdded ? 'CheckIcon' : 'PlusIcon'} size={12} />
-                              {isAdded ? 'Added to Cart' : isOutOfStock ? 'Unavailable' : 'Add to Cart'}
+                              {isAdded
+                                ? 'Added to Cart'
+                                : isOutOfStock
+                                  ? 'Unavailable'
+                                  : 'Add to Cart'}
                             </button>
                           </div>
                         </div>
@@ -676,8 +697,9 @@ export default function VisualSearchModal({
                   <div className="space-y-1 max-w-sm mx-auto">
                     <p className="text-xs font-bold text-foreground">No Visual Matches Found</p>
                     <p className="text-3xs text-muted-foreground">
-                      We could not find matching products in <strong>{effectiveStore}</strong> inventory with high confidence.
-                      Try taking the photo with clearer lighting, closer to the product label, or use Text/Barcode search.
+                      We could not find matching products in <strong>{effectiveStore}</strong>{' '}
+                      inventory with high confidence. Try taking the photo with clearer lighting,
+                      closer to the product label, or use Text/Barcode search.
                     </p>
                   </div>
                   <button
@@ -700,11 +722,7 @@ export default function VisualSearchModal({
             <Icon name="ShieldCheckIcon" size={13} className="text-emerald-500" />
             Real inventory data only • Permission-safe
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-secondary h-8 px-4 text-xs"
-          >
+          <button type="button" onClick={onClose} className="btn-secondary h-8 px-4 text-xs">
             Close
           </button>
         </div>

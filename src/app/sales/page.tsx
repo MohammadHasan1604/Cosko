@@ -8,7 +8,14 @@ import CoskoLogo from '@/components/ui/CoskoLogo';
 import BarcodeScannerModal from '@/components/ui/BarcodeScannerModal';
 import VisualSearchModal from '@/components/ui/VisualSearchModal';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
-import { useApp, Customer, InventoryItem, SalePhoto, RepairEnquiry, normalizeMobileNumber } from '@/context/AppContext';
+import {
+  useApp,
+  Customer,
+  InventoryItem,
+  SalePhoto,
+  RepairEnquiry,
+  normalizeMobileNumber,
+} from '@/context/AppContext';
 import CustomerFormModal from '@/components/forms/CustomerFormModal';
 import PaymentMethodSelect from '@/components/ui/PaymentMethodSelect';
 import NumericInput from '@/components/ui/NumericInput';
@@ -66,13 +73,12 @@ export default function SalesPage() {
         ? currentUser.store
         : 'CENTRAL'
       : selectedStore === 'All Stores'
-      ? 'CENTRAL'
-      : selectedStore;
+        ? 'CENTRAL'
+        : selectedStore;
 
   // Permissions
   const canOverridePrice =
-    currentUser.role === 'Super Admin' ||
-    currentUser.role === 'Store Manager';
+    currentUser.role === 'Super Admin' || currentUser.role === 'Store Manager';
   const canViewCost =
     currentUser.role === 'Super Admin' ||
     currentUser.role === 'Store Manager' ||
@@ -161,15 +167,15 @@ export default function SalesPage() {
 
     try {
       // 1. Check local customers first
-      const localMatch = customers.find(
-        (c) => clean10DigitPhone(c.phone) === phone10
-      );
+      const localMatch = customers.find((c) => clean10DigitPhone(c.phone) === phone10);
 
       // 2. Call backend legacy / customer lookup API
       let remoteMatch: any = null;
       let remoteRepairs: any[] = [];
       try {
-        const res = await fetch(`/api/customers/legacy/search?phone=${encodeURIComponent(phone10)}`);
+        const res = await fetch(
+          `/api/customers/legacy/search?phone=${encodeURIComponent(phone10)}`
+        );
         const data = await res.json();
         if (data.success && data.found) {
           remoteMatch = data.customer;
@@ -197,7 +203,8 @@ export default function SalesPage() {
           .slice(0, 3);
 
         // Fetch Last 3 Permitted Service/Repair records (Date, Status, Device/Service requested only)
-        const relevantRepairs: { date: string; status: string; service: string; device: string }[] = [];
+        const relevantRepairs: { date: string; status: string; service: string; device: string }[] =
+          [];
         if (remoteRepairs && remoteRepairs.length > 0) {
           remoteRepairs.slice(0, 3).forEach((r) => {
             relevantRepairs.push({
@@ -292,7 +299,8 @@ export default function SalesPage() {
         item.sku.toLowerCase().includes(searchLower) ||
         (item.barcode && item.barcode.includes(searchLower)) ||
         (item.brand && item.brand.toLowerCase().includes(searchLower));
-      const matchCategory = selectedCategory === 'All Categories' || item.category === selectedCategory;
+      const matchCategory =
+        selectedCategory === 'All Categories' || item.category === selectedCategory;
       return matchStore && matchSearch && matchCategory;
     });
   }, [inventory, effectiveStore, deferredCatalogSearch, selectedCategory]);
@@ -392,8 +400,14 @@ export default function SalesPage() {
     return Math.round(cartSubtotal * (gstRate / 100) * 100) / 100;
   }, [cartSubtotal, gstInvoiceEnabled]);
 
-  const cgstAmount = useMemo(() => (gstInvoiceEnabled ? Math.round((cartTax / 2) * 100) / 100 : 0), [cartTax, gstInvoiceEnabled]);
-  const sgstAmount = useMemo(() => (gstInvoiceEnabled ? Math.round((cartTax / 2) * 100) / 100 : 0), [cartTax, gstInvoiceEnabled]);
+  const cgstAmount = useMemo(
+    () => (gstInvoiceEnabled ? Math.round((cartTax / 2) * 100) / 100 : 0),
+    [cartTax, gstInvoiceEnabled]
+  );
+  const sgstAmount = useMemo(
+    () => (gstInvoiceEnabled ? Math.round((cartTax / 2) * 100) / 100 : 0),
+    [cartTax, gstInvoiceEnabled]
+  );
 
   const cartTotal = useMemo(() => {
     return Math.max(0, cartSubtotal + cartTax - cartDiscount);
@@ -413,7 +427,9 @@ export default function SalesPage() {
     if (gstInvoiceEnabled && customerGstin.trim()) {
       const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
       if (!gstinRegex.test(customerGstin.trim().toUpperCase())) {
-        toast.error('Invalid GSTIN format. Standard Indian GSTIN is 15 alphanumeric characters (e.g. 29ABCDE1234F1Z5).');
+        toast.error(
+          'Invalid GSTIN format. Standard Indian GSTIN is 15 alphanumeric characters (e.g. 29ABCDE1234F1Z5).'
+        );
         return;
       }
     }
@@ -424,7 +440,9 @@ export default function SalesPage() {
       return;
     }
     if (!posPaymentProofUrl) {
-      toast.error('Payment Proof (Receipt / Screenshot / Voucher) is strictly required to complete checkout.');
+      toast.error(
+        'Payment Proof (Receipt / Screenshot / Voucher) is strictly required to complete checkout.'
+      );
       return;
     }
 
@@ -440,13 +458,22 @@ export default function SalesPage() {
         { label: 'Store Location', value: effectiveStore },
         { label: 'Items in Cart', value: `${totalUnits} units (${cart.length} SKUs)` },
         { label: 'Taxable Subtotal', value: `₹${cartSubtotal.toLocaleString('en-IN')}` },
-        ...(gstInvoiceEnabled ? [{ label: 'GST (18%)', value: `₹${cartTax.toLocaleString('en-IN')}` }] : []),
-        ...(cartDiscount > 0 ? [{ label: 'Discount Applied', value: `-₹${cartDiscount.toLocaleString('en-IN')}` }] : []),
+        ...(gstInvoiceEnabled
+          ? [{ label: 'GST (18%)', value: `₹${cartTax.toLocaleString('en-IN')}` }]
+          : []),
+        ...(cartDiscount > 0
+          ? [{ label: 'Discount Applied', value: `-₹${cartDiscount.toLocaleString('en-IN')}` }]
+          : []),
         { label: 'Payment Method', value: paymentMethod },
         { label: 'Payment Ref / UTR', value: posReferenceNo.trim() },
-        { label: 'Total Payable Amount', value: `₹${cartTotal.toLocaleString('en-IN')}`, highlighted: true },
+        {
+          label: 'Total Payable Amount',
+          value: `₹${cartTotal.toLocaleString('en-IN')}`,
+          highlighted: true,
+        },
       ],
-      warningMessage: 'Once confirmed, physical inventory will be deducted immediately and an official sales invoice will be generated.',
+      warningMessage:
+        'Once confirmed, physical inventory will be deducted immediately and an official sales invoice will be generated.',
     });
 
     if (!confirmed) {
@@ -469,7 +496,8 @@ export default function SalesPage() {
           itemId: c.itemId,
           name: c.name,
           qty: c.qty,
-          unitPrice: c.actualSellingPrice !== '' ? Number(c.actualSellingPrice) : c.referenceSellingPrice,
+          unitPrice:
+            c.actualSellingPrice !== '' ? Number(c.actualSellingPrice) : c.referenceSellingPrice,
           taxRate: gstInvoiceEnabled ? gstRate : 0,
           warrantyMonths: c.warrantyMonths,
         })),
@@ -556,13 +584,21 @@ export default function SalesPage() {
         s.customerName.toLowerCase().includes(historySearch.toLowerCase()) ||
         s.customerPhone.includes(historySearch);
       const assignedStore = currentUser.store || 'BLR';
-      const matchStore = currentUser.role === 'Super Admin'
-        ? (historyStoreFilter === 'All' || s.store === historyStoreFilter)
-        : (s.store === assignedStore);
+      const matchStore =
+        currentUser.role === 'Super Admin'
+          ? historyStoreFilter === 'All' || s.store === historyStoreFilter
+          : s.store === assignedStore;
       const matchDate = !historyDateFilter || s.createdAt.includes(historyDateFilter);
       return matchSearch && matchStore && matchDate;
     });
-  }, [sales, historySearch, historyStoreFilter, historyDateFilter, currentUser.role, currentUser.store]);
+  }, [
+    sales,
+    historySearch,
+    historyStoreFilter,
+    historyDateFilter,
+    currentUser.role,
+    currentUser.store,
+  ]);
 
   return (
     <AppLayout activeRoute="/sales">
@@ -572,10 +608,13 @@ export default function SalesPage() {
           <div className="page-header">
             <div className="flex items-center gap-2">
               <h1 className="page-title">POS Terminal</h1>
-              <span className="badge-primary text-3xs font-mono font-bold px-1.5 py-0.5 rounded-full">{effectiveStore}</span>
+              <span className="badge-primary text-3xs font-mono font-bold px-1.5 py-0.5 rounded-full">
+                {effectiveStore}
+              </span>
             </div>
             <p className="page-subtitle">
-              Cashier: <strong className="text-foreground font-semibold">{activeEmployeeName}</strong>
+              Cashier:{' '}
+              <strong className="text-foreground font-semibold">{activeEmployeeName}</strong>
             </p>
           </div>
 
@@ -584,7 +623,9 @@ export default function SalesPage() {
               <button
                 onClick={() => setActiveTab('pos')}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
-                  activeTab === 'pos' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                  activeTab === 'pos'
+                    ? 'bg-card text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 POS Billing
@@ -592,7 +633,9 @@ export default function SalesPage() {
               <button
                 onClick={() => setActiveTab('history')}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
-                  activeTab === 'history' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                  activeTab === 'history'
+                    ? 'bg-card text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Sales History ({sales.length})
@@ -608,7 +651,11 @@ export default function SalesPage() {
               <div className="card p-3.5 sm:p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
-                    <Icon name="MagnifyingGlassIcon" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Icon
+                      name="MagnifyingGlassIcon"
+                      size={15}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    />
                     <input
                       type="text"
                       placeholder="Search product name, SKU, or brand..."
@@ -627,7 +674,11 @@ export default function SalesPage() {
                     <span className="hidden sm:inline">Search by Image</span>
                     <span className="sm:hidden">Image</span>
                   </button>
-                  <button onClick={() => setScannerOpen(true)} className="btn-secondary h-[38px] text-xs px-3.5 gap-1.5 whitespace-nowrap shadow-xs" title="Barcode Scanner">
+                  <button
+                    onClick={() => setScannerOpen(true)}
+                    className="btn-secondary h-[38px] text-xs px-3.5 gap-1.5 whitespace-nowrap shadow-xs"
+                    title="Barcode Scanner"
+                  >
                     <Icon name="QrCodeIcon" size={15} />
                     <span className="hidden sm:inline">Scan Barcode</span>
                     <span className="sm:hidden">Barcode</span>
@@ -677,15 +728,21 @@ export default function SalesPage() {
                           {item.qtyOnHand} in stock
                         </span>
                       </div>
-                      <h4 className="text-xs font-bold text-foreground line-clamp-2 leading-tight">{item.name}</h4>
+                      <h4 className="text-xs font-bold text-foreground line-clamp-2 leading-tight">
+                        {item.name}
+                      </h4>
                       <p className="text-3xs text-muted-foreground font-mono mt-0.5">{item.sku}</p>
                     </div>
 
                     <div className="pt-2 mt-2 border-t border-border/60 flex items-center justify-between">
                       <div>
-                        <span className="text-xs font-black text-primary font-tabular">₹{item.sellingPrice.toLocaleString('en-IN')}</span>
+                        <span className="text-xs font-black text-primary font-tabular">
+                          ₹{item.sellingPrice.toLocaleString('en-IN')}
+                        </span>
                         {canViewCost && (
-                          <span className="text-3xs text-muted-foreground block font-mono">Cost: ₹{item.costPrice}</span>
+                          <span className="text-3xs text-muted-foreground block font-mono">
+                            Cost: ₹{item.costPrice}
+                          </span>
                         )}
                       </div>
                       <button className="h-7 w-7 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-150 flex items-center justify-center shadow-2xs">
@@ -750,7 +807,9 @@ export default function SalesPage() {
                       className="flex-1 bg-transparent px-3 h-[38px] text-xs font-mono font-bold text-foreground focus:outline-none"
                     />
                     {lookupLoading && (
-                      <span className="pr-3 text-2xs text-muted-foreground animate-pulse">Searching...</span>
+                      <span className="pr-3 text-2xs text-muted-foreground animate-pulse">
+                        Searching...
+                      </span>
                     )}
                   </div>
                 </div>
@@ -782,8 +841,12 @@ export default function SalesPage() {
                   <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-2 fade-in">
                     <div className="flex items-start justify-between">
                       <div>
-                        <span className="font-bold text-xs text-foreground block">{customerName}</span>
-                        <span className="text-2xs font-mono text-muted-foreground">{customerPhone}</span>
+                        <span className="font-bold text-xs text-foreground block">
+                          {customerName}
+                        </span>
+                        <span className="text-2xs font-mono text-muted-foreground">
+                          {customerPhone}
+                        </span>
                       </div>
                       <span className="badge-success text-3xs px-2 py-0.5 rounded-full font-bold">
                         Verified Customer
@@ -791,16 +854,26 @@ export default function SalesPage() {
                     </div>
 
                     {/* Compact Customer History: Last 3 Purchases & Repairs (Requirement 3 & 51) */}
-                    {(customerHistory.purchases.length > 0 || customerHistory.repairs.length > 0) && (
+                    {(customerHistory.purchases.length > 0 ||
+                      customerHistory.repairs.length > 0) && (
                       <div className="pt-2 border-t border-emerald-500/20 space-y-2 text-2xs">
                         {customerHistory.purchases.length > 0 && (
                           <div>
-                            <span className="font-bold text-muted-foreground block mb-1">Last Purchases:</span>
+                            <span className="font-bold text-muted-foreground block mb-1">
+                              Last Purchases:
+                            </span>
                             <div className="space-y-1">
                               {customerHistory.purchases.map((p, idx) => (
-                                <div key={`past-p-${idx}`} className="flex justify-between text-foreground">
-                                  <span className="font-mono">{p.orderNo} ({p.createdAt})</span>
-                                  <span className="font-bold">₹{p.total.toLocaleString('en-IN')}</span>
+                                <div
+                                  key={`past-p-${idx}`}
+                                  className="flex justify-between text-foreground"
+                                >
+                                  <span className="font-mono">
+                                    {p.orderNo} ({p.createdAt})
+                                  </span>
+                                  <span className="font-bold">
+                                    ₹{p.total.toLocaleString('en-IN')}
+                                  </span>
                                 </div>
                               ))}
                             </div>
@@ -809,11 +882,18 @@ export default function SalesPage() {
 
                         {customerHistory.repairs.length > 0 && (
                           <div>
-                            <span className="font-bold text-muted-foreground block mb-1">Service & Repair History:</span>
+                            <span className="font-bold text-muted-foreground block mb-1">
+                              Service & Repair History:
+                            </span>
                             <div className="space-y-1">
                               {customerHistory.repairs.map((r, idx) => (
-                                <div key={`past-r-${idx}`} className="flex justify-between text-foreground">
-                                  <span>{r.device} - {r.service}</span>
+                                <div
+                                  key={`past-r-${idx}`}
+                                  className="flex justify-between text-foreground"
+                                >
+                                  <span>
+                                    {r.device} - {r.service}
+                                  </span>
                                   <span className="badge-warning text-3xs">{r.status}</span>
                                 </div>
                               ))}
@@ -836,8 +916,7 @@ export default function SalesPage() {
                       onClick={openQuickRegisterModal}
                       className="btn-primary text-xs py-1.5 px-3 font-bold flex items-center gap-1"
                     >
-                      <Icon name="PlusIcon" size={14} />
-                      + Add New Customer
+                      <Icon name="PlusIcon" size={14} />+ Add New Customer
                     </button>
                   </div>
                 )}
@@ -850,7 +929,9 @@ export default function SalesPage() {
                     <span className="text-xs sm:text-sm font-bold text-foreground">
                       Billing Cart ({cart.reduce((a, b) => a + b.qty, 0)})
                     </span>
-                    {heldCart && <span className="badge-warning text-3xs font-bold">Cart Held</span>}
+                    {heldCart && (
+                      <span className="badge-warning text-3xs font-bold">Cart Held</span>
+                    )}
                   </div>
 
                   {/* GST Invoice Toggle (Requirement 10) */}
@@ -870,13 +951,20 @@ export default function SalesPage() {
                 {gstInvoiceEnabled && (
                   <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 space-y-2 text-xs fade-in">
                     <div className="flex items-center justify-between text-2xs text-muted-foreground">
-                      <span>COSKO GSTIN: <strong className="font-mono text-foreground">{branding.taxNumber || '29AABCC1234F1Z5'}</strong></span>
+                      <span>
+                        COSKO GSTIN:{' '}
+                        <strong className="font-mono text-foreground">
+                          {branding.taxNumber || '29AABCC1234F1Z5'}
+                        </strong>
+                      </span>
                       <span>Rate: 18% (9% CGST + 9% SGST)</span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-3xs font-bold text-muted-foreground block mb-0.5">Customer GSTIN (Optional)</label>
+                        <label className="text-3xs font-bold text-muted-foreground block mb-0.5">
+                          Customer GSTIN (Optional)
+                        </label>
                         <input
                           type="text"
                           maxLength={15}
@@ -887,7 +975,9 @@ export default function SalesPage() {
                         />
                       </div>
                       <div>
-                        <label className="text-3xs font-bold text-muted-foreground block mb-0.5">Business / Firm Name</label>
+                        <label className="text-3xs font-bold text-muted-foreground block mb-0.5">
+                          Business / Firm Name
+                        </label>
                         <input
                           type="text"
                           placeholder="e.g. Acme Enterprises"
@@ -899,7 +989,9 @@ export default function SalesPage() {
                     </div>
 
                     <div>
-                      <label className="text-3xs font-bold text-muted-foreground block mb-0.5">Billing Address</label>
+                      <label className="text-3xs font-bold text-muted-foreground block mb-0.5">
+                        Billing Address
+                      </label>
                       <input
                         type="text"
                         placeholder="e.g. 12/B Commercial Street, Bengaluru"
@@ -914,27 +1006,45 @@ export default function SalesPage() {
                 {/* Cart Items List with Reference Selling Price & Actual Selling Price (Requirement 6, 7, 8) */}
                 {cart.length === 0 ? (
                   <div className="py-8 text-center space-y-2">
-                    <Icon name="ShoppingBagIcon" size={32} className="text-muted-foreground mx-auto" />
-                    <p className="text-xs text-muted-foreground font-medium">Cart is empty. Click products to add.</p>
+                    <Icon
+                      name="ShoppingBagIcon"
+                      size={32}
+                      className="text-muted-foreground mx-auto"
+                    />
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Cart is empty. Click products to add.
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
                     {cart.map((c) => {
-                      const isBelowCost = c.actualSellingPrice !== '' && Number(c.actualSellingPrice) < c.unitCost;
+                      const isBelowCost =
+                        c.actualSellingPrice !== '' && Number(c.actualSellingPrice) < c.unitCost;
                       return (
-                        <div key={`cart-item-${c.itemId}`} className="p-3 rounded-xl bg-muted/40 border border-border space-y-2">
+                        <div
+                          key={`cart-item-${c.itemId}`}
+                          className="p-3 rounded-xl bg-muted/40 border border-border space-y-2"
+                        >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-bold text-foreground truncate">{c.name}</p>
-                              <p className="text-3xs text-muted-foreground font-mono">{c.sku} · {c.warrantyMonths}m Warranty</p>
+                              <p className="text-3xs text-muted-foreground font-mono">
+                                {c.sku} · {c.warrantyMonths}m Warranty
+                              </p>
                             </div>
 
                             <div className="flex items-center gap-1 bg-card rounded-lg border border-border px-1 py-0.5">
-                              <button onClick={() => updateCartQty(c.itemId, -1)} className="p-0.5 text-muted-foreground hover:text-foreground">
+                              <button
+                                onClick={() => updateCartQty(c.itemId, -1)}
+                                className="p-0.5 text-muted-foreground hover:text-foreground"
+                              >
                                 <Icon name="MinusIcon" size={12} />
                               </button>
                               <span className="text-xs font-bold px-1.5 font-tabular">{c.qty}</span>
-                              <button onClick={() => updateCartQty(c.itemId, 1)} className="p-0.5 text-muted-foreground hover:text-foreground">
+                              <button
+                                onClick={() => updateCartQty(c.itemId, 1)}
+                                className="p-0.5 text-muted-foreground hover:text-foreground"
+                              >
                                 <Icon name="PlusIcon" size={12} />
                               </button>
                             </div>
@@ -944,18 +1054,24 @@ export default function SalesPage() {
                           <div className="flex items-center justify-between text-2xs pt-1 border-t border-border/50">
                             <div className="space-y-0.5">
                               <span className="text-muted-foreground block">
-                                Ref Price: <span className="font-semibold text-foreground">₹{c.referenceSellingPrice}</span>
+                                Ref Price:{' '}
+                                <span className="font-semibold text-foreground">
+                                  ₹{c.referenceSellingPrice}
+                                </span>
                               </span>
                               {canViewCost && (
                                 <span className="text-3xs text-muted-foreground block">
-                                  Ref Cost: <span className="font-mono font-medium">₹{c.unitCost}</span>
+                                  Ref Cost:{' '}
+                                  <span className="font-mono font-medium">₹{c.unitCost}</span>
                                 </span>
                               )}
                             </div>
 
                             <div className="flex items-center gap-2">
                               <div className="text-right">
-                                <label className="text-3xs text-muted-foreground block">Actual Sale Price (₹)</label>
+                                <label className="text-3xs text-muted-foreground block">
+                                  Actual Sale Price (₹)
+                                </label>
                                 {canOverridePrice ? (
                                   <NumericInput
                                     value={c.actualSellingPrice}
@@ -964,11 +1080,16 @@ export default function SalesPage() {
                                     placeholder="Price"
                                   />
                                 ) : (
-                                  <span className="font-bold text-foreground font-tabular">₹{c.actualSellingPrice}</span>
+                                  <span className="font-bold text-foreground font-tabular">
+                                    ₹{c.actualSellingPrice}
+                                  </span>
                                 )}
                               </div>
                               <span className="text-xs font-extrabold text-foreground font-tabular min-w-[55px] text-right">
-                                ₹{((Number(c.actualSellingPrice) || 0) * c.qty).toLocaleString('en-IN')}
+                                ₹
+                                {((Number(c.actualSellingPrice) || 0) * c.qty).toLocaleString(
+                                  'en-IN'
+                                )}
                               </span>
                             </div>
                           </div>
@@ -977,7 +1098,8 @@ export default function SalesPage() {
                           {isBelowCost && (
                             <div className="p-1.5 rounded-lg bg-danger/10 border border-danger/30 text-danger text-3xs font-bold flex items-center gap-1">
                               <Icon name="ExclamationTriangleIcon" size={12} />
-                              Below Authoritative Cost Warning (Cost: ₹{c.unitCost}). Authorized override active.
+                              Below Authoritative Cost Warning (Cost: ₹{c.unitCost}). Authorized
+                              override active.
                             </div>
                           )}
                         </div>
@@ -1039,7 +1161,11 @@ export default function SalesPage() {
                     <input
                       type="text"
                       required
-                      placeholder={paymentMethod === 'Cash' ? 'e.g. CASH-RCPT-001' : 'e.g. UTR-998210 or UPI Ref ID'}
+                      placeholder={
+                        paymentMethod === 'Cash'
+                          ? 'e.g. CASH-RCPT-001'
+                          : 'e.g. UTR-998210 or UPI Ref ID'
+                      }
                       value={posReferenceNo}
                       onChange={(e) => setPosReferenceNo(e.target.value)}
                       className="input-field text-xs py-1.5 font-mono"
@@ -1056,8 +1182,15 @@ export default function SalesPage() {
 
                   {(!posPaymentProofUrl || !posReferenceNo.trim()) && cart.length > 0 && (
                     <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-3xs font-semibold">
-                      <Icon name="ExclamationTriangleIcon" size={14} className="shrink-0 text-amber-600" />
-                      <span>Payment Reference and Payment Proof file are strictly mandatory to enable checkout.</span>
+                      <Icon
+                        name="ExclamationTriangleIcon"
+                        size={14}
+                        className="shrink-0 text-amber-600"
+                      />
+                      <span>
+                        Payment Reference and Payment Proof file are strictly mandatory to enable
+                        checkout.
+                      </span>
                     </div>
                   )}
                 </div>
@@ -1083,7 +1216,12 @@ export default function SalesPage() {
                   </button>
                   <button
                     onClick={handleCheckout}
-                    disabled={cart.length === 0 || isCheckingOut || !posPaymentProofUrl || !posReferenceNo.trim()}
+                    disabled={
+                      cart.length === 0 ||
+                      isCheckingOut ||
+                      !posPaymentProofUrl ||
+                      !posReferenceNo.trim()
+                    }
                     className="btn-primary h-10 text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isCheckingOut ? (
@@ -1108,13 +1246,19 @@ export default function SalesPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/80">
               <div>
                 <h3 className="text-sm font-bold text-foreground">Sales Orders & Invoices</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Authoritative MySQL customer sales transaction ledger</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Authoritative MySQL customer sales transaction ledger
+                </p>
               </div>
 
               {/* History Filters */}
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative">
-                  <Icon name="MagnifyingGlassIcon" size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Icon
+                    name="MagnifyingGlassIcon"
+                    size={14}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
                   <input
                     type="text"
                     placeholder="Search invoice, customer..."
@@ -1161,14 +1305,24 @@ export default function SalesPage() {
                   {filteredSalesHistory.map((s) => (
                     <tr key={`hist-row-${s.id}`} className="table-row">
                       <td className="px-4 py-3 font-mono font-bold text-primary">{s.orderNo}</td>
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{s.createdAt}</td>
-                      <td className="px-4 py-3"><span className="badge-info text-3xs font-semibold">{s.store}</span></td>
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                        {s.createdAt}
+                      </td>
                       <td className="px-4 py-3">
-                        <span className="font-semibold text-foreground block">{s.customerName}</span>
-                        <span className="text-3xs font-mono text-muted-foreground">{s.customerPhone}</span>
+                        <span className="badge-info text-3xs font-semibold">{s.store}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-semibold text-foreground block">
+                          {s.customerName}
+                        </span>
+                        <span className="text-3xs font-mono text-muted-foreground">
+                          {s.customerPhone}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-center font-medium">{s.items?.length || 1}</td>
-                      <td className="px-4 py-3 text-right font-tabular">₹{s.subtotal.toLocaleString('en-IN')}</td>
+                      <td className="px-4 py-3 text-right font-tabular">
+                        ₹{s.subtotal.toLocaleString('en-IN')}
+                      </td>
                       <td className="px-4 py-3 text-right font-tabular text-muted-foreground">
                         {s.taxTotal > 0 ? `₹${s.taxTotal.toLocaleString('en-IN')}` : '₹0'}
                       </td>
@@ -1178,7 +1332,10 @@ export default function SalesPage() {
                       <td className="px-4 py-3">
                         <span className="badge-neutral text-3xs">{s.paymentMethod}</span>
                         {s.referenceNo && (
-                          <span className="block text-3xs font-mono text-muted-foreground mt-0.5 truncate max-w-[110px]" title={s.referenceNo}>
+                          <span
+                            className="block text-3xs font-mono text-muted-foreground mt-0.5 truncate max-w-[110px]"
+                            title={s.referenceNo}
+                          >
                             {s.referenceNo}
                           </span>
                         )}
@@ -1186,17 +1343,19 @@ export default function SalesPage() {
                       <td className="px-4 py-3 text-center">
                         {s.paymentProofUrl ? (
                           <button
-                            onClick={() => setSelectedProof({
-                              url: s.paymentProofUrl!,
-                              referenceNo: s.referenceNo || s.orderNo,
-                              amount: s.total,
-                              paymentMethod: s.paymentMethod,
-                              paymentDate: s.createdAt,
-                              payeeOrPayer: s.customerName,
-                              recordedBy: s.cashierName || 'POS Terminal',
-                              timestamp: s.createdAt,
-                              notes: `Sales Order ${s.orderNo} (${s.store})`,
-                            })}
+                            onClick={() =>
+                              setSelectedProof({
+                                url: s.paymentProofUrl!,
+                                referenceNo: s.referenceNo || s.orderNo,
+                                amount: s.total,
+                                paymentMethod: s.paymentMethod,
+                                paymentDate: s.createdAt,
+                                payeeOrPayer: s.customerName,
+                                recordedBy: s.cashierName || 'POS Terminal',
+                                timestamp: s.createdAt,
+                                notes: `Sales Order ${s.orderNo} (${s.store})`,
+                              })
+                            }
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-3xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors shadow-2xs"
                             title="View Payment Proof"
                           >
@@ -1225,9 +1384,12 @@ export default function SalesPage() {
                             <Icon name="WhatsApp" size={14} />
                           </button>
                           {s.status === 'Cancelled' || s.status === 'Refunded' ? (
-                            <span className="px-1.5 py-0.5 rounded text-3xs font-bold bg-danger/10 text-danger border border-danger/20">Voided</span>
+                            <span className="px-1.5 py-0.5 rounded text-3xs font-bold bg-danger/10 text-danger border border-danger/20">
+                              Voided
+                            </span>
                           ) : (
-                            (currentUser.role === 'Super Admin' || currentUser.role === 'Store Manager') && (
+                            (currentUser.role === 'Super Admin' ||
+                              currentUser.role === 'Store Manager') && (
                               <button
                                 onClick={() => {
                                   setRefundModalSale(s);
@@ -1307,7 +1469,13 @@ export default function SalesPage() {
               className="absolute inset-0 flex items-center justify-center pointer-events-none z-0"
               style={{ opacity: (systemSettings?.watermarkOpacity ?? 5) / 100 }}
             >
-              <svg width="220" height="220" viewBox="0 0 100 100" fill="currentColor" className="text-foreground">
+              <svg
+                width="220"
+                height="220"
+                viewBox="0 0 100 100"
+                fill="currentColor"
+                className="text-foreground"
+              >
                 <rect x="15" y="15" width="70" height="70" rx="18" />
                 <circle cx="50" cy="50" r="22" fill="white" />
               </svg>
@@ -1323,35 +1491,59 @@ export default function SalesPage() {
                     <CoskoLogo size={28} showText variant="default" />
                   )}
                 </div>
-                <h4 className="font-extrabold text-foreground text-sm">{systemSettings?.invoiceHeader || branding.appName || 'COSKO Retail Enterprise'}</h4>
+                <h4 className="font-extrabold text-foreground text-sm">
+                  {systemSettings?.invoiceHeader || branding.appName || 'COSKO Retail Enterprise'}
+                </h4>
                 <p className="text-2xs text-muted-foreground">
-                  Invoice #: <strong className="font-mono text-foreground">{receiptModal.orderNo}</strong> · Store: {receiptModal.store}
+                  Invoice #:{' '}
+                  <strong className="font-mono text-foreground">{receiptModal.orderNo}</strong> ·
+                  Store: {receiptModal.store}
                 </p>
                 {systemSettings?.showStoreAddress && (
                   <p className="text-3xs text-muted-foreground mt-0.5">
-                    {branding.businessAddress || '100 Feet Ring Road, Indiranagar'}, {branding.city || 'Bengaluru'} · Phone: {branding.supportPhone || '+91 80 4000 8800'}
+                    {branding.businessAddress || '100 Feet Ring Road, Indiranagar'},{' '}
+                    {branding.city || 'Bengaluru'} · Phone:{' '}
+                    {branding.supportPhone || '+91 80 4000 8800'}
                   </p>
                 )}
                 <p className="text-3xs font-mono text-muted-foreground mt-0.5">
-                  COSKO GSTIN: <strong>{receiptModal.coskoGstin || systemSettings?.gstin || branding.taxNumber || '29AABCU9603R1ZM'}</strong>
+                  COSKO GSTIN:{' '}
+                  <strong>
+                    {receiptModal.coskoGstin ||
+                      systemSettings?.gstin ||
+                      branding.taxNumber ||
+                      '29AABCU9603R1ZM'}
+                  </strong>
                 </p>
               </div>
 
               {/* Billed To */}
               <div className="flex justify-between border-b border-border pb-2">
                 <div>
-                  <p className="font-bold text-foreground">Billed To: {receiptModal.customerName}</p>
-                  <p className="text-2xs text-muted-foreground">Phone: {receiptModal.customerPhone}</p>
+                  <p className="font-bold text-foreground">
+                    Billed To: {receiptModal.customerName}
+                  </p>
+                  <p className="text-2xs text-muted-foreground">
+                    Phone: {receiptModal.customerPhone}
+                  </p>
                   {receiptModal.customerGstin && (
-                    <p className="text-2xs font-mono text-primary font-bold">GSTIN: {receiptModal.customerGstin}</p>
+                    <p className="text-2xs font-mono text-primary font-bold">
+                      GSTIN: {receiptModal.customerGstin}
+                    </p>
                   )}
                   {receiptModal.customerBillingAddress && (
-                    <p className="text-3xs text-muted-foreground">{receiptModal.customerBillingAddress}</p>
+                    <p className="text-3xs text-muted-foreground">
+                      {receiptModal.customerBillingAddress}
+                    </p>
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-2xs font-semibold text-muted-foreground">Warranty Valid Until:</p>
-                  <p className="font-bold text-foreground">{receiptModal.warrantyExpiryDate || '12 Months'}</p>
+                  <p className="text-2xs font-semibold text-muted-foreground">
+                    Warranty Valid Until:
+                  </p>
+                  <p className="font-bold text-foreground">
+                    {receiptModal.warrantyExpiryDate || '12 Months'}
+                  </p>
                 </div>
               </div>
 
@@ -1360,12 +1552,18 @@ export default function SalesPage() {
                 {receiptModal.items?.map((item: any, idx: number) => (
                   <div key={`rcpt-line-${idx}`} className="flex justify-between">
                     <div>
-                      <span className="font-semibold">{item.name} x {item.qty}</span>
+                      <span className="font-semibold">
+                        {item.name} x {item.qty}
+                      </span>
                       {item.warrantyMonths && (
-                        <span className="text-3xs text-muted-foreground block">{item.warrantyMonths} Months Warranty</span>
+                        <span className="text-3xs text-muted-foreground block">
+                          {item.warrantyMonths} Months Warranty
+                        </span>
                       )}
                     </div>
-                    <span className="font-bold">₹{(item.unitPrice * item.qty).toLocaleString('en-IN')}</span>
+                    <span className="font-bold">
+                      ₹{(item.unitPrice * item.qty).toLocaleString('en-IN')}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1374,33 +1572,42 @@ export default function SalesPage() {
               <div className="space-y-1 font-tabular text-right text-muted-foreground pt-1">
                 <p>Taxable Subtotal: ₹{receiptModal.subtotal.toLocaleString('en-IN')}</p>
                 {receiptModal.taxEnabled ? (
-                  <p>GST Tax ({systemSettings?.defaultTaxRate ?? 18}%): ₹{receiptModal.taxTotal.toLocaleString('en-IN')}</p>
+                  <p>
+                    GST Tax ({systemSettings?.defaultTaxRate ?? 18}%): ₹
+                    {receiptModal.taxTotal.toLocaleString('en-IN')}
+                  </p>
                 ) : (
                   <p>GST Tax: ₹0 (Non-GST)</p>
                 )}
                 <p className="text-base font-extrabold text-foreground pt-1">
-                  Total Paid ({receiptModal.paymentMethod}): ₹{receiptModal.total.toLocaleString('en-IN')}
+                  Total Paid ({receiptModal.paymentMethod}): ₹
+                  {receiptModal.total.toLocaleString('en-IN')}
                 </p>
                 {receiptModal.referenceNo && (
                   <p className="text-xs font-mono text-muted-foreground">
-                    Ref / UTR: <span className="font-semibold text-foreground">{receiptModal.referenceNo}</span>
+                    Ref / UTR:{' '}
+                    <span className="font-semibold text-foreground">
+                      {receiptModal.referenceNo}
+                    </span>
                   </p>
                 )}
                 {receiptModal.paymentProofUrl && (
                   <div className="pt-2 flex justify-end">
                     <button
                       type="button"
-                      onClick={() => setSelectedProof({
-                        url: receiptModal.paymentProofUrl!,
-                        referenceNo: receiptModal.referenceNo || receiptModal.orderNo,
-                        amount: receiptModal.total,
-                        paymentMethod: receiptModal.paymentMethod,
-                        paymentDate: receiptModal.createdAt,
-                        payeeOrPayer: receiptModal.customerName,
-                        recordedBy: receiptModal.cashierName || 'POS Terminal',
-                        timestamp: receiptModal.createdAt,
-                        notes: `Digital Invoice Proof for ${receiptModal.orderNo}`,
-                      })}
+                      onClick={() =>
+                        setSelectedProof({
+                          url: receiptModal.paymentProofUrl!,
+                          referenceNo: receiptModal.referenceNo || receiptModal.orderNo,
+                          amount: receiptModal.total,
+                          paymentMethod: receiptModal.paymentMethod,
+                          paymentDate: receiptModal.createdAt,
+                          payeeOrPayer: receiptModal.customerName,
+                          recordedBy: receiptModal.cashierName || 'POS Terminal',
+                          timestamp: receiptModal.createdAt,
+                          notes: `Digital Invoice Proof for ${receiptModal.orderNo}`,
+                        })
+                      }
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors shadow-2xs"
                     >
                       <Icon name="DocumentCheckIcon" size={14} />
@@ -1418,7 +1625,9 @@ export default function SalesPage() {
                   </div>
                   <div className="text-3xs space-y-0.5">
                     <p className="font-bold text-foreground">Scan to Pay / Verify UPI</p>
-                    <p className="font-mono text-primary font-bold">{systemSettings.paymentUpiId || 'cosko@icici'}</p>
+                    <p className="font-mono text-primary font-bold">
+                      {systemSettings.paymentUpiId || 'cosko@icici'}
+                    </p>
                     {systemSettings.paymentBankDetails && (
                       <p className="text-muted-foreground">{systemSettings.paymentBankDetails}</p>
                     )}
@@ -1431,11 +1640,14 @@ export default function SalesPage() {
                 {systemSettings?.invoiceTerms && (
                   <>
                     <p className="font-semibold text-foreground">Terms & Conditions:</p>
-                    <p className="whitespace-pre-line leading-relaxed">{systemSettings.invoiceTerms}</p>
+                    <p className="whitespace-pre-line leading-relaxed">
+                      {systemSettings.invoiceTerms}
+                    </p>
                   </>
                 )}
                 <p className="italic text-center pt-2 text-foreground font-medium border-t border-border/40">
-                  {systemSettings?.invoiceFooter || 'Thank you for shopping with us! Goods once sold cannot be returned without original receipt.'}
+                  {systemSettings?.invoiceFooter ||
+                    'Thank you for shopping with us! Goods once sold cannot be returned without original receipt.'}
                 </p>
               </div>
 
@@ -1459,7 +1671,11 @@ export default function SalesPage() {
                   <Icon name="WhatsApp" size={14} />
                   Send WhatsApp Invoice
                 </button>
-                <button type="button" onClick={() => setReceiptModal(null)} className="btn-secondary text-xs">
+                <button
+                  type="button"
+                  onClick={() => setReceiptModal(null)}
+                  className="btn-secondary text-xs"
+                >
                   Close
                 </button>
               </div>
@@ -1505,13 +1721,8 @@ export default function SalesPage() {
         />
       )}
 
-
-
       {/* Full-Screen Payment Proof Viewer */}
-      <ProofViewerModal
-        proof={selectedProof}
-        onClose={() => setSelectedProof(null)}
-      />
+      <ProofViewerModal proof={selectedProof} onClose={() => setSelectedProof(null)} />
 
       {/* Void & Refund Modal with Dynamic Refund Payment Method */}
       {refundModalSale && (
@@ -1529,7 +1740,9 @@ export default function SalesPage() {
             <div className="p-3 rounded-xl bg-card border border-border/80 space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Customer:</span>
-                <span className="font-bold text-foreground">{refundModalSale.customerName || 'Walk-in Customer'}</span>
+                <span className="font-bold text-foreground">
+                  {refundModalSale.customerName || 'Walk-in Customer'}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Store Location:</span>
@@ -1564,7 +1777,9 @@ export default function SalesPage() {
                 <span>Restocking & Accounting Notice</span>
               </p>
               <p className="text-2xs text-danger/80">
-                Confirming will mark order {refundModalSale.orderNo} as Refunded, automatically restock all items into {refundModalSale.store}, and log a refund payout via {refundMethod} in the general ledger.
+                Confirming will mark order {refundModalSale.orderNo} as Refunded, automatically
+                restock all items into {refundModalSale.store}, and log a refund payout via{' '}
+                {refundMethod} in the general ledger.
               </p>
             </div>
 

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { comparePassword, hashPassword, signSessionToken, hashToken, isValidAuthOrigin } from '@/lib/auth';
+import {
+  comparePassword,
+  hashPassword,
+  signSessionToken,
+  hashToken,
+  isValidAuthOrigin,
+} from '@/lib/auth';
 import { authenticateRequest, invalidateUserSessions, createAuditLog } from '@/lib/authPipeline';
 
 /**
@@ -10,28 +16,43 @@ import { authenticateRequest, invalidateUserSessions, createAuditLog } from '@/l
  */
 export async function POST(req: NextRequest) {
   if (!isValidAuthOrigin(req)) {
-    return NextResponse.json({ success: false, message: 'Forbidden: Invalid request origin' }, { status: 403 });
+    return NextResponse.json(
+      { success: false, message: 'Forbidden: Invalid request origin' },
+      { status: 403 }
+    );
   }
 
   try {
     const auth = await authenticateRequest(req);
     if (!auth.user) {
-      return NextResponse.json({ success: false, message: auth.error || 'Unauthorized' }, { status: auth.status });
+      return NextResponse.json(
+        { success: false, message: auth.error || 'Unauthorized' },
+        { status: auth.status }
+      );
     }
 
     const body = await req.json().catch(() => null);
     if (!body) {
-      return NextResponse.json({ success: false, message: 'Invalid request payload' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'Invalid request payload' },
+        { status: 400 }
+      );
     }
 
     const { currentPassword, newPassword, confirmPassword } = body;
 
     if (!currentPassword || !newPassword || !confirmPassword) {
-      return NextResponse.json({ success: false, message: 'All password fields are required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'All password fields are required' },
+        { status: 400 }
+      );
     }
 
     if (newPassword !== confirmPassword) {
-      return NextResponse.json({ success: false, message: 'New password and confirmation do not match' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'New password and confirmation do not match' },
+        { status: 400 }
+      );
     }
 
     if (newPassword.length < 8) {
@@ -55,13 +76,19 @@ export async function POST(req: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ success: false, message: 'User account not found' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, message: 'User account not found' },
+        { status: 404 }
+      );
     }
 
     // Verify current password against salted hash
     const isCurrentValid = await comparePassword(currentPassword, user.passwordHash);
     if (!isCurrentValid) {
-      return NextResponse.json({ success: false, message: 'Incorrect current password' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'Incorrect current password' },
+        { status: 400 }
+      );
     }
 
     // Hash new password with salted bcrypt (work factor 12)
@@ -80,8 +107,12 @@ export async function POST(req: NextRequest) {
     await invalidateUserSessions(user.id, auth.user.sessionId);
 
     // Audit log
-    await createAuditLog(auth.user, 'Auth', 'Password Changed', 
-      `User "${user.name}" changed their password. Other sessions invalidated.`);
+    await createAuditLog(
+      auth.user,
+      'Auth',
+      'Password Changed',
+      `User "${user.name}" changed their password. Other sessions invalidated.`
+    );
 
     // Issue new token with updated session
     const allowedStores = user.storeAssignments.map((a) => a.storeCode);
@@ -92,7 +123,12 @@ export async function POST(req: NextRequest) {
       role: updatedUser.role as any,
       securityLevel: updatedUser.securityLevel,
       store: updatedUser.storeScope,
-      allowedStores: allowedStores.length > 0 ? allowedStores : (updatedUser.role === 'Super Admin' ? ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'] : [updatedUser.storeScope]),
+      allowedStores:
+        allowedStores.length > 0
+          ? allowedStores
+          : updatedUser.role === 'Super Admin'
+            ? ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM']
+            : [updatedUser.storeScope],
       avatar: updatedUser.name.substring(0, 2).toUpperCase(),
       shiftStatus: updatedUser.shiftStatus as any,
       avatarUrl: updatedUser.avatarUrl || undefined,

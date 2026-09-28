@@ -77,7 +77,9 @@ export default function StoreSalesRanking() {
       const rev = Number(sale.total) || 0;
       const subtotal = Number(sale.subtotal) || rev;
       const gp =
-        sale.grossProfit !== undefined && sale.grossProfit !== null && !isNaN(Number(sale.grossProfit))
+        sale.grossProfit !== undefined &&
+        sale.grossProfit !== null &&
+        !isNaN(Number(sale.grossProfit))
           ? Number(sale.grossProfit)
           : Math.max(0, subtotal * 0.25);
       const units = sale.items?.reduce((acc, it) => acc + (it.qty || 1), 0) || 1;
@@ -118,7 +120,9 @@ export default function StoreSalesRanking() {
     filteredSales.forEach((sale) => {
       const key = sale.customerPhone || sale.customerName || 'Walk-in';
       if (!custMap[key]) {
-        const matched = customers.find((c) => c.phone === sale.customerPhone || c.name === sale.customerName);
+        const matched = customers.find(
+          (c) => c.phone === sale.customerPhone || c.name === sale.customerName
+        );
         custMap[key] = {
           id: matched?.id || key,
           name: sale.customerName || 'Walk-in Customer',
@@ -126,7 +130,9 @@ export default function StoreSalesRanking() {
           totalSpend: 0,
           totalPurchases: 0,
           invoiceCount: 0,
-          lastPurchase: sale.createdAt ? new Date(sale.createdAt).toLocaleDateString('en-IN') : 'N/A',
+          lastPurchase: sale.createdAt
+            ? new Date(sale.createdAt).toLocaleDateString('en-IN')
+            : 'N/A',
         };
       }
 
@@ -178,7 +184,9 @@ export default function StoreSalesRanking() {
               {activeTab === 'stores' ? 'Store Sales Ranking' : 'Customer Sales Analytics'}
             </h2>
             <span className="badge-primary text-2xs px-2 py-0.5 rounded-full font-bold">
-              {activeTab === 'stores' ? `${storeRankings.length} Stores` : `${customerAnalytics.length} Active Customers`}
+              {activeTab === 'stores'
+                ? `${storeRankings.length} Stores`
+                : `${customerAnalytics.length} Active Customers`}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -255,7 +263,9 @@ export default function StoreSalesRanking() {
       {activeTab === 'stores' ? (
         <div className="space-y-2 max-h-72 overflow-y-auto pr-1 scrollbar-thin">
           {storeRankings.length === 0 ? (
-            <div className="p-6 text-center text-xs text-muted-foreground">No store sales in this period</div>
+            <div className="p-6 text-center text-xs text-muted-foreground">
+              No store sales in this period
+            </div>
           ) : (
             storeRankings.map((st, idx) => {
               const isLead = idx === 0 && st.revenue > 0;
@@ -282,8 +292,12 @@ export default function StoreSalesRanking() {
                     </span>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-xs text-foreground truncate">{st.storeCode}</span>
-                        <span className="text-3xs text-muted-foreground truncate">· {st.storeName}</span>
+                        <span className="font-bold text-xs text-foreground truncate">
+                          {st.storeCode}
+                        </span>
+                        <span className="text-3xs text-muted-foreground truncate">
+                          · {st.storeName}
+                        </span>
                         {isSelected && (
                           <span className="text-3xs bg-primary/20 text-primary px-1.5 py-0.2 rounded font-bold">
                             Current Scope
@@ -291,7 +305,8 @@ export default function StoreSalesRanking() {
                         )}
                       </div>
                       <p className="text-3xs text-muted-foreground mt-0.5">
-                        {st.invoiceCount} invoices · {st.totalUnits} units · Avg ticket ₹{st.avgInvoiceValue.toLocaleString('en-IN')}
+                        {st.invoiceCount} invoices · {st.totalUnits} units · Avg ticket ₹
+                        {st.avgInvoiceValue.toLocaleString('en-IN')}
                       </p>
                     </div>
                   </div>
@@ -312,7 +327,9 @@ export default function StoreSalesRanking() {
       ) : (
         <div className="space-y-2 max-h-72 overflow-y-auto pr-1 scrollbar-thin">
           {customerAnalytics.length === 0 ? (
-            <div className="p-6 text-center text-xs text-muted-foreground">No customer sales recorded in this period</div>
+            <div className="p-6 text-center text-xs text-muted-foreground">
+              No customer sales recorded in this period
+            </div>
           ) : (
             customerAnalytics.map((c, idx) => (
               <div
@@ -335,9 +352,7 @@ export default function StoreSalesRanking() {
                   <p className="text-xs font-bold text-foreground font-tabular">
                     ₹{c.totalSpend.toLocaleString('en-IN')}
                   </p>
-                  <p className="text-3xs text-muted-foreground mt-0.5">
-                    Last: {c.lastPurchase}
-                  </p>
+                  <p className="text-3xs text-muted-foreground mt-0.5">Last: {c.lastPurchase}</p>
                 </div>
               </div>
             ))

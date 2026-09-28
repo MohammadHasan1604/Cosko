@@ -90,7 +90,6 @@ export default function ExpenseFormModal({
     return opts;
   }, [categoriesList]);
 
-
   // Stores list
   const storeOptions: SelectOption[] = useMemo(() => {
     return [
@@ -113,7 +112,9 @@ export default function ExpenseFormModal({
         setCategory(expense.category || 'Store Rent');
         setStore(expense.store || 'CENTRAL');
         setDescription(expense.description || '');
-        setAmount(expense.amount !== undefined && expense.amount !== null ? Number(expense.amount) : '');
+        setAmount(
+          expense.amount !== undefined && expense.amount !== null ? Number(expense.amount) : ''
+        );
         setPaymentMethod(expense.paymentMethod || 'Bank Transfer');
         setReferenceNo(expense.referenceNo || '');
         setReceiptUrl(expense.receiptUrl || null);
@@ -168,9 +169,14 @@ export default function ExpenseFormModal({
         { label: 'Payment Method', value: paymentMethod },
         { label: 'Reference / UTR', value: referenceNo.trim() },
         { label: 'Description', value: description.trim() || 'N/A' },
-        { label: 'Expense Amount', value: `₹${parsedAmount.toLocaleString('en-IN')}`, highlighted: true },
+        {
+          label: 'Expense Amount',
+          value: `₹${parsedAmount.toLocaleString('en-IN')}`,
+          highlighted: true,
+        },
       ],
-      warningMessage: 'This will be booked as an operating expense in the store profit and loss statement.',
+      warningMessage:
+        'This will be booked as an operating expense in the store profit and loss statement.',
     });
 
     if (!confirmed) return;
@@ -242,8 +248,14 @@ export default function ExpenseFormModal({
       <Modal
         open={open}
         onClose={onClose}
-        title={isEdit ? `Edit Expense (${expense?.referenceNo || ''})` : 'Record Operational Expense'}
-        subtitle={isEdit ? 'Update expense details and attachments' : 'Track rent, utilities, maintenance, or store disbursements with proof'}
+        title={
+          isEdit ? `Edit Expense (${expense?.referenceNo || ''})` : 'Record Operational Expense'
+        }
+        subtitle={
+          isEdit
+            ? 'Update expense details and attachments'
+            : 'Track rent, utilities, maintenance, or store disbursements with proof'
+        }
         size="md"
         zIndex={zIndex}
       >
@@ -354,7 +366,10 @@ export default function ExpenseFormModal({
           {!receiptUrl && (
             <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-3xs font-semibold">
               <Icon name="ExclamationTriangleIcon" size={14} className="shrink-0 text-amber-600" />
-              <span>Payment Proof is strictly mandatory. Upload receipt/bill above to enable {isEdit ? 'updating' : 'recording'} expense.</span>
+              <span>
+                Payment Proof is strictly mandatory. Upload receipt/bill above to enable{' '}
+                {isEdit ? 'updating' : 'recording'} expense.
+              </span>
             </div>
           )}
 
@@ -371,7 +386,9 @@ export default function ExpenseFormModal({
             <button
               type="submit"
               className="btn-primary text-xs font-bold gap-1.5 px-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isSubmitting || !receiptUrl || !referenceNo.trim() || !amount || Number(amount) <= 0}
+              disabled={
+                isSubmitting || !receiptUrl || !referenceNo.trim() || !amount || Number(amount) <= 0
+              }
             >
               {isSubmitting ? (
                 <>

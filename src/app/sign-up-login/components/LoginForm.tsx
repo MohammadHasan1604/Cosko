@@ -84,7 +84,11 @@ export default function LoginForm() {
         setLockoutSeconds(0);
 
         setCurrentUser({ ...result.user, token: result.token });
-        addAuditLog('Authentication', 'User Login', `Signed in as ${result.user.role} (${result.user.email})`);
+        addAuditLog(
+          'Authentication',
+          'User Login',
+          `Signed in as ${result.user.role} (${result.user.email})`
+        );
         toast.success(`Welcome back, ${result.user.name}! Signed in as ${result.user.role}`);
         router.push('/dashboard');
         return;
@@ -92,16 +96,24 @@ export default function LoginForm() {
         if (res.status === 429 || result?.locked) {
           const retryAfter = result?.retryAfter || 900;
           if (typeof window !== 'undefined') {
-            localStorage.setItem('cosko_login_lockout_until', String(Date.now() + retryAfter * 1000));
+            localStorage.setItem(
+              'cosko_login_lockout_until',
+              String(Date.now() + retryAfter * 1000)
+            );
           }
           setLockoutSeconds(retryAfter);
           setError('root', {
-            message: result?.error || `Account is temporarily locked due to 5 consecutive failed login attempts. Please try again in ${retryAfter}s.`,
+            message:
+              result?.error ||
+              `Account is temporarily locked due to 5 consecutive failed login attempts. Please try again in ${retryAfter}s.`,
           });
           toast.error('Account temporarily locked due to 5 consecutive failed login attempts');
         } else {
           setError('root', {
-            message: result?.error || result?.message || 'Invalid email or password. Please verify your login credentials.',
+            message:
+              result?.error ||
+              result?.message ||
+              'Invalid email or password. Please verify your login credentials.',
           });
         }
       }
@@ -166,17 +178,26 @@ export default function LoginForm() {
               placeholder="cosko@gmail.com"
               className="w-full px-3.5 py-2.5 bg-background border border-input rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors pl-10 disabled:opacity-60"
             />
-            <Icon name="EnvelopeIcon" size={16} className="absolute left-3.5 top-3 text-muted-foreground" />
+            <Icon
+              name="EnvelopeIcon"
+              size={16}
+              className="absolute left-3.5 top-3 text-muted-foreground"
+            />
           </div>
           {errors.email && <p className="text-2xs text-danger mt-1">{errors.email.message}</p>}
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-semibold text-foreground block">
-              Password
-            </label>
-            <a href="#" onClick={(e) => { e.preventDefault(); toast.info('Contact Super Admin to reset account password'); }} className="text-2xs text-primary hover:underline">
+            <label className="text-xs font-semibold text-foreground block">Password</label>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                toast.info('Contact Super Admin to reset account password');
+              }}
+              className="text-2xs text-primary hover:underline"
+            >
               Forgot password?
             </a>
           </div>
@@ -188,7 +209,11 @@ export default function LoginForm() {
               placeholder="••••••••••••"
               className="w-full px-3.5 py-2.5 bg-background border border-input rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors pl-10 pr-10 disabled:opacity-60"
             />
-            <Icon name="LockClosedIcon" size={16} className="absolute left-3.5 top-3 text-muted-foreground" />
+            <Icon
+              name="LockClosedIcon"
+              size={16}
+              className="absolute left-3.5 top-3 text-muted-foreground"
+            />
             <button
               type="button"
               disabled={isLocked}
@@ -198,7 +223,9 @@ export default function LoginForm() {
               <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={16} />
             </button>
           </div>
-          {errors.password && <p className="text-2xs text-danger mt-1">{errors.password.message}</p>}
+          {errors.password && (
+            <p className="text-2xs text-danger mt-1">{errors.password.message}</p>
+          )}
         </div>
 
         <div className="flex items-center justify-between text-xs pt-1">
@@ -226,7 +253,9 @@ export default function LoginForm() {
           ) : isLocked ? (
             <>
               <Icon name="LockClosedIcon" size={16} />
-              <span>Account Locked ({Math.floor(lockoutSeconds / 60)}m {lockoutSeconds % 60}s)</span>
+              <span>
+                Account Locked ({Math.floor(lockoutSeconds / 60)}m {lockoutSeconds % 60}s)
+              </span>
             </>
           ) : (
             <>
@@ -241,7 +270,10 @@ export default function LoginForm() {
       <div className="text-center pt-2 border-t border-border">
         <p className="text-2xs text-muted-foreground">
           Protected by COSKO Enterprise RBAC Security. Need help?{' '}
-          <a href={`mailto:${branding.supportEmail || 'support@cosko.com'}`} className="text-primary hover:underline font-medium">
+          <a
+            href={`mailto:${branding.supportEmail || 'support@cosko.com'}`}
+            className="text-primary hover:underline font-medium"
+          >
             Contact Support
           </a>
         </p>

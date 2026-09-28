@@ -2,7 +2,12 @@
 
 import React from 'react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
 } from 'recharts';
 import { useApp } from '@/context/AppContext';
@@ -34,7 +39,10 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
       <p className="text-xs font-semibold text-muted-foreground mb-2">{label}</p>
       {payload.map((p) => (
         <div key={`tooltip-${p.name}`} className="flex items-center gap-2 mb-1">
-          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+          <span
+            className="w-2 h-2 rounded-full flex-shrink-0"
+            style={{ backgroundColor: p.color }}
+          />
           <span className="text-muted-foreground text-xs">{p.name}:</span>
           <span className="font-semibold text-foreground font-tabular text-xs">
             ₹{Math.round(p.value).toLocaleString('en-IN')}
@@ -52,7 +60,12 @@ export default function RevenueChart() {
     selectedStore === 'All Stores' || storeCode === selectedStore;
 
   const validSales = sales.filter((s) => {
-    return matchStore(s.store) && s.status !== 'Refunded' && s.status !== 'Cancelled' && s.status !== 'Voided';
+    return (
+      matchStore(s.store) &&
+      s.status !== 'Refunded' &&
+      s.status !== 'Cancelled' &&
+      s.status !== 'Voided'
+    );
   });
 
   // Generate continuous timeline buckets based on the selected period

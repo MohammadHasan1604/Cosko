@@ -94,14 +94,18 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
         <Icon name="ArrowRightIcon" size={18} className="text-muted-foreground flex-shrink-0" />
         <div className="text-center">
           <p className="text-2xs text-muted-foreground uppercase tracking-wider">New Qty</p>
-          <p className={`text-2xl font-bold font-tabular mt-0.5 ${getNewQty() === 0 ? 'text-danger' : getNewQty() < item.qtyOnHand ? 'text-warning' : 'text-positive'}`}>
+          <p
+            className={`text-2xl font-bold font-tabular mt-0.5 ${getNewQty() === 0 ? 'text-danger' : getNewQty() < item.qtyOnHand ? 'text-warning' : 'text-positive'}`}
+          >
             {getNewQty()}
           </p>
         </div>
         <div className="flex-1 text-right">
           <p className="text-2xs text-muted-foreground">Store</p>
           <p className="text-sm font-semibold text-foreground">{item.store}</p>
-          <p className="text-2xs text-muted-foreground mt-0.5">Cost: ₹{item.costPrice.toLocaleString('en-IN')}/unit</p>
+          <p className="text-2xs text-muted-foreground mt-0.5">
+            Cost: ₹{item.costPrice.toLocaleString('en-IN')}/unit
+          </p>
         </div>
       </div>
 
@@ -114,7 +118,8 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
               key={`adj-type-${type}`}
               className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-all duration-150 ${
                 adjustmentType === type
-                  ? 'border-primary bg-primary/5 text-primary' :'border-border bg-card text-muted-foreground hover:border-ring hover:text-foreground'
+                  ? 'border-primary bg-primary/5 text-primary'
+                  : 'border-border bg-card text-muted-foreground hover:border-ring hover:text-foreground'
               }`}
             >
               <input
@@ -124,10 +129,18 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
                 {...register('adjustmentType')}
               />
               <Icon
-                name={type === 'add' ? 'PlusCircleIcon' : type === 'remove' ? 'MinusCircleIcon' : 'PencilSquareIcon'}
+                name={
+                  type === 'add'
+                    ? 'PlusCircleIcon'
+                    : type === 'remove'
+                      ? 'MinusCircleIcon'
+                      : 'PencilSquareIcon'
+                }
                 size={15}
               />
-              <span className="text-sm font-semibold capitalize">{type === 'set' ? 'Set Exact' : type === 'add' ? 'Add Stock' : 'Remove Stock'}</span>
+              <span className="text-sm font-semibold capitalize">
+                {type === 'set' ? 'Set Exact' : type === 'add' ? 'Add Stock' : 'Remove Stock'}
+              </span>
             </label>
           ))}
         </div>
@@ -136,11 +149,18 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
       {/* Quantity */}
       <div>
         <label htmlFor="adj-qty" className="label-text">
-          {adjustmentType === 'set' ? 'Set Quantity To' : adjustmentType === 'add' ? 'Quantity to Add' : 'Quantity to Remove'}
+          {adjustmentType === 'set'
+            ? 'Set Quantity To'
+            : adjustmentType === 'add'
+              ? 'Quantity to Add'
+              : 'Quantity to Remove'}
         </label>
         <p className="helper-text">
-          {adjustmentType === 'set' ?'Enter the exact new stock quantity after counting'
-            : adjustmentType === 'add' ?'Number of units being added to stock' :'Number of units being removed from stock'}
+          {adjustmentType === 'set'
+            ? 'Enter the exact new stock quantity after counting'
+            : adjustmentType === 'add'
+              ? 'Number of units being added to stock'
+              : 'Number of units being removed from stock'}
         </p>
         <input
           id="adj-qty"
@@ -167,8 +187,12 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
 
       {/* Reason */}
       <div>
-        <label htmlFor="adj-reason" className="label-text">Reason Code</label>
-        <p className="helper-text">Select the reason for this adjustment — required for audit trail</p>
+        <label htmlFor="adj-reason" className="label-text">
+          Reason Code
+        </label>
+        <p className="helper-text">
+          Select the reason for this adjustment — required for audit trail
+        </p>
         <select
           id="adj-reason"
           className={`input-field mt-1.5 ${errors.reason ? 'border-danger ring-1 ring-danger' : ''}`}
@@ -176,7 +200,9 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
         >
           <option value="">— Select reason —</option>
           {REASON_CODES.map((r) => (
-            <option key={`reason-${r.value}`} value={r.value}>{r.label}</option>
+            <option key={`reason-${r.value}`} value={r.value}>
+              {r.label}
+            </option>
           ))}
         </select>
         {errors.reason && <p className="error-text">{errors.reason.message}</p>}
@@ -199,12 +225,18 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
       </div>
 
       {/* FIFO note */}
-      <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg border" style={{ backgroundColor: 'var(--info-bg)', borderColor: 'var(--info-border)' }}>
+      <div
+        className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg border"
+        style={{ backgroundColor: 'var(--info-bg)', borderColor: 'var(--info-border)' }}
+      >
         <Icon name="InformationCircleIcon" size={15} className="text-info flex-shrink-0 mt-0.5" />
         <p className="text-xs text-muted-foreground">
           <span className="font-semibold text-foreground">FIFO lot impact: </span>
-          {adjustmentType === 'add' ?'A new FIFO lot will be created at current cost price for the added units.'
-            : adjustmentType === 'remove' ?'Units will be consumed from the oldest FIFO lot first. COGS will be recorded.' :'Stock will be set and FIFO lots reconciled. Variance will be recorded as an adjustment entry.'}
+          {adjustmentType === 'add'
+            ? 'A new FIFO lot will be created at current cost price for the added units.'
+            : adjustmentType === 'remove'
+              ? 'Units will be consumed from the oldest FIFO lot first. COGS will be recorded.'
+              : 'Stock will be set and FIFO lots reconciled. Variance will be recorded as an adjustment entry.'}
         </p>
       </div>
 
@@ -218,16 +250,23 @@ export default function StockAdjustmentForm({ item, onClose }: StockAdjustmentFo
         >
           Cancel
         </button>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="btn-primary flex-1"
-        >
+        <button type="submit" disabled={isSubmitting} className="btn-primary flex-1">
           {isSubmitting ? (
             <>
               <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z" />
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
+                />
               </svg>
               Saving Adjustment...
             </>

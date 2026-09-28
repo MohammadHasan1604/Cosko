@@ -71,7 +71,9 @@ export default function StoreFormModal({
     if (!isEdit) {
       const duplicate = storesList.find((s) => s.code.toUpperCase() === cleanCode);
       if (duplicate) {
-        toast.error(`Store code "${cleanCode}" already exists. Please use a unique 3-4 character code.`);
+        toast.error(
+          `Store code "${cleanCode}" already exists. Please use a unique 3-4 character code.`
+        );
         return;
       }
     }
@@ -152,7 +154,11 @@ export default function StoreFormModal({
       onClose={onClose}
       zIndex={zIndex}
       title={isEdit ? `Edit Store Hub: ${store?.name}` : 'Provision New Store Hub'}
-      subtitle={isEdit ? `Code: ${store?.code}` : 'Multi-store retail network & regional warehouse configuration'}
+      subtitle={
+        isEdit
+          ? `Code: ${store?.code}`
+          : 'Multi-store retail network & regional warehouse configuration'
+      }
       size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4 py-2">
@@ -207,7 +213,9 @@ export default function StoreFormModal({
           </div>
 
           <div>
-            <label className="text-xs font-bold text-foreground block mb-1">Commercial Address</label>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Commercial Address
+            </label>
             <input
               type="text"
               placeholder="e.g. 100ft Road, Indiranagar"
@@ -246,7 +254,9 @@ export default function StoreFormModal({
         {/* Status */}
         <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-card">
           <div>
-            <label className="text-xs font-bold text-foreground block">Store Operational Status</label>
+            <label className="text-xs font-bold text-foreground block">
+              Store Operational Status
+            </label>
             <p className="text-3xs text-muted-foreground">
               Inactive stores are excluded from inventory transfers and POS checkout.
             </p>
@@ -271,11 +281,7 @@ export default function StoreFormModal({
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            className="btn-primary text-xs gap-1.5"
-            disabled={isSubmitting}
-          >
+          <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -293,4 +299,3 @@ export default function StoreFormModal({
     </Modal>
   );
 }
-

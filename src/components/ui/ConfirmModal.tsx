@@ -15,13 +15,26 @@ interface ConfirmModalProps {
 }
 
 export default function ConfirmModal({
-  open, onClose, onConfirm, title, message, confirmLabel = 'Confirm', variant = 'danger', loading = false
+  open,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmLabel = 'Confirm',
+  variant = 'danger',
+  loading = false,
 }: ConfirmModalProps) {
   return (
     <Modal open={open} onClose={onClose} title="" size="sm">
       <div className="flex flex-col items-center text-center gap-4 py-2">
-        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${variant === 'danger' ? 'bg-danger/10' : 'bg-warning/10'}`}>
-          <Icon name="ExclamationTriangleIcon" size={24} className={variant === 'danger' ? 'text-danger' : 'text-warning'} />
+        <div
+          className={`w-12 h-12 rounded-full flex items-center justify-center ${variant === 'danger' ? 'bg-danger/10' : 'bg-warning/10'}`}
+        >
+          <Icon
+            name="ExclamationTriangleIcon"
+            size={24}
+            className={variant === 'danger' ? 'text-danger' : 'text-warning'}
+          />
         </div>
         <div>
           <h3 className="text-base font-semibold text-foreground">{title}</h3>
@@ -38,8 +51,19 @@ export default function ConfirmModal({
           >
             {loading && (
               <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z" />
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
+                />
               </svg>
             )}
             {confirmLabel}

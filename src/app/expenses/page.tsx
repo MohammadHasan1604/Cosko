@@ -10,7 +10,7 @@ import ProofViewerModal, { PaymentProofData } from '@/components/ui/ProofViewerM
 
 export default function ExpensesPage() {
   const { expenses, deleteExpense, selectedStore } = useApp();
-  
+
   // Master modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -24,9 +24,8 @@ export default function ExpensesPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Filtered expenses based on active store scope
-  const filteredExpenses = selectedStore === 'All Stores'
-    ? expenses
-    : expenses.filter((e) => e.store === selectedStore);
+  const filteredExpenses =
+    selectedStore === 'All Stores' ? expenses : expenses.filter((e) => e.store === selectedStore);
 
   const totalExpense = filteredExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
 
@@ -58,11 +57,12 @@ export default function ExpensesPage() {
         <div className="flex items-start justify-between gap-3">
           <div className="page-header">
             <h1 className="page-title">Expenses</h1>
-            <p className="page-subtitle">
-              Store operating costs & approvals
-            </p>
+            <p className="page-subtitle">Store operating costs & approvals</p>
           </div>
-          <button onClick={() => setModalOpen(true)} className="btn-primary gap-1.5 text-xs flex-shrink-0">
+          <button
+            onClick={() => setModalOpen(true)}
+            className="btn-primary gap-1.5 text-xs flex-shrink-0"
+          >
             <Icon name="PlusIcon" size={14} />
             <span className="hidden sm:inline">Log Expense</span>
             <span className="sm:hidden">Add</span>
@@ -72,8 +72,12 @@ export default function ExpensesPage() {
         {/* Expenses Summary Card */}
         <div className="card p-3 md:p-5 bg-gradient-to-r from-primary/8 via-info/5 to-card flex items-center justify-between border border-border/60">
           <div>
-            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Expenses</p>
-            <h2 className="text-xl md:text-2xl font-extrabold text-foreground font-tabular mt-1">₹{totalExpense.toLocaleString('en-IN')}</h2>
+            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">
+              Total Expenses
+            </p>
+            <h2 className="text-xl md:text-2xl font-extrabold text-foreground font-tabular mt-1">
+              ₹{totalExpense.toLocaleString('en-IN')}
+            </h2>
             <p className="text-3xs text-muted-foreground mt-0.5">
               {filteredExpenses.length} transactions · {selectedStore}
             </p>
@@ -105,33 +109,47 @@ export default function ExpensesPage() {
               <tbody className="divide-y divide-border/60">
                 {filteredExpenses.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground text-xs">
-                      No expense records found for {selectedStore}. Click &quot;Log New Expense&quot; to add one.
+                    <td
+                      colSpan={10}
+                      className="px-4 py-12 text-center text-muted-foreground text-xs"
+                    >
+                      No expense records found for {selectedStore}. Click &quot;Log New
+                      Expense&quot; to add one.
                     </td>
                   </tr>
                 ) : (
                   filteredExpenses.map((exp) => (
                     <tr key={`exp-${exp.id}`} className="table-row">
-                      <td className="px-4 py-3 font-mono text-xs font-bold text-primary">{exp.referenceNo}</td>
+                      <td className="px-4 py-3 font-mono text-xs font-bold text-primary">
+                        {exp.referenceNo}
+                      </td>
                       <td className="px-4 py-3 font-semibold text-foreground">{exp.category}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{exp.description}</td>
-                      <td className="px-4 py-3"><span className="badge-info text-3xs font-semibold">{exp.store}</span></td>
-                      <td className="px-4 py-3 font-extrabold font-tabular text-foreground text-right">₹{exp.amount.toLocaleString('en-IN')}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{exp.paymentMethod}</td>
+                      <td className="px-4 py-3">
+                        <span className="badge-info text-3xs font-semibold">{exp.store}</span>
+                      </td>
+                      <td className="px-4 py-3 font-extrabold font-tabular text-foreground text-right">
+                        ₹{exp.amount.toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {exp.paymentMethod}
+                      </td>
                       <td className="px-4 py-3 text-center">
                         {exp.receiptUrl ? (
                           <button
-                            onClick={() => setSelectedProof({
-                              url: exp.receiptUrl!,
-                              referenceNo: exp.referenceNoText || exp.referenceNo,
-                              amount: exp.amount,
-                              paymentMethod: exp.paymentMethod,
-                              paymentDate: exp.date,
-                              payeeOrPayer: exp.category,
-                              recordedBy: exp.recordedBy || 'Finance Dept',
-                              timestamp: exp.createdAt || exp.date,
-                              notes: exp.description,
-                            })}
+                            onClick={() =>
+                              setSelectedProof({
+                                url: exp.receiptUrl!,
+                                referenceNo: exp.referenceNoText || exp.referenceNo,
+                                amount: exp.amount,
+                                paymentMethod: exp.paymentMethod,
+                                paymentDate: exp.date,
+                                payeeOrPayer: exp.category,
+                                recordedBy: exp.recordedBy || 'Finance Dept',
+                                timestamp: exp.createdAt || exp.date,
+                                notes: exp.description,
+                              })
+                            }
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-3xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors shadow-2xs"
                             title="View Attached Proof"
                           >
@@ -145,7 +163,9 @@ export default function ExpensesPage() {
                       <td className="px-4 py-3">
                         <span className="badge-success text-3xs font-bold">{exp.status}</span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{exp.date}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {exp.date}
+                      </td>
                       <td className="px-4 py-3 text-right space-x-1 whitespace-nowrap">
                         <button
                           onClick={() => handleOpenEdit(exp)}
@@ -178,14 +198,18 @@ export default function ExpensesPage() {
               </div>
             ) : (
               filteredExpenses.map((exp) => (
-                <div key={`m-exp-${exp.id}`} className="record-item" onClick={() => handleOpenEdit(exp)}>
-                  <div className="record-avatar bg-primary/10 text-primary">
-                    ₹
-                  </div>
+                <div
+                  key={`m-exp-${exp.id}`}
+                  className="record-item"
+                  onClick={() => handleOpenEdit(exp)}
+                >
+                  <div className="record-avatar bg-primary/10 text-primary">₹</div>
                   <div className="record-content">
                     <p className="record-title">{exp.category}</p>
                     <p className="record-subtitle">{exp.description}</p>
-                    <p className="text-3xs text-muted-foreground mt-0.5">{exp.date} · {exp.store}</p>
+                    <p className="text-3xs text-muted-foreground mt-0.5">
+                      {exp.date} · {exp.store}
+                    </p>
                   </div>
                   <div className="record-meta">
                     <p className="record-value">₹{exp.amount.toLocaleString('en-IN')}</p>
@@ -209,29 +233,50 @@ export default function ExpensesPage() {
       />
 
       {/* Delete Confirmation Modal */}
-      <Modal open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Delete Expense Record" size="sm">
+      <Modal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        title="Delete Expense Record"
+        size="sm"
+      >
         <div className="py-2 space-y-3 text-sm">
           <p className="text-muted-foreground">
-            Are you sure you want to delete expense <span className="font-mono font-bold text-foreground">{deletingExpense?.referenceNo}</span> ({deletingExpense?.description}) for <span className="font-bold text-foreground">₹{deletingExpense?.amount.toLocaleString('en-IN')}</span>?
+            Are you sure you want to delete expense{' '}
+            <span className="font-mono font-bold text-foreground">
+              {deletingExpense?.referenceNo}
+            </span>{' '}
+            ({deletingExpense?.description}) for{' '}
+            <span className="font-bold text-foreground">
+              ₹{deletingExpense?.amount.toLocaleString('en-IN')}
+            </span>
+            ?
           </p>
           <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs text-rose-600 dark:text-rose-400">
             This action permanently deletes this expense record from the MySQL database.
           </div>
           <div className="pt-2 border-t border-border flex justify-end gap-2">
-            <button type="button" onClick={() => setDeleteModalOpen(false)} className="btn-ghost text-xs" disabled={isDeleting}>Cancel</button>
-            <button type="button" onClick={handleConfirmDelete} className="btn-danger text-xs" disabled={isDeleting}>
+            <button
+              type="button"
+              onClick={() => setDeleteModalOpen(false)}
+              className="btn-ghost text-xs"
+              disabled={isDeleting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              className="btn-danger text-xs"
+              disabled={isDeleting}
+            >
               {isDeleting ? 'Deleting...' : 'Delete Expense'}
             </button>
           </div>
         </div>
       </Modal>
 
-
       {/* Full-Screen Payment Proof Viewer */}
-      <ProofViewerModal
-        proof={selectedProof}
-        onClose={() => setSelectedProof(null)}
-      />
+      <ProofViewerModal proof={selectedProof} onClose={() => setSelectedProof(null)} />
     </AppLayout>
   );
 }

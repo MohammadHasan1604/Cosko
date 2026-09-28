@@ -67,7 +67,11 @@ export default function VendorFormModal({
         setCategory(vendor.category || '');
         setAddress(vendor.address || '');
         setPaymentTerms(vendor.paymentTerms || 'Net 30');
-        setLeadTimeDays(vendor.leadTimeDays !== undefined && vendor.leadTimeDays !== null ? vendor.leadTimeDays : '');
+        setLeadTimeDays(
+          vendor.leadTimeDays !== undefined && vendor.leadTimeDays !== null
+            ? vendor.leadTimeDays
+            : ''
+        );
       } else {
         setName('');
         setContactPerson('');
@@ -128,13 +132,17 @@ export default function VendorFormModal({
         await updateVendor(vendor.id, {
           name: cleanName,
           contactPerson: contactPerson.trim() || 'Account Manager',
-          email: email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
+          email:
+            email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
           phone: phone.trim() || '+91 98000 00000',
           gstin: cleanGstin || undefined,
           category: category.trim() || 'General Hardware',
           address: address.trim() || undefined,
           paymentTerms: paymentTerms.trim() || 'Net 30',
-          leadTimeDays: leadTimeDays !== '' && leadTimeDays !== undefined && leadTimeDays !== null ? Number(leadTimeDays) : undefined,
+          leadTimeDays:
+            leadTimeDays !== '' && leadTimeDays !== undefined && leadTimeDays !== null
+              ? Number(leadTimeDays)
+              : undefined,
         });
 
         toast.success(`Vendor "${cleanName}" updated successfully`);
@@ -144,13 +152,17 @@ export default function VendorFormModal({
         const created = await addVendor({
           name: cleanName,
           contactPerson: contactPerson.trim() || 'Account Manager',
-          email: email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
+          email:
+            email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
           phone: phone.trim() || '+91 98000 00000',
           gstin: cleanGstin || undefined,
           category: category.trim() || 'General Hardware',
           address: address.trim() || undefined,
           paymentTerms: paymentTerms.trim() || 'Net 30',
-          leadTimeDays: leadTimeDays !== '' && leadTimeDays !== undefined && leadTimeDays !== null ? Number(leadTimeDays) : undefined,
+          leadTimeDays:
+            leadTimeDays !== '' && leadTimeDays !== undefined && leadTimeDays !== null
+              ? Number(leadTimeDays)
+              : undefined,
           outstandingPayable: 0,
           rating: 4.8,
         });
@@ -171,8 +183,18 @@ export default function VendorFormModal({
       <Modal
         open={open}
         onClose={onClose}
-        title={isEdit ? `Edit Supplier: ${vendor?.name}` : quickMode ? 'Quick Vendor Onboarding' : 'Onboard Supplier Vendor'}
-        subtitle={isEdit ? `Code: ${vendor?.code || vendor?.id}` : 'Unified vendor directory across Purchase Orders, Accounts, and Inventory'}
+        title={
+          isEdit
+            ? `Edit Supplier: ${vendor?.name}`
+            : quickMode
+              ? 'Quick Vendor Onboarding'
+              : 'Onboard Supplier Vendor'
+        }
+        subtitle={
+          isEdit
+            ? `Code: ${vendor?.code || vendor?.id}`
+            : 'Unified vendor directory across Purchase Orders, Accounts, and Inventory'
+        }
         size={quickMode ? 'sm' : 'md'}
         zIndex={zIndex}
       >
@@ -263,7 +285,9 @@ export default function VendorFormModal({
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Lead Time (Days)</label>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Lead Time (Days)
+              </label>
               <NumericInput
                 min={0}
                 allowDecimals={false}
@@ -292,7 +316,9 @@ export default function VendorFormModal({
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold text-foreground block mb-1">Office / Warehouse Address</label>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Office / Warehouse Address
+              </label>
               <input
                 type="text"
                 placeholder="e.g. Industrial Area Phase 2, Peenya"
@@ -313,11 +339,7 @@ export default function VendorFormModal({
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              className="btn-primary text-xs gap-1.5"
-              disabled={isSubmitting}
-            >
+            <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -326,7 +348,11 @@ export default function VendorFormModal({
               ) : (
                 <>
                   <Icon name="CheckIcon" size={14} />
-                  {isEdit ? 'Update Vendor' : quickMode ? 'Save & Select Supplier' : 'Onboard Supplier'}
+                  {isEdit
+                    ? 'Update Vendor'
+                    : quickMode
+                      ? 'Save & Select Supplier'
+                      : 'Onboard Supplier'}
                 </>
               )}
             </button>

@@ -55,10 +55,7 @@ export async function GET(request: NextRequest) {
     // Verify against MySQL database for authoritative live status
     const dbUser = await prisma.userAccount.findFirst({
       where: {
-        OR: [
-          { id: sessionUser.id },
-          { email: sessionUser.email.toLowerCase().trim() },
-        ],
+        OR: [{ id: sessionUser.id }, { email: sessionUser.email.toLowerCase().trim() }],
       },
       include: {
         storeAssignments: true,
@@ -84,9 +81,12 @@ export async function GET(request: NextRequest) {
       allowedStores.push(dbUser.storeScope);
     }
 
-    const effectiveStore = dbUser.role === 'Super Admin'
-      ? (dbUser.storeScope || 'All Stores')
-      : ((dbUser.storeScope && dbUser.storeScope !== 'All Stores') ? dbUser.storeScope : (allowedStores[0] || 'BLR'));
+    const effectiveStore =
+      dbUser.role === 'Super Admin'
+        ? dbUser.storeScope || 'All Stores'
+        : dbUser.storeScope && dbUser.storeScope !== 'All Stores'
+          ? dbUser.storeScope
+          : allowedStores[0] || 'BLR';
 
     const authoritativeUser = {
       id: dbUser.id,
@@ -95,9 +95,14 @@ export async function GET(request: NextRequest) {
       role: dbUser.role as any,
       securityLevel: dbUser.securityLevel,
       store: effectiveStore,
-      allowedStores: dbUser.role === 'Super Admin'
-        ? (allowedStores.length > 0 ? allowedStores : ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'])
-        : (allowedStores.length > 0 ? allowedStores : [effectiveStore]),
+      allowedStores:
+        dbUser.role === 'Super Admin'
+          ? allowedStores.length > 0
+            ? allowedStores
+            : ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM']
+          : allowedStores.length > 0
+            ? allowedStores
+            : [effectiveStore],
       avatar: dbUser.name.substring(0, 2).toUpperCase(),
       shiftStatus: dbUser.shiftStatus as any,
       avatarUrl: dbUser.avatarUrl || undefined,

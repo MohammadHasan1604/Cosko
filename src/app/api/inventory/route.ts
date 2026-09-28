@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 import { executeWithIdempotency } from '@/lib/idempotency';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
+import { ensureStoredImage } from '@/lib/objectStorage';
 
 /**
  * GET /api/inventory - Retrieve inventory with store filtering (excludes deleted & archived products by default)
@@ -34,17 +35,23 @@ export async function GET(req: NextRequest) {
       }
 
       // Fetch active stores dynamically to provide complete store stock breakdown (Super Admin gets all stores, others get only their assigned stores)
-      const allowedStoresList = user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
-      const storesWhere = user.role === 'Super Admin'
-        ? { status: 'Active' }
-        : { status: 'Active', code: { in: allowedStoresList } };
+      const allowedStoresList =
+        user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
+      const storesWhere =
+        user.role === 'Super Admin'
+          ? { status: 'Active' }
+          : { status: 'Active', code: { in: allowedStoresList } };
       const activeStores = await prisma.storeHub.findMany({
         where: storesWhere,
       });
-      activeStores.sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)));
+      activeStores.sort((a, b) =>
+        a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)
+      );
 
       const storeStock = activeStores.map((s) => {
-        const inv = product.inventoryItems.find((it) => it.storeCode.toUpperCase() === s.code.toUpperCase());
+        const inv = product.inventoryItems.find(
+          (it) => it.storeCode.toUpperCase() === s.code.toUpperCase()
+        );
         return {
           storeCode: s.code,
           storeName: s.name,
@@ -72,17 +79,23 @@ export async function GET(req: NextRequest) {
 
     const storeWhereClause: any = {};
     if (user.role !== 'Super Admin') {
-      const allowed = user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
+      const allowed =
+        user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
       if (store) {
         if (store === 'All Stores' || store === 'ALL') {
           return NextResponse.json(
-            { error: 'Forbidden: Consolidated view across all stores is restricted to Super Admin only' },
+            {
+              error:
+                'Forbidden: Consolidated view across all stores is restricted to Super Admin only',
+            },
             { status: 403 }
           );
         }
         if (!allowed.includes(store)) {
           return NextResponse.json(
-            { error: `Forbidden: Cross-store inventory queries are restricted to Super Admin accounts only` },
+            {
+              error: `Forbidden: Cross-store inventory queries are restricted to Super Admin accounts only`,
+            },
             { status: 403 }
           );
         }
@@ -134,7 +147,10 @@ export async function POST(req: NextRequest) {
     const user = auth.user;
 
     if (!hasPermission(user, 'inventory.add')) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to modify product inventory' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient permissions to modify product inventory' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
@@ -173,36 +189,72 @@ export async function POST(req: NextRequest) {
         if (body.store === 'All Stores' || body.store === 'ALL') {
           return {
             status: 400,
-            data: { error: '"All Stores" is a reporting/aggregation scope only. Physical inventory must be assigned to a specific store location or Central Warehouse (e.g., CENTRAL, BLR, MUM).' }
+            data: {
+              error:
+                '"All Stores" is a reporting/aggregation scope only. Physical inventory must be assigned to a specific store location or Central Warehouse (e.g., CENTRAL, BLR, MUM).',
+            },
           };
         }
 
         if (user.role !== 'Super Admin' && body.store && body.store !== user.store) {
           return {
             status: 403,
-            data: { error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot modify inventory for store "${body.store}".` }
+            data: {
+              error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot modify inventory for store "${body.store}".`,
+            },
           };
         }
-        const storeCode = user.role === 'Super Admin' ? (body.store || 'CENTRAL') : user.store;
-        const qtyOnHand = typeof body.qtyOnHand === 'number' ? body.qtyOnHand : (body.qtyOnHand !== undefined && body.qtyOnHand !== null && body.qtyOnHand !== '' ? Number(body.qtyOnHand) : 0);
-        const reorderPt = typeof body.reorderPt === 'number' ? body.reorderPt : (body.reorderPt !== undefined && body.reorderPt !== null && body.reorderPt !== '' ? Number(body.reorderPt) : 5);
+        const storeCode = user.role === 'Super Admin' ? body.store || 'CENTRAL' : user.store;
+        const qtyOnHand =
+          typeof body.qtyOnHand === 'number'
+            ? body.qtyOnHand
+            : body.qtyOnHand !== undefined && body.qtyOnHand !== null && body.qtyOnHand !== ''
+              ? Number(body.qtyOnHand)
+              : 0;
+        const reorderPt =
+          typeof body.reorderPt === 'number'
+            ? body.reorderPt
+            : body.reorderPt !== undefined && body.reorderPt !== null && body.reorderPt !== ''
+              ? Number(body.reorderPt)
+              : 5;
 
         if (body.costPrice === undefined || body.costPrice === null || body.costPrice === '') {
           return { status: 400, data: { error: 'Cost price is required' } };
         }
-        if (body.sellingPrice === undefined || body.sellingPrice === null || body.sellingPrice === '') {
+        if (
+          body.sellingPrice === undefined ||
+          body.sellingPrice === null ||
+          body.sellingPrice === ''
+        ) {
           return { status: 400, data: { error: 'Selling price is required' } };
         }
         const costPrice = Number(body.costPrice);
         const sellingPrice = Number(body.sellingPrice);
         if (isNaN(costPrice) || isNaN(sellingPrice)) {
-          return { status: 400, data: { error: 'Cost price and selling price must be valid numbers' } };
+          return {
+            status: 400,
+            data: { error: 'Cost price and selling price must be valid numbers' },
+          };
         }
 
-        const mrp = body.mrp !== undefined && body.mrp !== null && body.mrp !== '' ? Number(body.mrp) : null;
-        const taxRate = body.taxRate !== undefined && body.taxRate !== null && body.taxRate !== '' ? Number(body.taxRate) : 0;
-        const warrantyMonths = body.warrantyMonths !== undefined && body.warrantyMonths !== null && body.warrantyMonths !== '' ? Number(body.warrantyMonths) : 0;
-        const imageUrl = body.imageUrl || body.primaryImage || (Array.isArray(body.images) && body.images[0]) || null;
+        const mrp =
+          body.mrp !== undefined && body.mrp !== null && body.mrp !== '' ? Number(body.mrp) : null;
+        const taxRate =
+          body.taxRate !== undefined && body.taxRate !== null && body.taxRate !== ''
+            ? Number(body.taxRate)
+            : 0;
+        const warrantyMonths =
+          body.warrantyMonths !== undefined &&
+          body.warrantyMonths !== null &&
+          body.warrantyMonths !== ''
+            ? Number(body.warrantyMonths)
+            : 0;
+        const rawImageUrl =
+          body.imageUrl ||
+          body.primaryImage ||
+          (Array.isArray(body.images) && body.images[0]) ||
+          null;
+        const imageUrl = await ensureStoredImage(rawImageUrl, 'product-images', user.name);
         const description = body.description?.trim() || null;
 
         const savedProduct = await prisma.$transaction(async (tx: any) => {
@@ -289,7 +341,11 @@ export async function POST(req: NextRequest) {
           });
         });
 
-        broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode, productId: savedProduct?.id, sku: savedProduct?.sku });
+        broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+          storeCode,
+          productId: savedProduct?.id,
+          sku: savedProduct?.sku,
+        });
 
         return {
           status: 201,
@@ -324,7 +380,10 @@ export async function PUT(req: NextRequest) {
     const targetId = body.productId || body.id;
 
     if (!targetId && !body.sku) {
-      return NextResponse.json({ error: 'Product ID or SKU is required for update' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Product ID or SKU is required for update' },
+        { status: 400 }
+      );
     }
 
     // Resolve product reliably (whether body.id is product.id or inventory.id or sku)
@@ -333,9 +392,13 @@ export async function PUT(req: NextRequest) {
       product = await prisma.product.findUnique({ where: { id: targetId } }).catch(() => null);
       if (!product) {
         // Check if targetId is an inventory record ID
-        const inv = await prisma.inventory.findUnique({ where: { id: targetId } }).catch(() => null);
+        const inv = await prisma.inventory
+          .findUnique({ where: { id: targetId } })
+          .catch(() => null);
         if (inv) {
-          product = await prisma.product.findUnique({ where: { id: inv.productId } }).catch(() => null);
+          product = await prisma.product
+            .findUnique({ where: { id: inv.productId } })
+            .catch(() => null);
         }
       }
     }
@@ -355,105 +418,137 @@ export async function PUT(req: NextRequest) {
         where: { barcode: cleanBarcode, id: { not: product.id } },
       });
       if (duplicateBarcode) {
-        return NextResponse.json({ error: `Duplicate barcode: Already assigned to "${duplicateBarcode.name}"` }, { status: 409 });
+        return NextResponse.json(
+          { error: `Duplicate barcode: Already assigned to "${duplicateBarcode.name}"` },
+          { status: 409 }
+        );
       }
     }
 
     // Build update payload dynamically so UNTOUCHED fields are preserved
     const productUpdate: any = {};
     if (body.name !== undefined && body.name.trim() !== '') productUpdate.name = body.name.trim();
-    if (body.barcode !== undefined) productUpdate.barcode = body.barcode ? body.barcode.trim() : null;
+    if (body.barcode !== undefined)
+      productUpdate.barcode = body.barcode ? body.barcode.trim() : null;
     if (body.brand !== undefined) productUpdate.brand = body.brand ? body.brand.trim() : null;
     if (body.model !== undefined) productUpdate.model = body.model ? body.model.trim() : null;
-    if (body.category !== undefined && body.category.trim() !== '') productUpdate.category = body.category.trim();
-    if (body.subcategory !== undefined) productUpdate.subcategory = body.subcategory ? body.subcategory.trim() : null;
-    if (body.description !== undefined) productUpdate.description = body.description ? body.description.trim() : null;
-    if (body.costPrice !== undefined && body.costPrice !== null && body.costPrice !== '') productUpdate.baseCostPrice = Number(body.costPrice);
-    if (body.sellingPrice !== undefined && body.sellingPrice !== null && body.sellingPrice !== '') productUpdate.baseSellingPrice = Number(body.sellingPrice);
-    if (body.mrp !== undefined) productUpdate.mrp = (body.mrp !== null && body.mrp !== '') ? Number(body.mrp) : null;
-    if (body.taxRate !== undefined) productUpdate.gstRate = (body.taxRate !== null && body.taxRate !== '') ? Number(body.taxRate) : null;
-    if (body.warrantyMonths !== undefined) productUpdate.warrantyMonths = (body.warrantyMonths !== null && body.warrantyMonths !== '') ? Number(body.warrantyMonths) : null;
-    if (body.imageUrl !== undefined || body.primaryImage !== undefined || body.images !== undefined) {
-      const img = body.imageUrl || body.primaryImage || (Array.isArray(body.images) ? body.images[0] : null);
-      if (img !== undefined) productUpdate.imageUrl = img || null;
+    if (body.category !== undefined && body.category.trim() !== '')
+      productUpdate.category = body.category.trim();
+    if (body.subcategory !== undefined)
+      productUpdate.subcategory = body.subcategory ? body.subcategory.trim() : null;
+    if (body.description !== undefined)
+      productUpdate.description = body.description ? body.description.trim() : null;
+    if (body.costPrice !== undefined && body.costPrice !== null && body.costPrice !== '')
+      productUpdate.baseCostPrice = Number(body.costPrice);
+    if (body.sellingPrice !== undefined && body.sellingPrice !== null && body.sellingPrice !== '')
+      productUpdate.baseSellingPrice = Number(body.sellingPrice);
+    if (body.mrp !== undefined)
+      productUpdate.mrp = body.mrp !== null && body.mrp !== '' ? Number(body.mrp) : null;
+    if (body.taxRate !== undefined)
+      productUpdate.gstRate =
+        body.taxRate !== null && body.taxRate !== '' ? Number(body.taxRate) : null;
+    if (body.warrantyMonths !== undefined)
+      productUpdate.warrantyMonths =
+        body.warrantyMonths !== null && body.warrantyMonths !== ''
+          ? Number(body.warrantyMonths)
+          : null;
+    if (
+      body.imageUrl !== undefined ||
+      body.primaryImage !== undefined ||
+      body.images !== undefined
+    ) {
+      const img =
+        body.imageUrl || body.primaryImage || (Array.isArray(body.images) ? body.images[0] : null);
+      if (img !== undefined) {
+        productUpdate.imageUrl = await ensureStoredImage(img || null, 'product-images', user.name);
+      }
     }
     if (body.status !== undefined) productUpdate.status = body.status;
 
-    const updatedProduct = await prisma.$transaction(async (tx: any) => {
-      if (Object.keys(productUpdate).length > 0) {
-        await tx.product.update({
-          where: { id: product.id },
-          data: productUpdate,
-        });
-      }
-
-      // Update store inventory if store, quantity, or reorder point was provided
-      const storeCode = body.store || body.storeCode;
-      if (storeCode && storeCode !== 'All Stores' && storeCode !== 'ALL') {
-        const invWhere = {
-          productId_storeCode: {
-            productId: product.id,
-            storeCode: storeCode,
-          },
-        };
-
-        const existingInv = await tx.inventory.findUnique({ where: invWhere }).catch(() => null);
-        const invUpdate: any = {};
-        if (body.qtyOnHand !== undefined) invUpdate.qtyOnHand = Number(body.qtyOnHand);
-        if (body.reorderPt !== undefined) invUpdate.reorderPt = Number(body.reorderPt);
-
-        if (existingInv) {
-          if (Object.keys(invUpdate).length > 0) {
-            await tx.inventory.update({
-              where: invWhere,
-              data: invUpdate,
-            });
-
-            // If quantity was modified, record an adjustment entry
-            if (body.qtyOnHand !== undefined && body.qtyOnHand !== existingInv.qtyOnHand) {
-              const diff = Number(body.qtyOnHand) - existingInv.qtyOnHand;
-              await tx.inventoryLedger.create({
-                data: {
-                  productId: product.id,
-                  storeCode: storeCode,
-                  refNo: `ADJ-${product.sku}-${Date.now().toString().slice(-6)}`,
-                  type: 'ADJUSTMENT',
-                  qtyChange: diff,
-                  costPerUnit: productUpdate.baseCostPrice || product.baseCostPrice,
-                  sellingPricePerUnit: productUpdate.baseSellingPrice || product.baseSellingPrice,
-                  balanceAfter: Number(body.qtyOnHand),
-                  notes: `Stock quantity edited via Edit Product (${diff > 0 ? `+${diff}` : diff} units)`,
-                  createdBy: user.name || user.email,
-                },
-              });
-            }
-          }
-        } else if (body.qtyOnHand !== undefined) {
-          await tx.inventory.create({
-            data: {
-              productId: product.id,
-              storeCode: storeCode,
-              qtyOnHand: Number(body.qtyOnHand) || 0,
-              reorderPt: Number(body.reorderPt) || 5,
-            },
+    const updatedProduct = await prisma.$transaction(
+      async (tx: any) => {
+        if (Object.keys(productUpdate).length > 0) {
+          await tx.product.update({
+            where: { id: product.id },
+            data: productUpdate,
           });
         }
-      }
 
-      return tx.product.findUnique({
-        where: { id: product.id },
-        include: {
-          inventoryItems: true,
-        },
-      });
-    }, { maxWait: 15000, timeout: 45000 });
+        // Update store inventory if store, quantity, or reorder point was provided
+        const storeCode = body.store || body.storeCode;
+        if (storeCode && storeCode !== 'All Stores' && storeCode !== 'ALL') {
+          const invWhere = {
+            productId_storeCode: {
+              productId: product.id,
+              storeCode: storeCode,
+            },
+          };
 
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { productId: product.id, sku: product.sku });
+          const existingInv = await tx.inventory.findUnique({ where: invWhere }).catch(() => null);
+          const invUpdate: any = {};
+          if (body.qtyOnHand !== undefined) invUpdate.qtyOnHand = Number(body.qtyOnHand);
+          if (body.reorderPt !== undefined) invUpdate.reorderPt = Number(body.reorderPt);
+
+          if (existingInv) {
+            if (Object.keys(invUpdate).length > 0) {
+              await tx.inventory.update({
+                where: invWhere,
+                data: invUpdate,
+              });
+
+              // If quantity was modified, record an adjustment entry
+              if (body.qtyOnHand !== undefined && body.qtyOnHand !== existingInv.qtyOnHand) {
+                const diff = Number(body.qtyOnHand) - existingInv.qtyOnHand;
+                await tx.inventoryLedger.create({
+                  data: {
+                    productId: product.id,
+                    storeCode: storeCode,
+                    refNo: `ADJ-${product.sku}-${Date.now().toString().slice(-6)}`,
+                    type: 'ADJUSTMENT',
+                    qtyChange: diff,
+                    costPerUnit: productUpdate.baseCostPrice || product.baseCostPrice,
+                    sellingPricePerUnit: productUpdate.baseSellingPrice || product.baseSellingPrice,
+                    balanceAfter: Number(body.qtyOnHand),
+                    notes: `Stock quantity edited via Edit Product (${diff > 0 ? `+${diff}` : diff} units)`,
+                    createdBy: user.name || user.email,
+                  },
+                });
+              }
+            }
+          } else if (body.qtyOnHand !== undefined) {
+            await tx.inventory.create({
+              data: {
+                productId: product.id,
+                storeCode: storeCode,
+                qtyOnHand: Number(body.qtyOnHand) || 0,
+                reorderPt: Number(body.reorderPt) || 5,
+              },
+            });
+          }
+        }
+
+        return tx.product.findUnique({
+          where: { id: product.id },
+          include: {
+            inventoryItems: true,
+          },
+        });
+      },
+      { maxWait: 15000, timeout: 45000 }
+    );
+
+    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+      productId: product.id,
+      sku: product.sku,
+    });
 
     return NextResponse.json({ success: true, product: updatedProduct });
   } catch (error: any) {
     console.error('API /api/inventory PUT error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to update product' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to update product' },
+      { status: 500 }
+    );
   }
 }
 
@@ -470,7 +565,10 @@ export async function DELETE(req: NextRequest) {
     const user = auth.user;
 
     if (!hasPermission(user, 'inventory.archive')) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to archive or delete products' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient permissions to archive or delete products' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -497,7 +595,9 @@ export async function DELETE(req: NextRequest) {
       const parts = id.split('-');
       if (parts.length > 5) {
         const candidateUuid = parts.slice(0, 5).join('-');
-        target = await prisma.product.findUnique({ where: { id: candidateUuid } }).catch(() => null);
+        target = await prisma.product
+          .findUnique({ where: { id: candidateUuid } })
+          .catch(() => null);
       }
       if (!target) {
         target = await prisma.product.findUnique({ where: { id: parts[0] } }).catch(() => null);
@@ -505,13 +605,19 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (!target) {
-      return NextResponse.json({ success: true, message: 'Product already deleted or non-existent' });
+      return NextResponse.json({
+        success: true,
+        message: 'Product already deleted or non-existent',
+      });
     }
 
     // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────
     if (user.securityLevel < 100) {
       if (!reason || reason.trim().length < 3) {
-        return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'A reason for deletion is required (minimum 3 characters)' },
+          { status: 400 }
+        );
       }
       const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
       const result = await createDeleteRequest(user as any, {
@@ -538,7 +644,7 @@ export async function DELETE(req: NextRequest) {
       prisma.inventoryLedger.count({ where: { productId: target.id } }),
     ]);
 
-    const hasHistory = (salesCount + poCount + transferCount + ledgerCount) > 0;
+    const hasHistory = salesCount + poCount + transferCount + ledgerCount > 0;
 
     if (hasHistory || !permanent) {
       const product = await prisma.product.update({
@@ -550,14 +656,24 @@ export async function DELETE(req: NextRequest) {
         data: {
           module: 'INVENTORY',
           action: `ARCHIVED: Product "${target.name}" (${target.sku})`,
-          details: JSON.stringify({ productId: target.id, salesCount, poCount, transferCount, ledgerCount }),
+          details: JSON.stringify({
+            productId: target.id,
+            salesCount,
+            poCount,
+            transferCount,
+            ledgerCount,
+          }),
           userEmail: user.email,
           userRole: user.role,
           storeCode: user.store || 'CENTRAL',
         },
       });
 
-      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { productId: target.id, sku: target.sku, action: 'archived' });
+      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+        productId: target.id,
+        sku: target.sku,
+        action: 'archived',
+      });
 
       return NextResponse.json({
         success: true,
@@ -571,22 +687,29 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Hard-delete for unused products by Super Admin
-    await prisma.$transaction(async (tx: any) => {
-      await tx.inventory.deleteMany({ where: { productId: target.id } });
-      await tx.product.delete({ where: { id: target.id } });
-      await tx.auditLog.create({
-        data: {
-          module: 'INVENTORY',
-          action: `HARD_DELETED: Product "${target.name}" (${target.sku})`,
-          details: JSON.stringify({ productId: target.id, beforeState: target }),
-          userEmail: user.email,
-          userRole: user.role,
-          storeCode: user.store || 'CENTRAL',
-        },
-      });
-    }, { maxWait: 15000, timeout: 45000 });
+    await prisma.$transaction(
+      async (tx: any) => {
+        await tx.inventory.deleteMany({ where: { productId: target.id } });
+        await tx.product.delete({ where: { id: target.id } });
+        await tx.auditLog.create({
+          data: {
+            module: 'INVENTORY',
+            action: `HARD_DELETED: Product "${target.name}" (${target.sku})`,
+            details: JSON.stringify({ productId: target.id, beforeState: target }),
+            userEmail: user.email,
+            userRole: user.role,
+            storeCode: user.store || 'CENTRAL',
+          },
+        });
+      },
+      { maxWait: 15000, timeout: 45000 }
+    );
 
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { productId: target.id, sku: target.sku, action: 'deleted' });
+    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+      productId: target.id,
+      sku: target.sku,
+      action: 'deleted',
+    });
 
     return NextResponse.json({
       success: true,
@@ -595,7 +718,9 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /api/inventory DELETE error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to archive/delete product' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to archive/delete product' },
+      { status: 500 }
+    );
   }
 }
-

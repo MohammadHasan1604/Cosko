@@ -101,7 +101,7 @@ async function resolveImageToBuffer(imageUrl: string): Promise<Buffer | null> {
 
 /**
  * POST /api/inventory/visual-search
- * 
+ *
  * Body: {
  *   image: string; // Base64 data URL
  *   store?: string; // Current store code, e.g. 'BLR' or 'CENTRAL'
@@ -170,10 +170,7 @@ export async function POST(req: NextRequest) {
       const productMrp = prod.mrp ? Number(prod.mrp) : productSellingPrice;
 
       // 3A. Optical Barcode / SKU Exact Match (Confidence: 99-100%)
-      if (
-        barcode &&
-        ((prod.barcode && prod.barcode === barcode) || prod.sku === barcode)
-      ) {
+      if (barcode && ((prod.barcode && prod.barcode === barcode) || prod.sku === barcode)) {
         candidateMatches.push({
           id: storeInv?.id || `${prod.id}-${effectiveStore}`,
           productId: prod.id,

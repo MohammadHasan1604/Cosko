@@ -101,7 +101,7 @@ test('Login route has DB account lockout', () => {
 
 test('Auth secret refuses insecure default in production', () => {
   const content = readFile('src/lib/auth.ts');
-  return content.includes('INSECURE_DEFAULT') && content.includes("throw new Error('FATAL");
+  return content.includes('INSECURE_DEFAULT') && content.includes('FATAL: AUTH_SECRET');
 });
 
 // ═══════════════════════════════════════════════════

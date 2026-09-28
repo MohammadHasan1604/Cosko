@@ -22,7 +22,12 @@ export async function GET(req: NextRequest) {
     const includeArchived = searchParams.get('includeArchived') === 'true';
     const forceFresh = searchParams.get('fresh') === 'true';
 
-    if (!includeArchived && !forceFresh && cachedCategoriesPayload && Date.now() - lastCategoriesCacheTime < CATEGORIES_CACHE_TTL) {
+    if (
+      !includeArchived &&
+      !forceFresh &&
+      cachedCategoriesPayload &&
+      Date.now() - lastCategoriesCacheTime < CATEGORIES_CACHE_TTL
+    ) {
       return NextResponse.json(cachedCategoriesPayload, {
         headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
       });
@@ -34,7 +39,9 @@ export async function GET(req: NextRequest) {
     }
 
     // Auto-seed default expense categories if none exist with categoryType = 'Expense'
-    const expenseCatCount = await (prisma as any).category.count({ where: { categoryType: 'Expense' } });
+    const expenseCatCount = await (prisma as any).category.count({
+      where: { categoryType: 'Expense' },
+    });
     if (expenseCatCount === 0) {
       const DEFAULT_EXPENSE_CATEGORIES = [
         'Store Rent',
@@ -49,7 +56,10 @@ export async function GET(req: NextRequest) {
       ];
       for (let i = 0; i < DEFAULT_EXPENSE_CATEGORIES.length; i++) {
         const catName = DEFAULT_EXPENSE_CATEGORIES[i];
-        const slug = catName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        const slug = catName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)+/g, '');
         await (prisma as any).category.upsert({
           where: { slug },
           update: { categoryType: 'Expense' },
@@ -112,19 +122,38 @@ export async function POST(req: NextRequest) {
 
     if (!session || (session.role !== 'Super Admin' && session.role !== 'Store Manager')) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized: Only Admin or Store Manager can manage categories' },
+        {
+          success: false,
+          message: 'Unauthorized: Only Admin or Store Manager can manage categories',
+        },
         { status: 403 }
       );
     }
 
     const body = await req.json();
-    const { name, parentCategoryId, categoryType = 'Product', description, icon, imageUrl, status = 'Active', sortOrder = 0 } = body;
+    const {
+      name,
+      parentCategoryId,
+      categoryType = 'Product',
+      description,
+      icon,
+      imageUrl,
+      status = 'Active',
+      sortOrder = 0,
+    } = body;
 
     if (!name || typeof name !== 'string' || !name.trim()) {
-      return NextResponse.json({ success: false, message: 'Category name is required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'Category name is required' },
+        { status: 400 }
+      );
     }
 
-    const baseSlug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const baseSlug = name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
     const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
 
     const newCategory = await (prisma as any).category.create({
@@ -143,7 +172,11 @@ export async function POST(req: NextRequest) {
     });
 
     invalidateCategoriesCache();
-    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: newCategory.id, name: newCategory.name, action: 'created' });
+    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
+      id: newCategory.id,
+      name: newCategory.name,
+      action: 'created',
+    });
 
     return NextResponse.json({
       success: true,
@@ -173,16 +206,32 @@ export async function PUT(req: NextRequest) {
 
     if (!session || (session.role !== 'Super Admin' && session.role !== 'Store Manager')) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized: Only Admin or Store Manager can modify categories' },
+        {
+          success: false,
+          message: 'Unauthorized: Only Admin or Store Manager can modify categories',
+        },
         { status: 403 }
       );
     }
 
     const body = await req.json();
-    const { id, name, parentCategoryId, categoryType, description, icon, imageUrl, status, sortOrder } = body;
+    const {
+      id,
+      name,
+      parentCategoryId,
+      categoryType,
+      description,
+      icon,
+      imageUrl,
+      status,
+      sortOrder,
+    } = body;
 
     if (!id) {
-      return NextResponse.json({ success: false, message: 'Category ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'Category ID is required' },
+        { status: 400 }
+      );
     }
 
     const updated = await (prisma as any).category.update({
@@ -200,7 +249,11 @@ export async function PUT(req: NextRequest) {
     });
 
     invalidateCategoriesCache();
-    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: updated.id, name: updated.name, action: 'updated' });
+    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
+      id: updated.id,
+      name: updated.name,
+      action: 'updated',
+    });
 
     return NextResponse.json({
       success: true,
@@ -229,7 +282,10 @@ export async function DELETE(req: NextRequest) {
     const session = auth.user;
 
     if (session.securityLevel < 80) {
-      return NextResponse.json({ success: false, message: 'Forbidden: Insufficient security level' }, { status: 403 });
+      return NextResponse.json(
+        { success: false, message: 'Forbidden: Insufficient security level' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -238,7 +294,10 @@ export async function DELETE(req: NextRequest) {
     const reason = searchParams.get('reason') || '';
 
     if (!id) {
-      return NextResponse.json({ success: false, message: 'Category ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'Category ID is required' },
+        { status: 400 }
+      );
     }
 
     let target = await (prisma as any).category.findUnique({ where: { id } }).catch(() => null);
@@ -247,18 +306,34 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (!target) {
-      return NextResponse.json({ success: true, message: 'Category already deleted or non-existent' });
+      return NextResponse.json({
+        success: true,
+        message: 'Category already deleted or non-existent',
+      });
     }
 
     // NON-SUPER-ADMIN: delete approval workflow
     if (session.securityLevel < 100) {
       if (!reason || reason.trim().length < 3) {
-        return NextResponse.json({ success: false, message: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+        return NextResponse.json(
+          { success: false, message: 'A reason for deletion is required (minimum 3 characters)' },
+          { status: 400 }
+        );
       }
       const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
-      const result = await createDeleteRequest(session as any, { entityType: 'CATEGORY', entityId: target.id, reason: reason.trim() });
-      if (!result.success) return NextResponse.json({ success: false, message: result.error }, { status: 409 });
-      return NextResponse.json({ success: true, mode: 'pending_approval', deleteRequest: result.deleteRequest, message: `Delete request for category "${target.name}" submitted for Super Admin approval.` });
+      const result = await createDeleteRequest(session as any, {
+        entityType: 'CATEGORY',
+        entityId: target.id,
+        reason: reason.trim(),
+      });
+      if (!result.success)
+        return NextResponse.json({ success: false, message: result.error }, { status: 409 });
+      return NextResponse.json({
+        success: true,
+        mode: 'pending_approval',
+        deleteRequest: result.deleteRequest,
+        message: `Delete request for category "${target.name}" submitted for Super Admin approval.`,
+      });
     }
 
     // SUPER ADMIN: Check dependencies
@@ -287,7 +362,11 @@ export async function DELETE(req: NextRequest) {
       });
 
       invalidateCategoriesCache();
-      broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: target.id, name: target.name, action: 'archived' });
+      broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
+        id: target.id,
+        name: target.name,
+        action: 'archived',
+      });
 
       return NextResponse.json({
         success: true,
@@ -303,11 +382,24 @@ export async function DELETE(req: NextRequest) {
     // Hard-delete
     await prisma.$transaction(async (tx: any) => {
       await tx.category.delete({ where: { id: target.id } });
-      await tx.auditLog.create({ data: { module: 'CATEGORIES', action: `HARD_DELETED: Category "${target.name}"`, details: JSON.stringify({ categoryId: target.id, beforeState: target }), userEmail: session.email, userRole: session.role, storeCode: session.store || 'CENTRAL' } });
+      await tx.auditLog.create({
+        data: {
+          module: 'CATEGORIES',
+          action: `HARD_DELETED: Category "${target.name}"`,
+          details: JSON.stringify({ categoryId: target.id, beforeState: target }),
+          userEmail: session.email,
+          userRole: session.role,
+          storeCode: session.store || 'CENTRAL',
+        },
+      });
     });
 
     invalidateCategoriesCache();
-    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', { id: target.id, name: target.name, action: 'deleted' });
+    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
+      id: target.id,
+      name: target.name,
+      action: 'deleted',
+    });
 
     return NextResponse.json({
       success: true,

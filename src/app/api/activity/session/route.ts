@@ -35,7 +35,10 @@ export async function POST(req: NextRequest) {
     const todayStr = getLocalDateString(now, clientTimezone);
 
     if (action === 'start') {
-      const storeCode = (user.store && user.store !== 'All Stores') ? user.store : (user.allowedStores?.[0] || 'CENTRAL');
+      const storeCode =
+        user.store && user.store !== 'All Stores'
+          ? user.store
+          : user.allowedStores?.[0] || 'CENTRAL';
 
       // 1. Close any abandoned sessions older than 10 minutes for this user
       const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);

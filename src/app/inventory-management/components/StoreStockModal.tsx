@@ -48,66 +48,74 @@ export default function StoreStockModal({
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Fetch real-time authoritative stock from the database
-  const fetchLiveStoreStock = useCallback(async (isSilent = false) => {
-    if (!item) return;
+  const fetchLiveStoreStock = useCallback(
+    async (isSilent = false) => {
+      if (!item) return;
 
-    if (!isSilent) setLoading(true);
-    else setRefreshing(true);
-    setError(null);
+      if (!isSilent) setLoading(true);
+      else setRefreshing(true);
+      setError(null);
 
-    try {
-      const param = item.sku ? `sku=${encodeURIComponent(item.sku)}` : `productId=${encodeURIComponent(item.productId || item.id)}`;
-      const res = await fetch(`/api/inventory/store-stock?${param}`, {
-        cache: 'no-store',
-      });
-
-      if (!res.ok) {
-        throw new Error(`Server returned status ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (data.success && Array.isArray(data.stores)) {
-        setStores(data.stores);
-        setTotalStock(typeof data.totalStock === 'number' ? data.totalStock : 0);
-        setLastUpdated(new Date());
-      } else {
-        throw new Error(data.error || 'Invalid store stock response');
-      }
-    } catch (err: any) {
-      console.warn('Failed to fetch real-time store stock from DB:', err);
-      setError('Could not fetch real-time stock from database. Showing cached records.');
-
-      // Fallback: Populate from existing storesList & item.locationStock if network fails
-      const fallbackStores: StoreStockItem[] = storesList
-        .filter((s) => s.status === 'Active')
-        .sort((a, b) => (a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)))
-        .map((s) => {
-          const qty = item.locationStock?.[s.code] ?? (item.store === s.code ? item.qtyOnHand : 0);
-          const reorderPt = item.reorderPt || 5;
-          return {
-            storeId: s.id,
-            storeCode: s.code,
-            storeName: s.name,
-            displayName: s.code === 'CENTRAL' ? 'Central' : s.city || s.name,
-            city: s.city,
-            qtyOnHand: qty,
-            qtyReserved: 0,
-            reorderPt,
-            shelfLoc: null,
-            status: s.status,
-            inStock: qty > 0,
-            isLowStock: qty > 0 && qty <= reorderPt,
-          };
+      try {
+        const param = item.sku
+          ? `sku=${encodeURIComponent(item.sku)}`
+          : `productId=${encodeURIComponent(item.productId || item.id)}`;
+        const res = await fetch(`/api/inventory/store-stock?${param}`, {
+          cache: 'no-store',
         });
 
-      setStores(fallbackStores);
-      const fallbackTotal = fallbackStores.reduce((sum, s) => sum + s.qtyOnHand, 0);
-      setTotalStock(fallbackTotal);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [item, storesList]);
+        if (!res.ok) {
+          throw new Error(`Server returned status ${res.status}`);
+        }
+
+        const data = await res.json();
+        if (data.success && Array.isArray(data.stores)) {
+          setStores(data.stores);
+          setTotalStock(typeof data.totalStock === 'number' ? data.totalStock : 0);
+          setLastUpdated(new Date());
+        } else {
+          throw new Error(data.error || 'Invalid store stock response');
+        }
+      } catch (err: any) {
+        console.warn('Failed to fetch real-time store stock from DB:', err);
+        setError('Could not fetch real-time stock from database. Showing cached records.');
+
+        // Fallback: Populate from existing storesList & item.locationStock if network fails
+        const fallbackStores: StoreStockItem[] = storesList
+          .filter((s) => s.status === 'Active')
+          .sort((a, b) =>
+            a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)
+          )
+          .map((s) => {
+            const qty =
+              item.locationStock?.[s.code] ?? (item.store === s.code ? item.qtyOnHand : 0);
+            const reorderPt = item.reorderPt || 5;
+            return {
+              storeId: s.id,
+              storeCode: s.code,
+              storeName: s.name,
+              displayName: s.code === 'CENTRAL' ? 'Central' : s.city || s.name,
+              city: s.city,
+              qtyOnHand: qty,
+              qtyReserved: 0,
+              reorderPt,
+              shelfLoc: null,
+              status: s.status,
+              inStock: qty > 0,
+              isLowStock: qty > 0 && qty <= reorderPt,
+            };
+          });
+
+        setStores(fallbackStores);
+        const fallbackTotal = fallbackStores.reduce((sum, s) => sum + s.qtyOnHand, 0);
+        setTotalStock(fallbackTotal);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [item, storesList]
+  );
 
   // Trigger load whenever a new item is selected or modal opens
   useEffect(() => {
@@ -162,11 +170,7 @@ export default function StoreStockModal({
               </span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-secondary text-xs px-4 py-2"
-          >
+          <button type="button" onClick={onClose} className="btn-secondary text-xs px-4 py-2">
             Close
           </button>
         </div>
@@ -197,9 +201,7 @@ export default function StoreStockModal({
                     UPC: {item.barcode}
                   </span>
                 )}
-                <span className="badge-info text-3xs font-semibold">
-                  {item.brand || 'General'}
-                </span>
+                <span className="badge-info text-3xs font-semibold">{item.brand || 'General'}</span>
               </div>
               <h3 className="text-sm font-bold text-foreground truncate mt-0.5" title={item.name}>
                 {item.name}
@@ -258,7 +260,9 @@ export default function StoreStockModal({
                 >
                   <span className="font-semibold">{s.displayName || s.city || s.storeCode}</span>
                   <span className="text-muted-foreground font-mono">—</span>
-                  <span className={`font-mono font-bold ${s.qtyOnHand > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
+                  <span
+                    className={`font-mono font-bold ${s.qtyOnHand > 0 ? 'text-primary' : 'text-muted-foreground'}`}
+                  >
                     {s.qtyOnHand}
                   </span>
                 </div>
@@ -325,7 +329,9 @@ export default function StoreStockModal({
                 selectedStoreFilter.toUpperCase() === store.storeCode.toUpperCase();
 
               const stockPercent =
-                totalStock > 0 ? Math.min(100, Math.round((store.qtyOnHand / totalStock) * 100)) : 0;
+                totalStock > 0
+                  ? Math.min(100, Math.round((store.qtyOnHand / totalStock) * 100))
+                  : 0;
 
               return (
                 <div
@@ -334,8 +340,8 @@ export default function StoreStockModal({
                     isSelectedFilter
                       ? 'bg-primary/5 border-primary/40 shadow-sm'
                       : store.qtyOnHand > 0
-                      ? 'bg-card border-border hover:border-border/80'
-                      : 'bg-muted/15 border-border/70 opacity-80'
+                        ? 'bg-card border-border hover:border-border/80'
+                        : 'bg-muted/15 border-border/70 opacity-80'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -354,18 +360,26 @@ export default function StoreStockModal({
                           </span>
                         )}
                         {store.storeCode === 'CENTRAL' && (
-                          <span className="badge-neutral text-3xs font-medium">
-                            Central Hub
-                          </span>
+                          <span className="badge-neutral text-3xs font-medium">Central Hub</span>
                         )}
                       </div>
 
                       <div className="flex items-center gap-3 text-2xs text-muted-foreground mt-1 flex-wrap">
-                        <span>City: <strong className="text-foreground">{store.city || 'HQ'}</strong></span>
+                        <span>
+                          City: <strong className="text-foreground">{store.city || 'HQ'}</strong>
+                        </span>
                         {store.shelfLoc && (
-                          <span>Shelf: <strong className="text-foreground font-mono">{store.shelfLoc}</strong></span>
+                          <span>
+                            Shelf:{' '}
+                            <strong className="text-foreground font-mono">{store.shelfLoc}</strong>
+                          </span>
                         )}
-                        <span>Reorder Pt: <strong className="font-tabular text-foreground">{store.reorderPt}</strong></span>
+                        <span>
+                          Reorder Pt:{' '}
+                          <strong className="font-tabular text-foreground">
+                            {store.reorderPt}
+                          </strong>
+                        </span>
                       </div>
                     </div>
 
@@ -378,23 +392,20 @@ export default function StoreStockModal({
                               store.qtyOnHand === 0
                                 ? 'text-danger'
                                 : store.qtyOnHand <= store.reorderPt
-                                ? 'text-warning'
-                                : 'text-success'
+                                  ? 'text-warning'
+                                  : 'text-success'
                             }`}
                           >
                             {store.qtyOnHand}
                           </span>
-                          <span className="text-2xs text-muted-foreground font-medium">
-                            units
-                          </span>
+                          <span className="text-2xs text-muted-foreground font-medium">units</span>
                         </div>
 
                         {/* Status badge */}
                         <div className="mt-0.5">
                           {store.qtyOnHand === 0 ? (
                             <span className="inline-flex items-center gap-1 text-3xs font-semibold px-2 py-0.5 rounded-full bg-danger/10 text-danger border border-danger/20">
-                              <span className="w-1.5 h-1.5 rounded-full bg-danger" />
-                              0 Stock
+                              <span className="w-1.5 h-1.5 rounded-full bg-danger" />0 Stock
                             </span>
                           ) : store.qtyOnHand <= store.reorderPt ? (
                             <span className="inline-flex items-center gap-1 text-3xs font-semibold px-2 py-0.5 rounded-full bg-warning/10 text-warning border border-warning/20">
@@ -421,8 +432,8 @@ export default function StoreStockModal({
                             store.qtyOnHand === 0
                               ? 'bg-transparent'
                               : store.qtyOnHand <= store.reorderPt
-                              ? 'bg-warning'
-                              : 'bg-primary'
+                                ? 'bg-warning'
+                                : 'bg-primary'
                           }`}
                           style={{ width: `${stockPercent}%` }}
                         />

@@ -11,7 +11,11 @@ import RecentActivityFeed from './components/RecentActivityFeed';
 // Dynamically load heavy Recharts components to optimize initial page compilation & client bundle size
 const DashboardCharts = dynamic(() => import('./components/DashboardCharts'), {
   ssr: false,
-  loading: () => <div className="h-48 md:h-64 card animate-pulse bg-muted/30 flex items-center justify-center text-xs text-muted-foreground rounded-xl">Loading Analytics Charts...</div>,
+  loading: () => (
+    <div className="h-48 md:h-64 card animate-pulse bg-muted/30 flex items-center justify-center text-xs text-muted-foreground rounded-xl">
+      Loading Analytics Charts...
+    </div>
+  ),
 });
 
 export default function DashboardPage() {

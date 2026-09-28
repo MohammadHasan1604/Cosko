@@ -14,9 +14,12 @@ interface BottomSheetProps {
 export default function BottomSheet({ open, onClose, title, children, footer }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
 
-  const handleEscape = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
-  }, [onClose]);
+  const handleEscape = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    },
+    [onClose]
+  );
 
   useEffect(() => {
     if (open) {
@@ -34,11 +37,7 @@ export default function BottomSheet({ open, onClose, title, children, footer }: 
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="sheet-overlay"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="sheet-overlay" onClick={onClose} aria-hidden="true" />
 
       {/* Sheet */}
       <div
@@ -66,16 +65,10 @@ export default function BottomSheet({ open, onClose, title, children, footer }: 
         )}
 
         {/* Body */}
-        <div className="sheet-body">
-          {children}
-        </div>
+        <div className="sheet-body">{children}</div>
 
         {/* Footer */}
-        {footer && (
-          <div className="sheet-footer">
-            {footer}
-          </div>
-        )}
+        {footer && <div className="sheet-footer">{footer}</div>}
       </div>
     </>
   );

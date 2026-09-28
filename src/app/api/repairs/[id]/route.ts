@@ -38,7 +38,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         status: repair.status,
         estimatedCost: Number(repair.estimatedCost),
         storeCode: 'CENTRAL',
-        enquiryDate: new Date(repair.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        enquiryDate: new Date(repair.createdAt).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        }),
         assignedTech: repair.assignedTech,
         createdAt: repair.createdAt,
         updatedAt: repair.updatedAt,

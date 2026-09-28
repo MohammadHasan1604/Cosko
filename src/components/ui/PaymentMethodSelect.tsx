@@ -132,7 +132,9 @@ export default function PaymentMethodSelect({
               className="h-9 px-3 rounded-xl text-xs font-bold border border-warning/50 bg-warning/10 text-warning flex items-center gap-1.5"
             >
               <span>{value}</span>
-              <span className="text-4xs px-1.5 py-0.2 rounded bg-warning/20 font-mono">Inactive</span>
+              <span className="text-4xs px-1.5 py-0.2 rounded bg-warning/20 font-mono">
+                Inactive
+              </span>
             </button>
           )}
 

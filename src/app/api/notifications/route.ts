@@ -37,17 +37,23 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    return NextResponse.json({
-      success: true,
-      notifications,
-      unreadCount,
-      totalCount,
-    }, {
-      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' },
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        notifications,
+        unreadCount,
+        totalCount,
+      },
+      {
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' },
+      }
+    );
   } catch (error: any) {
     console.error('API /api/notifications GET error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch notifications' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch notifications' },
+      { status: 500 }
+    );
   }
 }
 
@@ -81,9 +87,15 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Notification marked as read' });
     }
 
-    return NextResponse.json({ error: 'notificationId or markAllRead is required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'notificationId or markAllRead is required' },
+      { status: 400 }
+    );
   } catch (error: any) {
     console.error('API /api/notifications PUT error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to update notification' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to update notification' },
+      { status: 500 }
+    );
   }
 }

@@ -4,14 +4,62 @@ import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPi
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 const DEFAULT_CATEGORY_TYPES = [
-  { name: 'Product', code: 'product', description: 'General retail products and inventory goods', color: 'primary', isSystem: true },
-  { name: 'Expense', code: 'expense', description: 'Operational, administrative and store expenses', color: 'danger', isSystem: true },
-  { name: 'Device', code: 'device', description: 'Smartphones, Tablets, Smartwatches, Laptops and finished electronics', color: 'info', isSystem: true },
-  { name: 'Spare Part', code: 'spare-part', description: 'Replacement parts, repair components and hardware', color: 'warning', isSystem: true },
-  { name: 'Accessory', code: 'accessory', description: 'Cables, cases, chargers and peripherals', color: 'success', isSystem: true },
-  { name: 'Service', code: 'service', description: 'Labor, diagnostic services and maintenance packages', color: 'purple', isSystem: true },
-  { name: 'EV', code: 'ev', description: 'Electric vehicle components, battery packs and drives', color: 'emerald', isSystem: true },
-  { name: 'Home Appliance', code: 'home-appliance', description: 'ACs, TVs, Refrigerators, Washing machines and spares', color: 'amber', isSystem: true },
+  {
+    name: 'Product',
+    code: 'product',
+    description: 'General retail products and inventory goods',
+    color: 'primary',
+    isSystem: true,
+  },
+  {
+    name: 'Expense',
+    code: 'expense',
+    description: 'Operational, administrative and store expenses',
+    color: 'danger',
+    isSystem: true,
+  },
+  {
+    name: 'Device',
+    code: 'device',
+    description: 'Smartphones, Tablets, Smartwatches, Laptops and finished electronics',
+    color: 'info',
+    isSystem: true,
+  },
+  {
+    name: 'Spare Part',
+    code: 'spare-part',
+    description: 'Replacement parts, repair components and hardware',
+    color: 'warning',
+    isSystem: true,
+  },
+  {
+    name: 'Accessory',
+    code: 'accessory',
+    description: 'Cables, cases, chargers and peripherals',
+    color: 'success',
+    isSystem: true,
+  },
+  {
+    name: 'Service',
+    code: 'service',
+    description: 'Labor, diagnostic services and maintenance packages',
+    color: 'purple',
+    isSystem: true,
+  },
+  {
+    name: 'EV',
+    code: 'ev',
+    description: 'Electric vehicle components, battery packs and drives',
+    color: 'emerald',
+    isSystem: true,
+  },
+  {
+    name: 'Home Appliance',
+    code: 'home-appliance',
+    description: 'ACs, TVs, Refrigerators, Washing machines and spares',
+    color: 'amber',
+    isSystem: true,
+  },
 ];
 
 let cachedCategoryTypesPayload: any = null;
@@ -30,7 +78,11 @@ function invalidateCategoryTypesCache() {
 export async function GET(req: NextRequest) {
   try {
     const forceFresh = req?.nextUrl?.searchParams?.get('fresh') === 'true';
-    if (!forceFresh && cachedCategoryTypesPayload && Date.now() - lastCategoryTypesCacheTime < CATEGORY_TYPES_CACHE_TTL) {
+    if (
+      !forceFresh &&
+      cachedCategoryTypesPayload &&
+      Date.now() - lastCategoryTypesCacheTime < CATEGORY_TYPES_CACHE_TTL
+    ) {
       return NextResponse.json(cachedCategoryTypesPayload, {
         headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
       });
@@ -58,8 +110,14 @@ export async function GET(req: NextRequest) {
       });
 
       for (const d of distinctTypes) {
-        if (d.categoryType && !DEFAULT_CATEGORY_TYPES.some(x => x.name.toLowerCase() === d.categoryType.toLowerCase())) {
-          const code = d.categoryType.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        if (
+          d.categoryType &&
+          !DEFAULT_CATEGORY_TYPES.some((x) => x.name.toLowerCase() === d.categoryType.toLowerCase())
+        ) {
+          const code = d.categoryType
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)+/g, '');
           await (prisma as any).categoryType.upsert({
             where: { name: d.categoryType },
             update: {},
@@ -130,7 +188,10 @@ export async function POST(req: NextRequest) {
     const session = _authResult.user;
     if (!session || (session.role !== 'Super Admin' && session.role !== 'Store Manager')) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized: Only Admin or Store Manager can create Category Types' },
+        {
+          success: false,
+          message: 'Unauthorized: Only Admin or Store Manager can create Category Types',
+        },
         { status: 403 }
       );
     }
@@ -139,19 +200,22 @@ export async function POST(req: NextRequest) {
     const { name, description, color = 'primary' } = body;
 
     if (!name || typeof name !== 'string' || !name.trim()) {
-      return NextResponse.json({ success: false, message: 'Category Type name is required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'Category Type name is required' },
+        { status: 400 }
+      );
     }
 
     const trimmedName = name.trim();
-    const code = trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const code = trimmedName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
 
     // Check for duplicate name or code
     const existing = await (prisma as any).categoryType.findFirst({
       where: {
-        OR: [
-          { name: { equals: trimmedName } },
-          { code: { equals: code } },
-        ],
+        OR: [{ name: { equals: trimmedName } }, { code: { equals: code } }],
       },
     });
 
@@ -173,7 +237,10 @@ export async function POST(req: NextRequest) {
     });
 
     invalidateCategoryTypesCache();
-    broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_CREATED', { id: newType.id, name: newType.name });
+    broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_CREATED', {
+      id: newType.id,
+      name: newType.name,
+    });
 
     return NextResponse.json({
       success: true,
@@ -202,7 +269,10 @@ export async function PUT(req: NextRequest) {
     const session = _authResult.user;
     if (!session || (session.role !== 'Super Admin' && session.role !== 'Store Manager')) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized: Only Admin or Store Manager can update Category Types' },
+        {
+          success: false,
+          message: 'Unauthorized: Only Admin or Store Manager can update Category Types',
+        },
         { status: 403 }
       );
     }
@@ -211,7 +281,10 @@ export async function PUT(req: NextRequest) {
     const { id, name, description, color } = body;
 
     if (!id) {
-      return NextResponse.json({ success: false, message: 'Category Type ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'Category Type ID is required' },
+        { status: 400 }
+      );
     }
 
     const existing = await (prisma as any).categoryType.findUnique({
@@ -219,7 +292,10 @@ export async function PUT(req: NextRequest) {
     });
 
     if (!existing) {
-      return NextResponse.json({ success: false, message: 'Category Type not found' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, message: 'Category Type not found' },
+        { status: 404 }
+      );
     }
 
     const trimmedName = name ? name.trim() : existing.name;
@@ -269,7 +345,10 @@ export async function PUT(req: NextRequest) {
     });
 
     invalidateCategoryTypesCache();
-    broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_UPDATED', { id: updated.id, name: updated.name });
+    broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_UPDATED', {
+      id: updated.id,
+      name: updated.name,
+    });
 
     return NextResponse.json({
       success: true,
@@ -297,7 +376,10 @@ export async function DELETE(req: NextRequest) {
     }
     const session = auth.user;
     if (session.securityLevel < 80) {
-      return NextResponse.json({ success: false, message: 'Forbidden: Insufficient security level' }, { status: 403 });
+      return NextResponse.json(
+        { success: false, message: 'Forbidden: Insufficient security level' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -310,49 +392,90 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (!id) {
-      return NextResponse.json({ success: false, message: 'Category Type ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'Category Type ID is required' },
+        { status: 400 }
+      );
     }
 
     const targetType = await (prisma as any).categoryType.findUnique({ where: { id } });
     if (!targetType) {
-      return NextResponse.json({ success: false, message: 'Category Type not found' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, message: 'Category Type not found' },
+        { status: 404 }
+      );
     }
 
     // NON-SUPER-ADMIN: delete approval workflow
     if (session.securityLevel < 100) {
       if (!reason || reason.trim().length < 3) {
-        return NextResponse.json({ success: false, message: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+        return NextResponse.json(
+          { success: false, message: 'A reason for deletion is required (minimum 3 characters)' },
+          { status: 400 }
+        );
       }
       const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
-      const result = await createDeleteRequest(session as any, { entityType: 'CATEGORY_TYPE', entityId: id, reason: reason.trim() });
-      if (!result.success) return NextResponse.json({ success: false, message: result.error }, { status: 409 });
-      return NextResponse.json({ success: true, mode: 'pending_approval', deleteRequest: result.deleteRequest, message: `Delete request for category type "${targetType.name}" submitted for Super Admin approval.` });
+      const result = await createDeleteRequest(session as any, {
+        entityType: 'CATEGORY_TYPE',
+        entityId: id,
+        reason: reason.trim(),
+      });
+      if (!result.success)
+        return NextResponse.json({ success: false, message: result.error }, { status: 409 });
+      return NextResponse.json({
+        success: true,
+        mode: 'pending_approval',
+        deleteRequest: result.deleteRequest,
+        message: `Delete request for category type "${targetType.name}" submitted for Super Admin approval.`,
+      });
     }
 
     // SUPER ADMIN: Dependency Protection
-    const categoryCount = await (prisma as any).category.count({ where: { categoryType: targetType.name } });
+    const categoryCount = await (prisma as any).category.count({
+      where: { categoryType: targetType.name },
+    });
 
     if (categoryCount > 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'DEPENDENCY_PROTECTED',
-        message: `Cannot delete Category Type "${targetType.name}" because ${categoryCount} categor${categoryCount === 1 ? 'y is' : 'ies are'} assigned to it.`,
-        categoryCount,
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'DEPENDENCY_PROTECTED',
+          message: `Cannot delete Category Type "${targetType.name}" because ${categoryCount} categor${categoryCount === 1 ? 'y is' : 'ies are'} assigned to it.`,
+          categoryCount,
+        },
+        { status: 400 }
+      );
     }
 
     await prisma.$transaction(async (tx: any) => {
       await tx.categoryType.delete({ where: { id } });
-      await tx.auditLog.create({ data: { module: 'CATEGORY_TYPES', action: `DELETED: Category Type "${targetType.name}"`, details: JSON.stringify({ categoryTypeId: id, beforeState: targetType }), userEmail: session.email, userRole: session.role, storeCode: session.store || 'CENTRAL' } });
+      await tx.auditLog.create({
+        data: {
+          module: 'CATEGORY_TYPES',
+          action: `DELETED: Category Type "${targetType.name}"`,
+          details: JSON.stringify({ categoryTypeId: id, beforeState: targetType }),
+          userEmail: session.email,
+          userRole: session.role,
+          storeCode: session.store || 'CENTRAL',
+        },
+      });
     });
 
     invalidateCategoryTypesCache();
-    broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_DELETED', { id, name: targetType.name });
+    broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_DELETED', {
+      id,
+      name: targetType.name,
+    });
 
-    return NextResponse.json({ success: true, message: `Category Type "${targetType.name}" deleted successfully` });
+    return NextResponse.json({
+      success: true,
+      message: `Category Type "${targetType.name}" deleted successfully`,
+    });
   } catch (error: any) {
     console.error('Error deleting category type:', error);
-    return NextResponse.json({ success: false, message: 'Failed to delete category type', error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: 'Failed to delete category type', error: error.message },
+      { status: 500 }
+    );
   }
 }
-

@@ -18,7 +18,14 @@ export default function RecentActivityFeed() {
       bg: 'bg-primary/10',
       title: `Invoice #${s.orderNo} raised`,
       meta: `${s.customerName || 'Customer'} · ₹${(s.total || 0).toLocaleString('en-IN')} · ${s.store}`,
-      time: s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Recent',
+      time: s.createdAt
+        ? new Date(s.createdAt).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : 'Recent',
       badge: { variant: 'active' as const, label: s.paymentMethod || 'Paid' },
     }));
 
@@ -31,12 +38,22 @@ export default function RecentActivityFeed() {
       bg: 'bg-info/10',
       title: `PO #${p.poNo} created`,
       meta: `Vendor: ${p.vendorName || 'Supplier'} · ₹${(p.totalAmount || 0).toLocaleString('en-IN')}`,
-      time: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Recent',
-      badge: { variant: p.status === 'Received' ? ('active' as const) : ('pending' as const), label: p.status },
+      time: p.createdAt
+        ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+        : 'Recent',
+      badge: {
+        variant: p.status === 'Received' ? ('active' as const) : ('pending' as const),
+        label: p.status,
+      },
     }));
 
   const transferActivities = stockTransfers
-    .filter((t) => selectedStore === 'All Stores' || t.sourceStore === selectedStore || t.destStore === selectedStore)
+    .filter(
+      (t) =>
+        selectedStore === 'All Stores' ||
+        t.sourceStore === selectedStore ||
+        t.destStore === selectedStore
+    )
     .map((t) => ({
       id: `transfer-${t.id}`,
       icon: 'ArrowsRightLeftIcon' as const,
@@ -44,7 +61,9 @@ export default function RecentActivityFeed() {
       bg: 'bg-accent/10',
       title: `Stock transfer #${t.transferNo}`,
       meta: `${t.sourceStore} → ${t.destStore} · ${t.productName} · ${t.qty} units`,
-      time: t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Recent',
+      time: t.createdAt
+        ? new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+        : 'Recent',
       badge: { variant: 'info' as const, label: t.status },
     }));
 
@@ -59,7 +78,12 @@ export default function RecentActivityFeed() {
     badge: { variant: 'neutral' as const, label: a.module },
   }));
 
-  const activities = [...saleActivities, ...purchaseActivities, ...transferActivities, ...auditActivities].slice(0, 10);
+  const activities = [
+    ...saleActivities,
+    ...purchaseActivities,
+    ...transferActivities,
+    ...auditActivities,
+  ].slice(0, 10);
 
   return (
     <div className="card h-full flex flex-col">
@@ -83,12 +107,20 @@ export default function RecentActivityFeed() {
               <Icon name="ClockIcon" size={20} className="text-muted-foreground" />
             </div>
             <p className="text-xs font-medium text-foreground">No recent activity</p>
-            <p className="text-2xs text-muted-foreground mt-1 max-w-[220px]">Live transactions, purchase orders, and stock movements will appear here automatically.</p>
+            <p className="text-2xs text-muted-foreground mt-1 max-w-[220px]">
+              Live transactions, purchase orders, and stock movements will appear here
+              automatically.
+            </p>
           </div>
         ) : (
           activities.map((act) => (
-            <div key={act.id} className="flex items-start gap-3.5 px-4 py-3.5 hover:bg-muted/50 transition-colors duration-100 cursor-pointer">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${act.bg}`}>
+            <div
+              key={act.id}
+              className="flex items-start gap-3.5 px-4 py-3.5 hover:bg-muted/50 transition-colors duration-100 cursor-pointer"
+            >
+              <div
+                className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${act.bg}`}
+              >
                 <Icon name={act.icon} size={15} className={act.color} />
               </div>
               <div className="flex-1 min-w-0">
@@ -106,7 +138,10 @@ export default function RecentActivityFeed() {
 
       {/* Footer */}
       <div className="px-5 py-3 border-t border-border">
-        <Link href="/audit-logs" className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:underline">
+        <Link
+          href="/audit-logs"
+          className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:underline"
+        >
           View full audit log
           <Icon name="ArrowRightIcon" size={12} />
         </Link>

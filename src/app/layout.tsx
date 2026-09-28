@@ -19,11 +19,13 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: 'COSKO — Multi-Store Retail & POS Management Platform',
-  description: 'COSKO is a production-grade multi-store business management platform for retail POS billing, inventory cataloging, procurement, CRM, and accounting.',
+  description:
+    'COSKO is a production-grade multi-store business management platform for retail POS billing, inventory cataloging, procurement, CRM, and accounting.',
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4028'),
   openGraph: {
     title: 'COSKO — Multi-Store Retail & POS Management Platform',
-    description: 'Enterprise POS, multi-store inventory cataloging, purchasing, CRM, and financial accounting system.',
+    description:
+      'Enterprise POS, multi-store inventory cataloging, purchasing, CRM, and financial accounting system.',
     url: 'http://localhost:4028',
     siteName: 'COSKO',
     locale: 'en_IN',
@@ -44,9 +46,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning className={plusJakartaSans.variable}>
       <body suppressHydrationWarning className={plusJakartaSans.className}>

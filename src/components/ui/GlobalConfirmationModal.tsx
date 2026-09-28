@@ -45,7 +45,10 @@ interface GlobalConfirmationModalProps {
   onExecuteConfirm: () => void;
 }
 
-const ACTION_BADGES: Record<ActionType, { label: string; icon: string; badgeClass: string; btnClass: string }> = {
+const ACTION_BADGES: Record<
+  ActionType,
+  { label: string; icon: string; badgeClass: string; btnClass: string }
+> = {
   checkout: {
     label: 'POS Sale Checkout',
     icon: 'ShoppingCartIcon',
@@ -125,8 +128,8 @@ export default function GlobalConfirmationModal({
     config.variant === 'danger'
       ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-500/25'
       : config.variant === 'warning'
-      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-500/25'
-      : badgeMeta.btnClass;
+        ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-500/25'
+        : badgeMeta.btnClass;
 
   const handleBackdropClose = () => {
     if (!isProcessing) {
@@ -135,13 +138,7 @@ export default function GlobalConfirmationModal({
   };
 
   return (
-    <Modal
-      open={open}
-      onClose={handleBackdropClose}
-      title=""
-      size="md"
-      zIndex={200}
-    >
+    <Modal open={open} onClose={handleBackdropClose} title="" size="md" zIndex={200}>
       <div className="py-1 space-y-4">
         {/* Step Indicator & Action Header */}
         <div className="flex items-center justify-between border-b border-border/80 pb-3">
@@ -149,7 +146,9 @@ export default function GlobalConfirmationModal({
             <span className="px-2 py-0.5 text-3xs font-extrabold uppercase tracking-wider rounded-full bg-primary/10 text-primary border border-primary/25">
               Step 2 of 2
             </span>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-3xs font-bold rounded-full border ${badgeMeta.badgeClass}`}>
+            <span
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-3xs font-bold rounded-full border ${badgeMeta.badgeClass}`}
+            >
               <Icon name={badgeMeta.icon as any} size={12} />
               {badgeMeta.label}
             </span>
@@ -187,7 +186,11 @@ export default function GlobalConfirmationModal({
         {/* Warning Banner */}
         {config.warningMessage && (
           <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-200 flex items-start gap-2.5 text-xs">
-            <Icon name="ExclamationTriangleIcon" size={18} className="flex-shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <Icon
+              name="ExclamationTriangleIcon"
+              size={18}
+              className="flex-shrink-0 text-amber-600 dark:text-amber-400 mt-0.5"
+            />
             <div>
               <p className="font-semibold text-3xs uppercase tracking-wider">Important Notice</p>
               <p className="text-2xs mt-0.5">{config.warningMessage}</p>
@@ -257,8 +260,19 @@ export default function GlobalConfirmationModal({
             {isProcessing ? (
               <>
                 <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
+                  />
                 </svg>
                 <span>Processing...</span>
               </>

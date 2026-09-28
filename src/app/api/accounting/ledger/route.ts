@@ -70,6 +70,9 @@ export async function GET(req: NextRequest) {
     );
   } catch (error: any) {
     console.error('API /api/accounting/ledger GET error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to retrieve ledger entries' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to retrieve ledger entries' },
+      { status: 500 }
+    );
   }
 }

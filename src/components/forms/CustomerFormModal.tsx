@@ -63,7 +63,11 @@ export default function CustomerFormModal({
         setAddress(customer.address || '');
         setGstin('');
         setTier(customer.tier || 'Regular');
-        setCreditBalance(customer.creditBalance !== undefined && customer.creditBalance !== null ? customer.creditBalance : '');
+        setCreditBalance(
+          customer.creditBalance !== undefined && customer.creditBalance !== null
+            ? customer.creditBalance
+            : ''
+        );
       } else {
         setName(initialName || '');
         setPhone(clean10DigitPhone(initialPhone || ''));
@@ -115,7 +119,14 @@ export default function CustomerFormModal({
         { label: 'Email Address', value: email.trim() || 'N/A' },
         { label: 'City / Location', value: city.trim() || 'Bengaluru' },
         { label: 'Customer Tier', value: tier },
-        ...(creditBalance !== '' ? [{ label: 'Credit Balance', value: `₹${Number(creditBalance).toLocaleString('en-IN')}` }] : []),
+        ...(creditBalance !== ''
+          ? [
+              {
+                label: 'Credit Balance',
+                value: `₹${Number(creditBalance).toLocaleString('en-IN')}`,
+              },
+            ]
+          : []),
       ],
       warningMessage: isEdit
         ? 'Customer updates will reflect immediately across all POS customer lookups and CRM history.'
@@ -134,7 +145,10 @@ export default function CustomerFormModal({
           city: city.trim() || 'Bengaluru',
           address: address.trim() || undefined,
           tier,
-          creditBalance: creditBalance !== '' && creditBalance !== undefined && creditBalance !== null ? Number(creditBalance) : 0,
+          creditBalance:
+            creditBalance !== '' && creditBalance !== undefined && creditBalance !== null
+              ? Number(creditBalance)
+              : 0,
         });
 
         const updatedCust: Customer = {
@@ -145,7 +159,10 @@ export default function CustomerFormModal({
           city: city.trim() || 'Bengaluru',
           address: address.trim(),
           tier,
-          creditBalance: creditBalance !== '' && creditBalance !== undefined && creditBalance !== null ? Number(creditBalance) : 0,
+          creditBalance:
+            creditBalance !== '' && creditBalance !== undefined && creditBalance !== null
+              ? Number(creditBalance)
+              : 0,
         };
 
         toast.success(`Customer "${cleanName}" updated successfully`);
@@ -155,11 +172,15 @@ export default function CustomerFormModal({
         const res = await addCustomer({
           name: cleanName,
           phone: formattedPhone,
-          email: email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@customer.com`,
+          email:
+            email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@customer.com`,
           city: city.trim() || 'Bengaluru',
           address: address.trim() || undefined,
           tier,
-          creditBalance: creditBalance !== '' && creditBalance !== undefined && creditBalance !== null ? Number(creditBalance) : 0,
+          creditBalance:
+            creditBalance !== '' && creditBalance !== undefined && creditBalance !== null
+              ? Number(creditBalance)
+              : 0,
           status: 'Active',
         });
 
@@ -181,8 +202,18 @@ export default function CustomerFormModal({
       open={open}
       onClose={onClose}
       zIndex={zIndex}
-      title={isEdit ? `Edit Customer: ${customer?.name}` : quickMode ? 'Quick Customer Registration' : 'Register New Customer'}
-      subtitle={isEdit ? `Account: ${customer?.phone}` : 'Unified customer profile across POS, Repairs, and Billing'}
+      title={
+        isEdit
+          ? `Edit Customer: ${customer?.name}`
+          : quickMode
+            ? 'Quick Customer Registration'
+            : 'Register New Customer'
+      }
+      subtitle={
+        isEdit
+          ? `Account: ${customer?.phone}`
+          : 'Unified customer profile across POS, Repairs, and Billing'
+      }
       size={quickMode ? 'sm' : 'md'}
     >
       <form onSubmit={handleSubmit} className="space-y-4 py-2">
@@ -242,7 +273,8 @@ export default function CustomerFormModal({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-bold text-foreground block mb-1">
-              Customer GSTIN <span className="text-muted-foreground font-normal">(B2B Invoices)</span>
+              Customer GSTIN{' '}
+              <span className="text-muted-foreground font-normal">(B2B Invoices)</span>
             </label>
             <input
               type="text"
@@ -269,7 +301,8 @@ export default function CustomerFormModal({
         {/* Billing Address */}
         <div>
           <label className="text-xs font-bold text-foreground block mb-1">
-            Billing / Delivery Address <span className="text-muted-foreground font-normal">(Optional)</span>
+            Billing / Delivery Address{' '}
+            <span className="text-muted-foreground font-normal">(Optional)</span>
           </label>
           <input
             type="text"
@@ -296,7 +329,9 @@ export default function CustomerFormModal({
           </div>
 
           <div>
-            <label className="text-xs font-bold text-foreground block mb-1">Opening Credit Balance (₹)</label>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Opening Credit Balance (₹)
+            </label>
             <NumericInput
               min={0}
               step="0.01"
@@ -319,11 +354,7 @@ export default function CustomerFormModal({
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            className="btn-primary text-xs gap-1.5"
-            disabled={isSubmitting}
-          >
+          <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -332,7 +363,11 @@ export default function CustomerFormModal({
             ) : (
               <>
                 <Icon name="CheckIcon" size={14} />
-                {isEdit ? 'Update Customer' : quickMode ? 'Save & Auto-Select' : 'Register Customer'}
+                {isEdit
+                  ? 'Update Customer'
+                  : quickMode
+                    ? 'Save & Auto-Select'
+                    : 'Register Customer'}
               </>
             )}
           </button>

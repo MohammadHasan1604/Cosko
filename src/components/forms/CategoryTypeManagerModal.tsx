@@ -13,7 +13,12 @@ interface CategoryTypeManagerModalProps {
   zIndex?: number;
 }
 
-export default function CategoryTypeManagerModal({ open, onClose, onOpenCreateNew, zIndex = 120 }: CategoryTypeManagerModalProps) {
+export default function CategoryTypeManagerModal({
+  open,
+  onClose,
+  onOpenCreateNew,
+  zIndex = 120,
+}: CategoryTypeManagerModalProps) {
   const { categoryTypes, updateCategoryType, deleteCategoryType } = useApp();
   const [editingType, setEditingType] = useState<CategoryTypeItem | null>(null);
   const [editName, setEditName] = useState('');
@@ -90,14 +95,16 @@ export default function CategoryTypeManagerModal({ open, onClose, onOpenCreateNe
               }}
               className="btn-primary text-xs gap-1.5 py-1.5"
             >
-              <Icon name="PlusIcon" size={13} />
-              + Add New Type
+              <Icon name="PlusIcon" size={13} />+ Add New Type
             </button>
           </div>
 
           {/* Edit Inline Box if editing */}
           {editingType && (
-            <form onSubmit={handleSaveEdit} className="p-3.5 rounded-xl border border-primary/40 bg-primary/5 space-y-3">
+            <form
+              onSubmit={handleSaveEdit}
+              className="p-3.5 rounded-xl border border-primary/40 bg-primary/5 space-y-3"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-foreground">
                   Editing Type: <span className="text-primary">{editingType.name}</span>
@@ -123,7 +130,9 @@ export default function CategoryTypeManagerModal({ open, onClose, onOpenCreateNe
                   />
                 </div>
                 <div>
-                  <label className="text-2xs font-semibold text-foreground block mb-1">Color Style</label>
+                  <label className="text-2xs font-semibold text-foreground block mb-1">
+                    Color Style
+                  </label>
                   <select
                     value={editColor}
                     onChange={(e) => setEditColor(e.target.value)}
@@ -141,7 +150,9 @@ export default function CategoryTypeManagerModal({ open, onClose, onOpenCreateNe
               </div>
 
               <div>
-                <label className="text-2xs font-semibold text-foreground block mb-1">Description</label>
+                <label className="text-2xs font-semibold text-foreground block mb-1">
+                  Description
+                </label>
                 <input
                   type="text"
                   value={editDescription}
@@ -159,11 +170,7 @@ export default function CategoryTypeManagerModal({ open, onClose, onOpenCreateNe
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={isUpdating}
-                  className="btn-primary text-2xs py-1"
-                >
+                <button type="submit" disabled={isUpdating} className="btn-primary text-2xs py-1">
                   {isUpdating ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
@@ -196,7 +203,9 @@ export default function CategoryTypeManagerModal({ open, onClose, onOpenCreateNe
                       )}
                     </div>
                     {t.description && (
-                      <p className="text-2xs text-muted-foreground mt-0.5 truncate">{t.description}</p>
+                      <p className="text-2xs text-muted-foreground mt-0.5 truncate">
+                        {t.description}
+                      </p>
                     )}
                   </div>
 
@@ -226,7 +235,11 @@ export default function CategoryTypeManagerModal({ open, onClose, onOpenCreateNe
                           ? 'text-muted-foreground/40 cursor-not-allowed'
                           : 'text-danger hover:bg-danger/10'
                       }`}
-                      title={hasCategories ? 'Protected: Categories depend on this type' : 'Delete Category Type'}
+                      title={
+                        hasCategories
+                          ? 'Protected: Categories depend on this type'
+                          : 'Delete Category Type'
+                      }
                     >
                       <Icon name="TrashIcon" size={15} />
                     </button>

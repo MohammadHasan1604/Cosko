@@ -17,7 +17,12 @@ function getLocalDateString(date: Date, timezone = 'Asia/Kolkata'): string {
   }
 }
 
-function computeDateRange(range: string, customStart?: string, customEnd?: string, timezone = 'Asia/Kolkata') {
+function computeDateRange(
+  range: string,
+  customStart?: string,
+  customEnd?: string,
+  timezone = 'Asia/Kolkata'
+) {
   const now = new Date();
   const todayStr = getLocalDateString(now, timezone);
 
@@ -44,8 +49,11 @@ function computeDateRange(range: string, customStart?: string, customEnd?: strin
 
 export async function GET(req: NextRequest) {
   try {
-    const _auth = await authenticateRequest(req); if (!_auth.user) { return NextResponse.json({ error: _auth.error }, { status: _auth.status }); } const caller = _auth.user;
-    
+    const _auth = await authenticateRequest(req);
+    if (!_auth.user) {
+      return NextResponse.json({ error: _auth.error }, { status: _auth.status });
+    }
+    const caller = _auth.user;
 
     const { searchParams } = new URL(req.url);
     const range = searchParams.get('range') || 'today';
@@ -128,18 +136,29 @@ export async function GET(req: NextRequest) {
 
     for (const u of users) {
       const userDaily = dailyRecords.filter((d) => d.userId === u.id);
-      const totalActiveSeconds = userDaily.reduce((acc, curr) => acc + (curr.activeSeconds || 0), 0);
+      const totalActiveSeconds = userDaily.reduce(
+        (acc, curr) => acc + (curr.activeSeconds || 0),
+        0
+      );
       const totalIdleSeconds = userDaily.reduce((acc, curr) => acc + (curr.idleSeconds || 0), 0);
       const workingDays = userDaily.filter((d) => (d.activeSeconds || 0) >= 60).length;
       const sessionsCount = userDaily.reduce((acc, curr) => acc + (curr.sessionsCount || 0), 0);
 
-      const firstLogin = userDaily.length > 0
-        ? userDaily.reduce((earliest, curr) => curr.firstLogin < earliest ? curr.firstLogin : earliest, userDaily[0].firstLogin)
-        : u.lastLogin;
+      const firstLogin =
+        userDaily.length > 0
+          ? userDaily.reduce(
+              (earliest, curr) => (curr.firstLogin < earliest ? curr.firstLogin : earliest),
+              userDaily[0].firstLogin
+            )
+          : u.lastLogin;
 
-      const lastActivity = userDaily.length > 0
-        ? userDaily.reduce((latest, curr) => curr.lastActivity > latest ? curr.lastActivity : latest, userDaily[0].lastActivity)
-        : u.lastLogin;
+      const lastActivity =
+        userDaily.length > 0
+          ? userDaily.reduce(
+              (latest, curr) => (curr.lastActivity > latest ? curr.lastActivity : latest),
+              userDaily[0].lastActivity
+            )
+          : u.lastLogin;
 
       rows.push([
         `"${u.name.replace(/"/g, '""')}"`,

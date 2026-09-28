@@ -17,7 +17,7 @@ export type DatePeriod =
 
 export interface CustomDateRange {
   start: string; // YYYY-MM-DD
-  end: string;   // YYYY-MM-DD
+  end: string; // YYYY-MM-DD
 }
 
 /**
@@ -140,13 +140,19 @@ export function getDateRange(
           parseInt(sParts[0], 10),
           parseInt(sParts[1], 10) - 1,
           parseInt(sParts[2], 10),
-          0, 0, 0, 0
+          0,
+          0,
+          0,
+          0
         );
         const end = new Date(
           parseInt(eParts[0], 10),
           parseInt(eParts[1], 10) - 1,
           parseInt(eParts[2], 10),
-          23, 59, 59, 999
+          23,
+          59,
+          59,
+          999
         );
         return { start, end };
       }
@@ -267,8 +273,23 @@ export function generateChartBuckets(
     // 6 4-hour slots: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
     const dayStart = new Date(start);
     for (let h = 0; h < 24; h += 4) {
-      const bStart = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), h, 0, 0);
-      const bEnd = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), h + 3, 59, 59, 999);
+      const bStart = new Date(
+        dayStart.getFullYear(),
+        dayStart.getMonth(),
+        dayStart.getDate(),
+        h,
+        0,
+        0
+      );
+      const bEnd = new Date(
+        dayStart.getFullYear(),
+        dayStart.getMonth(),
+        dayStart.getDate(),
+        h + 3,
+        59,
+        59,
+        999
+      );
       const label = `${String(h).padStart(2, '0')}:00`;
       buckets.push({ label, start: bStart, end: bEnd });
     }
@@ -295,7 +316,10 @@ export function generateChartBuckets(
     while (cur <= end) {
       const next = new Date(cur);
       next.setDate(next.getDate() + 4);
-      const bEnd = next > end ? new Date(end) : new Date(next.getFullYear(), next.getMonth(), next.getDate(), 23, 59, 59, 999);
+      const bEnd =
+        next > end
+          ? new Date(end)
+          : new Date(next.getFullYear(), next.getMonth(), next.getDate(), 23, 59, 59, 999);
       const label = `${cur.getDate()} - ${bEnd.getDate()} ${cur.toLocaleDateString('en-US', { month: 'short' })}`;
       buckets.push({ label, start: new Date(cur), end: bEnd });
       cur.setDate(cur.getDate() + 5);
@@ -345,7 +369,10 @@ export function generateChartBuckets(
     while (cur <= end) {
       const next = new Date(cur);
       next.setDate(next.getDate() + step - 1);
-      const bEnd = next > end ? new Date(end) : new Date(next.getFullYear(), next.getMonth(), next.getDate(), 23, 59, 59, 999);
+      const bEnd =
+        next > end
+          ? new Date(end)
+          : new Date(next.getFullYear(), next.getMonth(), next.getDate(), 23, 59, 59, 999);
       const label = `${cur.getDate()} ${cur.toLocaleDateString('en-US', { month: 'short' })}`;
       buckets.push({ label, start: new Date(cur), end: bEnd });
       cur.setDate(cur.getDate() + step);

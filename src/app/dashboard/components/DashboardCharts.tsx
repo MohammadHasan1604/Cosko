@@ -24,16 +24,23 @@ export default function DashboardCharts() {
           <div>
             <h2 className="section-header text-base sm:text-lg">Revenue & Gross Profit</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {periodLabel} timeline · Scope: <span className="font-semibold text-foreground">{selectedStore}</span>
+              {periodLabel} timeline · Scope:{' '}
+              <span className="font-semibold text-foreground">{selectedStore}</span>
             </p>
           </div>
           <div className="flex items-center gap-3 text-xs flex-wrap">
             <span className="flex items-center gap-1.5 text-muted-foreground">
-              <span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: 'var(--primary)' }} />
+              <span
+                className="w-3 h-0.5 rounded-full inline-block"
+                style={{ backgroundColor: 'var(--primary)' }}
+              />
               Revenue
             </span>
             <span className="flex items-center gap-1.5 text-muted-foreground">
-              <span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: 'var(--positive)' }} />
+              <span
+                className="w-3 h-0.5 rounded-full inline-block"
+                style={{ backgroundColor: 'var(--positive)' }}
+              />
               Gross Profit
             </span>
           </div>

@@ -51,7 +51,9 @@ export async function GET(req: NextRequest) {
     // 3. Map real-time stock across every active store (including 0-stock locations)
     let totalStock = 0;
     const storeBreakdown = activeStores.map((store) => {
-      const inv = product.inventoryItems.find((i) => i.storeCode.toUpperCase() === store.code.toUpperCase());
+      const inv = product.inventoryItems.find(
+        (i) => i.storeCode.toUpperCase() === store.code.toUpperCase()
+      );
       const qtyOnHand = inv ? inv.qtyOnHand : 0;
       const qtyReserved = inv ? inv.qtyReserved : 0;
       const reorderPt = inv ? inv.reorderPt : 5;
@@ -62,7 +64,10 @@ export async function GET(req: NextRequest) {
       let cleanLocationName = store.city || store.name;
       if (store.code === 'CENTRAL') {
         cleanLocationName = 'Central';
-      } else if (store.name.toLowerCase().includes('bengaluru') || store.name.toLowerCase().includes('bangalore')) {
+      } else if (
+        store.name.toLowerCase().includes('bengaluru') ||
+        store.name.toLowerCase().includes('bangalore')
+      ) {
         cleanLocationName = 'Bangalore';
       } else if (store.name.toLowerCase().includes('hyderabad')) {
         cleanLocationName = 'Hyderabad';
@@ -118,6 +123,9 @@ export async function GET(req: NextRequest) {
     );
   } catch (error: any) {
     console.error('API /api/inventory/store-stock error:', error);
-    return NextResponse.json({ error: 'Failed to retrieve store stock breakdown' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to retrieve store stock breakdown' },
+      { status: 500 }
+    );
   }
 }

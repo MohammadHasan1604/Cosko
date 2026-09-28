@@ -122,7 +122,8 @@ export function calculateTransferTotals(items: TransferLineItemInput[]): Transfe
 
   // Authoritative Grand Total Gross Profit: Transfer Value - Inventory Cost
   const grossProfit = round2(totalTransferValue - totalCost);
-  const grossMarginPercent = totalTransferValue > 0 ? round2((grossProfit / totalTransferValue) * 100) : 0;
+  const grossMarginPercent =
+    totalTransferValue > 0 ? round2((grossProfit / totalTransferValue) * 100) : 0;
 
   return {
     totalUnits,

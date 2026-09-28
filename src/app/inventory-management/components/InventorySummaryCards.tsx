@@ -8,20 +8,28 @@ interface InventorySummaryCardsProps {
   storeScope?: string;
 }
 
-export default function InventorySummaryCards({ categoryFilter, storeScope }: InventorySummaryCardsProps) {
+export default function InventorySummaryCards({
+  categoryFilter,
+  storeScope,
+}: InventorySummaryCardsProps) {
   const { inventory, selectedStore } = useApp();
   const activeStore = storeScope || selectedStore;
 
   const { totalSKUs, totalQuantity, totalValue, lowStockCount, outOfStockCount } = useMemo(() => {
     // Filter raw inventory by category first
     const catFiltered = inventory.filter((item) => {
-      return !categoryFilter || categoryFilter === 'All Categories' || item.category === categoryFilter;
+      return (
+        !categoryFilter || categoryFilter === 'All Categories' || item.category === categoryFilter
+      );
     });
 
     if (activeStore === 'All Stores' || activeStore === 'ALL') {
       // Aggregated across all stores
       // Group by distinct SKU / product
-      const productMap = new Map<string, { totalQty: number; costPrice: number; reorderPt: number }>();
+      const productMap = new Map<
+        string,
+        { totalQty: number; costPrice: number; reorderPt: number }
+      >();
 
       catFiltered.forEach((item) => {
         const key = item.productId || item.sku;
@@ -64,7 +72,9 @@ export default function InventorySummaryCards({ categoryFilter, storeScope }: In
       const storeItems = catFiltered.filter((item) => item.store === activeStore);
       const totalQty = storeItems.reduce((acc, item) => acc + item.qtyOnHand, 0);
       const totalVal = storeItems.reduce((acc, item) => acc + item.costPrice * item.qtyOnHand, 0);
-      const lowCount = storeItems.filter((item) => item.qtyOnHand > 0 && item.qtyOnHand <= item.reorderPt).length;
+      const lowCount = storeItems.filter(
+        (item) => item.qtyOnHand > 0 && item.qtyOnHand <= item.reorderPt
+      ).length;
       const outCount = storeItems.filter((item) => item.qtyOnHand === 0).length;
 
       return {
@@ -95,7 +105,10 @@ export default function InventorySummaryCards({ categoryFilter, storeScope }: In
       id: 'inv-sum-qty',
       label: 'Total Quantity',
       value: totalQuantity.toLocaleString('en-IN') + ' units',
-      sub: activeStore === 'All Stores' ? 'Aggregated across all stores' : `Physical stock in ${activeStore}`,
+      sub:
+        activeStore === 'All Stores'
+          ? 'Aggregated across all stores'
+          : `Physical stock in ${activeStore}`,
       icon: 'Square3Stack3DIcon',
       color: 'text-emerald-500',
       bg: 'bg-emerald-500/10',
@@ -132,13 +145,26 @@ export default function InventorySummaryCards({ categoryFilter, storeScope }: In
   return (
     <div className="flex gap-2 overflow-x-auto scrollbar-none md:grid md:grid-cols-5 md:gap-3 -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 pb-1 md:pb-0">
       {summaryCards.map((card) => (
-        <div key={card.id} className="card p-3 md:p-4 flex items-center gap-3 min-w-[150px] md:min-w-0 flex-shrink-0 md:flex-shrink">
-          <div className={`w-9 h-9 md:w-11 md:h-11 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 ${card.bg}`}>
-            <Icon name={card.icon as Parameters<typeof Icon>[0]['name']} size={18} className={card.color} />
+        <div
+          key={card.id}
+          className="card p-3 md:p-4 flex items-center gap-3 min-w-[150px] md:min-w-0 flex-shrink-0 md:flex-shrink"
+        >
+          <div
+            className={`w-9 h-9 md:w-11 md:h-11 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 ${card.bg}`}
+          >
+            <Icon
+              name={card.icon as Parameters<typeof Icon>[0]['name']}
+              size={18}
+              className={card.color}
+            />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-3xs md:text-2xs font-bold text-muted-foreground uppercase tracking-wider truncate">{card.label}</p>
-            <p className="text-base md:text-lg font-bold text-foreground font-tabular mt-0.5 truncate">{card.value}</p>
+            <p className="text-3xs md:text-2xs font-bold text-muted-foreground uppercase tracking-wider truncate">
+              {card.label}
+            </p>
+            <p className="text-base md:text-lg font-bold text-foreground font-tabular mt-0.5 truncate">
+              {card.value}
+            </p>
             <p className="text-3xs text-muted-foreground truncate hidden md:block">{card.sub}</p>
           </div>
         </div>

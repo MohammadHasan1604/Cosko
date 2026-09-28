@@ -59,7 +59,11 @@ export default function ProofViewerModal({ open, onClose, data, proof }: ProofVi
       open={isModalOpen}
       onClose={onClose}
       title={activeData.title || 'Authoritative Payment Proof & Voucher'}
-      subtitle={activeData.billNo ? `Transaction Ref: ${activeData.billNo}` : 'Verified Financial Transaction'}
+      subtitle={
+        activeData.billNo
+          ? `Transaction Ref: ${activeData.billNo}`
+          : 'Verified Financial Transaction'
+      }
       size="lg"
     >
       <div className="space-y-4 py-1 text-xs">
@@ -92,7 +96,10 @@ export default function ProofViewerModal({ open, onClose, data, proof }: ProofVi
               <span className="text-3xs uppercase tracking-wider text-muted-foreground font-bold block">
                 UTR / Reference
               </span>
-              <span className="text-xs font-mono font-bold text-primary block truncate" title={activeData.referenceNo}>
+              <span
+                className="text-xs font-mono font-bold text-primary block truncate"
+                title={activeData.referenceNo}
+              >
                 {activeData.referenceNo}
               </span>
             </div>
@@ -103,9 +110,7 @@ export default function ProofViewerModal({ open, onClose, data, proof }: ProofVi
               <span className="text-3xs uppercase tracking-wider text-muted-foreground font-bold block">
                 Payment Date
               </span>
-              <span className="text-xs font-semibold text-foreground block">
-                {formattedDate}
-              </span>
+              <span className="text-xs font-semibold text-foreground block">{formattedDate}</span>
             </div>
           )}
 

@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
 
     // Role check: Only Level 100 Super Admin can view connection details
     if (user.role !== 'Super Admin' || user.securityLevel < 100) {
-      return NextResponse.json({ error: 'Forbidden: Super Admin Level 100 authorization required' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Super Admin Level 100 authorization required' },
+        { status: 403 }
+      );
     }
 
     let config = await (prisma as any).legacyDataSourceConfig.findUnique({
@@ -86,13 +89,19 @@ export async function POST(req: NextRequest) {
     const user = auth.user;
 
     if (user.role !== 'Super Admin' || user.securityLevel < 100) {
-      return NextResponse.json({ error: 'Forbidden: Super Admin Level 100 authorization required' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Super Admin Level 100 authorization required' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
 
     if (!body.host || !body.databaseName || !body.username) {
-      return NextResponse.json({ error: 'Host, Database Name, and Username are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Host, Database Name, and Username are required' },
+        { status: 400 }
+      );
     }
 
     const updatedConfig = await (prisma as any).legacyDataSourceConfig.upsert({
@@ -105,7 +114,9 @@ export async function POST(req: NextRequest) {
         port: Number(body.port) || 3306,
         databaseName: body.databaseName,
         username: body.username,
-        encryptedPassword: body.password ? Buffer.from(body.password).toString('base64') : 'c2VjcmV0',
+        encryptedPassword: body.password
+          ? Buffer.from(body.password).toString('base64')
+          : 'c2VjcmV0',
         sslMode: body.sslMode || 'Preferred',
         connectionTimeout: Number(body.connectionTimeout) || 2500,
         readTimeout: Number(body.readTimeout) || 3000,
@@ -124,7 +135,9 @@ export async function POST(req: NextRequest) {
         port: Number(body.port),
         databaseName: body.databaseName,
         username: body.username,
-        encryptedPassword: body.password ? Buffer.from(body.password).toString('base64') : undefined,
+        encryptedPassword: body.password
+          ? Buffer.from(body.password).toString('base64')
+          : undefined,
         sslMode: body.sslMode,
         connectionTimeout: Number(body.connectionTimeout),
         readTimeout: Number(body.readTimeout),
@@ -160,6 +173,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /api/settings/data-connections POST error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to save connection configuration' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to save connection configuration' },
+      { status: 500 }
+    );
   }
 }

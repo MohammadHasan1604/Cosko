@@ -1,16 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
-import { buildUserActivitySummary, formatHHMMSS, getLocalDateString } from '@/lib/services/activityCalculationService';
+import {
+  buildUserActivitySummary,
+  formatHHMMSS,
+  getLocalDateString,
+} from '@/lib/services/activityCalculationService';
 
 /**
  * GET /api/activity/stats - Phase 2 activity stats using activityCalculationService
- * 
+ *
  * Uses server-calculated durations. Shows HH:MM:SS precision.
  * Includes anomaly detection and disclaimer about browser activity.
  * Enforces strict RBAC: non-admin sees only their own data.
  */
-function computeDateRange(range: string, customStart?: string, customEnd?: string, timezone = 'Asia/Kolkata') {
+function computeDateRange(
+  range: string,
+  customStart?: string,
+  customEnd?: string,
+  timezone = 'Asia/Kolkata'
+) {
   const now = new Date();
   const todayStr = getLocalDateString(now, timezone);
 
@@ -58,8 +67,11 @@ function computeDateRange(range: string, customStart?: string, customEnd?: strin
 
 export async function GET(req: NextRequest) {
   try {
-    const _auth = await authenticateRequest(req); if (!_auth.user) { return NextResponse.json({ error: _auth.error }, { status: _auth.status }); } const caller = _auth.user;
-    
+    const _auth = await authenticateRequest(req);
+    if (!_auth.user) {
+      return NextResponse.json({ error: _auth.error }, { status: _auth.status });
+    }
+    const caller = _auth.user;
 
     const { searchParams } = new URL(req.url);
     const range = searchParams.get('range') || 'today';
@@ -81,13 +93,19 @@ export async function GET(req: NextRequest) {
       }
       if (reqStore && reqStore !== 'All Stores' && reqStore !== caller.store) {
         return NextResponse.json(
-          { error: 'Forbidden: You do not have permission to view activity records for another store' },
+          {
+            error:
+              'Forbidden: You do not have permission to view activity records for another store',
+          },
           { status: 403 }
         );
       }
       if (reqStore === 'All Stores') {
         return NextResponse.json(
-          { error: 'Forbidden: Consolidated view across all stores is restricted to Super Admin only' },
+          {
+            error:
+              'Forbidden: Consolidated view across all stores is restricted to Super Admin only',
+          },
           { status: 403 }
         );
       }
@@ -128,9 +146,10 @@ export async function GET(req: NextRequest) {
     const totalTeamSessions = userStats.reduce((acc, u) => acc + u.sessionCount, 0);
     const activeStaffTodayCount = userStats.filter((u) => u.liveStatus === 'ONLINE').length;
     const totalWorkingDaysAllUsers = userStats.reduce((acc, u) => acc + u.workingDays, 0);
-    const averageDailyHours = totalWorkingDaysAllUsers > 0
-      ? (totalTeamActiveSeconds / 3600 / totalWorkingDaysAllUsers).toFixed(1)
-      : '0.0';
+    const averageDailyHours =
+      totalWorkingDaysAllUsers > 0
+        ? (totalTeamActiveSeconds / 3600 / totalWorkingDaysAllUsers).toFixed(1)
+        : '0.0';
 
     return NextResponse.json({
       success: true,
@@ -145,7 +164,7 @@ export async function GET(req: NextRequest) {
         averageDailyHours,
         totalUsersCount: userStats.length,
       },
-      users: userStats.map(u => ({
+      users: userStats.map((u) => ({
         ...u,
         formattedActiveTotal: formatHHMMSS(u.totalActiveSeconds),
         formattedIdleTotal: formatHHMMSS(u.totalIdleSeconds),
@@ -154,7 +173,8 @@ export async function GET(req: NextRequest) {
         totalWorkingHours: (u.totalActiveSeconds / 3600).toFixed(1),
         totalIdleMinutes: Math.floor(u.totalIdleSeconds / 60),
       })),
-      disclaimer: 'Browser activity tracking measures tab visibility and heartbeat responsiveness. It does not prove physical presence or productive work output.',
+      disclaimer:
+        'Browser activity tracking measures tab visibility and heartbeat responsiveness. It does not prove physical presence or productive work output.',
       isSuperAdmin,
     });
   } catch (err: any) {

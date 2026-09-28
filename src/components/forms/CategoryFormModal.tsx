@@ -32,7 +32,8 @@ export default function CategoryFormModal({
   quickMode = false,
   zIndex = 110,
 }: CategoryFormModalProps) {
-  const { categoriesList, categoryTypes, addCategory, updateCategory, currentUser, confirmAction } = useApp();
+  const { categoriesList, categoryTypes, addCategory, updateCategory, currentUser, confirmAction } =
+    useApp();
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -219,8 +220,20 @@ export default function CategoryFormModal({
       <Modal
         open={open}
         onClose={onClose}
-        title={isEdit ? `Edit ${entityTitle}: ${category?.name}` : quickMode ? `+ Add New ${entityTitle}` : `Create ${entityTitle} Record`}
-        subtitle={isEdit ? `ID: ${category?.id}` : isExpenseMode ? 'Unified store operational expenditure classification' : 'Unified taxonomy & catalog master categorization'}
+        title={
+          isEdit
+            ? `Edit ${entityTitle}: ${category?.name}`
+            : quickMode
+              ? `+ Add New ${entityTitle}`
+              : `Create ${entityTitle} Record`
+        }
+        subtitle={
+          isEdit
+            ? `ID: ${category?.id}`
+            : isExpenseMode
+              ? 'Unified store operational expenditure classification'
+              : 'Unified taxonomy & catalog master categorization'
+        }
         size={quickMode ? 'sm' : 'md'}
         zIndex={zIndex}
       >
@@ -234,7 +247,11 @@ export default function CategoryFormModal({
               type="text"
               required
               autoFocus
-              placeholder={isExpenseMode ? "e.g. Store Rent, Electricity Bill, Logistics Freight, Packaging" : "e.g. Mobile Accessories, Display Panels, EV Spare Parts"}
+              placeholder={
+                isExpenseMode
+                  ? 'e.g. Store Rent, Electricity Bill, Logistics Freight, Packaging'
+                  : 'e.g. Mobile Accessories, Display Panels, EV Spare Parts'
+              }
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
               className="input-field text-xs"
@@ -245,7 +262,8 @@ export default function CategoryFormModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-foreground block mb-1">
-                URL Slug <span className="text-3xs text-muted-foreground font-normal">(Auto-generated)</span>
+                URL Slug{' '}
+                <span className="text-3xs text-muted-foreground font-normal">(Auto-generated)</span>
               </label>
               <input
                 type="text"
@@ -312,7 +330,8 @@ export default function CategoryFormModal({
                   </button>
                 </div>
                 <p className="text-3xs text-muted-foreground mt-0.5">
-                  Classifies whether items under this category are hardware devices, spare parts, EV parts, retail products, or expenses.
+                  Classifies whether items under this category are hardware devices, spare parts, EV
+                  parts, retail products, or expenses.
                 </p>
               </>
             )}
@@ -340,11 +359,7 @@ export default function CategoryFormModal({
                 Inactive categories are hidden from POS and inventory selectors.
               </p>
             </div>
-            <ToggleSwitch
-              checked={isActive}
-              onChange={setIsActive}
-              size="sm"
-            />
+            <ToggleSwitch checked={isActive} onChange={setIsActive} size="sm" />
           </div>
 
           {/* Submit Actions */}
@@ -357,11 +372,7 @@ export default function CategoryFormModal({
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              className="btn-primary text-xs gap-1.5"
-              disabled={isSubmitting}
-            >
+            <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />

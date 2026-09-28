@@ -49,14 +49,13 @@ export default function UnitModal({
         setName(initialName);
         setCode(
           initialName
-            ? initialName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 16)
+            ? initialName
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .slice(0, 16)
             : ''
         );
-        setSymbol(
-          initialName
-            ? initialName.toLowerCase().slice(0, 6)
-            : ''
-        );
+        setSymbol(initialName ? initialName.toLowerCase().slice(0, 6) : '');
         setDescription('');
         setIsActive(true);
       }
@@ -66,7 +65,10 @@ export default function UnitModal({
   const handleNameChange = (val: string) => {
     setName(val);
     if (!isEdit) {
-      const generated = val.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 16);
+      const generated = val
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .slice(0, 16);
       setCode(generated);
       if (!symbol) setSymbol(generated.slice(0, 4));
     }
@@ -83,9 +85,7 @@ export default function UnitModal({
     }
 
     if (!isEdit) {
-      const duplicate = units.find(
-        (u) => u.name.toLowerCase() === cleanName.toLowerCase()
-      );
+      const duplicate = units.find((u) => u.name.toLowerCase() === cleanName.toLowerCase());
       if (duplicate) {
         toast.info(`Unit "${cleanName}" already exists. Selecting it.`);
         if (onSuccess) onSuccess(duplicate.name, duplicate);
@@ -96,7 +96,10 @@ export default function UnitModal({
 
     const cleanCode =
       code.trim().toLowerCase() ||
-      cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 16);
+      cleanName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .slice(0, 16);
     const cleanSymbol = symbol.trim() || cleanCode;
 
     const confirmed = await confirmAction({
@@ -157,8 +160,12 @@ export default function UnitModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? `Edit Unit: ${unit?.name}` : quickMode ? '+ Add New Unit' : 'Create Unit Record'}
-      subtitle={isEdit ? `Symbol: ${unit?.symbol}` : 'Define inventory quantity units of measurement'}
+      title={
+        isEdit ? `Edit Unit: ${unit?.name}` : quickMode ? '+ Add New Unit' : 'Create Unit Record'
+      }
+      subtitle={
+        isEdit ? `Symbol: ${unit?.symbol}` : 'Define inventory quantity units of measurement'
+      }
       size={quickMode ? 'sm' : 'md'}
       zIndex={zIndex}
     >
@@ -183,7 +190,8 @@ export default function UnitModal({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-bold text-foreground block mb-1">
-              Unit Code <span className="text-3xs text-muted-foreground font-normal">(Auto-generated)</span>
+              Unit Code{' '}
+              <span className="text-3xs text-muted-foreground font-normal">(Auto-generated)</span>
             </label>
             <input
               type="text"
@@ -212,7 +220,8 @@ export default function UnitModal({
         {/* Description */}
         <div>
           <label className="text-xs font-bold text-foreground block mb-1">
-            Description <span className="text-3xs text-muted-foreground font-normal">(Optional)</span>
+            Description{' '}
+            <span className="text-3xs text-muted-foreground font-normal">(Optional)</span>
           </label>
           <textarea
             rows={2}

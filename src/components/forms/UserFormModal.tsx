@@ -17,7 +17,12 @@ interface UserFormModalProps {
 // 🔒 STRICT RBAC: Super Admin is completely removed from role options.
 // Only exactly ONE protected Super Admin exists in the system.
 const AVAILABLE_ROLES: Array<{
-  role: 'Store Manager' | 'Inventory Manager' | 'Sales Executive' | 'POS Cashier' | 'Restricted Employee';
+  role:
+    | 'Store Manager'
+    | 'Inventory Manager'
+    | 'Sales Executive'
+    | 'POS Cashier'
+    | 'Restricted Employee';
   level: number;
   desc: string;
 }> = [
@@ -42,7 +47,13 @@ export default function UserFormModal({
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<'Store Manager' | 'Inventory Manager' | 'Sales Executive' | 'POS Cashier' | 'Restricted Employee'>('Store Manager');
+  const [role, setRole] = useState<
+    | 'Store Manager'
+    | 'Inventory Manager'
+    | 'Sales Executive'
+    | 'POS Cashier'
+    | 'Restricted Employee'
+  >('Store Manager');
   // Single source of truth for store access: assignedStores
   const [assignedStores, setAssignedStores] = useState<string[]>(['BLR']);
   const [storeSearch, setStoreSearch] = useState('');
@@ -99,11 +110,12 @@ export default function UserFormModal({
         if (user.role !== 'Super Admin') {
           setRole((user.role as any) || 'Store Manager');
         }
-        const initialStores = user.allowedStores && user.allowedStores.length > 0
-          ? user.allowedStores
-          : user.store
-          ? [user.store]
-          : [callerAccessibleStores[0] || 'BLR'];
+        const initialStores =
+          user.allowedStores && user.allowedStores.length > 0
+            ? user.allowedStores
+            : user.store
+              ? [user.store]
+              : [callerAccessibleStores[0] || 'BLR'];
         setAssignedStores(initialStores);
         setStatus((user.status as any) || 'Active');
         setShiftStatus((user.shiftStatus as any) || 'On Shift');
@@ -186,8 +198,14 @@ export default function UserFormModal({
       summaryItems: [
         { label: 'Full Name', value: cleanName, highlighted: true },
         { label: 'Official Email', value: cleanEmail },
-        { label: 'Operational Role', value: isProtectedSuperAdmin ? 'Super Admin (Level 100)' : role },
-        { label: 'Assigned Store(s)', value: `${assignedSummary} (${assignedStores.length} store${assignedStores.length > 1 ? 's' : ''})` },
+        {
+          label: 'Operational Role',
+          value: isProtectedSuperAdmin ? 'Super Admin (Level 100)' : role,
+        },
+        {
+          label: 'Assigned Store(s)',
+          value: `${assignedSummary} (${assignedStores.length} store${assignedStores.length > 1 ? 's' : ''})`,
+        },
         { label: 'Account Status', value: status },
         { label: 'Shift Status', value: shiftStatus },
       ],
@@ -288,7 +306,9 @@ export default function UserFormModal({
               <Icon name="ShieldCheckIcon" size={18} />
               <div>
                 <p className="font-bold text-xs">Protected System Root Account</p>
-                <p className="text-3xs text-danger/80">Role: Super Admin (Level 100) · Unrestricted System Authority</p>
+                <p className="text-3xs text-danger/80">
+                  Role: Super Admin (Level 100) · Unrestricted System Authority
+                </p>
               </div>
             </div>
             <span className="badge-danger text-3xs font-extrabold flex items-center gap-1">
@@ -332,9 +352,7 @@ export default function UserFormModal({
         {/* 2. Phone & Password */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-bold text-foreground block mb-1">
-              Contact Phone
-            </label>
+            <label className="text-xs font-bold text-foreground block mb-1">Contact Phone</label>
             <input
               type="tel"
               placeholder="+91 99000 12345"
@@ -392,7 +410,8 @@ export default function UserFormModal({
             </select>
           )}
           <p className="text-3xs text-muted-foreground mt-1">
-            Defines module access clearances, financial reporting authorities, and POS terminal privileges.
+            Defines module access clearances, financial reporting authorities, and POS terminal
+            privileges.
           </p>
         </div>
 
@@ -513,7 +532,9 @@ export default function UserFormModal({
         {/* 5. Account Status & Shift Status */}
         <div className="grid grid-cols-2 gap-3 p-3 rounded-xl border border-border bg-card">
           <div>
-            <label className="text-2xs font-semibold text-foreground block mb-1">Account Status</label>
+            <label className="text-2xs font-semibold text-foreground block mb-1">
+              Account Status
+            </label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as any)}
@@ -526,7 +547,9 @@ export default function UserFormModal({
           </div>
 
           <div>
-            <label className="text-2xs font-semibold text-foreground block mb-1">Shift Status</label>
+            <label className="text-2xs font-semibold text-foreground block mb-1">
+              Shift Status
+            </label>
             <select
               value={shiftStatus}
               onChange={(e) => setShiftStatus(e.target.value as any)}

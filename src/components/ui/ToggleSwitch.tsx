@@ -52,7 +52,7 @@ export default function ToggleSwitch({
       container: 'w-16 h-7',
       thumb: 'w-5 h-5',
       thumbTranslate: 'translate-x-9', // 36px offset
-      thumbRest: 'translate-x-1',       // 4px offset
+      thumbRest: 'translate-x-1', // 4px offset
       textChecked: 'left-2.5 text-[10px]',
       textUnchecked: 'right-2.5 text-[10px]',
       spinner: 'w-3 h-3',
@@ -96,9 +96,14 @@ export default function ToggleSwitch({
       title={title}
     >
       {(label || sublabel) && (
-        <label htmlFor={switchId} className={`select-none text-left ${isInteractive ? 'cursor-pointer' : ''}`}>
+        <label
+          htmlFor={switchId}
+          className={`select-none text-left ${isInteractive ? 'cursor-pointer' : ''}`}
+        >
           {label && <p className="text-xs font-bold text-foreground leading-tight">{label}</p>}
-          {sublabel && <p className="text-2xs text-muted-foreground mt-0.5 leading-tight">{sublabel}</p>}
+          {sublabel && (
+            <p className="text-2xs text-muted-foreground mt-0.5 leading-tight">{sublabel}</p>
+          )}
         </label>
       )}
 
@@ -132,7 +137,7 @@ export default function ToggleSwitch({
               : `${sizeConfig.textUnchecked} text-slate-700 dark:text-slate-200`
           }`}
         >
-          {checked ? (onText.length > 3 ? 'ON' : onText) : (offText.length > 3 ? 'OFF' : offText)}
+          {checked ? (onText.length > 3 ? 'ON' : onText) : offText.length > 3 ? 'OFF' : offText}
         </span>
 
         {/* Crisp Smooth Sliding Thumb */}
@@ -148,7 +153,14 @@ export default function ToggleSwitch({
               fill="none"
               viewBox="0 0 24 24"
             >
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
               <path
                 className="opacity-75"
                 fill="currentColor"

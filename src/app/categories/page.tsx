@@ -10,7 +10,15 @@ import CategoryTypeManagerModal from '@/components/forms/CategoryTypeManagerModa
 import { useApp, CategoryItem } from '@/context/AppContext';
 
 export default function CategoriesPage() {
-  const { categoriesList, categoryTypes, toggleCategoryStatus, deleteCategory, inventory, branding, currentUser } = useApp();
+  const {
+    categoriesList,
+    categoryTypes,
+    toggleCategoryStatus,
+    deleteCategory,
+    inventory,
+    branding,
+    currentUser,
+  } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('All');
@@ -48,8 +56,12 @@ export default function CategoriesPage() {
   // Category Metrics
   const metrics = useMemo(() => {
     const activeList = categoriesList.filter((c) => c.status === 'Active');
-    const topLevelCount = categoriesList.filter((c) => !c.parentCategoryId && c.status !== 'Archived').length;
-    const subCount = categoriesList.filter((c) => !!c.parentCategoryId && c.status !== 'Archived').length;
+    const topLevelCount = categoriesList.filter(
+      (c) => !c.parentCategoryId && c.status !== 'Archived'
+    ).length;
+    const subCount = categoriesList.filter(
+      (c) => !!c.parentCategoryId && c.status !== 'Archived'
+    ).length;
 
     return {
       total: categoriesList.filter((c) => c.status !== 'Archived').length,
@@ -112,26 +124,42 @@ export default function CategoriesPage() {
         {/* Summary KPI Metric Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
           <div className="p-4 rounded-2xl bg-card border border-border">
-            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Categories</p>
-            <p className="text-xl sm:text-2xl font-extrabold text-foreground font-tabular mt-1">{metrics.total}</p>
+            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">
+              Total Categories
+            </p>
+            <p className="text-xl sm:text-2xl font-extrabold text-foreground font-tabular mt-1">
+              {metrics.total}
+            </p>
             <p className="text-3xs text-muted-foreground mt-0.5">Authoritative taxonomy items</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-card border border-border">
-            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Active in Catalog</p>
-            <p className="text-xl sm:text-2xl font-extrabold text-success font-tabular mt-1">{metrics.active}</p>
+            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">
+              Active in Catalog
+            </p>
+            <p className="text-xl sm:text-2xl font-extrabold text-success font-tabular mt-1">
+              {metrics.active}
+            </p>
             <p className="text-3xs text-success mt-0.5">Available for POS & Inventory</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-card border border-border">
-            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Top-Level Groups</p>
-            <p className="text-xl sm:text-2xl font-extrabold text-primary font-tabular mt-1">{metrics.topLevel}</p>
+            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">
+              Top-Level Groups
+            </p>
+            <p className="text-xl sm:text-2xl font-extrabold text-primary font-tabular mt-1">
+              {metrics.topLevel}
+            </p>
             <p className="text-3xs text-muted-foreground mt-0.5">Mobile, EV, Appliances, etc.</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-card border border-border">
-            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Subcategories</p>
-            <p className="text-xl sm:text-2xl font-extrabold text-foreground font-tabular mt-1">{metrics.subcategories}</p>
+            <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">
+              Subcategories
+            </p>
+            <p className="text-xl sm:text-2xl font-extrabold text-foreground font-tabular mt-1">
+              {metrics.subcategories}
+            </p>
             <p className="text-3xs text-muted-foreground mt-0.5">Nested parts & service lines</p>
           </div>
         </div>
@@ -159,7 +187,9 @@ export default function CategoriesPage() {
               className="input-field py-2 text-xs"
             >
               {dynamicCategoryTypes.map((t) => (
-                <option key={`type-${t}`} value={t}>{t === 'All' ? 'All Types' : t}</option>
+                <option key={`type-${t}`} value={t}>
+                  {t === 'All' ? 'All Types' : t}
+                </option>
               ))}
             </select>
 
@@ -195,22 +225,37 @@ export default function CategoriesPage() {
                 {filteredCategories.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
-                      <Icon name="FolderIcon" size={32} className="mx-auto text-muted-foreground/50 mb-2" />
-                      <p className="font-semibold text-sm">No categories match your search criteria</p>
-                      <p className="text-3xs mt-1">Try adjusting the filter options or click "Add Category" to create a new one.</p>
+                      <Icon
+                        name="FolderIcon"
+                        size={32}
+                        className="mx-auto text-muted-foreground/50 mb-2"
+                      />
+                      <p className="font-semibold text-sm">
+                        No categories match your search criteria
+                      </p>
+                      <p className="text-3xs mt-1">
+                        Try adjusting the filter options or click "Add Category" to create a new
+                        one.
+                      </p>
                     </td>
                   </tr>
                 ) : (
                   filteredCategories.map((cat) => {
                     const productsLinked = inventory.filter(
-                      (i) => i.category === cat.name || i.category === cat.slug || i.subcategory === cat.name || i.subcategory === cat.slug
+                      (i) =>
+                        i.category === cat.name ||
+                        i.category === cat.slug ||
+                        i.subcategory === cat.name ||
+                        i.subcategory === cat.slug
                     ).length;
 
                     return (
                       <tr key={`cat-row-${cat.id}`} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3 font-semibold text-foreground">
                           <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${cat.status === 'Active' ? 'bg-success' : 'bg-muted-foreground'}`} />
+                            <div
+                              className={`w-2 h-2 rounded-full ${cat.status === 'Active' ? 'bg-success' : 'bg-muted-foreground'}`}
+                            />
                             <div>
                               <p className="font-bold text-foreground">{cat.name}</p>
                               <p className="text-3xs text-muted-foreground font-mono">{cat.slug}</p>
@@ -232,13 +277,19 @@ export default function CategoriesPage() {
                         </td>
 
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-md text-3xs font-bold ${
-                            cat.categoryType === 'Device' ? 'bg-info/15 text-info' :
-                            cat.categoryType === 'Spare Part' ? 'bg-primary/15 text-primary' :
-                            cat.categoryType === 'EV' ? 'bg-success/15 text-success' :
-                            cat.categoryType === 'Home Appliance' ? 'bg-warning/15 text-warning' :
-                            'bg-muted text-foreground'
-                          }`}>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-3xs font-bold ${
+                              cat.categoryType === 'Device'
+                                ? 'bg-info/15 text-info'
+                                : cat.categoryType === 'Spare Part'
+                                  ? 'bg-primary/15 text-primary'
+                                  : cat.categoryType === 'EV'
+                                    ? 'bg-success/15 text-success'
+                                    : cat.categoryType === 'Home Appliance'
+                                      ? 'bg-warning/15 text-warning'
+                                      : 'bg-muted text-foreground'
+                            }`}
+                          >
                             {cat.categoryType}
                           </span>
                         </td>
@@ -248,7 +299,9 @@ export default function CategoriesPage() {
                         </td>
 
                         <td className="px-4 py-3 text-center">
-                          <span className={`font-bold px-2 py-0.5 rounded-full text-2xs ${productsLinked > 0 ? 'bg-primary/10 text-primary font-extrabold' : 'bg-muted/60 text-muted-foreground'}`}>
+                          <span
+                            className={`font-bold px-2 py-0.5 rounded-full text-2xs ${productsLinked > 0 ? 'bg-primary/10 text-primary font-extrabold' : 'bg-muted/60 text-muted-foreground'}`}
+                          >
                             {productsLinked} SKUs
                           </span>
                         </td>
@@ -304,10 +357,7 @@ export default function CategoriesPage() {
         />
 
         {/* Dynamic Category Type Modals */}
-        <CategoryTypeModal
-          open={createTypeOpen}
-          onClose={() => setCreateTypeOpen(false)}
-        />
+        <CategoryTypeModal open={createTypeOpen} onClose={() => setCreateTypeOpen(false)} />
 
         <CategoryTypeManagerModal
           open={manageTypesOpen}
@@ -327,14 +377,30 @@ export default function CategoriesPage() {
             <div className="space-y-4 py-2 text-xs">
               {(() => {
                 const linkedCount = inventory.filter(
-                  (i) => i.category === confirmDeleteCat.name || i.category === confirmDeleteCat.slug || i.subcategory === confirmDeleteCat.name || i.subcategory === confirmDeleteCat.slug
+                  (i) =>
+                    i.category === confirmDeleteCat.name ||
+                    i.category === confirmDeleteCat.slug ||
+                    i.subcategory === confirmDeleteCat.name ||
+                    i.subcategory === confirmDeleteCat.slug
                 ).length;
 
                 return (
                   <>
-                    <div className={`p-4 rounded-xl border ${linkedCount > 0 ? 'bg-warning/10 border-warning/30 text-foreground' : 'bg-muted/40 border-border text-foreground'}`}>
+                    <div
+                      className={`p-4 rounded-xl border ${linkedCount > 0 ? 'bg-warning/10 border-warning/30 text-foreground' : 'bg-muted/40 border-border text-foreground'}`}
+                    >
                       <div className="flex items-start gap-2.5">
-                        <Icon name={linkedCount > 0 ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'} size={18} className={linkedCount > 0 ? 'text-warning shrink-0 mt-0.5' : 'text-primary shrink-0 mt-0.5'} />
+                        <Icon
+                          name={
+                            linkedCount > 0 ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'
+                          }
+                          size={18}
+                          className={
+                            linkedCount > 0
+                              ? 'text-warning shrink-0 mt-0.5'
+                              : 'text-primary shrink-0 mt-0.5'
+                          }
+                        />
                         <div>
                           <p className="font-bold text-sm">
                             {linkedCount > 0 ? 'Category in Active Use' : 'Unused Category'}
@@ -388,4 +454,3 @@ export default function CategoriesPage() {
     </AppLayout>
   );
 }
-

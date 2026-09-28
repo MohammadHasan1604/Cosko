@@ -16,27 +16,50 @@ interface NavDestination {
 
 const roleAllowedHrefs: Record<string, string[]> = {
   'Super Admin': [
-    '/dashboard', '/sales', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/customers',
-    '/vendors', '/expenses', '/accounting', '/central-profit',
-    '/reports', '/employees', '/stores', '/users', '/work-activity', '/audit-logs', '/settings', '/delete-requests', '/repairs'
+    '/dashboard',
+    '/sales',
+    '/inventory-management',
+    '/stock-transfers',
+    '/categories',
+    '/purchases',
+    '/customers',
+    '/vendors',
+    '/expenses',
+    '/accounting',
+    '/central-profit',
+    '/reports',
+    '/employees',
+    '/stores',
+    '/users',
+    '/work-activity',
+    '/audit-logs',
+    '/settings',
+    '/delete-requests',
   ],
   'Store Manager': [
-    '/dashboard', '/sales', '/inventory-management', '/categories', '/purchases', '/customers',
-    '/vendors', '/expenses', '/accounting',
-    '/reports', '/employees', '/repairs'
+    '/dashboard',
+    '/sales',
+    '/inventory-management',
+    '/categories',
+    '/purchases',
+    '/customers',
+    '/vendors',
+    '/expenses',
+    '/accounting',
+    '/reports',
+    '/employees',
   ],
   'Inventory Manager': [
-    '/dashboard', '/inventory-management', '/categories', '/purchases', '/vendors', '/reports'
+    '/dashboard',
+    '/inventory-management',
+    '/categories',
+    '/purchases',
+    '/vendors',
+    '/reports',
   ],
-  'Sales Executive': [
-    '/dashboard', '/sales', '/customers', '/repairs'
-  ],
-  'POS Cashier': [
-    '/sales', '/customers'
-  ],
-  'Restricted Employee': [
-    '/dashboard'
-  ],
+  'Sales Executive': ['/dashboard', '/sales', '/customers'],
+  'POS Cashier': ['/sales', '/customers'],
+  'Restricted Employee': ['/dashboard'],
 };
 
 // Primary bottom nav destinations per role (max ~4 + More)
@@ -78,22 +101,41 @@ const allSecondaryNav: NavDestination[] = [
   { id: 'more-dashboard', label: 'Dashboard', icon: 'HomeIcon', href: '/dashboard' },
   { id: 'more-sales', label: 'Sales & POS', icon: 'ShoppingCartIcon', href: '/sales' },
   { id: 'more-inventory', label: 'Inventory', icon: 'CubeIcon', href: '/inventory-management' },
-  { id: 'more-stock-transfers', label: 'Stock Transfers', icon: 'ArrowsRightLeftIcon', href: '/stock-transfers' },
+  {
+    id: 'more-stock-transfers',
+    label: 'Stock Transfers',
+    icon: 'ArrowsRightLeftIcon',
+    href: '/stock-transfers',
+  },
   { id: 'more-categories', label: 'Categories', icon: 'TagIcon', href: '/categories' },
   { id: 'more-purchases', label: 'Purchases', icon: 'TruckIcon', href: '/purchases' },
   { id: 'more-customers', label: 'Customers', icon: 'UsersIcon', href: '/customers' },
   { id: 'more-vendors', label: 'Vendors', icon: 'BuildingStorefrontIcon', href: '/vendors' },
-  { id: 'more-repairs', label: 'Repairs', icon: 'WrenchScrewdriverIcon', href: '/repairs' },
   { id: 'more-expenses', label: 'Expenses', icon: 'BanknotesIcon', href: '/expenses' },
   { id: 'more-accounting', label: 'Accounting', icon: 'CalculatorIcon', href: '/accounting' },
-  { id: 'more-central-profit', label: 'Central Profit', icon: 'ArrowTrendingUpIcon', href: '/central-profit' },
+  {
+    id: 'more-central-profit',
+    label: 'Central Profit',
+    icon: 'ArrowTrendingUpIcon',
+    href: '/central-profit',
+  },
   { id: 'more-reports', label: 'Reports', icon: 'ChartBarIcon', href: '/reports' },
   { id: 'more-employees', label: 'Employees', icon: 'UserGroupIcon', href: '/employees' },
   { id: 'more-stores', label: 'Stores', icon: 'MapPinIcon', href: '/stores' },
   { id: 'more-users', label: 'Users & Roles', icon: 'ShieldCheckIcon', href: '/users' },
   { id: 'more-work-activity', label: 'Work Activity', icon: 'ClockIcon', href: '/work-activity' },
-  { id: 'more-delete-requests', label: 'Delete Requests', icon: 'TrashIcon', href: '/delete-requests' },
-  { id: 'more-audit-logs', label: 'Audit Logs', icon: 'ClipboardDocumentListIcon', href: '/audit-logs' },
+  {
+    id: 'more-delete-requests',
+    label: 'Delete Requests',
+    icon: 'TrashIcon',
+    href: '/delete-requests',
+  },
+  {
+    id: 'more-audit-logs',
+    label: 'Audit Logs',
+    icon: 'ClipboardDocumentListIcon',
+    href: '/audit-logs',
+  },
   { id: 'more-settings', label: 'Settings', icon: 'Cog6ToothIcon', href: '/settings' },
 ];
 
@@ -104,12 +146,12 @@ export default function BottomNav() {
 
   const allowedHrefs = roleAllowedHrefs[currentUser.role] || ['/dashboard'];
   const primaryNav = rolePrimaryNav[currentUser.role] || rolePrimaryNav['Restricted Employee'];
-  const primaryHrefs = new Set(primaryNav.map(n => n.href));
+  const primaryHrefs = new Set(primaryNav.map((n) => n.href));
 
   // Secondary items: authorized but not in primary nav
   const secondaryNav = useMemo(() => {
-    return allSecondaryNav.filter(item =>
-      allowedHrefs.includes(item.href) && !primaryHrefs.has(item.href)
+    return allSecondaryNav.filter(
+      (item) => allowedHrefs.includes(item.href) && !primaryHrefs.has(item.href)
     );
   }, [allowedHrefs, primaryHrefs]);
 
@@ -120,7 +162,7 @@ export default function BottomNav() {
     return pathname?.startsWith(href) ?? false;
   };
 
-  const isMoreActive = secondaryNav.some(item => isActive(item.href));
+  const isMoreActive = secondaryNav.some((item) => isActive(item.href));
 
   return (
     <>
@@ -163,11 +205,7 @@ export default function BottomNav() {
       </nav>
 
       {/* More Bottom Sheet */}
-      <BottomSheet
-        open={moreOpen}
-        onClose={() => setMoreOpen(false)}
-        title="All Modules"
-      >
+      <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="All Modules">
         <div className="grid grid-cols-3 gap-1 py-1">
           {secondaryNav.map((item) => (
             <Link
@@ -180,13 +218,12 @@ export default function BottomNav() {
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                isActive(item.href) ? 'bg-primary/10' : 'bg-muted'
-              }`}>
-                <Icon
-                  name={item.icon as Parameters<typeof Icon>[0]['name']}
-                  size={20}
-                />
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  isActive(item.href) ? 'bg-primary/10' : 'bg-muted'
+                }`}
+              >
+                <Icon name={item.icon as Parameters<typeof Icon>[0]['name']} size={20} />
               </div>
               <span className="text-2xs font-medium text-center leading-tight">{item.label}</span>
             </Link>

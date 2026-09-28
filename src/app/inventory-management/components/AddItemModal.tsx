@@ -13,11 +13,6 @@ interface AddItemModalProps {
 
 export default function AddItemModal({ open, onClose, editItem, onSuccess }: AddItemModalProps) {
   return (
-    <ProductFormModal
-      open={open}
-      onClose={onClose}
-      editItem={editItem}
-      onSuccess={onSuccess}
-    />
+    <ProductFormModal open={open} onClose={onClose} editItem={editItem} onSuccess={onSuccess} />
   );
 }

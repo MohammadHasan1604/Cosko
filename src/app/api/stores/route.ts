@@ -35,9 +35,15 @@ export async function GET(req: NextRequest) {
 
     // RBAC: Non-Super Admin can ONLY view their assigned store(s)
     if (user.role !== 'Super Admin') {
-      const allowed = user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
+      const allowed =
+        user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
       where.code = { in: allowed };
-    } else if (!includeInactive && !forceFresh && cachedStoresPayload && Date.now() - lastStoresCacheTime < STORES_CACHE_TTL) {
+    } else if (
+      !includeInactive &&
+      !forceFresh &&
+      cachedStoresPayload &&
+      Date.now() - lastStoresCacheTime < STORES_CACHE_TTL
+    ) {
       return NextResponse.json(cachedStoresPayload, {
         headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
       });
@@ -84,19 +90,25 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     if (!body.code || !body.name || !body.city) {
-      return NextResponse.json({ error: 'Store Code, Name, and City are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Store Code, Name, and City are required' },
+        { status: 400 }
+      );
     }
 
     const upperCode = body.code.toUpperCase().trim();
     if (upperCode === 'ALL' || body.name.toLowerCase().trim() === 'all stores') {
       return NextResponse.json(
-        { error: '"All Stores" is a reporting/aggregation scope only and cannot be created as a physical store.' },
+        {
+          error:
+            '"All Stores" is a reporting/aggregation scope only and cannot be created as a physical store.',
+        },
         { status: 400 }
       );
     }
 
     // Protect CENTRAL status: must always remain Active
-    const storeStatus = upperCode === 'CENTRAL' ? 'Active' : (body.status || 'Active');
+    const storeStatus = upperCode === 'CENTRAL' ? 'Active' : body.status || 'Active';
 
     const customKey =
       body.idempotencyKey ||
@@ -113,13 +125,23 @@ export async function POST(req: NextRequest) {
         extractEntityId: (d) => d?.store?.id || d?.store?.code,
       },
       async () => {
-        const ownerVal = body.ownerName !== undefined ? body.ownerName : (body.owner !== undefined ? body.owner : (body.managerName !== undefined ? body.managerName : body.manager));
+        const ownerVal =
+          body.ownerName !== undefined
+            ? body.ownerName
+            : body.owner !== undefined
+              ? body.owner
+              : body.managerName !== undefined
+                ? body.managerName
+                : body.manager;
 
         const store = await prisma.storeHub.upsert({
           where: { code: upperCode },
           create: {
             code: upperCode,
-            name: upperCode === 'CENTRAL' ? (body.name || 'COSKO Central Warehouse & Owner Stock') : body.name,
+            name:
+              upperCode === 'CENTRAL'
+                ? body.name || 'COSKO Central Warehouse & Owner Stock'
+                : body.name,
             city: body.city,
             address: body.address || 'COSKO Retail Hub',
             ownerName: ownerVal || null,
@@ -131,22 +153,29 @@ export async function POST(req: NextRequest) {
             name: body.name,
             city: body.city,
             address: body.address || undefined,
-            ownerName: ownerVal !== undefined ? (ownerVal || null) : undefined,
-            managerName: ownerVal !== undefined ? (ownerVal || null) : undefined,
+            ownerName: ownerVal !== undefined ? ownerVal || null : undefined,
+            managerName: ownerVal !== undefined ? ownerVal || null : undefined,
             phone: body.phone || undefined,
-            status: upperCode === 'CENTRAL' ? 'Active' : (body.status || undefined),
+            status: upperCode === 'CENTRAL' ? 'Active' : body.status || undefined,
           },
         });
 
         invalidateStoresCache();
-        broadcastRealtimeEvent('stores', 'STORE_UPDATED', { code: store.code, name: store.name, action: 'saved' });
+        broadcastRealtimeEvent('stores', 'STORE_UPDATED', {
+          code: store.code,
+          name: store.name,
+          action: 'saved',
+        });
 
         return { status: 201, data: { success: true, store } };
       }
     );
   } catch (error: any) {
     console.error('API /api/stores POST error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to save store hub' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to save store hub' },
+      { status: 500 }
+    );
   }
 }
 
@@ -184,11 +213,7 @@ export async function DELETE(req: NextRequest) {
     if (!target) {
       target = await prisma.storeHub.findFirst({
         where: {
-          OR: [
-            { id },
-            { code: id },
-            { code: id.toUpperCase() },
-          ],
+          OR: [{ id }, { code: id }, { code: id.toUpperCase() }],
         },
       });
     }
@@ -200,7 +225,10 @@ export async function DELETE(req: NextRequest) {
     // STRICT PROTECTION: CENTRAL cannot be deleted or deactivated under any circumstances
     if (target.code === 'CENTRAL') {
       return NextResponse.json(
-        { error: 'The default Central Warehouse & Owner Store (CENTRAL) is permanent and cannot be deactivated or deleted.' },
+        {
+          error:
+            'The default Central Warehouse & Owner Store (CENTRAL) is permanent and cannot be deactivated or deleted.',
+        },
         { status: 400 }
       );
     }
@@ -210,7 +238,9 @@ export async function DELETE(req: NextRequest) {
       prisma.inventory.count({ where: { storeCode: target.code } }),
       prisma.salesOrder.count({ where: { storeCode: target.code } }),
       prisma.purchaseOrder.count({ where: { storeCode: target.code } }),
-      prisma.stockTransfer.count({ where: { OR: [{ sourceStore: target.code }, { destStore: target.code }] } }),
+      prisma.stockTransfer.count({
+        where: { OR: [{ sourceStore: target.code }, { destStore: target.code }] },
+      }),
     ]);
 
     const hasHistory = invCount > 0 || salesCount > 0 || poCount > 0 || transferCount > 0;
@@ -222,7 +252,11 @@ export async function DELETE(req: NextRequest) {
       });
 
       invalidateStoresCache();
-      broadcastRealtimeEvent('stores', 'STORE_UPDATED', { code: target.code, name: target.name, action: 'deactivated' });
+      broadcastRealtimeEvent('stores', 'STORE_UPDATED', {
+        code: target.code,
+        name: target.name,
+        action: 'deactivated',
+      });
 
       return NextResponse.json({
         success: true,
@@ -240,7 +274,11 @@ export async function DELETE(req: NextRequest) {
     await prisma.storeHub.delete({ where: { id: target.id } });
 
     invalidateStoresCache();
-    broadcastRealtimeEvent('stores', 'STORE_UPDATED', { code: target.code, name: target.name, action: 'deleted' });
+    broadcastRealtimeEvent('stores', 'STORE_UPDATED', {
+      code: target.code,
+      name: target.name,
+      action: 'deleted',
+    });
 
     return NextResponse.json({
       success: true,
@@ -249,8 +287,9 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /api/stores DELETE error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to deactivate/delete store' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to deactivate/delete store' },
+      { status: 500 }
+    );
   }
 }
-
-

@@ -5,12 +5,25 @@ export interface LedgerEntryInput {
   entryNo: string;
   entryDate?: Date;
   storeCode: string;
-  accountCategory: 'REVENUE' | 'COGS' | 'OPERATING_EXPENSE' | 'CENTRAL_EXPENSE' | 'TRANSFER_MARKUP' | 'ASSET' | 'LIABILITY';
+  accountCategory:
+    | 'REVENUE'
+    | 'COGS'
+    | 'OPERATING_EXPENSE'
+    | 'CENTRAL_EXPENSE'
+    | 'TRANSFER_MARKUP'
+    | 'ASSET'
+    | 'LIABILITY';
   accountName: string;
   debit?: number;
   credit?: number;
   amount: number;
-  refType: 'SALE' | 'PURCHASE_GRN' | 'VENDOR_PAYMENT' | 'EXPENSE' | 'STOCK_TRANSFER' | 'INVENTORY_ADJUSTMENT';
+  refType:
+    | 'SALE'
+    | 'PURCHASE_GRN'
+    | 'VENDOR_PAYMENT'
+    | 'EXPENSE'
+    | 'STOCK_TRANSFER'
+    | 'INVENTORY_ADJUSTMENT';
   refId?: string | null;
   refNo: string;
   entityName?: string | null;
@@ -86,7 +99,13 @@ export async function getConsolidatedPnL(filters: AccountingFilterParams) {
       items: {
         include: {
           product: {
-            select: { id: true, baseCostPrice: true, baseSellingPrice: true, name: true, sku: true },
+            select: {
+              id: true,
+              baseCostPrice: true,
+              baseSellingPrice: true,
+              name: true,
+              sku: true,
+            },
           },
         },
       },
@@ -109,7 +128,7 @@ export async function getConsolidatedPnL(filters: AccountingFilterParams) {
     grossRevenue += saleSubtotal;
     totalDiscounts += saleDiscount;
     totalTax += saleTax;
-    netExternalRevenue += (saleSubtotal - saleDiscount);
+    netExternalRevenue += saleSubtotal - saleDiscount;
 
     // Compute authoritative vendor COGS directly from persisted totalCost or line item unitCost
     let saleCogs = 0;
@@ -125,7 +144,8 @@ export async function getConsolidatedPnL(filters: AccountingFilterParams) {
   }
 
   const consolidatedGrossProfit = netExternalRevenue - vendorCOGS;
-  const grossMarginPercent = netExternalRevenue > 0 ? (consolidatedGrossProfit / netExternalRevenue) * 100 : 0;
+  const grossMarginPercent =
+    netExternalRevenue > 0 ? (consolidatedGrossProfit / netExternalRevenue) * 100 : 0;
 
   // Expenses: Store Operating vs Central Operations
   const expWhere: any = {};
@@ -149,7 +169,10 @@ export async function getConsolidatedPnL(filters: AccountingFilterParams) {
 
   for (const e of allExpenses) {
     const amt = Number(e.amount) || 0;
-    const isCentral = e.storeCode === 'CENTRAL' || e.category.toLowerCase().includes('freight') || e.description.toLowerCase().includes('central');
+    const isCentral =
+      e.storeCode === 'CENTRAL' ||
+      e.category.toLowerCase().includes('freight') ||
+      e.description.toLowerCase().includes('central');
     if (isCentral) {
       centralExpenses += amt;
     } else {
@@ -160,7 +183,8 @@ export async function getConsolidatedPnL(filters: AccountingFilterParams) {
 
   const totalExpenses = storeOperatingExpenses + centralExpenses;
   const consolidatedNetProfit = consolidatedGrossProfit - totalExpenses;
-  const netMarginPercent = netExternalRevenue > 0 ? (consolidatedNetProfit / netExternalRevenue) * 100 : 0;
+  const netMarginPercent =
+    netExternalRevenue > 0 ? (consolidatedNetProfit / netExternalRevenue) * 100 : 0;
 
   // Internal Transfer Revenue that was ELIMINATED
   const transferWhere: any = {
@@ -174,34 +198,64 @@ export async function getConsolidatedPnL(filters: AccountingFilterParams) {
   const transfers = await prisma.stockTransfer.findMany({
     where: transferWhere,
   });
-  const eliminatedTransferRevenue = transfers.reduce((acc, t) => acc + Number(t.totalTransferValue), 0);
+  const eliminatedTransferRevenue = transfers.reduce(
+    (acc, t) => acc + Number(t.totalTransferValue),
+    0
+  );
   const eliminatedTransferMarkup = transfers.reduce((acc, t) => acc + Number(t.grossProfit), 0);
 
   // Store contributions breakdown
-  const storeContributionsMap: Record<string, { storeCode: string; revenue: number; cogs: number; grossProfit: number; expenses: number; netProfit: number; ordersCount: number }> = {};
-  
+  const storeContributionsMap: Record<
+    string,
+    {
+      storeCode: string;
+      revenue: number;
+      cogs: number;
+      grossProfit: number;
+      expenses: number;
+      netProfit: number;
+      ordersCount: number;
+    }
+  > = {};
+
   for (const s of sales) {
     const sc = s.storeCode;
     if (!storeContributionsMap[sc]) {
-      storeContributionsMap[sc] = { storeCode: sc, revenue: 0, cogs: 0, grossProfit: 0, expenses: 0, netProfit: 0, ordersCount: 0 };
+      storeContributionsMap[sc] = {
+        storeCode: sc,
+        revenue: 0,
+        cogs: 0,
+        grossProfit: 0,
+        expenses: 0,
+        netProfit: 0,
+        ordersCount: 0,
+      };
     }
     const rev = (Number(s.subtotal) || 0) - (Number(s.discountAmount) || 0);
     const cogs = Number(s.totalCost) || 0;
     storeContributionsMap[sc].revenue += rev;
     storeContributionsMap[sc].cogs += cogs;
-    storeContributionsMap[sc].grossProfit += (rev - cogs);
+    storeContributionsMap[sc].grossProfit += rev - cogs;
     storeContributionsMap[sc].ordersCount += 1;
   }
 
   for (const e of allExpenses) {
     const sc = e.storeCode;
     if (!storeContributionsMap[sc]) {
-      storeContributionsMap[sc] = { storeCode: sc, revenue: 0, cogs: 0, grossProfit: 0, expenses: 0, netProfit: 0, ordersCount: 0 };
+      storeContributionsMap[sc] = {
+        storeCode: sc,
+        revenue: 0,
+        cogs: 0,
+        grossProfit: 0,
+        expenses: 0,
+        netProfit: 0,
+        ordersCount: 0,
+      };
     }
-    storeContributionsMap[sc].expenses += (Number(e.amount) || 0);
+    storeContributionsMap[sc].expenses += Number(e.amount) || 0;
   }
 
-  const storeContributions = Object.values(storeContributionsMap).map(sc => ({
+  const storeContributions = Object.values(storeContributionsMap).map((sc) => ({
     ...sc,
     netProfit: sc.grossProfit - sc.expenses,
     grossMarginPercent: sc.revenue > 0 ? (sc.grossProfit / sc.revenue) * 100 : 0,
@@ -256,7 +310,13 @@ export async function getStoreOperationalPnL(filters: AccountingFilterParams) {
       items: {
         include: {
           product: {
-            select: { id: true, baseCostPrice: true, baseSellingPrice: true, name: true, sku: true },
+            select: {
+              id: true,
+              baseCostPrice: true,
+              baseSellingPrice: true,
+              name: true,
+              sku: true,
+            },
           },
         },
       },
@@ -266,7 +326,9 @@ export async function getStoreOperationalPnL(filters: AccountingFilterParams) {
 
   // Fetch transfer pricing records for items received by store
   const transferItems = await prisma.stockTransferItem.findMany({
-    where: storeScope ? { transfer: { destStore: storeScope, status: { in: ['Completed', 'Received'] } } } : undefined,
+    where: storeScope
+      ? { transfer: { destStore: storeScope, status: { in: ['Completed', 'Received'] } } }
+      : undefined,
     include: { transfer: true },
     orderBy: { transfer: { shipDate: 'desc' } },
   });
@@ -285,14 +347,17 @@ export async function getStoreOperationalPnL(filters: AccountingFilterParams) {
     storeSalesRevenue += rev;
 
     for (const it of s.items) {
-      // Store COGS = transfer price paid to Central if available, else unitCost/baseCost
-      const effectiveTransferPrice = transferPriceMap.get(it.productId) ?? Number(it.unitCost) ?? Number(it.product?.baseCostPrice) ?? 0;
-      storeCOGS += effectiveTransferPrice * it.qty;
+      const effectiveTransferPrice =
+        transferPriceMap.get(it.productId) ??
+        (it.unitCost != null ? Number(it.unitCost) : null) ??
+        (it.product?.baseCostPrice != null ? Number(it.product.baseCostPrice) : 0);
+      storeCOGS += (Number(effectiveTransferPrice) || 0) * it.qty;
     }
   }
 
   const storeGrossProfit = storeSalesRevenue - storeCOGS;
-  const storeGrossMarginPercent = storeSalesRevenue > 0 ? (storeGrossProfit / storeSalesRevenue) * 100 : 0;
+  const storeGrossMarginPercent =
+    storeSalesRevenue > 0 ? (storeGrossProfit / storeSalesRevenue) * 100 : 0;
 
   const expWhere: any = {};
   if (storeScope) {
@@ -312,7 +377,8 @@ export async function getStoreOperationalPnL(filters: AccountingFilterParams) {
   });
   const totalStoreExpenses = storeExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   const storeNetProfit = storeGrossProfit - totalStoreExpenses;
-  const storeNetMarginPercent = storeSalesRevenue > 0 ? (storeNetProfit / storeSalesRevenue) * 100 : 0;
+  const storeNetMarginPercent =
+    storeSalesRevenue > 0 ? (storeNetProfit / storeSalesRevenue) * 100 : 0;
 
   return {
     storeScope: storeScope || 'All Retail Outlets',
@@ -365,12 +431,22 @@ export async function getCentralTransferPnL(filters: AccountingFilterParams) {
   let grossTransferProfit = 0;
   let totalUnitsTransferred = 0;
 
-  const outletTransferBreakdownMap: Record<string, { destStore: string; transferValue: number; inventoryCost: number; markupProfit: number; units: number; count: number }> = {};
+  const outletTransferBreakdownMap: Record<
+    string,
+    {
+      destStore: string;
+      transferValue: number;
+      inventoryCost: number;
+      markupProfit: number;
+      units: number;
+      count: number;
+    }
+  > = {};
 
   for (const t of transfers) {
     const val = Number(t.totalTransferValue) || 0;
     const cost = Number(t.totalCost) || 0;
-    const profit = Number(t.grossProfit) || (val - cost);
+    const profit = Number(t.grossProfit) || val - cost;
     const units = t.totalUnits || 0;
 
     centralTransferRevenue += val;
@@ -380,7 +456,14 @@ export async function getCentralTransferPnL(filters: AccountingFilterParams) {
 
     const dest = t.destStore;
     if (!outletTransferBreakdownMap[dest]) {
-      outletTransferBreakdownMap[dest] = { destStore: dest, transferValue: 0, inventoryCost: 0, markupProfit: 0, units: 0, count: 0 };
+      outletTransferBreakdownMap[dest] = {
+        destStore: dest,
+        transferValue: 0,
+        inventoryCost: 0,
+        markupProfit: 0,
+        units: 0,
+        count: 0,
+      };
     }
     outletTransferBreakdownMap[dest].transferValue += val;
     outletTransferBreakdownMap[dest].inventoryCost += cost;
@@ -407,9 +490,13 @@ export async function getCentralTransferPnL(filters: AccountingFilterParams) {
     where: expWhere,
     orderBy: { date: 'desc' },
   });
-  const totalCentralExpenses = centralExpensesRecords.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+  const totalCentralExpenses = centralExpensesRecords.reduce(
+    (acc, e) => acc + (Number(e.amount) || 0),
+    0
+  );
   const netCentralProfit = grossTransferProfit - totalCentralExpenses;
-  const centralMarkupMarginPercent = centralTransferRevenue > 0 ? (grossTransferProfit / centralTransferRevenue) * 100 : 0;
+  const centralMarkupMarginPercent =
+    centralTransferRevenue > 0 ? (grossTransferProfit / centralTransferRevenue) * 100 : 0;
 
   return {
     centralTransferRevenue: Math.round(centralTransferRevenue * 100) / 100,
@@ -463,10 +550,17 @@ export async function getDrillDownRecords(metricKey: string, filters: Accounting
         profit: Number(s.grossProfit),
         status: s.status,
         paymentMethod: s.paymentMethod,
-        items: s.items.map((it) => `${it.productName} (x${it.qty} @ ₹${Number(it.unitPrice)})`).join(', '),
+        items: s.items
+          .map((it) => `${it.productName} (x${it.qty} @ ₹${Number(it.unitPrice)})`)
+          .join(', '),
       }));
       const total = rows.reduce((acc, r) => acc + r.netRevenue, 0);
-      return { metric: 'Net External Sales Revenue', total: Math.round(total * 100) / 100, count: rows.length, rows };
+      return {
+        metric: 'Net External Sales Revenue',
+        total: Math.round(total * 100) / 100,
+        count: rows.length,
+        rows,
+      };
     }
 
     case 'cogs':
@@ -493,10 +587,17 @@ export async function getDrillDownRecords(metricKey: string, filters: Accounting
         amount: Number(s.totalCost),
         revenue: Number(s.grandTotal),
         profit: Number(s.grossProfit),
-        items: s.items.map((it) => `${it.productName}: ${it.qty} x ₹${Number(it.unitCost)}`).join(', '),
+        items: s.items
+          .map((it) => `${it.productName}: ${it.qty} x ₹${Number(it.unitCost)}`)
+          .join(', '),
       }));
       const total = rows.reduce((acc, r) => acc + r.amount, 0);
-      return { metric: 'Cost of Goods Sold (Vendor Cost)', total: Math.round(total * 100) / 100, count: rows.length, rows };
+      return {
+        metric: 'Cost of Goods Sold (Vendor Cost)',
+        total: Math.round(total * 100) / 100,
+        count: rows.length,
+        rows,
+      };
     }
 
     case 'expenses':
@@ -538,7 +639,12 @@ export async function getDrillDownRecords(metricKey: string, filters: Accounting
         paymentMethod: e.paymentMethod,
       }));
       const total = rows.reduce((acc, r) => acc + r.amount, 0);
-      return { metric: 'Operating Expenses Breakdown', total: Math.round(total * 100) / 100, count: rows.length, rows };
+      return {
+        metric: 'Operating Expenses Breakdown',
+        total: Math.round(total * 100) / 100,
+        count: rows.length,
+        rows,
+      };
     }
 
     case 'transferRevenue':
@@ -573,11 +679,18 @@ export async function getDrillDownRecords(metricKey: string, filters: Accounting
         profit: Number(t.grossProfit),
         amount: metricKey.includes('Profit') ? Number(t.grossProfit) : Number(t.totalTransferValue),
         status: t.status,
-        items: t.items.map((it) => `${it.product?.name || 'Item'} (Qty: ${it.qty}, Cost: ₹${Number(it.costPerUnit)}, Billed: ₹${Number(it.transferPricePerUnit)})`).join(', '),
+        items: t.items
+          .map(
+            (it) =>
+              `${it.product?.name || 'Item'} (Qty: ${it.qty}, Cost: ₹${Number(it.costPerUnit)}, Billed: ₹${Number(it.transferPricePerUnit)})`
+          )
+          .join(', '),
       }));
       const total = rows.reduce((acc, r) => acc + r.amount, 0);
       return {
-        metric: metricKey.includes('Profit') ? 'Central Transfer Gross Markup' : 'Central Transfer Billed Value',
+        metric: metricKey.includes('Profit')
+          ? 'Central Transfer Gross Markup'
+          : 'Central Transfer Billed Value',
         total: Math.round(total * 100) / 100,
         count: rows.length,
         rows,
@@ -772,7 +885,8 @@ export async function runRootFinancialReconciliation() {
   ]);
 
   // Calculations
-  const salesNetRevenue = (Number(salesAgg._sum.subtotal) || 0) - (Number(salesAgg._sum.discountAmount) || 0);
+  const salesNetRevenue =
+    (Number(salesAgg._sum.subtotal) || 0) - (Number(salesAgg._sum.discountAmount) || 0);
   const salesCOGS = Number(salesAgg._sum.totalCost) || 0;
   const salesGrossProfit = salesNetRevenue - salesCOGS;
   const totalExpenses = Number(expensesAgg._sum.amount) || 0;
@@ -798,7 +912,9 @@ export async function runRootFinancialReconciliation() {
     for (const po of v.purchases) {
       const tc = Number(po.totalCost) || 0;
       const ca = Number(po.creditAmount) || 0;
-      const pd = po.payments?.reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0) ?? (Number(po.paidAmount) || 0);
+      const pd =
+        po.payments?.reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0) ??
+        (Number(po.paidAmount) || 0);
       const rem = Math.max(0, tc - pd - ca);
       totalVendorBilled += tc;
       totalVendorPaid += pd;
@@ -834,8 +950,12 @@ export async function runRootFinancialReconciliation() {
     {
       test: 'Outstanding Payables = Total Vendor Bills - Recorded Payments - Credits',
       leftValue: Math.round(totalOutstandingPayables * 100) / 100,
-      rightValue: Math.round((totalVendorBilled - totalVendorPaid - totalVendorCredits) * 100) / 100,
-      isReconciled: Math.abs(totalOutstandingPayables - (totalVendorBilled - totalVendorPaid - totalVendorCredits)) < 0.05,
+      rightValue:
+        Math.round((totalVendorBilled - totalVendorPaid - totalVendorCredits) * 100) / 100,
+      isReconciled:
+        Math.abs(
+          totalOutstandingPayables - (totalVendorBilled - totalVendorPaid - totalVendorCredits)
+        ) < 0.05,
     },
     {
       test: 'General Ledger Double-Entry Balance (Total Debits == Total Credits)',

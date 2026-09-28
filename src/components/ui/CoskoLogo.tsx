@@ -40,7 +40,10 @@ export const CoskoLogo = memo(function CoskoLogo({
   const iconSize = Math.round(size * 0.88);
 
   return (
-    <div className={`inline-flex items-center select-none flex-shrink-0 ${className}`} style={{ height: size }}>
+    <div
+      className={`inline-flex items-center select-none flex-shrink-0 ${className}`}
+      style={{ height: size }}
+    >
       {showText ? (
         <div className="inline-flex items-center leading-none">
           <span

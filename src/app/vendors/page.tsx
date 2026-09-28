@@ -12,7 +12,16 @@ import { toast } from 'sonner';
 import { validateAndNormalizeGstin } from '@/lib/gstUtils';
 
 export default function VendorsPage() {
-  const { vendors, addVendor, updateVendor, deleteVendor, purchases, recordPurchasePayment, refreshAllData, currentUser } = useApp();
+  const {
+    vendors,
+    addVendor,
+    updateVendor,
+    deleteVendor,
+    purchases,
+    recordPurchasePayment,
+    refreshAllData,
+    currentUser,
+  } = useApp();
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,7 +86,9 @@ export default function VendorsPage() {
 
       const totalCost = Number(p.totalAmount) || 0;
       const credit = Number(p.creditAmount) || 0;
-      const realPaid = p.payments?.reduce((sum: number, pay: any) => sum + (Number(pay.amount) || 0), 0) ?? (Number(p.paidAmount) || 0);
+      const realPaid =
+        p.payments?.reduce((sum: number, pay: any) => sum + (Number(pay.amount) || 0), 0) ??
+        (Number(p.paidAmount) || 0);
       const balance = Math.max(0, Math.round((totalCost - realPaid - credit) * 100) / 100);
 
       map[vKey].totalBilled += totalCost;
@@ -96,7 +107,11 @@ export default function VendorsPage() {
         map[vKey].unpaidCount++;
         if (effDue) {
           const dueD = new Date(effDue);
-          const dueMidnight = new Date(dueD.getFullYear(), dueD.getMonth(), dueD.getDate()).getTime();
+          const dueMidnight = new Date(
+            dueD.getFullYear(),
+            dueD.getMonth(),
+            dueD.getDate()
+          ).getTime();
           const diff = Math.round((todayMidnight - dueMidnight) / (1000 * 60 * 60 * 24));
           if (diff > 0) {
             overdueDays = diff;
@@ -126,15 +141,16 @@ export default function VendorsPage() {
   // Aggregate enriched vendors
   const enrichedVendors = useMemo(() => {
     return vendors.map((v) => {
-      const fin = vendorFinancials[v.id] || vendorFinancials[v.name.toLowerCase().trim()] || {
-        totalBilled: v.totalBilledAmount || 0,
-        totalPaid: v.totalPaidAmount || 0,
-        totalCredits: v.totalCreditsAmount || 0,
-        outstanding: v.outstandingPayable || 0,
-        unpaidCount: v.unpaidBillsCount || 0,
-        overdueCount: v.overdueBillsCount || 0,
-        bills: [],
-      };
+      const fin = vendorFinancials[v.id] ||
+        vendorFinancials[v.name.toLowerCase().trim()] || {
+          totalBilled: v.totalBilledAmount || 0,
+          totalPaid: v.totalPaidAmount || 0,
+          totalCredits: v.totalCreditsAmount || 0,
+          outstanding: v.outstandingPayable || 0,
+          unpaidCount: v.unpaidBillsCount || 0,
+          overdueCount: v.overdueBillsCount || 0,
+          bills: [],
+        };
 
       return {
         ...v,
@@ -155,7 +171,10 @@ export default function VendorsPage() {
     const totalBilled = enrichedVendors.reduce((acc, v) => acc + v.totalBilledAmount, 0);
     const totalPaid = enrichedVendors.reduce((acc, v) => acc + v.totalPaidAmount, 0);
     const totalOutstanding = enrichedVendors.reduce((acc, v) => acc + v.outstandingPayable, 0);
-    const totalOverdueBills = enrichedVendors.reduce((acc, v) => acc + (v.overdueBillsCount || 0), 0);
+    const totalOverdueBills = enrichedVendors.reduce(
+      (acc, v) => acc + (v.overdueBillsCount || 0),
+      0
+    );
     const totalUnpaidBills = enrichedVendors.reduce((acc, v) => acc + (v.unpaidBillsCount || 0), 0);
 
     return {
@@ -233,9 +252,7 @@ export default function VendorsPage() {
         <div className="flex items-start justify-between gap-3">
           <div className="page-header">
             <h1 className="page-title">Vendors</h1>
-            <p className="page-subtitle">
-              Supplier payables, bills & payment processing
-            </p>
+            <p className="page-subtitle">Supplier payables, bills & payment processing</p>
           </div>
           <button
             onClick={() => setOnboardModal(true)}
@@ -251,20 +268,27 @@ export default function VendorsPage() {
         <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 md:grid md:grid-cols-4 md:gap-3 pb-1 md:pb-0">
           <div className="card p-3 md:p-4 border border-border min-w-[170px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <div className="flex items-center justify-between">
-              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Active Suppliers</span>
+              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                Active Suppliers
+              </span>
               <span className="p-2 rounded-xl bg-primary/10 text-primary">
                 <Icon name="BuildingStorefrontIcon" size={18} />
               </span>
             </div>
-            <p className="text-2xl font-extrabold text-foreground font-tabular mt-1.5">{summaryMetrics.totalVendors}</p>
+            <p className="text-2xl font-extrabold text-foreground font-tabular mt-1.5">
+              {summaryMetrics.totalVendors}
+            </p>
             <p className="text-3xs text-muted-foreground mt-1">
-              {summaryMetrics.totalUnpaidBills} active bill{summaryMetrics.totalUnpaidBills === 1 ? '' : 's'} recorded
+              {summaryMetrics.totalUnpaidBills} active bill
+              {summaryMetrics.totalUnpaidBills === 1 ? '' : 's'} recorded
             </p>
           </div>
 
           <div className="card p-3 md:p-4 border border-border min-w-[170px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <div className="flex items-center justify-between">
-              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Total Procurement Billed</span>
+              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                Total Procurement Billed
+              </span>
               <span className="p-2 rounded-xl bg-info/10 text-info">
                 <Icon name="DocumentTextIcon" size={18} />
               </span>
@@ -272,12 +296,16 @@ export default function VendorsPage() {
             <p className="text-2xl font-extrabold text-foreground font-tabular mt-1.5">
               ₹{summaryMetrics.totalBilled.toLocaleString('en-IN')}
             </p>
-            <p className="text-3xs text-muted-foreground mt-1">Across all verified purchase orders</p>
+            <p className="text-3xs text-muted-foreground mt-1">
+              Across all verified purchase orders
+            </p>
           </div>
 
           <div className="card p-3 md:p-4 border border-border min-w-[170px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <div className="flex items-center justify-between">
-              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Settled Payments</span>
+              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                Settled Payments
+              </span>
               <span className="p-2 rounded-xl bg-positive/10 text-positive">
                 <Icon name="CheckCircleIcon" size={18} />
               </span>
@@ -285,7 +313,9 @@ export default function VendorsPage() {
             <p className="text-2xl font-extrabold text-positive font-tabular mt-1.5">
               ₹{summaryMetrics.totalPaid.toLocaleString('en-IN')}
             </p>
-            <p className="text-3xs text-muted-foreground mt-1">Verified bank, UPI & cash disbursements</p>
+            <p className="text-3xs text-muted-foreground mt-1">
+              Verified bank, UPI & cash disbursements
+            </p>
           </div>
 
           <div
@@ -298,12 +328,18 @@ export default function VendorsPage() {
             title="Click to toggle filter for vendors with outstanding payables"
           >
             <div className="flex items-center justify-between">
-              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Net Outstanding Payables</span>
-              <span className={`p-2 rounded-xl ${summaryMetrics.totalOutstanding > 0 ? 'bg-danger/10 text-danger' : 'bg-emerald-500/10 text-emerald-600'}`}>
+              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                Net Outstanding Payables
+              </span>
+              <span
+                className={`p-2 rounded-xl ${summaryMetrics.totalOutstanding > 0 ? 'bg-danger/10 text-danger' : 'bg-emerald-500/10 text-emerald-600'}`}
+              >
                 <Icon name="BanknotesIcon" size={18} />
               </span>
             </div>
-            <p className={`text-2xl font-extrabold font-tabular mt-1.5 ${summaryMetrics.totalOutstanding > 0 ? 'text-danger' : 'text-emerald-600'}`}>
+            <p
+              className={`text-2xl font-extrabold font-tabular mt-1.5 ${summaryMetrics.totalOutstanding > 0 ? 'text-danger' : 'text-emerald-600'}`}
+            >
               ₹{summaryMetrics.totalOutstanding.toLocaleString('en-IN')}
             </p>
             <div className="flex items-center gap-1.5 mt-1">
@@ -323,7 +359,11 @@ export default function VendorsPage() {
         <div className="card p-4 flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex flex-1 items-center gap-3 w-full md:w-auto">
             <div className="relative flex-1 max-w-md">
-              <Icon name="MagnifyingGlassIcon" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Icon
+                name="MagnifyingGlassIcon"
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
               <input
                 type="text"
                 value={searchQuery}
@@ -384,7 +424,9 @@ export default function VendorsPage() {
           <div className="card p-12 text-center text-muted-foreground">
             <Icon name="BuildingStorefrontIcon" size={40} className="mx-auto mb-2 opacity-30" />
             <h3 className="text-sm font-semibold text-foreground">No Suppliers Found</h3>
-            <p className="text-xs text-muted-foreground mt-1">Try modifying your search or filter settings, or onboard a new supplier.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Try modifying your search or filter settings, or onboard a new supplier.
+            </p>
           </div>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -396,13 +438,19 @@ export default function VendorsPage() {
                 <div
                   key={`vend-${v.id}`}
                   className={`card p-5 space-y-4 hover:shadow-card-hover transition-all duration-200 relative group border ${
-                    hasOverdue ? 'border-danger/50' : hasPayable ? 'border-border/90' : 'border-border/60'
+                    hasOverdue
+                      ? 'border-danger/50'
+                      : hasPayable
+                        ? 'border-border/90'
+                        : 'border-border/60'
                   }`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-3xs font-mono font-bold text-muted-foreground">{v.code}</span>
+                        <span className="text-3xs font-mono font-bold text-muted-foreground">
+                          {v.code}
+                        </span>
                         {hasOverdue && (
                           <span className="badge-danger text-3xs font-extrabold px-1.5 py-0.2">
                             {v.overdueBillsCount} Overdue
@@ -418,10 +466,18 @@ export default function VendorsPage() {
                         ★ {v.rating || 5.0}
                       </span>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => openEdit(v)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit Vendor">
+                        <button
+                          onClick={() => openEdit(v)}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                          title="Edit Vendor"
+                        >
                           <Icon name="PencilSquareIcon" size={14} />
                         </button>
-                        <button onClick={() => setDeleteVendorModal(v)} className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors" title="Archive / Delete">
+                        <button
+                          onClick={() => setDeleteVendorModal(v)}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors"
+                          title="Archive / Delete"
+                        >
                           <Icon name="TrashIcon" size={14} />
                         </button>
                       </div>
@@ -443,14 +499,19 @@ export default function VendorsPage() {
                     )}
                     {v.gstin && (
                       <p className="flex items-center gap-1.5">
-                        <Icon name="DocumentTextIcon" size={13} className="text-muted-foreground/70" />
+                        <Icon
+                          name="DocumentTextIcon"
+                          size={13}
+                          className="text-muted-foreground/70"
+                        />
                         <span>GSTIN:</span>
                         <span className="font-mono text-primary font-bold text-2xs">{v.gstin}</span>
                       </p>
                     )}
                     {v.paymentTerms && (
                       <p className="text-2xs text-muted-foreground">
-                        Terms: <strong className="text-foreground">{v.paymentTerms}</strong> · Lead: {v.leadTimeDays || 3}d
+                        Terms: <strong className="text-foreground">{v.paymentTerms}</strong> · Lead:{' '}
+                        {v.leadTimeDays || 3}d
                       </p>
                     )}
                   </div>
@@ -479,8 +540,14 @@ export default function VendorsPage() {
                     </div>
 
                     <div className="flex items-center gap-1 text-2xs font-semibold">
-                      <span>{hasPayable ? `${v.unpaidBillsCount || 0} bills pending` : 'All Settled'}</span>
-                      <Icon name="ChevronRightIcon" size={14} className="transition-transform group-hover:translate-x-0.5" />
+                      <span>
+                        {hasPayable ? `${v.unpaidBillsCount || 0} bills pending` : 'All Settled'}
+                      </span>
+                      <Icon
+                        name="ChevronRightIcon"
+                        size={14}
+                        className="transition-transform group-hover:translate-x-0.5"
+                      />
                     </div>
                   </div>
                 </div>
@@ -510,14 +577,18 @@ export default function VendorsPage() {
                     return (
                       <tr key={`v-row-${v.id}`} className="table-row">
                         <td className="px-4 py-3">
-                          <span className="font-mono text-3xs font-bold text-muted-foreground block">{v.code}</span>
+                          <span className="font-mono text-3xs font-bold text-muted-foreground block">
+                            {v.code}
+                          </span>
                           <span className="font-bold text-foreground">{v.name}</span>
                         </td>
                         <td className="px-4 py-3">
                           <span className="badge-neutral text-3xs">{v.category || 'General'}</span>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
-                          <div className="font-medium text-foreground">{v.contactPerson || '—'}</div>
+                          <div className="font-medium text-foreground">
+                            {v.contactPerson || '—'}
+                          </div>
                           <div className="font-mono text-3xs">{v.phone}</div>
                         </td>
                         <td className="px-4 py-3 font-mono text-2xs text-primary font-semibold">
@@ -547,10 +618,18 @@ export default function VendorsPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => openEdit(v)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit">
+                            <button
+                              onClick={() => openEdit(v)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                              title="Edit"
+                            >
                               <Icon name="PencilSquareIcon" size={14} />
                             </button>
-                            <button onClick={() => setDeleteVendorModal(v)} className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors" title="Archive / Delete">
+                            <button
+                              onClick={() => setDeleteVendorModal(v)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors"
+                              title="Archive / Delete"
+                            >
                               <Icon name="TrashIcon" size={14} />
                             </button>
                           </div>
@@ -579,28 +658,38 @@ export default function VendorsPage() {
               {/* Financial Reconciled Banner */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-muted/40 border border-border rounded-xl">
                 <div>
-                  <span className="text-3xs uppercase font-bold text-muted-foreground block">Total Billed</span>
+                  <span className="text-3xs uppercase font-bold text-muted-foreground block">
+                    Total Billed
+                  </span>
                   <span className="text-base font-bold text-foreground font-tabular">
                     ₹{(selectedVendorForBills.totalBilledAmount || 0).toLocaleString('en-IN')}
                   </span>
                 </div>
                 <div>
-                  <span className="text-3xs uppercase font-bold text-muted-foreground block">Settled Payments</span>
+                  <span className="text-3xs uppercase font-bold text-muted-foreground block">
+                    Settled Payments
+                  </span>
                   <span className="text-base font-bold text-emerald-600 font-tabular">
                     ₹{(selectedVendorForBills.totalPaidAmount || 0).toLocaleString('en-IN')}
                   </span>
                 </div>
                 <div>
-                  <span className="text-3xs uppercase font-bold text-muted-foreground block">Vendor Credits</span>
+                  <span className="text-3xs uppercase font-bold text-muted-foreground block">
+                    Vendor Credits
+                  </span>
                   <span className="text-base font-bold text-info font-tabular">
                     ₹{(selectedVendorForBills.totalCreditsAmount || 0).toLocaleString('en-IN')}
                   </span>
                 </div>
                 <div className="border-l border-border pl-3">
-                  <span className="text-3xs uppercase font-bold text-muted-foreground block">Net Balance Due</span>
+                  <span className="text-3xs uppercase font-bold text-muted-foreground block">
+                    Net Balance Due
+                  </span>
                   <span
                     className={`text-lg font-extrabold font-tabular ${
-                      selectedVendorForBills.outstandingPayable > 0 ? 'text-danger' : 'text-emerald-600'
+                      selectedVendorForBills.outstandingPayable > 0
+                        ? 'text-danger'
+                        : 'text-emerald-600'
                     }`}
                   >
                     ₹{(selectedVendorForBills.outstandingPayable || 0).toLocaleString('en-IN')}
@@ -651,7 +740,11 @@ export default function VendorsPage() {
               {/* Bills Listing */}
               {selectedVendorBills.length === 0 ? (
                 <div className="py-10 text-center text-muted-foreground">
-                  <Icon name="CheckCircleIcon" size={36} className="mx-auto mb-2 text-positive/60" />
+                  <Icon
+                    name="CheckCircleIcon"
+                    size={36}
+                    className="mx-auto mb-2 text-positive/60"
+                  />
                   <p className="font-bold text-foreground">No matching purchase bills found</p>
                   <p className="text-2xs text-muted-foreground mt-0.5">
                     {billsFilter === 'pending'
@@ -673,8 +766,8 @@ export default function VendorsPage() {
                           isOverdue
                             ? 'border-danger/40 bg-danger/5'
                             : isSettled
-                            ? 'border-emerald-500/30 bg-emerald-500/5'
-                            : 'border-border bg-card'
+                              ? 'border-emerald-500/30 bg-emerald-500/5'
+                              : 'border-border bg-card'
                         }`}
                       >
                         {/* Bill Header */}
@@ -684,9 +777,13 @@ export default function VendorsPage() {
                               {bill.invoiceNo || bill.poNo}
                             </span>
                             {bill.invoiceNo && bill.invoiceNo !== bill.poNo && (
-                              <span className="text-3xs text-muted-foreground font-mono">({bill.poNo})</span>
+                              <span className="text-3xs text-muted-foreground font-mono">
+                                ({bill.poNo})
+                              </span>
                             )}
-                            <span className="badge-neutral text-3xs">{bill.store || bill.storeCode}</span>
+                            <span className="badge-neutral text-3xs">
+                              {bill.store || bill.storeCode}
+                            </span>
 
                             {/* Overdue Badge */}
                             {isOverdue ? (
@@ -695,7 +792,9 @@ export default function VendorsPage() {
                                 Overdue by {bill.overdueDays} day{bill.overdueDays === 1 ? '' : 's'}
                               </span>
                             ) : bill.overdueStatus === 'Due Today' ? (
-                              <span className="badge-warning text-3xs font-extrabold">Due Today</span>
+                              <span className="badge-warning text-3xs font-extrabold">
+                                Due Today
+                              </span>
                             ) : isSettled ? (
                               <span className="badge-positive text-3xs font-bold flex items-center gap-1">
                                 <Icon name="CheckIcon" size={11} /> Settled
@@ -712,7 +811,8 @@ export default function VendorsPage() {
                               className="btn-secondary text-3xs py-1 px-2.5 gap-1"
                             >
                               <Icon name="DocumentTextIcon" size={12} />
-                              {bill.payments?.length || 0} Payment{bill.payments?.length === 1 ? '' : 's'}
+                              {bill.payments?.length || 0} Payment
+                              {bill.payments?.length === 1 ? '' : 's'}
                               <Icon
                                 name="ChevronDownIcon"
                                 size={12}
@@ -738,26 +838,40 @@ export default function VendorsPage() {
                           <div>
                             <span className="text-muted-foreground block">Order Date:</span>
                             <span className="font-semibold text-foreground">
-                              {bill.orderDate ? new Date(bill.orderDate).toLocaleDateString('en-IN') : '—'}
+                              {bill.orderDate
+                                ? new Date(bill.orderDate).toLocaleDateString('en-IN')
+                                : '—'}
                             </span>
                           </div>
                           <div>
                             <span className="text-muted-foreground block">Due Date:</span>
-                            <span className={`font-semibold ${isOverdue ? 'text-danger' : 'text-foreground'}`}>
-                              {bill.effectiveDueDate ? new Date(bill.effectiveDueDate).toLocaleDateString('en-IN') : 'Net 30'}
+                            <span
+                              className={`font-semibold ${isOverdue ? 'text-danger' : 'text-foreground'}`}
+                            >
+                              {bill.effectiveDueDate
+                                ? new Date(bill.effectiveDueDate).toLocaleDateString('en-IN')
+                                : 'Net 30'}
                             </span>
                           </div>
                           <div>
                             <span className="text-muted-foreground block">Original Amount:</span>
-                            <span className="font-bold text-foreground">₹{bill.totalCost.toLocaleString('en-IN')}</span>
+                            <span className="font-bold text-foreground">
+                              ₹{bill.totalCost.toLocaleString('en-IN')}
+                            </span>
                           </div>
                           <div>
                             <span className="text-muted-foreground block">Paid Amount:</span>
-                            <span className="font-semibold text-emerald-600">₹{(bill.paidAmount || 0).toLocaleString('en-IN')}</span>
+                            <span className="font-semibold text-emerald-600">
+                              ₹{(bill.paidAmount || 0).toLocaleString('en-IN')}
+                            </span>
                           </div>
                           <div>
-                            <span className="text-muted-foreground block font-bold">Outstanding Balance:</span>
-                            <span className={`font-extrabold text-xs ${bill.balance > 0 ? 'text-danger' : 'text-emerald-600'}`}>
+                            <span className="text-muted-foreground block font-bold">
+                              Outstanding Balance:
+                            </span>
+                            <span
+                              className={`font-extrabold text-xs ${bill.balance > 0 ? 'text-danger' : 'text-emerald-600'}`}
+                            >
                               ₹{bill.balance.toLocaleString('en-IN')}
                             </span>
                           </div>
@@ -770,11 +884,15 @@ export default function VendorsPage() {
                               <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">
                                 Verified Payment Transactions
                               </span>
-                              <span className="text-3xs text-muted-foreground">Source: Real DB Purchase Payments</span>
+                              <span className="text-3xs text-muted-foreground">
+                                Source: Real DB Purchase Payments
+                              </span>
                             </div>
 
-                            {(!bill.payments || bill.payments.length === 0) ? (
-                              <p className="text-3xs text-muted-foreground italic py-1">No payment transactions recorded yet.</p>
+                            {!bill.payments || bill.payments.length === 0 ? (
+                              <p className="text-3xs text-muted-foreground italic py-1">
+                                No payment transactions recorded yet.
+                              </p>
                             ) : (
                               <div className="overflow-x-auto border border-border rounded-lg">
                                 <table className="w-full text-left text-3xs">
@@ -782,7 +900,9 @@ export default function VendorsPage() {
                                     <tr className="bg-muted text-muted-foreground font-bold uppercase">
                                       <th className="px-2.5 py-1.5">Voucher #</th>
                                       <th className="px-2.5 py-1.5">Date</th>
-                                      <th className="px-2.5 py-1.5 font-tabular text-right">Amount</th>
+                                      <th className="px-2.5 py-1.5 font-tabular text-right">
+                                        Amount
+                                      </th>
                                       <th className="px-2.5 py-1.5">Method</th>
                                       <th className="px-2.5 py-1.5">Reference / UTR</th>
                                       <th className="px-2.5 py-1.5">Remarks</th>
@@ -797,7 +917,9 @@ export default function VendorsPage() {
                                           {p.voucherNo || 'PV-LEGACY'}
                                         </td>
                                         <td className="px-2.5 py-1.5 text-muted-foreground">
-                                          {new Date(p.paymentDate || p.createdAt).toLocaleDateString('en-IN')}
+                                          {new Date(
+                                            p.paymentDate || p.createdAt
+                                          ).toLocaleDateString('en-IN')}
                                         </td>
                                         <td className="px-2.5 py-1.5 text-right font-extrabold text-emerald-600">
                                           ₹{Number(p.amount).toLocaleString('en-IN')}
@@ -806,26 +928,33 @@ export default function VendorsPage() {
                                         <td className="px-2.5 py-1.5 font-mono text-muted-foreground">
                                           {p.referenceNo || 'N/A'}
                                         </td>
-                                        <td className="px-2.5 py-1.5 text-muted-foreground max-w-[160px] truncate" title={p.notes || ''}>
+                                        <td
+                                          className="px-2.5 py-1.5 text-muted-foreground max-w-[160px] truncate"
+                                          title={p.notes || ''}
+                                        >
                                           {p.notes || '—'}
                                         </td>
-                                        <td className="px-2.5 py-1.5 text-muted-foreground">{p.recordedBy}</td>
+                                        <td className="px-2.5 py-1.5 text-muted-foreground">
+                                          {p.recordedBy}
+                                        </td>
                                         <td className="px-2.5 py-1.5 text-center">
                                           {p.receiptUrl ? (
                                             <button
                                               type="button"
-                                              onClick={() => setProofViewerData({
-                                                proofUrl: p.receiptUrl,
-                                                title: `Payment Proof — Voucher #${p.voucherNo || 'PV'}`,
-                                                amount: Number(p.amount),
-                                                paymentMethod: p.paymentMethod,
-                                                referenceNo: p.referenceNo,
-                                                paymentDate: p.paymentDate,
-                                                recordedBy: p.recordedBy,
-                                                entityName: selectedVendorForBills?.name,
-                                                billNo: bill.invoiceNo || bill.poNo,
-                                                notes: p.notes,
-                                              })}
+                                              onClick={() =>
+                                                setProofViewerData({
+                                                  proofUrl: p.receiptUrl,
+                                                  title: `Payment Proof — Voucher #${p.voucherNo || 'PV'}`,
+                                                  amount: Number(p.amount),
+                                                  paymentMethod: p.paymentMethod,
+                                                  referenceNo: p.referenceNo,
+                                                  paymentDate: p.paymentDate,
+                                                  recordedBy: p.recordedBy,
+                                                  entityName: selectedVendorForBills?.name,
+                                                  billNo: bill.invoiceNo || bill.poNo,
+                                                  notes: p.notes,
+                                                })
+                                              }
                                               className="text-primary hover:underline font-bold inline-flex items-center gap-0.5"
                                             >
                                               <Icon name="DocumentIcon" size={11} /> View Proof
@@ -849,7 +978,10 @@ export default function VendorsPage() {
               )}
 
               <div className="flex justify-end pt-3 border-t border-border">
-                <button onClick={() => setSelectedVendorForBills(null)} className="btn-secondary text-xs">
+                <button
+                  onClick={() => setSelectedVendorForBills(null)}
+                  className="btn-secondary text-xs"
+                >
                   Close Payables Drawer
                 </button>
               </div>
@@ -884,15 +1016,26 @@ export default function VendorsPage() {
           >
             <div className="space-y-4 py-2 text-xs">
               {/* Printable Voucher Card */}
-              <div id="payment-voucher-print-area" className="p-5 border border-border rounded-xl bg-card space-y-4">
+              <div
+                id="payment-voucher-print-area"
+                className="p-5 border border-border rounded-xl bg-card space-y-4"
+              >
                 <div className="flex items-start justify-between border-b border-border pb-3">
                   <div>
-                    <h2 className="text-base font-extrabold text-foreground tracking-tight">COSKO ENTERPRISE RETAIL</h2>
-                    <p className="text-3xs text-muted-foreground">Procurement & Accounts Payable Department</p>
-                    <p className="text-3xs text-muted-foreground font-mono mt-0.5">Voucher: {receiptVoucherModal.voucherNo}</p>
+                    <h2 className="text-base font-extrabold text-foreground tracking-tight">
+                      COSKO ENTERPRISE RETAIL
+                    </h2>
+                    <p className="text-3xs text-muted-foreground">
+                      Procurement & Accounts Payable Department
+                    </p>
+                    <p className="text-3xs text-muted-foreground font-mono mt-0.5">
+                      Voucher: {receiptVoucherModal.voucherNo}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <span className="badge-positive text-2xs font-bold px-2 py-0.5">PAID / SETTLED</span>
+                    <span className="badge-positive text-2xs font-bold px-2 py-0.5">
+                      PAID / SETTLED
+                    </span>
                     <p className="text-3xs text-muted-foreground mt-1">
                       {new Date(receiptVoucherModal.paymentDate).toLocaleDateString('en-IN')}
                     </p>
@@ -901,35 +1044,55 @@ export default function VendorsPage() {
 
                 <div className="grid grid-cols-2 gap-3 text-2xs">
                   <div>
-                    <span className="text-muted-foreground uppercase text-3xs font-bold block">Vendor Beneficiary:</span>
-                    <strong className="text-foreground text-xs block">{receiptVoucherModal.vendorName}</strong>
+                    <span className="text-muted-foreground uppercase text-3xs font-bold block">
+                      Vendor Beneficiary:
+                    </span>
+                    <strong className="text-foreground text-xs block">
+                      {receiptVoucherModal.vendorName}
+                    </strong>
                     {receiptVoucherModal.vendorGstin && (
-                      <span className="text-muted-foreground font-mono block">GSTIN: {receiptVoucherModal.vendorGstin}</span>
+                      <span className="text-muted-foreground font-mono block">
+                        GSTIN: {receiptVoucherModal.vendorGstin}
+                      </span>
                     )}
                     {receiptVoucherModal.vendorPhone && (
-                      <span className="text-muted-foreground block">Phone: {receiptVoucherModal.vendorPhone}</span>
+                      <span className="text-muted-foreground block">
+                        Phone: {receiptVoucherModal.vendorPhone}
+                      </span>
                     )}
                   </div>
                   <div className="text-right">
-                    <span className="text-muted-foreground uppercase text-3xs font-bold block">Bill Details:</span>
-                    <strong className="text-primary font-mono text-xs block">Invoice #{receiptVoucherModal.billNo}</strong>
-                    <span className="text-muted-foreground font-mono text-3xs block">PO Ref: {receiptVoucherModal.poNo}</span>
+                    <span className="text-muted-foreground uppercase text-3xs font-bold block">
+                      Bill Details:
+                    </span>
+                    <strong className="text-primary font-mono text-xs block">
+                      Invoice #{receiptVoucherModal.billNo}
+                    </strong>
+                    <span className="text-muted-foreground font-mono text-3xs block">
+                      PO Ref: {receiptVoucherModal.poNo}
+                    </span>
                   </div>
                 </div>
 
                 <div className="p-3 bg-muted/40 rounded-xl border border-border space-y-1.5 font-tabular text-2xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Total Bill Value:</span>
-                    <span className="font-bold text-foreground">₹{Number(receiptVoucherModal.totalCost).toLocaleString('en-IN')}</span>
+                    <span className="font-bold text-foreground">
+                      ₹{Number(receiptVoucherModal.totalCost).toLocaleString('en-IN')}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Payment Method:</span>
-                    <span className="font-bold text-foreground">{receiptVoucherModal.paymentMethod}</span>
+                    <span className="font-bold text-foreground">
+                      {receiptVoucherModal.paymentMethod}
+                    </span>
                   </div>
                   {receiptVoucherModal.referenceNo && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Transaction Reference (UTR):</span>
-                      <span className="font-mono font-bold text-foreground">{receiptVoucherModal.referenceNo}</span>
+                      <span className="font-mono font-bold text-foreground">
+                        {receiptVoucherModal.referenceNo}
+                      </span>
                     </div>
                   )}
                   <div className="flex justify-between pt-1.5 border-t border-border font-extrabold text-sm text-emerald-600">
@@ -947,25 +1110,33 @@ export default function VendorsPage() {
                 {receiptVoucherModal.receiptUrl && (
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300">
                     <div className="flex items-center gap-2">
-                      <Icon name="DocumentCheckIcon" size={16} className="text-emerald-600 shrink-0" />
+                      <Icon
+                        name="DocumentCheckIcon"
+                        size={16}
+                        className="text-emerald-600 shrink-0"
+                      />
                       <div>
                         <span className="font-bold text-2xs block">Payment Proof Attached</span>
-                        <span className="text-4xs text-muted-foreground font-mono">Permanently stored in database ledger</span>
+                        <span className="text-4xs text-muted-foreground font-mono">
+                          Permanently stored in database ledger
+                        </span>
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setProofViewerData({
-                        proofUrl: receiptVoucherModal.receiptUrl,
-                        title: `Payment Proof — Voucher #${receiptVoucherModal.voucherNo}`,
-                        amount: Number(receiptVoucherModal.amount),
-                        paymentMethod: receiptVoucherModal.paymentMethod,
-                        referenceNo: receiptVoucherModal.referenceNo,
-                        paymentDate: receiptVoucherModal.paymentDate,
-                        recordedBy: receiptVoucherModal.recordedBy,
-                        entityName: receiptVoucherModal.vendorName,
-                        billNo: receiptVoucherModal.billNo,
-                      })}
+                      onClick={() =>
+                        setProofViewerData({
+                          proofUrl: receiptVoucherModal.receiptUrl,
+                          title: `Payment Proof — Voucher #${receiptVoucherModal.voucherNo}`,
+                          amount: Number(receiptVoucherModal.amount),
+                          paymentMethod: receiptVoucherModal.paymentMethod,
+                          referenceNo: receiptVoucherModal.referenceNo,
+                          paymentDate: receiptVoucherModal.paymentDate,
+                          recordedBy: receiptVoucherModal.recordedBy,
+                          entityName: receiptVoucherModal.vendorName,
+                          billNo: receiptVoucherModal.billNo,
+                        })
+                      }
                       className="btn-secondary text-2xs py-1 px-2.5 gap-1 font-bold shadow-2xs"
                     >
                       <Icon name="EyeIcon" size={12} />
@@ -975,20 +1146,31 @@ export default function VendorsPage() {
                 )}
 
                 <div className="flex items-center justify-between text-3xs text-muted-foreground pt-2 border-t border-border">
-                  <span>Authorized by: <strong>{receiptVoucherModal.recordedBy || currentUser?.name}</strong></span>
+                  <span>
+                    Authorized by:{' '}
+                    <strong>{receiptVoucherModal.recordedBy || currentUser?.name}</strong>
+                  </span>
                   <span>Digitally Recorded via COSKO StoreCommand</span>
                 </div>
               </div>
 
               {/* Actions */}
               <div className="flex items-center justify-between pt-2 border-t border-border">
-                <span className="text-3xs text-muted-foreground">Print or export copy for vendor file.</span>
+                <span className="text-3xs text-muted-foreground">
+                  Print or export copy for vendor file.
+                </span>
                 <div className="flex items-center gap-2">
-                  <button onClick={handlePrintReceipt} className="btn-secondary text-xs gap-1.5 font-bold">
+                  <button
+                    onClick={handlePrintReceipt}
+                    className="btn-secondary text-xs gap-1.5 font-bold"
+                  >
                     <Icon name="PrinterIcon" size={14} />
                     Print Receipt Voucher
                   </button>
-                  <button onClick={() => setReceiptVoucherModal(null)} className="btn-primary text-xs font-bold">
+                  <button
+                    onClick={() => setReceiptVoucherModal(null)}
+                    className="btn-primary text-xs font-bold"
+                  >
                     Done
                   </button>
                 </div>
@@ -1020,23 +1202,33 @@ export default function VendorsPage() {
           >
             <div className="space-y-4 py-2 text-xs">
               {(() => {
-                const poCount = (deleteVendorModal as any).totalBillsCount || (deleteVendorModal.outstandingPayable > 0 ? 1 : 0);
+                const poCount =
+                  (deleteVendorModal as any).totalBillsCount ||
+                  (deleteVendorModal.outstandingPayable > 0 ? 1 : 0);
                 return (
                   <>
                     <div
                       className={`p-4 rounded-xl border ${
-                        poCount > 0 ? 'bg-warning/10 border-warning/30 text-foreground' : 'bg-muted/40 border-border text-foreground'
+                        poCount > 0
+                          ? 'bg-warning/10 border-warning/30 text-foreground'
+                          : 'bg-muted/40 border-border text-foreground'
                       }`}
                     >
                       <div className="flex items-start gap-2.5">
                         <Icon
                           name={poCount > 0 ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'}
                           size={18}
-                          className={poCount > 0 ? 'text-warning shrink-0 mt-0.5' : 'text-primary shrink-0 mt-0.5'}
+                          className={
+                            poCount > 0
+                              ? 'text-warning shrink-0 mt-0.5'
+                              : 'text-primary shrink-0 mt-0.5'
+                          }
                         />
                         <div>
                           <p className="font-bold text-sm">
-                            {poCount > 0 ? 'Linked Procurement & Financial Records Found' : 'Unused Supplier Profile'}
+                            {poCount > 0
+                              ? 'Linked Procurement & Financial Records Found'
+                              : 'Unused Supplier Profile'}
                           </p>
                           <p className="text-muted-foreground mt-1">
                             {poCount > 0
@@ -1050,7 +1242,10 @@ export default function VendorsPage() {
                     </div>
 
                     <div className="flex justify-end gap-2 pt-3 border-t border-border">
-                      <button onClick={() => setDeleteVendorModal(null)} className="btn-secondary text-xs">
+                      <button
+                        onClick={() => setDeleteVendorModal(null)}
+                        className="btn-secondary text-xs"
+                      >
                         Cancel
                       </button>
                       <button

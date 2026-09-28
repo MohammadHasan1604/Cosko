@@ -8,7 +8,7 @@
  * 13: 1 alphanumeric (Entity code: 1-9 or A-Z)
  * 14: Default 'Z' or alphanumeric
  * 15: 1 alphanumeric check character
- * 
+ *
  * Unregistered / Exempt / Optional representations:
  * Blank / empty string, whitespace, null, undefined, or explicitly unregistered
  * markers like 'URP', 'NA', 'N/A', 'NONE', 'EXEMPT', 'PENDING', 'UNREGISTERED'.
@@ -53,7 +53,7 @@ export function validateAndNormalizeGstin(input?: string | null): GstinValidatio
 
   // If blank or designated as unregistered / pending / exempt
   if (raw === '' || UNREGISTERED_SET.has(raw)) {
-    const normalized = raw === 'PENDING' ? 'PENDING' : (raw === 'URP' ? 'URP' : '');
+    const normalized = raw === 'PENDING' ? 'PENDING' : raw === 'URP' ? 'URP' : '';
     return {
       isValid: true,
       normalized,
@@ -78,7 +78,8 @@ export function validateAndNormalizeGstin(input?: string | null): GstinValidatio
       isValid: false,
       normalized: cleanGstin,
       isOptionalOrUnregistered: false,
-      error: 'Invalid GSTIN structure. Expected: 2-digit State Code + 10-char PAN + Entity Code + Z + Check Digit (e.g. 29AABCS1429B1ZB).',
+      error:
+        'Invalid GSTIN structure. Expected: 2-digit State Code + 10-char PAN + Entity Code + Z + Check Digit (e.g. 29AABCS1429B1ZB).',
     };
   }
 

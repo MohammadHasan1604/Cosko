@@ -32,13 +32,19 @@ export async function GET(req: NextRequest) {
     if (user.role !== 'Super Admin') {
       if (requestedStore && requestedStore !== 'All Stores' && requestedStore !== user.store) {
         return NextResponse.json(
-          { error: 'Forbidden: You do not have permission to access another store\'s accounting records.' },
+          {
+            error:
+              "Forbidden: You do not have permission to access another store's accounting records.",
+          },
           { status: 403 }
         );
       }
       if (requestedStore === 'All Stores' || view === 'consolidated' || view === 'central') {
         return NextResponse.json(
-          { error: 'Forbidden: Consolidated and central views across stores are restricted to Super Admin only.' },
+          {
+            error:
+              'Forbidden: Consolidated and central views across stores are restricted to Super Admin only.',
+          },
           { status: 403 }
         );
       }
@@ -72,9 +78,13 @@ export async function GET(req: NextRequest) {
     // Parallel fetch required statements (non-Super Admin never gets consolidated or central statements)
     const isSuperAdmin = user.role === 'Super Admin';
     const [consolidated, storePnL, centralPnL] = await Promise.all([
-      isSuperAdmin && (view === 'all' || view === 'consolidated') ? getConsolidatedPnL(filter) : null,
+      isSuperAdmin && (view === 'all' || view === 'consolidated')
+        ? getConsolidatedPnL(filter)
+        : null,
       view === 'all' || view === 'store' ? getStoreOperationalPnL(filter) : null,
-      isSuperAdmin && (view === 'all' || view === 'central') ? getCentralTransferPnL({ startDate, endDate }) : null,
+      isSuperAdmin && (view === 'all' || view === 'central')
+        ? getCentralTransferPnL({ startDate, endDate })
+        : null,
     ]);
 
     return NextResponse.json(
@@ -96,6 +106,9 @@ export async function GET(req: NextRequest) {
     );
   } catch (error: any) {
     console.error('API /api/accounting GET error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to generate accounting statements' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to generate accounting statements' },
+      { status: 500 }
+    );
   }
 }

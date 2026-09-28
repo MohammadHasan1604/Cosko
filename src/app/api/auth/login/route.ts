@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
 
     if (!passwordMatch) {
       const currentFailed = (user.failedLoginAttempts || 0) + 1;
-      let isNowLocked = currentFailed >= MAX_FAILED_LOGIN_ATTEMPTS;
+      const isNowLocked = currentFailed >= MAX_FAILED_LOGIN_ATTEMPTS;
       const lockoutDate = isNowLocked ? new Date(Date.now() + LOCKOUT_DURATION_MS) : null;
 
       try {
@@ -177,9 +177,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Enforce strict store scope RBAC: Non-Super Admin MUST be permanently assigned to a physical store
-    const effectiveStore = user.role === 'Super Admin'
-      ? (user.storeScope || 'All Stores')
-      : ((user.storeScope && user.storeScope !== 'All Stores') ? user.storeScope : (allowedStores[0] || 'BLR'));
+    const effectiveStore =
+      user.role === 'Super Admin'
+        ? user.storeScope || 'All Stores'
+        : user.storeScope && user.storeScope !== 'All Stores'
+          ? user.storeScope
+          : allowedStores[0] || 'BLR';
 
     const sessionUser = {
       id: user.id,
@@ -188,9 +191,14 @@ export async function POST(req: NextRequest) {
       role: user.role as any,
       securityLevel: user.securityLevel,
       store: effectiveStore,
-      allowedStores: user.role === 'Super Admin'
-        ? (allowedStores.length > 0 ? allowedStores : ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'])
-        : (allowedStores.length > 0 ? allowedStores : [effectiveStore]),
+      allowedStores:
+        user.role === 'Super Admin'
+          ? allowedStores.length > 0
+            ? allowedStores
+            : ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM']
+          : allowedStores.length > 0
+            ? allowedStores
+            : [effectiveStore],
       avatar: user.name.substring(0, 2).toUpperCase(),
       shiftStatus: user.shiftStatus as any,
       avatarUrl: user.avatarUrl || undefined,
@@ -215,11 +223,16 @@ export async function POST(req: NextRequest) {
       });
       dbSessionId = dbSession.id;
     } catch (sessionErr) {
-      console.warn('Could not create DB session record (session will still work via JWT):', sessionErr);
+      console.warn(
+        'Could not create DB session record (session will still work via JWT):',
+        sessionErr
+      );
     }
 
     // Re-sign with session ID if we got one
-    const finalToken = dbSessionId ? signSessionToken({ ...sessionUser, sessionId: dbSessionId }, dbSessionId) : token;
+    const finalToken = dbSessionId
+      ? signSessionToken({ ...sessionUser, sessionId: dbSessionId }, dbSessionId)
+      : token;
     const finalTokenHash = dbSessionId ? hashToken(finalToken) : tokenDigest;
 
     // Update the token hash if we re-signed

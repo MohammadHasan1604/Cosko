@@ -26,7 +26,10 @@ export default function ActivityTracker() {
         channelRef.current = channel;
 
         channel.onmessage = (event) => {
-          if (event.data?.type === 'ACTIVE_TAB_HEARTBEAT' && event.data?.tabId !== tabIdRef.current) {
+          if (
+            event.data?.type === 'ACTIVE_TAB_HEARTBEAT' &&
+            event.data?.tabId !== tabIdRef.current
+          ) {
             // Another tab is actively sending heartbeats and focused
             if (document.visibilityState === 'hidden') {
               isPrimaryTabRef.current = false;

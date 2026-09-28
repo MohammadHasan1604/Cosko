@@ -16,17 +16,20 @@ export async function GET(req: NextRequest) {
 
     // Super Admin only — audit logs are a privileged, enterprise-level feature
     if (user.role !== 'Super Admin') {
-      return NextResponse.json({ error: 'Forbidden: Audit log access is restricted to Super Admin only' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Audit log access is restricted to Super Admin only' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
     const limit = Math.min(parseInt(searchParams.get('limit') || '200'), 500);
-    const module = searchParams.get('module');
+    const moduleName = searchParams.get('module');
     const storeCode = searchParams.get('store');
 
     const whereClause: any = {};
-    if (module) {
-      whereClause.module = module;
+    if (moduleName) {
+      whereClause.module = moduleName;
     }
     if (storeCode && storeCode !== 'All Stores' && storeCode !== 'ALL') {
       whereClause.storeCode = storeCode;
@@ -73,8 +76,8 @@ export async function POST(req: NextRequest) {
         module: body.module,
         action: body.action,
         details: body.details || '',
-        userEmail: user.email || user.name,  // from session, NOT body
-        userRole: user.role,                  // from session, NOT body
+        userEmail: user.email || user.name, // from session, NOT body
+        userRole: user.role, // from session, NOT body
         storeCode: body.storeCode || user.store || 'CENTRAL',
       },
     });

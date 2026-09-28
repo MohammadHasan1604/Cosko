@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
     if (user.role !== 'Super Admin') {
       if (store && store !== user.store && !user.allowedStores?.includes(store)) {
         return NextResponse.json(
-          { error: `Forbidden: You do not have permission to view inventory ledger for store "${store}"` },
+          {
+            error: `Forbidden: You do not have permission to view inventory ledger for store "${store}"`,
+          },
           { status: 403 }
         );
       }

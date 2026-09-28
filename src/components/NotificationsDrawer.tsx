@@ -4,7 +4,14 @@ import { useApp } from '@/context/AppContext';
 import Icon from '@/components/ui/AppIcon';
 
 export default function NotificationsDrawer() {
-  const { notificationsOpen, setNotificationsOpen, notifications, markNotificationRead, markAllNotificationsRead, branding } = useApp();
+  const {
+    notificationsOpen,
+    setNotificationsOpen,
+    notifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    branding,
+  } = useApp();
 
   if (!notificationsOpen) return null;
 
@@ -13,7 +20,9 @@ export default function NotificationsDrawer() {
   return (
     <div
       className="fixed inset-0 z-50 flex justify-end bg-foreground/20 backdrop-blur-sm fade-in"
-      onClick={(e) => { if (e.target === e.currentTarget) setNotificationsOpen(false); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) setNotificationsOpen(false);
+      }}
     >
       <div className="w-full md:max-w-md bg-card border-l border-border h-full flex flex-col shadow-2xl">
         {/* Header */}
@@ -61,10 +70,10 @@ export default function NotificationsDrawer() {
                     n.type === 'warning'
                       ? 'bg-warning/10 text-warning'
                       : n.type === 'success'
-                      ? 'bg-success/10 text-success'
-                      : n.type === 'danger'
-                      ? 'bg-danger/10 text-danger'
-                      : 'bg-info/10 text-info'
+                        ? 'bg-success/10 text-success'
+                        : n.type === 'danger'
+                          ? 'bg-danger/10 text-danger'
+                          : 'bg-info/10 text-info'
                   }`}
                 >
                   <Icon
@@ -72,10 +81,10 @@ export default function NotificationsDrawer() {
                       n.type === 'warning'
                         ? 'ExclamationTriangleIcon'
                         : n.type === 'success'
-                        ? 'CheckCircleIcon'
-                        : n.type === 'danger'
-                        ? 'XCircleIcon'
-                        : 'InformationCircleIcon'
+                          ? 'CheckCircleIcon'
+                          : n.type === 'danger'
+                            ? 'XCircleIcon'
+                            : 'InformationCircleIcon'
                     }
                     size={16}
                   />
@@ -94,7 +103,9 @@ export default function NotificationsDrawer() {
 
         {/* Footer */}
         <div className="p-4 border-t border-border bg-muted/30 text-center">
-          <p className="text-2xs text-muted-foreground">{branding.appName} Real-Time Event Dispatcher</p>
+          <p className="text-2xs text-muted-foreground">
+            {branding.appName} Real-Time Event Dispatcher
+          </p>
         </div>
       </div>
     </div>

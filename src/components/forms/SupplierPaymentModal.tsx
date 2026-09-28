@@ -94,15 +94,26 @@ export default function SupplierPaymentModal({
       subtitle: 'Please review payment amount, vendor, and reference details before recording.',
       confirmLabel: 'Confirm & Record Payment',
       summaryItems: [
-        { label: 'Vendor / Supplier', value: purchase.vendorName || purchase.vendor?.name || 'Vendor' },
+        {
+          label: 'Vendor / Supplier',
+          value: purchase.vendorName || purchase.vendor?.name || 'Vendor',
+        },
         { label: 'PO / Invoice Ref', value: purchase.invoiceNo || purchase.poNo },
         { label: 'Payment Method', value: payMethod },
         { label: 'Payment Date', value: payDate },
         { label: 'Reference / UTR', value: payRef.trim() },
-        { label: 'Remaining Balance After', value: `₹${Math.max(0, remaining - amountNum).toLocaleString('en-IN')}` },
-        { label: 'Payment Amount', value: `₹${amountNum.toLocaleString('en-IN')}`, highlighted: true },
+        {
+          label: 'Remaining Balance After',
+          value: `₹${Math.max(0, remaining - amountNum).toLocaleString('en-IN')}`,
+        },
+        {
+          label: 'Payment Amount',
+          value: `₹${amountNum.toLocaleString('en-IN')}`,
+          highlighted: true,
+        },
       ],
-      warningMessage: 'This transaction will be recorded in the accounting ledger and supplier balance immediately.',
+      warningMessage:
+        'This transaction will be recorded in the accounting ledger and supplier balance immediately.',
     });
 
     if (!confirmed) return;
@@ -120,14 +131,19 @@ export default function SupplierPaymentModal({
       });
 
       if (res.success) {
-        toast.success(`Payment of ₹${amountNum.toLocaleString('en-IN')} recorded for ${purchase.poNo}`);
+        toast.success(
+          `Payment of ₹${amountNum.toLocaleString('en-IN')} recorded for ${purchase.poNo}`
+        );
         await refreshAllData();
         if (onSuccess) {
-          onSuccess({
-            ...purchase,
-            paidAmount: (purchase.paidAmount || 0) + amountNum,
-            remainingAmount: Math.max(0, remaining - amountNum),
-          }, res.receiptVoucher);
+          onSuccess(
+            {
+              ...purchase,
+              paidAmount: (purchase.paidAmount || 0) + amountNum,
+              remainingAmount: Math.max(0, remaining - amountNum),
+            },
+            res.receiptVoucher
+          );
         }
         onClose();
       } else {
@@ -155,13 +171,19 @@ export default function SupplierPaymentModal({
           <div className="flex justify-between text-muted-foreground">
             <span>Bill Total:</span>
             <span className="font-semibold text-foreground">
-              ₹{Number(purchase.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              ₹
+              {Number(purchase.totalAmount || 0).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+              })}
             </span>
           </div>
           <div className="flex justify-between text-muted-foreground">
             <span>Already Paid:</span>
             <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-              ₹{Number(purchase.paidAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              ₹
+              {Number(purchase.paidAmount || 0).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+              })}
             </span>
           </div>
           <div className="flex justify-between pt-1 border-t border-primary/20 font-bold">
@@ -263,7 +285,8 @@ export default function SupplierPaymentModal({
         {/* Remarks / Notes */}
         <div>
           <label className="text-xs font-bold text-foreground block mb-1">
-            Notes / Disbursement Remarks <span className="text-muted-foreground font-normal">(Optional)</span>
+            Notes / Disbursement Remarks{' '}
+            <span className="text-muted-foreground font-normal">(Optional)</span>
           </label>
           <input
             type="text"
@@ -278,7 +301,10 @@ export default function SupplierPaymentModal({
         {!payProof && (
           <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-3xs font-semibold">
             <Icon name="ExclamationTriangleIcon" size={14} className="shrink-0 text-amber-600" />
-            <span>Payment Proof is strictly mandatory. Upload receipt/screenshot above to enable Record Payment.</span>
+            <span>
+              Payment Proof is strictly mandatory. Upload receipt/screenshot above to enable Record
+              Payment.
+            </span>
           </div>
         )}
 
@@ -295,7 +321,9 @@ export default function SupplierPaymentModal({
           <button
             type="submit"
             className="btn-primary text-xs font-bold gap-1.5 px-4 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isSubmitting || !payProof || !payRef.trim() || !payAmount || Number(payAmount) <= 0}
+            disabled={
+              isSubmitting || !payProof || !payRef.trim() || !payAmount || Number(payAmount) <= 0
+            }
           >
             {isSubmitting ? (
               <>

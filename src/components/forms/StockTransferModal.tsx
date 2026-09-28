@@ -35,16 +35,11 @@ export default function StockTransferModal({
   onSuccess,
   zIndex = 100,
 }: StockTransferModalProps) {
-  const {
-    inventory,
-    storesList,
-    currentUser,
-    transferStock,
-    refreshAllData,
-    confirmAction,
-  } = useApp();
+  const { inventory, storesList, currentUser, transferStock, refreshAllData, confirmAction } =
+    useApp();
 
-  const defaultSource = initialSourceStore || (currentUser.role === 'Super Admin' ? 'CENTRAL' : currentUser.store);
+  const defaultSource =
+    initialSourceStore || (currentUser.role === 'Super Admin' ? 'CENTRAL' : currentUser.store);
   const [sourceStore, setSourceStore] = useState(defaultSource);
   const [destStore, setDestStore] = useState(initialDestStore || 'BLR');
   const [selectedProductId, setSelectedProductId] = useState(initialItemId || '');
@@ -62,7 +57,9 @@ export default function StockTransferModal({
       return storesList.filter((s) => s.status === 'Active');
     }
     return storesList.filter(
-      (s) => s.code === currentUser.store || (currentUser.allowedStores && currentUser.allowedStores.includes(s.code))
+      (s) =>
+        s.code === currentUser.store ||
+        (currentUser.allowedStores && currentUser.allowedStores.includes(s.code))
     );
   }, [storesList, currentUser]);
 
@@ -97,7 +94,9 @@ export default function StockTransferModal({
   // Active selected item
   const activeItem = useMemo(() => {
     if (selectedProductId) {
-      const match = sourceInventoryItems.find((i) => i.id === selectedProductId || i.productId === selectedProductId);
+      const match = sourceInventoryItems.find(
+        (i) => i.id === selectedProductId || i.productId === selectedProductId
+      );
       if (match) return match;
     }
     return sourceInventoryItems[0] || null;
@@ -106,9 +105,11 @@ export default function StockTransferModal({
   // Reset or initialize state when opened
   useEffect(() => {
     if (open) {
-      const src = initialSourceStore || (currentUser.role === 'Super Admin' ? 'CENTRAL' : currentUser.store);
+      const src =
+        initialSourceStore || (currentUser.role === 'Super Admin' ? 'CENTRAL' : currentUser.store);
       setSourceStore(src);
-      const possibleDest = storesList.find((s) => s.status === 'Active' && s.code !== src)?.code || 'BLR';
+      const possibleDest =
+        storesList.find((s) => s.status === 'Active' && s.code !== src)?.code || 'BLR';
       setDestStore(initialDestStore || possibleDest);
       if (initialItemId) setSelectedProductId(initialItemId);
       setTransferQty('');
@@ -169,7 +170,9 @@ export default function StockTransferModal({
 
     const qtyNum = parseInt(String(transferQty), 10);
     if (qtyNum > availableStock) {
-      toast.error(`Transfer quantity (${qtyNum}) exceeds available stock (${availableStock}) at ${sourceStore}`);
+      toast.error(
+        `Transfer quantity (${qtyNum}) exceeds available stock (${availableStock}) at ${sourceStore}`
+      );
       return;
     }
 
@@ -190,7 +193,10 @@ export default function StockTransferModal({
         { label: 'SKU', value: activeItem.sku },
         { label: 'Transfer Quantity', value: `${qtyNum} unit(s)` },
         { label: 'Transfer Price/Unit', value: `₹${effectivePrice.toLocaleString('en-IN')}` },
-        { label: 'Total Transfer Value', value: `₹${(effectivePrice * qtyNum).toLocaleString('en-IN')}` },
+        {
+          label: 'Total Transfer Value',
+          value: `₹${(effectivePrice * qtyNum).toLocaleString('en-IN')}`,
+        },
       ],
       warningMessage: `This will immediately deduct ${qtyNum} units from ${sourceStore} and credit them into ${destStore}.`,
     });
@@ -277,7 +283,8 @@ export default function StockTransferModal({
             </label>
             {sourceInventoryItems.length === 0 ? (
               <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs">
-                No inventory currently in stock at <strong>{sourceStore}</strong>. Please select another source store.
+                No inventory currently in stock at <strong>{sourceStore}</strong>. Please select
+                another source store.
               </div>
             ) : (
               <CustomSelect
@@ -304,7 +311,9 @@ export default function StockTransferModal({
               </div>
               <div className="text-right">
                 <span className="text-3xs text-muted-foreground block">Available Stock:</span>
-                <strong className="text-foreground text-sm font-tabular">{availableStock} units</strong>
+                <strong className="text-foreground text-sm font-tabular">
+                  {availableStock} units
+                </strong>
               </div>
             </div>
           )}
@@ -348,18 +357,30 @@ export default function StockTransferModal({
           {activeItem && (
             <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/5 space-y-2 font-tabular text-xs">
               <div className="flex justify-between text-muted-foreground">
-                <span>Inventory Cost ({transferQty || 0} × {formatTransferINR(unitCost)}):</span>
-                <span className="font-semibold text-foreground">{formatTransferINR(lineCalc.lineTotalCost)}</span>
+                <span>
+                  Inventory Cost ({transferQty || 0} × {formatTransferINR(unitCost)}):
+                </span>
+                <span className="font-semibold text-foreground">
+                  {formatTransferINR(lineCalc.lineTotalCost)}
+                </span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Transfer Value ({transferQty || 0} × {formatTransferINR(effectivePrice)}):</span>
-                <span className="font-bold text-foreground">{formatTransferINR(lineCalc.lineTotalValue)}</span>
+                <span>
+                  Transfer Value ({transferQty || 0} × {formatTransferINR(effectivePrice)}):
+                </span>
+                <span className="font-bold text-foreground">
+                  {formatTransferINR(lineCalc.lineTotalValue)}
+                </span>
               </div>
-              <div className={`flex justify-between pt-1 border-t border-primary/20 font-bold ${getTransferProfitColorClass(lineCalc.lineProfit)}`}>
+              <div
+                className={`flex justify-between pt-1 border-t border-primary/20 font-bold ${getTransferProfitColorClass(lineCalc.lineProfit)}`}
+              >
                 <span>Gross Transfer Profit:</span>
                 <span>
                   {formatTransferINR(lineCalc.lineProfit, { showPositiveSign: true })}{' '}
-                  <span className="text-3xs font-semibold">({formatTransferMargin(lineCalc.profitMarginPercent)})</span>
+                  <span className="text-3xs font-semibold">
+                    ({formatTransferMargin(lineCalc.profitMarginPercent)})
+                  </span>
                 </span>
               </div>
             </div>
@@ -368,7 +389,8 @@ export default function StockTransferModal({
           {/* Transfer Dispatch Notes */}
           <div>
             <label className="text-xs font-bold text-foreground block mb-1">
-              Dispatch Instructions / Vehicle Notes <span className="text-muted-foreground font-normal">(Optional)</span>
+              Dispatch Instructions / Vehicle Notes{' '}
+              <span className="text-muted-foreground font-normal">(Optional)</span>
             </label>
             <input
               type="text"

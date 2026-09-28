@@ -26,7 +26,10 @@ export async function GET(req: NextRequest) {
     );
   } catch (error: any) {
     console.error('API /api/accounting/reconcile GET error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to run root reconciliation' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to run root reconciliation' },
+      { status: 500 }
+    );
   }
 }
 

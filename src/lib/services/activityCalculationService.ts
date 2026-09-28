@@ -1,10 +1,10 @@
 /**
  * COSKO Phase 2 — Activity Calculation Service
- * 
+ *
  * Single source of truth for all work activity duration calculations.
  * Reconstructs durations from server-timestamped WorkActivityEvent records.
  * Used by dashboard, detail view, and export APIs.
- * 
+ *
  * All timestamps stored UTC. Display in configured timezone.
  * Shows exact HH:MM:SS without minute rounding.
  * Never claims browser activity proves physical work.
@@ -94,14 +94,18 @@ function detectAnomalies(sessions: any[], events: any[]): string[] {
 
     // Flag sessions > 16 hours
     if (durationSec > 16 * 3600) {
-      anomalies.push(`Session ${sess.id.slice(0, 8)} exceeded 16 hours (${formatHHMMSS(durationSec)})`);
+      anomalies.push(
+        `Session ${sess.id.slice(0, 8)} exceeded 16 hours (${formatHHMMSS(durationSec)})`
+      );
     }
 
     // Flag > 90% active ratio (suspicious)
     if (durationSec > 3600 && sess.activeSeconds > 0) {
       const activeRatio = sess.activeSeconds / durationSec;
       if (activeRatio > 0.9) {
-        anomalies.push(`Session ${sess.id.slice(0, 8)} shows ${Math.round(activeRatio * 100)}% active ratio (unusually high)`);
+        anomalies.push(
+          `Session ${sess.id.slice(0, 8)} shows ${Math.round(activeRatio * 100)}% active ratio (unusually high)`
+        );
       }
     }
   }
@@ -157,9 +161,7 @@ export function splitAcrossMidnight(
   if (totalSpan <= 0) return [{ date: startDate, seconds }];
 
   // Construct midnight timestamp in the correct timezone
-  const midnightStr = timezone === 'UTC'
-    ? endDate + 'T00:00:00Z'
-    : endDate + 'T00:00:00';
+  const midnightStr = timezone === 'UTC' ? endDate + 'T00:00:00Z' : endDate + 'T00:00:00';
 
   const midnightMs = new Date(midnightStr).getTime();
   const beforeMidnightMs = midnightMs - startTime.getTime();
@@ -255,7 +257,10 @@ export async function calculateUserActivity(
   // Calculate authenticated duration from sessions
   for (const sess of sessions) {
     const end = sess.endedAt || sess.lastActiveAt || new Date();
-    const durationSec = Math.max(0, Math.floor((new Date(end).getTime() - new Date(sess.startedAt).getTime()) / 1000));
+    const durationSec = Math.max(
+      0,
+      Math.floor((new Date(end).getTime() - new Date(sess.startedAt).getTime()) / 1000)
+    );
     totalAuthenticatedSeconds += durationSec;
   }
 
@@ -294,7 +299,7 @@ export async function buildUserActivitySummary(
   endDate: string,
   timezone: string = 'Asia/Kolkata'
 ): Promise<UserActivitySummary[]> {
-  const userIds = users.map(u => u.id);
+  const userIds = users.map((u) => u.id);
 
   // Batch fetch all daily records
   const allDailyRecords = await prisma.userDailyActivity.findMany({
@@ -318,7 +323,10 @@ export async function buildUserActivitySummary(
     orderBy: { lastActiveAt: 'desc' },
   });
 
-  const liveStatusMap = new Map<string, { status: 'ONLINE' | 'IDLE' | 'OFFLINE'; lastActiveAt: Date }>();
+  const liveStatusMap = new Map<
+    string,
+    { status: 'ONLINE' | 'IDLE' | 'OFFLINE'; lastActiveAt: Date }
+  >();
   for (const sess of recentSessions) {
     if (!liveStatusMap.has(sess.userId)) {
       const isOnline = new Date(sess.lastActiveAt).getTime() >= twoMinutesAgo.getTime();
@@ -341,20 +349,23 @@ export async function buildUserActivitySummary(
     select: { id: true, userId: true, startedAt: true, endedAt: true, activeSeconds: true },
   });
 
-  return users.map(u => {
-    const userDaily = allDailyRecords.filter(d => d.userId === u.id);
-    const userSessions = allSessions.filter(s => s.userId === u.id);
+  return users.map((u) => {
+    const userDaily = allDailyRecords.filter((d) => d.userId === u.id);
+    const userSessions = allSessions.filter((s) => s.userId === u.id);
 
     const totalActiveSeconds = userDaily.reduce((acc, d) => acc + (d.activeSeconds || 0), 0);
     const totalIdleSeconds = userDaily.reduce((acc, d) => acc + (d.idleSeconds || 0), 0);
     const sessionsCount = userDaily.reduce((acc, d) => acc + (d.sessionsCount || 0), 0);
-    const workingDays = userDaily.filter(d => (d.activeSeconds || 0) >= 60).length;
+    const workingDays = userDaily.filter((d) => (d.activeSeconds || 0) >= 60).length;
 
     // Calculate authenticated duration from sessions
     let totalAuthSeconds = 0;
     for (const sess of userSessions) {
       const end = sess.endedAt || new Date();
-      totalAuthSeconds += Math.max(0, Math.floor((end.getTime() - sess.startedAt.getTime()) / 1000));
+      totalAuthSeconds += Math.max(
+        0,
+        Math.floor((end.getTime() - sess.startedAt.getTime()) / 1000)
+      );
     }
 
     // First/last timestamps
@@ -376,13 +387,13 @@ export async function buildUserActivitySummary(
       if (dur > 16 * 3600) {
         anomalies.push(`Session exceeded 16 hours`);
       }
-      if (dur > 3600 && sess.activeSeconds > 0 && (sess.activeSeconds / dur) > 0.9) {
+      if (dur > 3600 && sess.activeSeconds > 0 && sess.activeSeconds / dur > 0.9) {
         anomalies.push(`Session shows >90% active ratio`);
       }
     }
 
     // Build daily breakdown with HH:MM:SS formatting
-    const dailyBreakdown: DailyBreakdown[] = userDaily.map(d => ({
+    const dailyBreakdown: DailyBreakdown[] = userDaily.map((d) => ({
       date: d.date,
       activeSeconds: d.activeSeconds,
       idleSeconds: d.idleSeconds,

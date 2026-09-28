@@ -79,7 +79,9 @@ export default function BarcodeScannerModal({
     try {
       setCameraError(null);
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraError('Camera API is not supported on this browser. Please enter barcode manually.');
+        setCameraError(
+          'Camera API is not supported on this browser. Please enter barcode manually.'
+        );
         return;
       }
 
@@ -246,7 +248,9 @@ export default function BarcodeScannerModal({
           {!cameraActive && !cameraError && (
             <div className="text-center text-white space-y-2">
               <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-              <p className="text-xs font-medium text-gray-300">Initializing Optical Camera Stream...</p>
+              <p className="text-xs font-medium text-gray-300">
+                Initializing Optical Camera Stream...
+              </p>
             </div>
           )}
 
@@ -254,7 +258,9 @@ export default function BarcodeScannerModal({
             <div className="absolute inset-0 bg-success/90 flex flex-col items-center justify-center text-white space-y-1 z-20">
               <Icon name="CheckCircleIcon" size={48} className="animate-bounce" />
               <p className="text-sm font-black uppercase tracking-wider">Barcode Recognized!</p>
-              <p className="text-xs font-mono font-bold bg-white/20 px-3 py-1 rounded-full">{scannedSuccess}</p>
+              <p className="text-xs font-mono font-bold bg-white/20 px-3 py-1 rounded-full">
+                {scannedSuccess}
+              </p>
             </div>
           )}
         </div>

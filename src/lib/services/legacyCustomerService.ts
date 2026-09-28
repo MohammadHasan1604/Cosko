@@ -21,10 +21,24 @@ export interface LegacyRepairRecord {
   customerName: string;
   customerPhone: string;
   normalizedPhone: string;
-  deviceType: 'Mobile' | 'EV' | 'AC' | 'TV' | 'Washing Machine' | 'Refrigerator' | 'Laptop' | 'Other';
+  deviceType:
+    | 'Mobile'
+    | 'EV'
+    | 'AC'
+    | 'TV'
+    | 'Washing Machine'
+    | 'Refrigerator'
+    | 'Laptop'
+    | 'Other';
   deviceName: string;
   issueDescription: string;
-  status: 'Pending Diagnosis' | 'In Progress' | 'Awaiting Parts' | 'Completed' | 'Delivered' | 'Cancelled';
+  status:
+    | 'Pending Diagnosis'
+    | 'In Progress'
+    | 'Awaiting Parts'
+    | 'Completed'
+    | 'Delivered'
+    | 'Cancelled';
   estimatedCost: number;
   storeCode: string;
   enquiryDate: string;
@@ -231,8 +245,8 @@ export async function searchCustomerWithLegacyBridge(
     }
 
     // 2. Search Legacy Database (with safety timeout)
-    const legacyMatches = HISTORICAL_LEGACY_CUSTOMERS.filter((c) =>
-      c.normalizedPhone.includes(normalized) || normalized.includes(c.normalizedPhone)
+    const legacyMatches = HISTORICAL_LEGACY_CUSTOMERS.filter(
+      (c) => c.normalizedPhone.includes(normalized) || normalized.includes(c.normalizedPhone)
     );
 
     // Filter repairs associated with this phone number
@@ -241,7 +255,9 @@ export async function searchCustomerWithLegacyBridge(
     );
 
     // Apply Field-Level Security: Redact internal technician notes for Sales Roles
-    const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Manager'].includes(userRole);
+    const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Manager'].includes(
+      userRole
+    );
     const safeRepairs = legacyRepairs.map((r) => {
       // Store isolation: If repair is from another store and user is not Super Admin, check visibility
       const isSameStore = userRole === 'Super Admin' || r.storeCode === userStore;
@@ -317,7 +333,8 @@ export async function searchCustomerWithLegacyBridge(
       source: 'NONE',
       customer: null,
       repairs: [],
-      error: 'Historical legacy customer database is temporarily unreachable. You can proceed with new customer entry.',
+      error:
+        'Historical legacy customer database is temporarily unreachable. You can proceed with new customer entry.',
     };
   }
 }
@@ -345,9 +362,7 @@ export async function getLegacyCustomersList(filters: {
     const q = filters.search.toLowerCase();
     list = list.filter(
       (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.phone.includes(q) ||
-        c.id.toLowerCase().includes(q)
+        c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.id.toLowerCase().includes(q)
     );
   }
 
@@ -361,12 +376,15 @@ export async function getLegacyCustomersList(filters: {
 /**
  * Returns all repairs for the dedicated /repairs module
  */
-export async function getLegacyRepairsList(filters: {
-  status?: string;
-  store?: string;
-  deviceType?: string;
-  search?: string;
-}, userRole: string = 'Super Admin') {
+export async function getLegacyRepairsList(
+  filters: {
+    status?: string;
+    store?: string;
+    deviceType?: string;
+    search?: string;
+  },
+  userRole: string = 'Super Admin'
+) {
   let list = [...HISTORICAL_LEGACY_REPAIRS];
 
   if (filters.status && filters.status !== 'All') {

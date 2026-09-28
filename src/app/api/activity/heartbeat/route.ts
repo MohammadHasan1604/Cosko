@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
-import { calculateServerDelta, getLocalDateString, formatHHMMSS } from '@/lib/services/activityCalculationService';
+import {
+  calculateServerDelta,
+  getLocalDateString,
+  formatHHMMSS,
+} from '@/lib/services/activityCalculationService';
 
 /**
  * POST /api/activity/heartbeat
@@ -48,7 +52,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const storeCode = (user.store && user.store !== 'All Stores') ? user.store : (user.allowedStores?.[0] || 'CENTRAL');
+    const storeCode =
+      user.store && user.store !== 'All Stores' ? user.store : user.allowedStores?.[0] || 'CENTRAL';
 
     if (!session) {
       session = await prisma.userWorkSession.create({
@@ -75,13 +80,17 @@ export async function POST(req: NextRequest) {
             metadataJson: JSON.stringify({ tabId, device: session.device, storeCode }),
           },
         });
-      } catch { /* table may not exist yet */ }
+      } catch {
+        /* table may not exist yet */
+      }
     }
 
     // ─── Record heartbeat event ──────────────────────────────────────────────
-    const eventType = isIdle ? 'HEARTBEAT_IDLE'
-      : visibilityState === 'hidden' ? 'VISIBILITY_HIDDEN'
-      : 'HEARTBEAT_ACTIVE';
+    const eventType = isIdle
+      ? 'HEARTBEAT_IDLE'
+      : visibilityState === 'hidden'
+        ? 'VISIBILITY_HIDDEN'
+        : 'HEARTBEAT_ACTIVE';
 
     try {
       await (prisma as any).workActivityEvent.create({
@@ -93,7 +102,9 @@ export async function POST(req: NextRequest) {
           metadataJson: JSON.stringify({ tabId, visibilityState }),
         },
       });
-    } catch { /* table may not exist yet */ }
+    } catch {
+      /* table may not exist yet */
+    }
 
     // ─── Server-side delta calculation ────────────────────────────────────────
     const lastActiveMs = new Date(session.lastActiveAt).getTime();

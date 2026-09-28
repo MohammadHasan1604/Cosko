@@ -66,16 +66,22 @@ export async function GET(req: NextRequest) {
       where: { ...whereClause, status: 'PENDING' },
     });
 
-    return NextResponse.json({
-      success: true,
-      requests: formatted,
-      pendingCount,
-    }, {
-      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' },
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        requests: formatted,
+        pendingCount,
+      },
+      {
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' },
+      }
+    );
   } catch (error: any) {
     console.error('API /api/delete-requests GET error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch delete requests' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch delete requests' },
+      { status: 500 }
+    );
   }
 }
 
@@ -92,14 +98,20 @@ export async function POST(req: NextRequest) {
     const user = auth.user;
 
     if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to request deletions' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient permissions to request deletions' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
     const { entityType, entityId, reason } = body;
 
     if (!entityType || !entityId || !reason) {
-      return NextResponse.json({ error: 'entityType, entityId, and reason are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'entityType, entityId, and reason are required' },
+        { status: 400 }
+      );
     }
 
     const result = await createDeleteRequest(user as any, { entityType, entityId, reason });
@@ -108,14 +120,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 409 });
     }
 
-    return NextResponse.json({
-      success: true,
-      deleteRequest: result.deleteRequest,
-      message: 'Delete request submitted successfully. A Super Admin will review it.',
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        deleteRequest: result.deleteRequest,
+        message: 'Delete request submitted successfully. A Super Admin will review it.',
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     console.error('API /api/delete-requests POST error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to create delete request' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to create delete request' },
+      { status: 500 }
+    );
   }
 }
 
@@ -133,7 +151,10 @@ export async function PUT(req: NextRequest) {
     const user = auth.user;
 
     if (user.securityLevel < 100) {
-      return NextResponse.json({ error: 'Forbidden: Only Super Admin can review delete requests' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Only Super Admin can review delete requests' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
@@ -157,7 +178,10 @@ export async function PUT(req: NextRequest) {
 
     if (action === 'reject') {
       if (!rejectionReason) {
-        return NextResponse.json({ error: 'rejectionReason is required when rejecting' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'rejectionReason is required when rejecting' },
+          { status: 400 }
+        );
       }
       const result = await rejectDeleteRequest(user, requestId, rejectionReason);
       if (!result.success) {
@@ -172,6 +196,9 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'action must be "approve" or "reject"' }, { status: 400 });
   } catch (error: any) {
     console.error('API /api/delete-requests PUT error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to process delete request' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to process delete request' },
+      { status: 500 }
+    );
   }
 }

@@ -66,7 +66,9 @@ export async function GET(req: NextRequest) {
 
       v.purchases?.forEach((po: any) => {
         const cost = Number(po.totalCost) || 0;
-        const paid = po.payments?.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0) ?? (Number(po.paidAmount) || 0);
+        const paid =
+          po.payments?.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0) ??
+          (Number(po.paidAmount) || 0);
         const credit = Number(po.creditAmount) || 0;
         const remaining = Math.max(0, Math.round((cost - paid - credit) * 100) / 100);
 
@@ -80,7 +82,11 @@ export async function GET(req: NextRequest) {
           const effDue = po.dueDate || po.expectedDate;
           if (effDue) {
             const dueD = new Date(effDue);
-            const dueMidnight = new Date(dueD.getFullYear(), dueD.getMonth(), dueD.getDate()).getTime();
+            const dueMidnight = new Date(
+              dueD.getFullYear(),
+              dueD.getMonth(),
+              dueD.getDate()
+            ).getTime();
             if (todayMidnight > dueMidnight) {
               overdueBillsCount++;
             }
@@ -123,7 +129,10 @@ export async function POST(req: NextRequest) {
     const user = auth.user;
 
     if (user.securityLevel < 60) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient security level to create vendor' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient security level to create vendor' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
@@ -134,9 +143,12 @@ export async function POST(req: NextRequest) {
 
     const gstinValidation = validateAndNormalizeGstin(body.gstin);
     if (!gstinValidation.isValid) {
-      return NextResponse.json({ 
-        error: gstinValidation.error || 'Invalid Indian GSTIN format.' 
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: gstinValidation.error || 'Invalid Indian GSTIN format.',
+        },
+        { status: 400 }
+      );
     }
     const cleanGstin = gstinValidation.normalized;
 
@@ -174,13 +186,20 @@ export async function POST(req: NextRequest) {
             code,
             name: body.name.trim(),
             contactPerson: body.contactPerson?.trim() || 'Account Manager',
-            email: body.email?.trim() || `${body.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@vendor.com`,
+            email:
+              body.email?.trim() ||
+              `${body.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@vendor.com`,
             phone: body.phone?.trim() || '+91 00000 00000',
             city: body.city?.trim() || 'Central',
             address: body.address?.trim() || null,
             categories: body.categories?.trim() || body.category?.trim() || 'General',
             gstin: cleanGstin,
-            leadTimeDays: body.leadTimeDays !== undefined && body.leadTimeDays !== null && body.leadTimeDays !== '' ? Number(body.leadTimeDays) : null,
+            leadTimeDays:
+              body.leadTimeDays !== undefined &&
+              body.leadTimeDays !== null &&
+              body.leadTimeDays !== ''
+                ? Number(body.leadTimeDays)
+                : null,
             rating: body.rating ? Number(body.rating) : 5.0,
             paymentTerms: body.paymentTerms?.trim() || 'Net 30',
             status: body.status || 'Active',
@@ -192,9 +211,18 @@ export async function POST(req: NextRequest) {
             ...(body.phone ? { phone: body.phone.trim() } : {}),
             ...(body.city ? { city: body.city.trim() } : {}),
             ...(body.address !== undefined ? { address: body.address?.trim() || null } : {}),
-            ...(body.categories || body.category ? { categories: (body.categories || body.category).trim() } : {}),
+            ...(body.categories || body.category
+              ? { categories: (body.categories || body.category).trim() }
+              : {}),
             gstin: cleanGstin,
-            ...(body.leadTimeDays !== undefined ? { leadTimeDays: (body.leadTimeDays !== null && body.leadTimeDays !== '') ? Number(body.leadTimeDays) : null } : {}),
+            ...(body.leadTimeDays !== undefined
+              ? {
+                  leadTimeDays:
+                    body.leadTimeDays !== null && body.leadTimeDays !== ''
+                      ? Number(body.leadTimeDays)
+                      : null,
+                }
+              : {}),
             ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
             ...(body.paymentTerms ? { paymentTerms: body.paymentTerms.trim() } : {}),
             ...(body.status ? { status: body.status } : {}),
@@ -213,7 +241,12 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: vendor.id, code: vendor.code, name: vendor.name, action: 'saved' });
+        broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
+          id: vendor.id,
+          code: vendor.code,
+          name: vendor.name,
+          action: 'saved',
+        });
 
         return { status: 201, data: { success: true, vendor } };
       }
@@ -236,7 +269,10 @@ export async function PUT(req: NextRequest) {
     const user = auth.user;
 
     if (user.securityLevel < 60) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient security level to update vendor' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient security level to update vendor' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
@@ -247,9 +283,12 @@ export async function PUT(req: NextRequest) {
     if (body.gstin !== undefined && body.gstin !== null) {
       const gstinValidation = validateAndNormalizeGstin(body.gstin);
       if (!gstinValidation.isValid) {
-        return NextResponse.json({ 
-          error: gstinValidation.error || 'Invalid Indian GSTIN format.' 
-        }, { status: 400 });
+        return NextResponse.json(
+          {
+            error: gstinValidation.error || 'Invalid Indian GSTIN format.',
+          },
+          { status: 400 }
+        );
       }
       body.gstin = gstinValidation.normalized;
     }
@@ -263,7 +302,9 @@ export async function PUT(req: NextRequest) {
         ...(body.phone ? { phone: body.phone.trim() } : {}),
         ...(body.city ? { city: body.city.trim() } : {}),
         ...(body.address !== undefined ? { address: body.address?.trim() || null } : {}),
-        ...(body.categories || body.category ? { categories: (body.categories || body.category).trim() } : {}),
+        ...(body.categories || body.category
+          ? { categories: (body.categories || body.category).trim() }
+          : {}),
         ...(body.gstin !== undefined ? { gstin: body.gstin } : {}),
         ...(body.leadTimeDays !== undefined ? { leadTimeDays: Number(body.leadTimeDays) } : {}),
         ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
@@ -284,12 +325,20 @@ export async function PUT(req: NextRequest) {
       },
     });
 
-    broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: vendor.id, code: vendor.code, name: vendor.name, action: 'updated' });
+    broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
+      id: vendor.id,
+      code: vendor.code,
+      name: vendor.name,
+      action: 'updated',
+    });
 
     return NextResponse.json({ success: true, vendor });
   } catch (error: any) {
     console.error('API /api/vendors PUT error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to update vendor' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to update vendor' },
+      { status: 500 }
+    );
   }
 }
 
@@ -306,7 +355,10 @@ export async function DELETE(req: NextRequest) {
     const user = auth.user;
 
     if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient security level to archive/delete vendor' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient security level to archive/delete vendor' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -324,13 +376,19 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (!target) {
-      return NextResponse.json({ success: true, message: 'Vendor already deleted or non-existent' });
+      return NextResponse.json({
+        success: true,
+        message: 'Vendor already deleted or non-existent',
+      });
     }
 
     // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────
     if (user.securityLevel < 100) {
       if (!reason || reason.trim().length < 3) {
-        return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'A reason for deletion is required (minimum 3 characters)' },
+          { status: 400 }
+        );
       }
       const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
       const result = await createDeleteRequest(user as any, {
@@ -369,16 +427,22 @@ export async function DELETE(req: NextRequest) {
         },
       });
 
-      broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: target.id, code: target.code, name: target.name, action: 'archived' });
+      broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
+        id: target.id,
+        code: target.code,
+        name: target.name,
+        action: 'archived',
+      });
 
       return NextResponse.json({
         success: true,
         mode: 'archived',
         vendor,
         hasHistory: poCount > 0,
-        message: poCount > 0
-          ? `Vendor "${target.name}" has ${poCount} linked purchase orders and was safely Archived.`
-          : `Vendor "${target.name}" archived successfully.`,
+        message:
+          poCount > 0
+            ? `Vendor "${target.name}" has ${poCount} linked purchase orders and was safely Archived.`
+            : `Vendor "${target.name}" archived successfully.`,
       });
     }
 
@@ -397,7 +461,12 @@ export async function DELETE(req: NextRequest) {
       });
     });
 
-    broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', { id: target.id, code: target.code, name: target.name, action: 'deleted' });
+    broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
+      id: target.id,
+      code: target.code,
+      name: target.name,
+      action: 'deleted',
+    });
 
     return NextResponse.json({
       success: true,
@@ -406,6 +475,9 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /api/vendors DELETE error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to archive/delete vendor' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to archive/delete vendor' },
+      { status: 500 }
+    );
   }
 }

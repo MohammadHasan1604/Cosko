@@ -61,7 +61,10 @@ export default function PaymentMethodModal({
         setName(initialName);
         setCode(
           initialName
-            ? initialName.toUpperCase().replace(/[^A-Z0-9_]+/g, '_').slice(0, 32)
+            ? initialName
+                .toUpperCase()
+                .replace(/[^A-Z0-9_]+/g, '_')
+                .slice(0, 32)
             : ''
         );
         setType('Bank');
@@ -75,7 +78,10 @@ export default function PaymentMethodModal({
   const handleNameChange = (val: string) => {
     setName(val);
     if (!isEdit) {
-      const generated = val.toUpperCase().replace(/[^A-Z0-9_]+/g, '_').slice(0, 32);
+      const generated = val
+        .toUpperCase()
+        .replace(/[^A-Z0-9_]+/g, '_')
+        .slice(0, 32);
       setCode(generated);
     }
   };
@@ -105,7 +111,10 @@ export default function PaymentMethodModal({
 
     const cleanCode =
       code.trim().toUpperCase() ||
-      cleanName.toUpperCase().replace(/[^A-Z0-9_]+/g, '_').slice(0, 32);
+      cleanName
+        .toUpperCase()
+        .replace(/[^A-Z0-9_]+/g, '_')
+        .slice(0, 32);
 
     const confirmed = await confirmAction({
       actionType: isEdit ? 'update' : 'create',
@@ -167,8 +176,18 @@ export default function PaymentMethodModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? `Edit Payment Method: ${paymentMethod?.name}` : quickMode ? '+ Add New Payment Method' : 'Create Payment Method'}
-      subtitle={isEdit ? `Code: ${paymentMethod?.code}` : 'Define financial instruments for POS checkout and expenditure vouchers'}
+      title={
+        isEdit
+          ? `Edit Payment Method: ${paymentMethod?.name}`
+          : quickMode
+            ? '+ Add New Payment Method'
+            : 'Create Payment Method'
+      }
+      subtitle={
+        isEdit
+          ? `Code: ${paymentMethod?.code}`
+          : 'Define financial instruments for POS checkout and expenditure vouchers'
+      }
       size={quickMode ? 'sm' : 'md'}
       zIndex={zIndex}
     >
@@ -193,7 +212,8 @@ export default function PaymentMethodModal({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-bold text-foreground block mb-1">
-              Method Code <span className="text-3xs text-muted-foreground font-normal">(Auto-generated)</span>
+              Method Code{' '}
+              <span className="text-3xs text-muted-foreground font-normal">(Auto-generated)</span>
             </label>
             <input
               type="text"
@@ -226,7 +246,8 @@ export default function PaymentMethodModal({
         {/* Description / Bank Details */}
         <div>
           <label className="text-xs font-bold text-foreground block mb-1">
-            Description / Account Details <span className="text-3xs text-muted-foreground font-normal">(Optional)</span>
+            Description / Account Details{' '}
+            <span className="text-3xs text-muted-foreground font-normal">(Optional)</span>
           </label>
           <textarea
             rows={2}

@@ -104,10 +104,7 @@ export default function ScrollManager() {
       if (container) {
         const routeKey = getRouteKey();
         try {
-          sessionStorage.setItem(
-            `cosko-scroll-${routeKey}`,
-            String(container.scrollTop)
-          );
+          sessionStorage.setItem(`cosko-scroll-${routeKey}`, String(container.scrollTop));
         } catch {
           // sessionStorage may be full or disabled — silently ignore
         }

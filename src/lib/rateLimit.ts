@@ -17,17 +17,20 @@ const BLOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes lockout
 
 // Periodic cleanup of stale records every 10 minutes
 if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, record] of rateLimitStore.entries()) {
-      if (
-        (!record.blockedUntil || record.blockedUntil < now) &&
-        now - record.firstAttemptTime > WINDOW_DURATION_MS
-      ) {
-        rateLimitStore.delete(key);
+  setInterval(
+    () => {
+      const now = Date.now();
+      for (const [key, record] of rateLimitStore.entries()) {
+        if (
+          (!record.blockedUntil || record.blockedUntil < now) &&
+          now - record.firstAttemptTime > WINDOW_DURATION_MS
+        ) {
+          rateLimitStore.delete(key);
+        }
       }
-    }
-  }, 10 * 60 * 1000);
+    },
+    10 * 60 * 1000
+  );
 }
 
 export interface RateLimitResult {

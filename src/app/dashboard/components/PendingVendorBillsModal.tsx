@@ -15,7 +15,8 @@ interface PendingVendorBillsModalProps {
 }
 
 export default function PendingVendorBillsModal({ open, onClose }: PendingVendorBillsModalProps) {
-  const { purchases, vendors, selectedStore, datePeriod, recordPurchasePayment, refreshAllData } = useApp();
+  const { purchases, vendors, selectedStore, datePeriod, recordPurchasePayment, refreshAllData } =
+    useApp();
 
   // Fresh authoritative sync whenever modal opens
   React.useEffect(() => {
@@ -32,12 +33,18 @@ export default function PendingVendorBillsModal({ open, onClose }: PendingVendor
     const matchStore = selectedStore === 'All Stores' || p.store === selectedStore;
     const isNotCancelled = p.status !== 'Cancelled' && p.status !== 'Archived';
     const isUnpaid = p.paymentStatus !== 'Paid';
-    const rem = p.remainingAmount !== undefined ? p.remainingAmount : (p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0));
+    const rem =
+      p.remainingAmount !== undefined
+        ? p.remainingAmount
+        : p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0);
     return matchStore && isNotCancelled && isUnpaid && rem > 0.005;
   });
 
   const totalOutstanding = pendingBills.reduce((acc, p) => {
-    const rem = p.remainingAmount !== undefined ? p.remainingAmount : Math.max(0, p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0));
+    const rem =
+      p.remainingAmount !== undefined
+        ? p.remainingAmount
+        : Math.max(0, p.totalAmount - (p.paidAmount || 0) - (p.creditAmount || 0));
     return acc + rem;
   }, 0);
 
@@ -58,12 +65,15 @@ export default function PendingVendorBillsModal({ open, onClose }: PendingVendor
           {/* Header Summary Banner */}
           <div className="p-4 rounded-xl bg-muted/40 border border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Outstanding Payables</p>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                Total Outstanding Payables
+              </p>
               <p className="text-2xl font-bold text-foreground font-tabular mt-0.5">
                 ₹{totalOutstanding.toLocaleString('en-IN')}
               </p>
               <p className="text-2xs text-muted-foreground mt-0.5">
-                {pendingBills.length} pending bill{pendingBills.length === 1 ? '' : 's'} across {selectedStore}
+                {pendingBills.length} pending bill{pendingBills.length === 1 ? '' : 's'} across{' '}
+                {selectedStore}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -90,14 +100,21 @@ export default function PendingVendorBillsModal({ open, onClose }: PendingVendor
               </div>
               <h3 className="text-sm font-semibold text-foreground">No Pending Bills</h3>
               <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                All purchase orders and supplier bills under {selectedStore} are fully paid and settled. No outstanding vendor liabilities exist.
+                All purchase orders and supplier bills under {selectedStore} are fully paid and
+                settled. No outstanding vendor liabilities exist.
               </p>
             </div>
           ) : (
             <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1 scrollbar-thin">
               {pendingBills.map((po) => {
-                const vendorInfo = vendors.find((v) => v.id === po.vendorId || v.name.toLowerCase() === po.vendorName?.toLowerCase());
-                const remaining = po.remainingAmount !== undefined ? po.remainingAmount : Math.max(0, po.totalAmount - (po.paidAmount || 0) - (po.creditAmount || 0));
+                const vendorInfo = vendors.find(
+                  (v) =>
+                    v.id === po.vendorId || v.name.toLowerCase() === po.vendorName?.toLowerCase()
+                );
+                const remaining =
+                  po.remainingAmount !== undefined
+                    ? po.remainingAmount
+                    : Math.max(0, po.totalAmount - (po.paidAmount || 0) - (po.creditAmount || 0));
                 const paid = po.paidAmount || 0;
 
                 return (
@@ -107,9 +124,13 @@ export default function PendingVendorBillsModal({ open, onClose }: PendingVendor
                   >
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-xs text-foreground font-mono">{po.invoiceNo || po.poNo}</span>
+                        <span className="font-bold text-xs text-foreground font-mono">
+                          {po.invoiceNo || po.poNo}
+                        </span>
                         {po.invoiceNo && po.invoiceNo !== po.poNo && (
-                          <span className="text-3xs text-muted-foreground font-mono">({po.poNo})</span>
+                          <span className="text-3xs text-muted-foreground font-mono">
+                            ({po.poNo})
+                          </span>
                         )}
                         <StatusBadge
                           variant={po.paymentStatus === 'Partial' ? 'warning' : 'danger'}
@@ -121,17 +142,28 @@ export default function PendingVendorBillsModal({ open, onClose }: PendingVendor
                       </div>
 
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="font-semibold text-foreground truncate">{po.vendorName}</span>
+                        <span className="font-semibold text-foreground truncate">
+                          {po.vendorName}
+                        </span>
                         {vendorInfo?.phone && (
-                          <span className="text-muted-foreground text-3xs">· {vendorInfo.phone}</span>
+                          <span className="text-muted-foreground text-3xs">
+                            · {vendorInfo.phone}
+                          </span>
                         )}
                         {vendorInfo?.city && (
-                          <span className="text-muted-foreground text-3xs">· {vendorInfo.city}</span>
+                          <span className="text-muted-foreground text-3xs">
+                            · {vendorInfo.city}
+                          </span>
                         )}
                       </div>
 
                       <div className="flex items-center gap-3 text-3xs text-muted-foreground">
-                        <span>Ordered: {po.createdAt ? new Date(po.createdAt).toLocaleDateString('en-IN') : 'N/A'}</span>
+                        <span>
+                          Ordered:{' '}
+                          {po.createdAt
+                            ? new Date(po.createdAt).toLocaleDateString('en-IN')
+                            : 'N/A'}
+                        </span>
                         {po.expectedDate && <span>Expected: {po.expectedDate}</span>}
                         <span>Items: {po.items?.length || 0} SKUs</span>
                       </div>
@@ -145,7 +177,8 @@ export default function PendingVendorBillsModal({ open, onClose }: PendingVendor
                         </p>
                         {paid > 0 && (
                           <p className="text-3xs text-muted-foreground">
-                            Paid: ₹{paid.toLocaleString('en-IN')} / Total: ₹{po.totalAmount.toLocaleString('en-IN')}
+                            Paid: ₹{paid.toLocaleString('en-IN')} / Total: ₹
+                            {po.totalAmount.toLocaleString('en-IN')}
                           </p>
                         )}
                       </div>

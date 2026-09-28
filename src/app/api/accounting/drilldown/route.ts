@@ -73,6 +73,9 @@ export async function GET(req: NextRequest) {
     );
   } catch (error: any) {
     console.error('API /api/accounting/drilldown GET error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to retrieve drill-down records' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to retrieve drill-down records' },
+      { status: 500 }
+    );
   }
 }

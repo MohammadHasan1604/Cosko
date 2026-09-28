@@ -38,7 +38,10 @@ export function evaluateAuthorization({
 
   // 3. Super Admin Only Block
   if (superAdminOnly) {
-    return { authorized: false, reason: '403 Forbidden: Resource is classified as SUPER_ADMIN_ONLY' };
+    return {
+      authorized: false,
+      reason: '403 Forbidden: Resource is classified as SUPER_ADMIN_ONLY',
+    };
   }
 
   // 4. Custom User Permission Overrides (Explicit DENY / ALLOW)
@@ -46,7 +49,10 @@ export function evaluateAuthorization({
     const override = userOverrides.find((o) => o.permissionCode === requiredPermission);
     if (override) {
       if (override.overrideType === 'DENY') {
-        return { authorized: false, reason: `Deny Access: Custom DENY override for "${requiredPermission}"` };
+        return {
+          authorized: false,
+          reason: `Deny Access: Custom DENY override for "${requiredPermission}"`,
+        };
       }
       if (override.overrideType === 'ALLOW') {
         return { authorized: true };
@@ -56,17 +62,26 @@ export function evaluateAuthorization({
 
   // 5. Minimum Security Level Check
   if (user.securityLevel < requiredMinLevel) {
-    return { authorized: false, reason: `Deny Access: User Security Level (${user.securityLevel}) is below required Level (${requiredMinLevel})` };
+    return {
+      authorized: false,
+      reason: `Deny Access: User Security Level (${user.securityLevel}) is below required Level (${requiredMinLevel})`,
+    };
   }
 
   // 6. Store Scope Lock Check: User must only access stores explicitly assigned to them
   if (targetStoreCode) {
     if (targetStoreCode === 'All Stores') {
-      return { authorized: false, reason: 'Deny Access: Non-Super-Admin accounts cannot access enterprise "All Stores" scope' };
+      return {
+        authorized: false,
+        reason: 'Deny Access: Non-Super-Admin accounts cannot access enterprise "All Stores" scope',
+      };
     }
     const userAllowedStores = user.allowedStores || [user.store];
     if (!userAllowedStores.includes(targetStoreCode)) {
-      return { authorized: false, reason: `Deny Access: Store Scope Lock prevents access to ${targetStoreCode}` };
+      return {
+        authorized: false,
+        reason: `Deny Access: Store Scope Lock prevents access to ${targetStoreCode}`,
+      };
     }
   }
 

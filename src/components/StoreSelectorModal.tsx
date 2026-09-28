@@ -9,7 +9,18 @@ import StoreFormModal from '@/components/forms/StoreFormModal';
 import { toast } from 'sonner';
 
 export default function StoreSelectorModal() {
-  const { storeSelectorOpen, setStoreSelectorOpen, selectedStore, setSelectedStore, storesList, deleteStoreHub, currentUser, branding, addAuditLog, inventory } = useApp();
+  const {
+    storeSelectorOpen,
+    setStoreSelectorOpen,
+    selectedStore,
+    setSelectedStore,
+    storesList,
+    deleteStoreHub,
+    currentUser,
+    branding,
+    addAuditLog,
+    inventory,
+  } = useApp();
 
   const [addStoreModal, setAddStoreModal] = useState(false);
   const [editStoreModal, setEditStoreModal] = useState<StoreHub | null>(null);
@@ -23,20 +34,31 @@ export default function StoreSelectorModal() {
     // Scope Permission Check
     if (currentUser.role !== 'Super Admin') {
       if (targetStore === 'All Stores') {
-        toast.error('Store Scope Restricted: Enterprise "All Stores" scope is restricted to Super Admin accounts only.');
+        toast.error(
+          'Store Scope Restricted: Enterprise "All Stores" scope is restricted to Super Admin accounts only.'
+        );
         return;
       }
-      const allowedStores = currentUser.allowedStores && currentUser.allowedStores.length > 0
-        ? currentUser.allowedStores
-        : (currentUser.store && currentUser.store !== 'All Stores' ? [currentUser.store] : ['BLR']);
+      const allowedStores =
+        currentUser.allowedStores && currentUser.allowedStores.length > 0
+          ? currentUser.allowedStores
+          : currentUser.store && currentUser.store !== 'All Stores'
+            ? [currentUser.store]
+            : ['BLR'];
       if (!allowedStores.includes(targetStore)) {
-        toast.error(`Store Scope Restricted: You are only permitted to access assigned store(s): ${allowedStores.join(', ')}`);
+        toast.error(
+          `Store Scope Restricted: You are only permitted to access assigned store(s): ${allowedStores.join(', ')}`
+        );
         return;
       }
     }
 
     setSelectedStore(targetStore);
-    addAuditLog('Organization', 'Switch Store Scope', `Switched active store view context to "${storeName}" (${storeCode})`);
+    addAuditLog(
+      'Organization',
+      'Switch Store Scope',
+      `Switched active store view context to "${storeName}" (${storeCode})`
+    );
     setStoreSelectorOpen(false);
     toast.success(`Active store scope set to: ${storeName}`);
   };
@@ -49,7 +71,9 @@ export default function StoreSelectorModal() {
   const openDelete = (e: React.MouseEvent, st: StoreHub) => {
     e.stopPropagation();
     if (st.code === 'CENTRAL') {
-      toast.error('The default Central Warehouse & Owner Store (CENTRAL) is permanent and cannot be deleted.');
+      toast.error(
+        'The default Central Warehouse & Owner Store (CENTRAL) is permanent and cannot be deleted.'
+      );
       return;
     }
     setDeleteStoreModal(st);
@@ -75,20 +99,29 @@ export default function StoreSelectorModal() {
         <div className="p-3.5 rounded-xl bg-muted/40 border border-border flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {branding.logoUrl ? (
-              <img src={branding.logoUrl} alt={branding.appName} className="w-10 h-10 object-contain rounded-lg border border-border" />
+              <img
+                src={branding.logoUrl}
+                alt={branding.appName}
+                className="w-10 h-10 object-contain rounded-lg border border-border"
+              />
             ) : (
               <CoskoLogo size={28} showText />
             )}
             {branding.logoUrl && (
               <div>
                 <h4 className="text-sm font-bold text-foreground">{branding.appName}</h4>
-                <p className="text-2xs text-muted-foreground">{branding.tagline || 'Multi-Store Enterprise Retail System'}</p>
+                <p className="text-2xs text-muted-foreground">
+                  {branding.tagline || 'Multi-Store Enterprise Retail System'}
+                </p>
               </div>
             )}
           </div>
 
           {currentUser.role === 'Super Admin' && (
-            <button onClick={() => setAddStoreModal(true)} className="btn-primary text-2xs py-1.5 px-3 gap-1">
+            <button
+              onClick={() => setAddStoreModal(true)}
+              className="btn-primary text-2xs py-1.5 px-3 gap-1"
+            >
               <Icon name="PlusIcon" size={13} />
               Add Store Hub
             </button>
@@ -103,7 +136,9 @@ export default function StoreSelectorModal() {
                 <Icon name="ChartBarSquareIcon" size={13} />
                 Enterprise Reporting Scope (Aggregated View)
               </h5>
-              <span className="text-3xs text-muted-foreground font-medium">Reporting & Filter Only</span>
+              <span className="text-3xs text-muted-foreground font-medium">
+                Reporting & Filter Only
+              </span>
             </div>
 
             {(() => {
@@ -118,16 +153,23 @@ export default function StoreSelectorModal() {
                   }`}
                 >
                   <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-xs flex-shrink-0 ${isSelected ? 'bg-primary text-white' : 'bg-muted text-foreground'}`}>
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-xs flex-shrink-0 ${isSelected ? 'bg-primary text-white' : 'bg-muted text-foreground'}`}
+                    >
                       ALL
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-bold text-foreground">All Stores (Consolidated View)</p>
-                        <span className="text-3xs bg-primary/15 text-primary px-2 py-0.5 rounded-full font-bold">Consolidated Scope</span>
+                        <p className="text-sm font-bold text-foreground">
+                          All Stores (Consolidated View)
+                        </p>
+                        <span className="text-3xs bg-primary/15 text-primary px-2 py-0.5 rounded-full font-bold">
+                          Consolidated Scope
+                        </span>
                       </div>
                       <p className="text-2xs text-muted-foreground mt-0.5">
-                        Consolidated reporting & cross-store analytics across all {storesList.length} locations. (Non-physical / Non-inventory scope)
+                        Consolidated reporting & cross-store analytics across all{' '}
+                        {storesList.length} locations. (Non-physical / Non-inventory scope)
                       </p>
                     </div>
                   </div>
@@ -147,13 +189,17 @@ export default function StoreSelectorModal() {
 
         {/* SECTION 2: Physical Store Locations & Warehouses */}
         {(() => {
-          const userAllowed = currentUser.allowedStores && currentUser.allowedStores.length > 0
-            ? currentUser.allowedStores
-            : (currentUser.store && currentUser.store !== 'All Stores' ? [currentUser.store] : ['BLR']);
+          const userAllowed =
+            currentUser.allowedStores && currentUser.allowedStores.length > 0
+              ? currentUser.allowedStores
+              : currentUser.store && currentUser.store !== 'All Stores'
+                ? [currentUser.store]
+                : ['BLR'];
 
-          const displayStores = currentUser.role === 'Super Admin'
-            ? sortedPhysicalStores
-            : sortedPhysicalStores.filter((st) => userAllowed.includes(st.code));
+          const displayStores =
+            currentUser.role === 'Super Admin'
+              ? sortedPhysicalStores
+              : sortedPhysicalStores.filter((st) => userAllowed.includes(st.code));
 
           return (
             <div>
@@ -165,7 +211,9 @@ export default function StoreSelectorModal() {
                     : `Your Assigned Stores (${displayStores.length})`}
                 </h5>
                 <span className="text-3xs text-muted-foreground font-medium">
-                  {currentUser.role === 'Super Admin' ? 'Inventory & POS Owning' : 'Permitted Locations'}
+                  {currentUser.role === 'Super Admin'
+                    ? 'Inventory & POS Owning'
+                    : 'Permitted Locations'}
                 </span>
               </div>
 
@@ -185,11 +233,17 @@ export default function StoreSelectorModal() {
                       }`}
                     >
                       <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 ${
-                          isCentral
-                            ? isSelected ? 'bg-primary text-white' : 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                            : isSelected ? 'bg-primary text-white' : 'bg-muted text-foreground'
-                        }`}>
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                            isCentral
+                              ? isSelected
+                                ? 'bg-primary text-white'
+                                : 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                              : isSelected
+                                ? 'bg-primary text-white'
+                                : 'bg-muted text-foreground'
+                          }`}
+                        >
                           {st.code}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -203,7 +257,9 @@ export default function StoreSelectorModal() {
                               <span className="badge-info text-3xs">{st.status}</span>
                             )}
                           </div>
-                          <p className="text-2xs text-muted-foreground mt-0.5 truncate">{st.address}</p>
+                          <p className="text-2xs text-muted-foreground mt-0.5 truncate">
+                            {st.address}
+                          </p>
                           <div className="flex items-center gap-3 text-2xs text-muted-foreground mt-1">
                             <span>{st.city}</span>
                             {isCentral && (
@@ -262,11 +318,7 @@ export default function StoreSelectorModal() {
       </div>
 
       {/* Master Reusable Store Form Modal (Add Store) */}
-      <StoreFormModal
-        open={addStoreModal}
-        onClose={() => setAddStoreModal(false)}
-        zIndex={120}
-      />
+      <StoreFormModal open={addStoreModal} onClose={() => setAddStoreModal(false)} zIndex={120} />
 
       {/* Master Reusable Store Form Modal (Edit Store) */}
       {editStoreModal && (
@@ -280,17 +332,30 @@ export default function StoreSelectorModal() {
 
       {/* Delete Store Hub Modal */}
       {deleteStoreModal && (
-        <Modal open={!!deleteStoreModal} onClose={() => setDeleteStoreModal(null)} title="Delete Store Hub" size="sm">
+        <Modal
+          open={!!deleteStoreModal}
+          onClose={() => setDeleteStoreModal(null)}
+          title="Delete Store Hub"
+          size="sm"
+        >
           <div className="space-y-3 py-2">
             <p className="text-xs text-muted-foreground">
-              Are you sure you want to delete store hub <strong className="text-foreground">{deleteStoreModal.name} ({deleteStoreModal.code})</strong>?
+              Are you sure you want to delete store hub{' '}
+              <strong className="text-foreground">
+                {deleteStoreModal.name} ({deleteStoreModal.code})
+              </strong>
+              ?
             </p>
             <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <button onClick={() => setDeleteStoreModal(null)} className="btn-secondary text-xs">Cancel</button>
+              <button onClick={() => setDeleteStoreModal(null)} className="btn-secondary text-xs">
+                Cancel
+              </button>
               <button
                 onClick={async () => {
                   if (deleteStoreModal.code === 'CENTRAL') {
-                    toast.error('The default Central Warehouse & Owner Store (CENTRAL) cannot be deleted.');
+                    toast.error(
+                      'The default Central Warehouse & Owner Store (CENTRAL) cannot be deleted.'
+                    );
                     setDeleteStoreModal(null);
                     return;
                   }

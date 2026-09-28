@@ -19,7 +19,10 @@ export async function POST(req: NextRequest) {
     const { name, phone, avatarUrl } = body;
 
     if (name && !name.trim()) {
-      return NextResponse.json({ success: false, message: 'Name cannot be empty' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'Name cannot be empty' },
+        { status: 400 }
+      );
     }
 
     const updatedUser = await prisma.userAccount.update({
@@ -38,7 +41,12 @@ export async function POST(req: NextRequest) {
       role: updatedUser.role as SessionUser['role'],
       securityLevel: updatedUser.securityLevel,
       store: updatedUser.storeScope,
-      avatar: updatedUser.name.split(' ').map((n) => n[0]).join('').toUpperCase().substring(0, 2),
+      avatar: updatedUser.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .substring(0, 2),
       avatarUrl: updatedUser.avatarUrl || undefined,
       shiftStatus: (updatedUser.shiftStatus as 'On Shift' | 'On Leave') || 'On Shift',
     };

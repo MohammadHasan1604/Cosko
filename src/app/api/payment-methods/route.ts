@@ -6,16 +6,79 @@ import { broadcastRealtimeEvent } from '@/lib/realtime';
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_PAYMENT_METHODS = [
-  { name: 'Cash', code: 'CASH', type: 'Cash', description: 'Cash on counter / cash disbursement', isSystem: true, sortOrder: 1, status: 'Active' },
-  { name: 'UPI', code: 'UPI', type: 'Digital', description: 'Instant UPI / QR Code transfer (GPay, PhonePe, Paytm)', isSystem: true, sortOrder: 2, status: 'Active' },
-  { name: 'Card', code: 'CARD', type: 'Card', description: 'Credit or Debit Card swipe / POS terminal', isSystem: true, sortOrder: 3, status: 'Active' },
-  { name: 'Bank Transfer', code: 'BANK_TRANSFER', type: 'Bank', description: 'Direct Bank NEFT / RTGS / IMPS wire', isSystem: true, sortOrder: 4, status: 'Active' },
-  { name: 'Corporate Card', code: 'CORP_CARD', type: 'Card', description: 'Company / Corporate Card payment', isSystem: true, sortOrder: 5, status: 'Active' },
-  { name: 'Direct Debit', code: 'DIRECT_DEBIT', type: 'Bank', description: 'Automated bank ECS / ACH direct debit', isSystem: true, sortOrder: 6, status: 'Active' },
-  { name: 'Cheque', code: 'CHEQUE', type: 'Bank', description: 'Physical bank cheque clearing', isSystem: true, sortOrder: 7, status: 'Active' },
-  { name: 'Credit', code: 'CREDIT', type: 'Credit', description: 'Store credit / customer ledger credit balance', isSystem: true, sortOrder: 8, status: 'Active' },
+  {
+    name: 'Cash',
+    code: 'CASH',
+    type: 'Cash',
+    description: 'Cash on counter / cash disbursement',
+    isSystem: true,
+    sortOrder: 1,
+    status: 'Active',
+  },
+  {
+    name: 'UPI',
+    code: 'UPI',
+    type: 'Digital',
+    description: 'Instant UPI / QR Code transfer (GPay, PhonePe, Paytm)',
+    isSystem: true,
+    sortOrder: 2,
+    status: 'Active',
+  },
+  {
+    name: 'Card',
+    code: 'CARD',
+    type: 'Card',
+    description: 'Credit or Debit Card swipe / POS terminal',
+    isSystem: true,
+    sortOrder: 3,
+    status: 'Active',
+  },
+  {
+    name: 'Bank Transfer',
+    code: 'BANK_TRANSFER',
+    type: 'Bank',
+    description: 'Direct Bank NEFT / RTGS / IMPS wire',
+    isSystem: true,
+    sortOrder: 4,
+    status: 'Active',
+  },
+  {
+    name: 'Corporate Card',
+    code: 'CORP_CARD',
+    type: 'Card',
+    description: 'Company / Corporate Card payment',
+    isSystem: true,
+    sortOrder: 5,
+    status: 'Active',
+  },
+  {
+    name: 'Direct Debit',
+    code: 'DIRECT_DEBIT',
+    type: 'Bank',
+    description: 'Automated bank ECS / ACH direct debit',
+    isSystem: true,
+    sortOrder: 6,
+    status: 'Active',
+  },
+  {
+    name: 'Cheque',
+    code: 'CHEQUE',
+    type: 'Bank',
+    description: 'Physical bank cheque clearing',
+    isSystem: true,
+    sortOrder: 7,
+    status: 'Active',
+  },
+  {
+    name: 'Credit',
+    code: 'CREDIT',
+    type: 'Credit',
+    description: 'Store credit / customer ledger credit balance',
+    isSystem: true,
+    sortOrder: 8,
+    status: 'Active',
+  },
 ];
-
 
 let cachedPayload: any = null;
 let lastCacheTime = 0;
@@ -76,7 +139,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const _ar = await authenticateRequest(req);
-    if (!_ar.user) { return NextResponse.json({ error: _ar.error }, { status: _ar.status }); }
+    if (!_ar.user) {
+      return NextResponse.json({ error: _ar.error }, { status: _ar.status });
+    }
     const authUser = _ar.user;
     const body = await req.json();
 
@@ -89,8 +154,14 @@ export async function POST(req: NextRequest) {
     }
 
     const code =
-      body?.code?.trim().toUpperCase().replace(/[^A-Z0-9_]+/g, '_') ||
-      name.toUpperCase().replace(/[^A-Z0-9_]+/g, '_').slice(0, 32);
+      body?.code
+        ?.trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9_]+/g, '_') ||
+      name
+        .toUpperCase()
+        .replace(/[^A-Z0-9_]+/g, '_')
+        .slice(0, 32);
 
     const type = body?.type?.trim() || 'Bank';
     const description = body?.description?.trim() || null;
@@ -100,10 +171,7 @@ export async function POST(req: NextRequest) {
     // Check duplicate
     const existing = await prisma.paymentMethod.findFirst({
       where: {
-        OR: [
-          { name: { equals: name } },
-          { code: { equals: code } },
-        ],
+        OR: [{ name: { equals: name } }, { code: { equals: code } }],
       },
     });
 
@@ -145,7 +213,9 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const _ar = await authenticateRequest(req);
-    if (!_ar.user) { return NextResponse.json({ error: _ar.error }, { status: _ar.status }); }
+    if (!_ar.user) {
+      return NextResponse.json({ error: _ar.error }, { status: _ar.status });
+    }
     const authUser = _ar.user;
     const body = await req.json();
 
@@ -197,14 +267,19 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const _ar = await authenticateRequest(req);
-    if (!_ar.user) { return NextResponse.json({ error: _ar.error }, { status: _ar.status }); }
+    if (!_ar.user) {
+      return NextResponse.json({ error: _ar.error }, { status: _ar.status });
+    }
     const authUser = _ar.user;
     if (!authUser) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
     if (authUser.securityLevel < 80) {
-      return NextResponse.json({ success: false, error: 'Forbidden: Insufficient permissions' }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Insufficient permissions' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -236,7 +311,10 @@ export async function DELETE(req: NextRequest) {
     // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────
     if (authUser.securityLevel < 100) {
       if (!reason || reason.trim().length < 3) {
-        return NextResponse.json({ success: false, error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+        return NextResponse.json(
+          { success: false, error: 'A reason for deletion is required (minimum 3 characters)' },
+          { status: 400 }
+        );
       }
       const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
       const result = await createDeleteRequest(authUser as any, {
@@ -285,4 +363,3 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
-

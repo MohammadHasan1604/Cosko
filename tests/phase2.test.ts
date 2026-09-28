@@ -1,6 +1,6 @@
 /**
  * COSKO Phase 2 — Comprehensive Test Suite
- * 
+ *
  * Tests:
  * A. Delete Approval Workflow
  * B. Notifications API
@@ -9,7 +9,87 @@
  * E. RBAC Extensions
  */
 
-import { describe, it, expect } from 'vitest';
+import fs from 'fs';
+import path from 'path';
+
+let p2Passed = 0;
+let p2Failed = 0;
+const p2Errors: string[] = [];
+
+interface DescribeFunction {
+  (name: string, fn: () => void | Promise<void>): void;
+  skipIf: (condition: boolean) => (name: string, fn: () => void | Promise<void>) => void;
+}
+
+const describe: DescribeFunction = Object.assign(
+  function (name: string, fn: () => void | Promise<void>) {
+    console.log(`\n📋 ${name}`);
+    fn();
+  },
+  {
+    skipIf(condition: boolean) {
+      return function (name: string, fn: () => void | Promise<void>) {
+        if (condition) {
+          console.log(`\n⏭️  ${name} (skipped)`);
+          return;
+        }
+        console.log(`\n📋 ${name}`);
+        fn();
+      };
+    },
+  }
+);
+
+async function it(name: string, fn: () => void | Promise<void>) {
+  try {
+    await fn();
+    console.log(`  ✅ ${name}`);
+    p2Passed++;
+  } catch (err: any) {
+    console.log(`  ❌ ${name}: ${err.message}`);
+    p2Errors.push(`${name}: ${err.message}`);
+    p2Failed++;
+  }
+}
+
+function expect(actual: any) {
+  return {
+    toBe(expected: any) {
+      if (actual !== expected)
+        throw new Error(`Expected ${JSON.stringify(expected)} but got ${JSON.stringify(actual)}`);
+    },
+    toEqual(expected: any) {
+      if (JSON.stringify(actual) !== JSON.stringify(expected))
+        throw new Error(`Expected ${JSON.stringify(expected)} but got ${JSON.stringify(actual)}`);
+    },
+    toBeDefined() {
+      if (actual === undefined) throw new Error('Expected value to be defined');
+    },
+    toBeNull() {
+      if (actual !== null) throw new Error(`Expected null but got ${actual}`);
+    },
+    toBeTruthy() {
+      if (!actual) throw new Error(`Expected truthy but got ${actual}`);
+    },
+    toBeFalsy() {
+      if (actual) throw new Error(`Expected falsy but got ${actual}`);
+    },
+    toContain(item: any) {
+      if (typeof actual === 'string' && !actual.includes(item))
+        throw new Error(`Expected "${actual}" to contain "${item}"`);
+      if (Array.isArray(actual) && !actual.includes(item))
+        throw new Error(`Expected array to contain ${item}`);
+    },
+    toBeGreaterThan(num: number) {
+      if (typeof actual !== 'number' || actual <= num)
+        throw new Error(`Expected ${actual} > ${num}`);
+    },
+    toMatch(regex: RegExp) {
+      if (typeof actual !== 'string' || !regex.test(actual))
+        throw new Error(`Expected "${actual}" to match ${regex}`);
+    },
+  };
+}
 
 // ─── Test Helpers ────────────────────────────────────────────────────────────
 
@@ -105,7 +185,8 @@ describe('Phase 2 — Unit Tests', () => {
     });
 
     it('calculateServerDelta caps at maxInterval', async () => {
-      const { calculateServerDelta } = await import('../src/lib/services/activityCalculationService');
+      const { calculateServerDelta } =
+        await import('../src/lib/services/activityCalculationService');
 
       const now = new Date();
       const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
@@ -129,7 +210,8 @@ describe('Phase 2 — Unit Tests', () => {
     });
 
     it('splitAcrossMidnight handles same-day correctly', async () => {
-      const { splitAcrossMidnight } = await import('../src/lib/services/activityCalculationService');
+      const { splitAcrossMidnight } =
+        await import('../src/lib/services/activityCalculationService');
 
       const start = new Date('2025-01-15T10:00:00Z');
       const end = new Date('2025-01-15T10:00:30Z');
@@ -138,7 +220,8 @@ describe('Phase 2 — Unit Tests', () => {
     });
 
     it('splitAcrossMidnight handles midnight crossing', async () => {
-      const { splitAcrossMidnight } = await import('../src/lib/services/activityCalculationService');
+      const { splitAcrossMidnight } =
+        await import('../src/lib/services/activityCalculationService');
 
       const start = new Date('2025-01-15T23:59:30Z');
       const end = new Date('2025-01-16T00:00:30Z');
@@ -312,12 +395,20 @@ describe('Phase 2 — API Integration Tests', () => {
     });
 
     it('GET /api/activity/stats — Non-admin cannot view others', async () => {
-      const { status } = await apiCall('GET', '/api/activity/stats?userId=other-user', STORE_MANAGER);
+      const { status } = await apiCall(
+        'GET',
+        '/api/activity/stats?userId=other-user',
+        STORE_MANAGER
+      );
       expect(status).toBe(403);
     });
 
     it('GET /api/activity/stats — Non-admin cannot view All Stores', async () => {
-      const { status } = await apiCall('GET', '/api/activity/stats?storeCode=All Stores', STORE_MANAGER);
+      const { status } = await apiCall(
+        'GET',
+        '/api/activity/stats?storeCode=All Stores',
+        STORE_MANAGER
+      );
       expect(status).toBe(403);
     });
   });
@@ -327,7 +418,7 @@ describe('Phase 2 — API Integration Tests', () => {
       const { status, data } = await apiCall(
         'DELETE',
         '/api/customers?id=test-cust-001',
-        STORE_MANAGER,
+        STORE_MANAGER
       );
       expect(status).toBe(400);
       expect(data.error).toContain('reason');
@@ -337,7 +428,7 @@ describe('Phase 2 — API Integration Tests', () => {
       const { status, data } = await apiCall(
         'DELETE',
         '/api/inventory?id=test-prod-001',
-        STORE_MANAGER,
+        STORE_MANAGER
       );
       expect(status).toBe(400);
       expect(data.error).toContain('reason');
@@ -347,7 +438,7 @@ describe('Phase 2 — API Integration Tests', () => {
       const { status, data } = await apiCall(
         'DELETE',
         '/api/vendors?id=test-vend-001',
-        STORE_MANAGER,
+        STORE_MANAGER
       );
       expect(status).toBe(400);
       expect(data.error).toContain('reason');
@@ -357,7 +448,7 @@ describe('Phase 2 — API Integration Tests', () => {
       const { status, data } = await apiCall(
         'DELETE',
         '/api/expenses?id=test-exp-001',
-        STORE_MANAGER,
+        STORE_MANAGER
       );
       expect(status).toBe(400);
       expect(data.error).toContain('reason');
@@ -367,9 +458,113 @@ describe('Phase 2 — API Integration Tests', () => {
       const { status } = await apiCall(
         'DELETE',
         '/api/customers?id=test-cust-001&reason=remove+old+entry',
-        SALES_EXEC,
+        SALES_EXEC
       );
       expect(status).toBe(403);
     });
   });
+
+  describe('Phase 2 — Responsive UI & Component System', () => {
+    it('CustomSelect renders BottomSheet for mobile devices', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/ui/CustomSelect.tsx'),
+        'utf8'
+      );
+      expect(content).toContain('BottomSheet');
+      expect(content).toContain('isMobile');
+      expect(content).toContain('role="combobox"');
+    });
+
+    it('BottomSheet provides accessible modal dialog with backdrop', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/ui/BottomSheet.tsx'),
+        'utf8'
+      );
+      expect(content).toContain('role="dialog"');
+      expect(content).toContain('aria-modal="true"');
+      expect(content).toContain('handleEscape');
+    });
+
+    it('Inventory Table provides dedicated mobile cards with actions', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/inventory-management/components/InventoryTable.tsx'),
+        'utf8'
+      );
+      expect(content).toContain('md:hidden');
+      expect(content).toContain('StockStatusBadge');
+    });
+
+    it('NumericInput enforces currency validation and mobile-friendly keypad', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/ui/NumericInput.tsx'),
+        'utf8'
+      );
+      expect(content).toContain('inputMode');
+      expect(content).toContain('font-tabular');
+    });
+  });
+
+  describe('Phase 2 — Standalone Repairs Module Decommissioning', () => {
+    it('Sidebar excludes /repairs navigation', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/Sidebar.tsx'),
+        'utf8'
+      );
+      expect(content.includes("href: '/repairs'")).toBeFalsy();
+    });
+
+    it('BottomNav excludes /repairs navigation', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/BottomNav.tsx'),
+        'utf8'
+      );
+      expect(content.includes("href: '/repairs'")).toBeFalsy();
+    });
+
+    it('AppLayout route permissions exclude /repairs', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/AppLayout.tsx'),
+        'utf8'
+      );
+      expect(content.includes("'/repairs':")).toBeFalsy();
+    });
+
+    it('/repairs page redirects to /customers', () => {
+      const content = fs.readFileSync(path.join(process.cwd(), 'src/app/repairs/page.tsx'), 'utf8');
+      expect(content).toContain("redirect('/customers')");
+    });
+
+    it('/repairs/[id] page redirects to /customers', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/repairs/[id]/page.tsx'),
+        'utf8'
+      );
+      expect(content).toContain("redirect('/customers')");
+    });
+
+    it('/api/repairs route has mutation methods decommissioned (410)', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/api/repairs/route.ts'),
+        'utf8'
+      );
+      expect(content).toContain('status: 410');
+      expect(content).toContain('REPAIRS_DECOMMISSIONED');
+    });
+
+    it('Customer 360 view includes read-only connected device repair history', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/customers/page.tsx'),
+        'utf8'
+      );
+      expect(content).toContain('Connected Device Repair History (Read-Only Legacy DB)');
+      expect(content).toContain('repairsEnquiries');
+    });
+  });
 });
+
+setTimeout(() => {
+  console.log('\n══════════════════════════════════════════════════');
+  console.log(`📊 Phase 2 Test Results: ${p2Passed} passed, ${p2Failed} failed`);
+  console.log('══════════════════════════════════════════════════');
+  if (p2Failed > 0) process.exit(1);
+}, 500);

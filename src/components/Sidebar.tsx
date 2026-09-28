@@ -33,36 +33,73 @@ const badgeColorMap: Record<string, string> = {
   info: 'bg-info text-white',
 };
 
-export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRoute }: SidebarProps) {
-  const { selectedStore, setStoreSelectorOpen, setUserProfileOpen, currentUser, inventory, purchases, branding } = useApp();
+export default function Sidebar({
+  collapsed,
+  mobileOpen,
+  onMobileClose,
+  activeRoute,
+}: SidebarProps) {
+  const {
+    selectedStore,
+    setStoreSelectorOpen,
+    setUserProfileOpen,
+    currentUser,
+    inventory,
+    purchases,
+    branding,
+  } = useApp();
 
   const lowStockCount = inventory.filter((i) => i.qtyOnHand <= i.reorderPt).length;
-  const pendingPOCount = purchases.filter((p) => p.status === 'Sent' || p.status === 'Draft').length;
+  const pendingPOCount = purchases.filter(
+    (p) => p.status === 'Sent' || p.status === 'Draft'
+  ).length;
 
   // Strict RBAC Navigation — Super Admin-only modules enforced per requirements
   const roleAllowedHrefs: Record<string, string[]> = {
     'Super Admin': [
-      '/dashboard', '/sales', '/inventory-management', '/stock-transfers', '/categories', '/purchases', '/customers',
-      '/vendors', '/expenses', '/accounting', '/central-profit',
-      '/reports', '/employees', '/stores', '/users', '/work-activity', '/audit-logs', '/settings'
+      '/dashboard',
+      '/sales',
+      '/inventory-management',
+      '/stock-transfers',
+      '/categories',
+      '/purchases',
+      '/customers',
+      '/vendors',
+      '/expenses',
+      '/accounting',
+      '/central-profit',
+      '/reports',
+      '/employees',
+      '/stores',
+      '/users',
+      '/work-activity',
+      '/audit-logs',
+      '/settings',
     ],
     'Store Manager': [
-      '/dashboard', '/sales', '/inventory-management', '/categories', '/purchases', '/customers',
-      '/vendors', '/expenses', '/accounting',
-      '/reports', '/employees'
+      '/dashboard',
+      '/sales',
+      '/inventory-management',
+      '/categories',
+      '/purchases',
+      '/customers',
+      '/vendors',
+      '/expenses',
+      '/accounting',
+      '/reports',
+      '/employees',
     ],
     'Inventory Manager': [
-      '/dashboard', '/inventory-management', '/categories', '/purchases', '/vendors', '/reports'
+      '/dashboard',
+      '/inventory-management',
+      '/categories',
+      '/purchases',
+      '/vendors',
+      '/reports',
     ],
-    'Sales Executive': [
-      '/dashboard', '/sales', '/customers'
-    ],
-    'POS Cashier': [
-      '/sales', '/customers'
-    ],
-    'Restricted Employee': [
-      '/dashboard'
-    ],
+    'Sales Executive': ['/dashboard', '/sales', '/customers'],
+    'POS Cashier': ['/sales', '/customers'],
+    'Restricted Employee': ['/dashboard'],
   };
 
   const allowedHrefs = roleAllowedHrefs[currentUser.role] || ['/sales', '/work-activity'];
@@ -71,19 +108,36 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
     {
       id: 'group-overview',
       label: 'Overview',
-      items: [
-        { id: 'nav-dashboard', label: 'Dashboard', icon: 'HomeIcon', href: '/dashboard' },
-      ],
+      items: [{ id: 'nav-dashboard', label: 'Dashboard', icon: 'HomeIcon', href: '/dashboard' }],
     },
     {
       id: 'group-commerce',
       label: 'Commerce',
       items: [
         { id: 'nav-sales', label: 'Sales & POS', icon: 'ShoppingCartIcon', href: '/sales' },
-        { id: 'nav-inventory', label: 'Inventory', icon: 'CubeIcon', href: '/inventory-management', badge: lowStockCount, badgeVariant: 'warning' },
-        { id: 'nav-stock-transfers', label: 'Stock Transfers', icon: 'ArrowsRightLeftIcon', href: '/stock-transfers' },
+        {
+          id: 'nav-inventory',
+          label: 'Inventory',
+          icon: 'CubeIcon',
+          href: '/inventory-management',
+          badge: lowStockCount,
+          badgeVariant: 'warning',
+        },
+        {
+          id: 'nav-stock-transfers',
+          label: 'Stock Transfers',
+          icon: 'ArrowsRightLeftIcon',
+          href: '/stock-transfers',
+        },
         { id: 'nav-categories', label: 'Categories', icon: 'TagIcon', href: '/categories' },
-        { id: 'nav-purchases', label: 'Purchases', icon: 'TruckIcon', href: '/purchases', badge: pendingPOCount, badgeVariant: 'info' },
+        {
+          id: 'nav-purchases',
+          label: 'Purchases',
+          icon: 'TruckIcon',
+          href: '/purchases',
+          badge: pendingPOCount,
+          badgeVariant: 'info',
+        },
         { id: 'nav-customers', label: 'Customers', icon: 'UsersIcon', href: '/customers' },
         { id: 'nav-vendors', label: 'Vendors', icon: 'BuildingStorefrontIcon', href: '/vendors' },
       ],
@@ -94,7 +148,12 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
       items: [
         { id: 'nav-expenses', label: 'Expenses', icon: 'BanknotesIcon', href: '/expenses' },
         { id: 'nav-accounting', label: 'Accounting', icon: 'CalculatorIcon', href: '/accounting' },
-        { id: 'nav-central-profit', label: 'Central Profit', icon: 'ArrowTrendingUpIcon', href: '/central-profit' },
+        {
+          id: 'nav-central-profit',
+          label: 'Central Profit',
+          icon: 'ArrowTrendingUpIcon',
+          href: '/central-profit',
+        },
         { id: 'nav-reports', label: 'Reports', icon: 'ChartBarIcon', href: '/reports' },
       ],
     },
@@ -105,14 +164,24 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
         { id: 'nav-employees', label: 'Employees', icon: 'UserGroupIcon', href: '/employees' },
         { id: 'nav-stores', label: 'Stores', icon: 'MapPinIcon', href: '/stores' },
         { id: 'nav-users', label: 'Users & Roles', icon: 'ShieldCheckIcon', href: '/users' },
-        { id: 'nav-work-activity', label: 'Work Activity', icon: 'ClockIcon', href: '/work-activity' },
+        {
+          id: 'nav-work-activity',
+          label: 'Work Activity',
+          icon: 'ClockIcon',
+          href: '/work-activity',
+        },
       ],
     },
     {
       id: 'group-system',
       label: 'System',
       items: [
-        { id: 'nav-audit', label: 'Audit Logs', icon: 'ClipboardDocumentListIcon', href: '/audit-logs' },
+        {
+          id: 'nav-audit',
+          label: 'Audit Logs',
+          icon: 'ClipboardDocumentListIcon',
+          href: '/audit-logs',
+        },
         { id: 'nav-settings', label: 'Settings', icon: 'Cog6ToothIcon', href: '/settings' },
       ],
     },
@@ -121,7 +190,10 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   const navGroups = rawNavGroups
     .map((g) => ({
       ...g,
-      items: currentUser.role === 'Super Admin' ? g.items : g.items.filter((item) => allowedHrefs.includes(item.href)),
+      items:
+        currentUser.role === 'Super Admin'
+          ? g.items
+          : g.items.filter((item) => allowedHrefs.includes(item.href)),
     }))
     .filter((g) => g.items.length > 0);
 
@@ -138,7 +210,8 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   ].join(' ');
 
   const renderNavItem = (item: NavItem) => {
-    const isActive = activeRoute === item.href || (activeRoute === '/' && item.href === '/dashboard');
+    const isActive =
+      activeRoute === item.href || (activeRoute === '/' && item.href === '/dashboard');
     return (
       <Link
         key={item.id}
@@ -157,7 +230,9 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
           <span className="flex-1 truncate text-[13px] tracking-tight">{item.label}</span>
         )}
         {!collapsed && item.badge !== undefined && item.badge > 0 && (
-          <span className={`text-3xs px-1.5 py-0.5 rounded-full font-bold ${badgeColorMap[item.badgeVariant ?? 'info']}`}>
+          <span
+            className={`text-3xs px-1.5 py-0.5 rounded-full font-bold ${badgeColorMap[item.badgeVariant ?? 'info']}`}
+          >
             {item.badge}
           </span>
         )}
@@ -171,7 +246,9 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   const renderSidebarContent = (isCollapsed: boolean) => (
     <>
       {/* Logo */}
-      <div className={`flex items-center justify-between gap-2 px-3.5 py-3 border-b border-border/60 flex-shrink-0 ${isCollapsed ? 'justify-center px-2' : ''}`}>
+      <div
+        className={`flex items-center justify-between gap-2 px-3.5 py-3 border-b border-border/60 flex-shrink-0 ${isCollapsed ? 'justify-center px-2' : ''}`}
+      >
         <Link href="/dashboard" onClick={onMobileClose} className="flex items-center gap-2 min-w-0">
           <CoskoLogo size={24} showText={!isCollapsed} />
         </Link>
@@ -187,67 +264,92 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
       </div>
 
       {/* Store selector */}
-      {!isCollapsed && (() => {
-        const isSuperAdmin = currentUser.role === 'Super Admin';
-        const userAllowed = currentUser.allowedStores && currentUser.allowedStores.length > 0
-          ? currentUser.allowedStores
-          : (currentUser.store && currentUser.store !== 'All Stores' ? [currentUser.store] : ['BLR']);
-        const canSwitch = isSuperAdmin || userAllowed.length > 1;
+      {!isCollapsed &&
+        (() => {
+          const isSuperAdmin = currentUser.role === 'Super Admin';
+          const userAllowed =
+            currentUser.allowedStores && currentUser.allowedStores.length > 0
+              ? currentUser.allowedStores
+              : currentUser.store && currentUser.store !== 'All Stores'
+                ? [currentUser.store]
+                : ['BLR'];
+          const canSwitch = isSuperAdmin || userAllowed.length > 1;
 
-        if (canSwitch) {
+          if (canSwitch) {
+            return (
+              <div className="px-2.5 py-2 border-b border-border/60 flex-shrink-0">
+                <div
+                  onClick={() => setStoreSelectorOpen(true)}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/30 border border-border/60 cursor-pointer hover:bg-muted hover:border-slate-300 transition-all shadow-2xs group"
+                  title={
+                    isSuperAdmin
+                      ? 'Switch active store scope'
+                      : 'Switch between your assigned stores'
+                  }
+                >
+                  <div
+                    className={`w-6 h-6 rounded-md flex-shrink-0 flex items-center justify-center text-white text-3xs font-bold ${
+                      selectedStore === 'All Stores'
+                        ? 'bg-primary'
+                        : selectedStore === 'CENTRAL'
+                          ? 'bg-slate-800'
+                          : 'gradient-primary'
+                    }`}
+                  >
+                    {selectedStore === 'All Stores' ? 'ALL' : selectedStore.slice(0, 3)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-foreground truncate leading-tight group-hover:text-primary transition-colors">
+                      {branding.appName}
+                    </p>
+                    <p className="text-3xs text-muted-foreground truncate leading-tight mt-0.5">
+                      {selectedStore === 'All Stores'
+                        ? 'Consolidated View'
+                        : selectedStore === 'CENTRAL'
+                          ? 'Central Warehouse'
+                          : `${selectedStore} Store`}
+                    </p>
+                  </div>
+                  <Icon
+                    name="ChevronUpDownIcon"
+                    size={14}
+                    className="text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors"
+                  />
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div className="px-2.5 py-2 border-b border-border/60 flex-shrink-0">
               <div
-                onClick={() => setStoreSelectorOpen(true)}
-                className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/30 border border-border/60 cursor-pointer hover:bg-muted hover:border-slate-300 transition-all shadow-2xs group"
-                title={isSuperAdmin ? "Switch active store scope" : "Switch between your assigned stores"}
+                className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/20 border border-border/40 select-none"
+                title={`Assigned to ${userAllowed[0] || currentUser.store || selectedStore}`}
               >
-                <div className={`w-6 h-6 rounded-md flex-shrink-0 flex items-center justify-center text-white text-3xs font-bold ${
-                  selectedStore === 'All Stores' ? 'bg-primary' : selectedStore === 'CENTRAL' ? 'bg-slate-800' : 'gradient-primary'
-                }`}>
-                  {selectedStore === 'All Stores' ? 'ALL' : selectedStore.slice(0, 3)}
+                <div className="w-6 h-6 rounded-md flex-shrink-0 flex items-center justify-center text-white text-3xs font-bold gradient-primary">
+                  {(userAllowed[0] || currentUser.store || selectedStore || 'BLR').slice(0, 3)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-foreground truncate leading-tight group-hover:text-primary transition-colors">{branding.appName}</p>
+                  <p className="text-xs font-bold text-foreground truncate leading-tight">
+                    {branding.appName}
+                  </p>
                   <p className="text-3xs text-muted-foreground truncate leading-tight mt-0.5">
-                    {selectedStore === 'All Stores'
-                      ? 'Consolidated View'
-                      : selectedStore === 'CENTRAL'
-                      ? 'Central Warehouse'
-                      : `${selectedStore} Store`}
+                    {userAllowed[0] || currentUser.store || selectedStore} Store
                   </p>
                 </div>
-                <Icon name="ChevronUpDownIcon" size={14} className="text-muted-foreground group-hover:text-foreground flex-shrink-0 transition-colors" />
+                <span className="text-3xs font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/60">
+                  Assigned
+                </span>
               </div>
             </div>
           );
-        }
-
-        return (
-          <div className="px-2.5 py-2 border-b border-border/60 flex-shrink-0">
-            <div
-              className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/20 border border-border/40 select-none"
-              title={`Assigned to ${userAllowed[0] || currentUser.store || selectedStore}`}
-            >
-              <div className="w-6 h-6 rounded-md flex-shrink-0 flex items-center justify-center text-white text-3xs font-bold gradient-primary">
-                {(userAllowed[0] || currentUser.store || selectedStore || 'BLR').slice(0, 3)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-foreground truncate leading-tight">{branding.appName}</p>
-                <p className="text-3xs text-muted-foreground truncate leading-tight mt-0.5">
-                  {userAllowed[0] || currentUser.store || selectedStore} Store
-                </p>
-              </div>
-              <span className="text-3xs font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/60">
-                Assigned
-              </span>
-            </div>
-          </div>
-        );
-      })()}
+        })()}
 
       {/* Nav groups */}
-      <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 py-2.5 space-y-4" aria-label="Main navigation">
+      <nav
+        className="flex-1 overflow-y-auto scrollbar-thin px-2 py-2.5 space-y-4"
+        aria-label="Main navigation"
+      >
         {navGroups.map((group) => (
           <div key={group.id}>
             {!isCollapsed && (
@@ -255,15 +357,15 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
                 {group.label}
               </p>
             )}
-            <div className="space-y-0.5">
-              {group.items.map(renderNavItem)}
-            </div>
+            <div className="space-y-0.5">{group.items.map(renderNavItem)}</div>
           </div>
         ))}
       </nav>
 
       {/* User footer */}
-      <div className={`border-t border-border/60 p-2.5 flex-shrink-0 ${isCollapsed ? 'flex justify-center' : ''}`}>
+      <div
+        className={`border-t border-border/60 p-2.5 flex-shrink-0 ${isCollapsed ? 'flex justify-center' : ''}`}
+      >
         {isCollapsed ? (
           <button
             onClick={() => setUserProfileOpen(true)}
@@ -271,7 +373,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
             aria-label="User profile"
           >
             {currentUser.avatarUrl ? (
-              <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-8 h-8 rounded-full object-cover" />
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.name}
+                className="w-8 h-8 rounded-full object-cover"
+              />
             ) : (
               <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-bold">
                 {currentUser.avatar}
@@ -285,7 +391,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
             aria-label="User profile"
           >
             {currentUser.avatarUrl ? (
-              <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.name}
+                className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0"
+              />
             ) : (
               <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                 {currentUser.avatar}
@@ -295,7 +405,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
               <p className="text-xs font-semibold text-foreground truncate">{currentUser.name}</p>
               <p className="text-2xs text-muted-foreground">{currentUser.role}</p>
             </div>
-            <Icon name="ArrowRightOnRectangleIcon" size={16} className="text-muted-foreground hover:text-danger transition-colors flex-shrink-0" />
+            <Icon
+              name="ArrowRightOnRectangleIcon"
+              size={16}
+              className="text-muted-foreground hover:text-danger transition-colors flex-shrink-0"
+            />
           </button>
         )}
       </div>
@@ -305,14 +419,10 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, activeRo
   return (
     <>
       {/* Desktop sidebar */}
-      <div className={sidebarClasses}>
-        {renderSidebarContent(collapsed)}
-      </div>
+      <div className={sidebarClasses}>{renderSidebarContent(collapsed)}</div>
 
       {/* Mobile sidebar (accessed via hamburger for full navigation) */}
-      <div className={mobileSidebarClasses}>
-        {renderSidebarContent(false)}
-      </div>
+      <div className={mobileSidebarClasses}>{renderSidebarContent(false)}</div>
     </>
   );
 }

@@ -7,7 +7,13 @@ import { useApp } from '@/context/AppContext';
  * Client-side guard that redirects non-Super Admin users away from restricted pages.
  * Wraps children — renders nothing and redirects if the current user is not Super Admin.
  */
-export default function SuperAdminGuard({ children, moduleName }: { children: React.ReactNode; moduleName?: string }) {
+export default function SuperAdminGuard({
+  children,
+  moduleName,
+}: {
+  children: React.ReactNode;
+  moduleName?: string;
+}) {
   const { currentUser } = useApp();
   const router = useRouter();
 
@@ -26,7 +32,8 @@ export default function SuperAdminGuard({ children, moduleName }: { children: Re
           </div>
           <h2 className="text-lg font-bold text-foreground">Access Restricted</h2>
           <p className="text-sm text-muted-foreground max-w-sm">
-            {moduleName || 'This module'} is restricted to Super Admin only. You are being redirected to the dashboard.
+            {moduleName || 'This module'} is restricted to Super Admin only. You are being
+            redirected to the dashboard.
           </p>
         </div>
       </div>

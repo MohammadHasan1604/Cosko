@@ -25,35 +25,43 @@ export default function GlobalSearchModal() {
   if (!searchOpen) return null;
 
   const matchedItems = query
-    ? inventory.filter(
-        (i) =>
-          i.name.toLowerCase().includes(query.toLowerCase()) ||
-          i.sku.toLowerCase().includes(query.toLowerCase()) ||
-          (i.barcode && i.barcode.includes(query))
-      ).slice(0, 4)
+    ? inventory
+        .filter(
+          (i) =>
+            i.name.toLowerCase().includes(query.toLowerCase()) ||
+            i.sku.toLowerCase().includes(query.toLowerCase()) ||
+            (i.barcode && i.barcode.includes(query))
+        )
+        .slice(0, 4)
     : [];
 
   const matchedCustomers = query
-    ? customers.filter(
-        (c) =>
-          c.name.toLowerCase().includes(query.toLowerCase()) ||
-          c.phone.includes(query) ||
-          c.email.toLowerCase().includes(query.toLowerCase())
-      ).slice(0, 3)
+    ? customers
+        .filter(
+          (c) =>
+            c.name.toLowerCase().includes(query.toLowerCase()) ||
+            c.phone.includes(query) ||
+            c.email.toLowerCase().includes(query.toLowerCase())
+        )
+        .slice(0, 3)
     : [];
 
   const matchedSales = query
-    ? sales.filter(
-        (s) =>
-          s.orderNo.toLowerCase().includes(query.toLowerCase()) ||
-          s.customerName.toLowerCase().includes(query.toLowerCase())
-      ).slice(0, 3)
+    ? sales
+        .filter(
+          (s) =>
+            s.orderNo.toLowerCase().includes(query.toLowerCase()) ||
+            s.customerName.toLowerCase().includes(query.toLowerCase())
+        )
+        .slice(0, 3)
     : [];
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-start md:items-start md:justify-center md:pt-16 bg-foreground/30 backdrop-blur-sm fade-in"
-      onClick={(e) => { if (e.target === e.currentTarget) setSearchOpen(false); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) setSearchOpen(false);
+      }}
     >
       <div className="bg-card w-full h-full md:h-auto md:border md:border-border md:max-w-2xl md:rounded-2xl md:shadow-2xl overflow-hidden flex flex-col md:max-h-[80vh] md:mx-4">
         {/* Search Header */}
@@ -83,15 +91,21 @@ export default function GlobalSearchModal() {
           {!query && (
             <div className="py-8 text-center text-muted-foreground">
               <Icon name="MagnifyingGlassIcon" size={32} className="mx-auto mb-2 opacity-40" />
-              <p className="text-sm font-medium">Type anything to search across {branding.appName}</p>
-              <p className="text-2xs text-muted-foreground mt-1">Search SKUs, barcodes, orders, customers, or module pages</p>
+              <p className="text-sm font-medium">
+                Type anything to search across {branding.appName}
+              </p>
+              <p className="text-2xs text-muted-foreground mt-1">
+                Search SKUs, barcodes, orders, customers, or module pages
+              </p>
             </div>
           )}
 
           {/* Products */}
           {matchedItems.length > 0 && (
             <div>
-              <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground px-2 mb-2">Inventory Products</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground px-2 mb-2">
+                Inventory Products
+              </p>
               <div className="space-y-1">
                 {matchedItems.map((item) => (
                   <Link
@@ -105,13 +119,21 @@ export default function GlobalSearchModal() {
                         {item.sku.slice(-3)}
                       </div>
                       <div className="truncate">
-                        <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
-                        <p className="text-2xs text-muted-foreground font-mono">{item.sku} · {item.category} · {item.store}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {item.name}
+                        </p>
+                        <p className="text-2xs text-muted-foreground font-mono">
+                          {item.sku} · {item.category} · {item.store}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <span className="text-sm font-semibold font-tabular">₹{item.sellingPrice.toLocaleString('en-IN')}</span>
-                      <p className="text-2xs text-muted-foreground font-tabular">{item.qtyOnHand} in stock</p>
+                      <span className="text-sm font-semibold font-tabular">
+                        ₹{item.sellingPrice.toLocaleString('en-IN')}
+                      </span>
+                      <p className="text-2xs text-muted-foreground font-tabular">
+                        {item.qtyOnHand} in stock
+                      </p>
                     </div>
                   </Link>
                 ))}
@@ -122,7 +144,9 @@ export default function GlobalSearchModal() {
           {/* Customers */}
           {matchedCustomers.length > 0 && (
             <div>
-              <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground px-2 mb-2">Customers</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground px-2 mb-2">
+                Customers
+              </p>
               <div className="space-y-1">
                 {matchedCustomers.map((cust) => (
                   <Link
@@ -136,8 +160,12 @@ export default function GlobalSearchModal() {
                         {cust.name[0]}
                       </div>
                       <div className="truncate">
-                        <p className="text-sm font-semibold text-foreground truncate">{cust.name}</p>
-                        <p className="text-2xs text-muted-foreground">{cust.phone} · {cust.city}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {cust.name}
+                        </p>
+                        <p className="text-2xs text-muted-foreground">
+                          {cust.phone} · {cust.city}
+                        </p>
                       </div>
                     </div>
                     <span className="badge-info text-2xs">{cust.tier}</span>
@@ -150,7 +178,9 @@ export default function GlobalSearchModal() {
           {/* Sales */}
           {matchedSales.length > 0 && (
             <div>
-              <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground px-2 mb-2">Sales Orders</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground px-2 mb-2">
+                Sales Orders
+              </p>
               <div className="space-y-1">
                 {matchedSales.map((s) => (
                   <Link
@@ -164,22 +194,31 @@ export default function GlobalSearchModal() {
                         POS
                       </div>
                       <div className="truncate">
-                        <p className="text-sm font-semibold text-foreground truncate">{s.orderNo} — {s.customerName}</p>
-                        <p className="text-2xs text-muted-foreground">{s.createdAt} · {s.store}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {s.orderNo} — {s.customerName}
+                        </p>
+                        <p className="text-2xs text-muted-foreground">
+                          {s.createdAt} · {s.store}
+                        </p>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-foreground font-tabular">₹{s.total.toLocaleString('en-IN')}</span>
+                    <span className="text-sm font-bold text-foreground font-tabular">
+                      ₹{s.total.toLocaleString('en-IN')}
+                    </span>
                   </Link>
                 ))}
               </div>
             </div>
           )}
 
-          {query && matchedItems.length === 0 && matchedCustomers.length === 0 && matchedSales.length === 0 && (
-            <div className="py-8 text-center text-muted-foreground">
-              <p className="text-sm font-medium">No results found for &quot;{query}&quot;</p>
-            </div>
-          )}
+          {query &&
+            matchedItems.length === 0 &&
+            matchedCustomers.length === 0 &&
+            matchedSales.length === 0 && (
+              <div className="py-8 text-center text-muted-foreground">
+                <p className="text-sm font-medium">No results found for &quot;{query}&quot;</p>
+              </div>
+            )}
         </div>
 
         {/* Footer */}

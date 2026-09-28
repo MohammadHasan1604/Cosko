@@ -23,7 +23,9 @@ export default function DataConnectionsPage() {
   const [readTimeout, setReadTimeout] = useState(3000);
 
   // Status & Health State
-  const [status, setStatus] = useState<'Connected' | 'Not Configured' | 'Connection Failed' | 'Disabled'>('Connected');
+  const [status, setStatus] = useState<
+    'Connected' | 'Not Configured' | 'Connection Failed' | 'Disabled'
+  >('Connected');
   const [latencyMs, setLatencyMs] = useState(12);
   const [lastCheckedAt, setLastCheckedAt] = useState<string>(new Date().toISOString());
   const [passwordConfigured, setPasswordConfigured] = useState(true);
@@ -194,7 +196,9 @@ export default function DataConnectionsPage() {
           <Icon name="ShieldExclamationIcon" className="w-12 h-12 text-destructive mx-auto" />
           <h2 className="text-xl font-bold text-foreground">Access Denied (403 Forbidden)</h2>
           <p className="text-sm text-muted-foreground">
-            Data Connections management is classified as <span className="font-semibold text-foreground">SUPER_ADMIN_ONLY</span>. Your account does not have sufficient security clearance (Level 100).
+            Data Connections management is classified as{' '}
+            <span className="font-semibold text-foreground">SUPER_ADMIN_ONLY</span>. Your account
+            does not have sufficient security clearance (Level 100).
           </p>
           <Link href="/settings" className="btn-primary text-xs py-2 px-4 inline-block">
             Return to Settings
@@ -211,20 +215,21 @@ export default function DataConnectionsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-              <Link href="/settings" className="hover:text-foreground">Settings</Link>
+              <Link href="/settings" className="hover:text-foreground">
+                Settings
+              </Link>
               <span>/</span>
               <span className="text-foreground font-medium">Data Connections</span>
             </div>
             <div className="flex items-center gap-2">
-              <h1 className="page-title">
-                External Data Connections
-              </h1>
+              <h1 className="page-title">External Data Connections</h1>
               <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-primary/10 text-primary border border-primary/20">
                 Super Admin Only
               </span>
             </div>
             <p className="page-subtitle">
-              Securely configure read-only database connections to query historical customer and service records without modifying legacy sources.
+              Securely configure read-only database connections to query historical customer and
+              service records without modifying legacy sources.
             </p>
           </div>
 
@@ -255,17 +260,25 @@ export default function DataConnectionsPage() {
                 <Icon name="CircleStackIcon" className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-foreground">Legacy Customer & Repair Database</h3>
-                <span className="text-xs text-muted-foreground font-mono">{host}:{port} · DB: {databaseName}</span>
+                <h3 className="text-base font-bold text-foreground">
+                  Legacy Customer & Repair Database
+                </h3>
+                <span className="text-xs text-muted-foreground font-mono">
+                  {host}:{port} · DB: {databaseName}
+                </span>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${
-                status === 'Connected' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' :
-                status === 'Disabled' ? 'bg-secondary text-muted-foreground border-border' :
-                'bg-destructive/10 text-destructive border-destructive/20'
-              }`}>
+              <span
+                className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${
+                  status === 'Connected'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                    : status === 'Disabled'
+                      ? 'bg-secondary text-muted-foreground border-border'
+                      : 'bg-destructive/10 text-destructive border-destructive/20'
+                }`}
+              >
                 <span className="w-2 h-2 rounded-full bg-current animate-pulse"></span>
                 {status}
               </span>
@@ -282,7 +295,9 @@ export default function DataConnectionsPage() {
             </div>
             <div className="p-3 bg-secondary/40 rounded-xl space-y-0.5">
               <span className="text-muted-foreground block">Read-Only Guard</span>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">ENFORCED (No Writes)</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                ENFORCED (No Writes)
+              </span>
             </div>
             <div className="p-3 bg-secondary/40 rounded-xl space-y-0.5">
               <span className="text-muted-foreground block">Driver & Engine</span>
@@ -304,13 +319,17 @@ export default function DataConnectionsPage() {
               <Icon name="KeyIcon" className="w-5 h-5 text-primary" />
               <span>Server-Side Database Credentials</span>
             </h2>
-            <span className="text-xs text-muted-foreground">Credentials are encrypted at rest & never exposed to client</span>
+            <span className="text-xs text-muted-foreground">
+              Credentials are encrypted at rest & never exposed to client
+            </span>
           </div>
 
           <form onSubmit={handleSaveConnection} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Connection Label</label>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Connection Label
+                </label>
                 <input
                   type="text"
                   required
@@ -321,7 +340,9 @@ export default function DataConnectionsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Database Engine</label>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Database Engine
+                </label>
                 <select
                   value={dbType}
                   onChange={(e) => setDbType(e.target.value)}
@@ -335,7 +356,9 @@ export default function DataConnectionsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-foreground mb-1">Host / Endpoint</label>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Host / Endpoint
+                </label>
                 <input
                   type="text"
                   required
@@ -360,7 +383,9 @@ export default function DataConnectionsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Database Name</label>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Database Name
+                </label>
                 <input
                   type="text"
                   required
@@ -371,7 +396,9 @@ export default function DataConnectionsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Username (SELECT-only recommended)</label>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Username (SELECT-only recommended)
+                </label>
                 <input
                   type="text"
                   required
@@ -385,7 +412,9 @@ export default function DataConnectionsPage() {
                 <label className="block text-xs font-semibold text-foreground mb-1">Password</label>
                 <input
                   type="password"
-                  placeholder={passwordConfigured ? '•••••••••••• (Configured)' : 'Enter database password'}
+                  placeholder={
+                    passwordConfigured ? '•••••••••••• (Configured)' : 'Enter database password'
+                  }
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-xl text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -395,7 +424,9 @@ export default function DataConnectionsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-border/50">
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">SSL / TLS Mode</label>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  SSL / TLS Mode
+                </label>
                 <select
                   value={sslMode}
                   onChange={(e) => setSslMode(e.target.value)}
@@ -408,7 +439,9 @@ export default function DataConnectionsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Connect Timeout</label>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Connect Timeout
+                </label>
                 <select
                   value={connectionTimeout}
                   onChange={(e) => setConnectionTimeout(Number(e.target.value))}
@@ -421,7 +454,9 @@ export default function DataConnectionsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Read Timeout</label>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Read Timeout
+                </label>
                 <select
                   value={readTimeout}
                   onChange={(e) => setReadTimeout(Number(e.target.value))}
@@ -481,24 +516,37 @@ export default function DataConnectionsPage() {
                   <Icon name="CheckCircleIcon" className="w-4 h-4" />
                   <span>Connection Successful</span>
                 </div>
-                <p>READ ONLY mode confirmed. All historical customer and repair data will be read without modifications.</p>
+                <p>
+                  READ ONLY mode confirmed. All historical customer and repair data will be read
+                  without modifications.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="p-3 bg-secondary/50 rounded-xl">
                   <span className="text-muted-foreground block text-[11px]">Database Host</span>
-                  <span className="font-mono font-bold text-foreground">{testResultModal.host}</span>
+                  <span className="font-mono font-bold text-foreground">
+                    {testResultModal.host}
+                  </span>
                 </div>
                 <div className="p-3 bg-secondary/50 rounded-xl">
                   <span className="text-muted-foreground block text-[11px]">Selected DB</span>
-                  <span className="font-mono font-bold text-foreground">{testResultModal.database}</span>
+                  <span className="font-mono font-bold text-foreground">
+                    {testResultModal.database}
+                  </span>
                 </div>
                 <div className="p-3 bg-secondary/50 rounded-xl">
-                  <span className="text-muted-foreground block text-[11px]">Round-Trip Latency</span>
-                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{testResultModal.latencyMs} ms</span>
+                  <span className="text-muted-foreground block text-[11px]">
+                    Round-Trip Latency
+                  </span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    {testResultModal.latencyMs} ms
+                  </span>
                 </div>
                 <div className="p-3 bg-secondary/50 rounded-xl">
-                  <span className="text-muted-foreground block text-[11px]">Access Verification</span>
+                  <span className="text-muted-foreground block text-[11px]">
+                    Access Verification
+                  </span>
                   <span className="font-bold text-foreground">SELECT-Only OK</span>
                 </div>
               </div>
@@ -507,16 +555,29 @@ export default function DataConnectionsPage() {
                 <span className="text-muted-foreground block text-[11px]">Detected Tables:</span>
                 <div className="flex flex-wrap gap-1 font-mono text-[11px]">
                   {testResultModal.detectedCustomerTables.map((t: string) => (
-                    <span key={t} className="px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">{t}</span>
+                    <span
+                      key={t}
+                      className="px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20"
+                    >
+                      {t}
+                    </span>
                   ))}
                   {testResultModal.detectedRepairTables.map((t: string) => (
-                    <span key={t} className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">{t}</span>
+                    <span
+                      key={t}
+                      className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                    >
+                      {t}
+                    </span>
                   ))}
                 </div>
               </div>
 
               <div className="flex justify-end pt-2 border-t border-border">
-                <button onClick={() => setTestResultModal(null)} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-xs">
+                <button
+                  onClick={() => setTestResultModal(null)}
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-xs"
+                >
                   Close Diagnostics
                 </button>
               </div>
@@ -535,9 +596,14 @@ export default function DataConnectionsPage() {
           >
             <div className="space-y-4 py-2 text-xs">
               {discoverModal.map((table: any) => (
-                <div key={table.tableName} className="p-4 rounded-xl bg-card border border-border space-y-2">
+                <div
+                  key={table.tableName}
+                  className="p-4 rounded-xl bg-card border border-border space-y-2"
+                >
                   <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-sm text-foreground">{table.tableName}</span>
+                    <span className="font-mono font-bold text-sm text-foreground">
+                      {table.tableName}
+                    </span>
                     <span className="px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground text-[11px]">
                       {table.type} · {table.rowCount.toLocaleString()} rows
                     </span>
@@ -545,14 +611,22 @@ export default function DataConnectionsPage() {
                   <div className="text-muted-foreground text-[11px]">Available Columns:</div>
                   <div className="flex flex-wrap gap-1 font-mono text-[11px]">
                     {table.columns.map((col: string) => (
-                      <span key={col} className="px-2 py-0.5 rounded bg-secondary/80 text-foreground border border-border/60">{col}</span>
+                      <span
+                        key={col}
+                        className="px-2 py-0.5 rounded bg-secondary/80 text-foreground border border-border/60"
+                      >
+                        {col}
+                      </span>
                     ))}
                   </div>
                 </div>
               ))}
 
               <div className="flex justify-end pt-2 border-t border-border">
-                <button onClick={() => setDiscoverModal(null)} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-xs">
+                <button
+                  onClick={() => setDiscoverModal(null)}
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-xs"
+                >
                   Done
                 </button>
               </div>
@@ -578,7 +652,9 @@ export default function DataConnectionsPage() {
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Full Name Column</label>
+                    <label className="text-[11px] text-muted-foreground block mb-1">
+                      Full Name Column
+                    </label>
                     <input
                       type="text"
                       value={custNameCol}
@@ -587,7 +663,9 @@ export default function DataConnectionsPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Phone / Mobile</label>
+                    <label className="text-[11px] text-muted-foreground block mb-1">
+                      Phone / Mobile
+                    </label>
                     <input
                       type="text"
                       value={custPhoneCol}
@@ -605,7 +683,9 @@ export default function DataConnectionsPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">City / Location</label>
+                    <label className="text-[11px] text-muted-foreground block mb-1">
+                      City / Location
+                    </label>
                     <input
                       type="text"
                       value={custCityCol}
@@ -624,7 +704,9 @@ export default function DataConnectionsPage() {
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Ticket Reference</label>
+                    <label className="text-[11px] text-muted-foreground block mb-1">
+                      Ticket Reference
+                    </label>
                     <input
                       type="text"
                       value={repTicketCol}
@@ -633,7 +715,9 @@ export default function DataConnectionsPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Device / Model</label>
+                    <label className="text-[11px] text-muted-foreground block mb-1">
+                      Device / Model
+                    </label>
                     <input
                       type="text"
                       value={repDeviceCol}
@@ -642,7 +726,9 @@ export default function DataConnectionsPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Problem / Symptom</label>
+                    <label className="text-[11px] text-muted-foreground block mb-1">
+                      Problem / Symptom
+                    </label>
                     <input
                       type="text"
                       value={repIssueCol}
@@ -651,7 +737,9 @@ export default function DataConnectionsPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Status Column</label>
+                    <label className="text-[11px] text-muted-foreground block mb-1">
+                      Status Column
+                    </label>
                     <input
                       type="text"
                       value={repStatusCol}
@@ -673,8 +761,12 @@ export default function DataConnectionsPage() {
                     <div className="p-3 bg-card rounded-lg border border-border space-y-1">
                       <span className="font-bold text-foreground block">Customer Preview:</span>
                       <div>Name: {mappingPreview.customer.coskoInterpretation.name}</div>
-                      <div>Mobile: {mappingPreview.customer.coskoInterpretation.canonical_mobile}</div>
-                      <div>Link Status: {mappingPreview.customer.coskoInterpretation.link_status}</div>
+                      <div>
+                        Mobile: {mappingPreview.customer.coskoInterpretation.canonical_mobile}
+                      </div>
+                      <div>
+                        Link Status: {mappingPreview.customer.coskoInterpretation.link_status}
+                      </div>
                     </div>
                     <div className="p-3 bg-card rounded-lg border border-border space-y-1">
                       <span className="font-bold text-foreground block">Repair Preview:</span>

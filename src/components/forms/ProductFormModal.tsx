@@ -12,6 +12,7 @@ import BrandModal from './BrandModal';
 import CustomSelect, { SelectOption } from '@/components/ui/CustomSelect';
 import NumericInput from '@/components/ui/NumericInput';
 import { toast } from 'sonner';
+import { StorageService } from '@/lib/storageService';
 
 interface ProductFormModalProps {
   open: boolean;
@@ -21,8 +22,23 @@ interface ProductFormModalProps {
   zIndex?: number;
 }
 
-export default function ProductFormModal({ open, onClose, editItem, onSuccess, zIndex = 100 }: ProductFormModalProps) {
-  const { addItem, updateItem, addAuditLog, storesList, categoriesList, vendors, brands, confirmAction } = useApp();
+export default function ProductFormModal({
+  open,
+  onClose,
+  editItem,
+  onSuccess,
+  zIndex = 100,
+}: ProductFormModalProps) {
+  const {
+    addItem,
+    updateItem,
+    addAuditLog,
+    storesList,
+    categoriesList,
+    vendors,
+    brands,
+    confirmAction,
+  } = useApp();
 
   const [images, setImages] = useState<string[]>([]);
   const [primaryImage, setPrimaryImage] = useState<string>('');
@@ -118,22 +134,47 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
           vendor: (editItem as any)?.vendor || '',
           description: editItem.description || '',
           store: editItem.store || 'CENTRAL',
-          qtyOnHand: editItem.qtyOnHand !== undefined && editItem.qtyOnHand !== null ? editItem.qtyOnHand : ('' as unknown as number),
-          reorderPt: editItem.reorderPt !== undefined && editItem.reorderPt !== null ? editItem.reorderPt : ('' as unknown as number),
-          minStock: editItem.minStock !== undefined && editItem.minStock !== null ? editItem.minStock : ('' as unknown as number),
-          costPrice: editItem.costPrice !== undefined && editItem.costPrice !== null ? editItem.costPrice : ('' as unknown as number),
-          sellingPrice: editItem.sellingPrice !== undefined && editItem.sellingPrice !== null ? editItem.sellingPrice : ('' as unknown as number),
-          mrp: editItem.mrp !== undefined && editItem.mrp !== null ? editItem.mrp : ('' as unknown as number),
+          qtyOnHand:
+            editItem.qtyOnHand !== undefined && editItem.qtyOnHand !== null
+              ? editItem.qtyOnHand
+              : ('' as unknown as number),
+          reorderPt:
+            editItem.reorderPt !== undefined && editItem.reorderPt !== null
+              ? editItem.reorderPt
+              : ('' as unknown as number),
+          minStock:
+            editItem.minStock !== undefined && editItem.minStock !== null
+              ? editItem.minStock
+              : ('' as unknown as number),
+          costPrice:
+            editItem.costPrice !== undefined && editItem.costPrice !== null
+              ? editItem.costPrice
+              : ('' as unknown as number),
+          sellingPrice:
+            editItem.sellingPrice !== undefined && editItem.sellingPrice !== null
+              ? editItem.sellingPrice
+              : ('' as unknown as number),
+          mrp:
+            editItem.mrp !== undefined && editItem.mrp !== null
+              ? editItem.mrp
+              : ('' as unknown as number),
           hsn: editItem.hsn || '',
-          taxRate: editItem.taxRate !== undefined && editItem.taxRate !== null ? editItem.taxRate : ('' as unknown as number),
-          warrantyMonths: editItem.warrantyMonths !== undefined && editItem.warrantyMonths !== null ? editItem.warrantyMonths : ('' as unknown as number),
+          taxRate:
+            editItem.taxRate !== undefined && editItem.taxRate !== null
+              ? editItem.taxRate
+              : ('' as unknown as number),
+          warrantyMonths:
+            editItem.warrantyMonths !== undefined && editItem.warrantyMonths !== null
+              ? editItem.warrantyMonths
+              : ('' as unknown as number),
           status: (editItem.status as any) || 'active',
         });
-        const existingImages = editItem.images && editItem.images.length > 0
-          ? editItem.images
-          : editItem.imageUrl
-          ? [editItem.imageUrl]
-          : [];
+        const existingImages =
+          editItem.images && editItem.images.length > 0
+            ? editItem.images
+            : editItem.imageUrl
+              ? [editItem.imageUrl]
+              : [];
         setImages(existingImages);
         setPrimaryImage(editItem.primaryImage || editItem.imageUrl || existingImages[0] || '');
       } else {
@@ -182,7 +223,7 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
     const maxSize = 5 * 1024 * 1024;
 
-    files.forEach((file) => {
+    files.forEach(async (file) => {
       if (!allowedTypes.includes(file.type)) {
         toast.error(`Invalid image format (${file.name})! Upload PNG, JPG, or WebP.`);
         return;
@@ -192,17 +233,19 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        setImages((prev) => {
-          const updated = [...prev, result];
-          if (!primaryImage) setPrimaryImage(result);
-          return updated;
-        });
-        toast.success(`Uploaded product image: ${file.name}`);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const uploadResult = await StorageService.uploadFile('product-images', file, file.name);
+        if (uploadResult.url) {
+          setImages((prev) => {
+            const updated = [...prev, uploadResult.url];
+            if (!primaryImage) setPrimaryImage(uploadResult.url);
+            return updated;
+          });
+          toast.success(`Uploaded product image: ${file.name}`);
+        }
+      } catch (err: any) {
+        toast.error(`Failed to upload ${file.name}: ${err.message}`);
+      }
     });
   };
 
@@ -214,6 +257,10 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
       }
       return updated;
     });
+    if (imgUrl.includes('/uploads/product-images/') || imgUrl.startsWith('product-images/')) {
+      const key = imgUrl.replace(/^\/uploads\//, '');
+      StorageService.deleteFile('product-images', key).catch(console.error);
+    }
     toast.info('Product image removed.');
   };
 
@@ -235,12 +282,22 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
       return;
     }
 
-    if (formData.costPrice === ('' as unknown as number) || formData.costPrice === undefined || formData.costPrice === null || isNaN(Number(formData.costPrice))) {
+    if (
+      formData.costPrice === ('' as unknown as number) ||
+      formData.costPrice === undefined ||
+      formData.costPrice === null ||
+      isNaN(Number(formData.costPrice))
+    ) {
       toast.error('Cost Price is required. Please enter a valid number.');
       return;
     }
 
-    if (formData.sellingPrice === ('' as unknown as number) || formData.sellingPrice === undefined || formData.sellingPrice === null || isNaN(Number(formData.sellingPrice))) {
+    if (
+      formData.sellingPrice === ('' as unknown as number) ||
+      formData.sellingPrice === undefined ||
+      formData.sellingPrice === null ||
+      isNaN(Number(formData.sellingPrice))
+    ) {
       toast.error('Selling Price is required. Please enter a valid number.');
       return;
     }
@@ -258,12 +315,42 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
       costPrice: Number(formData.costPrice),
       transferPrice: Number(formData.costPrice),
       sellingPrice: Number(formData.sellingPrice),
-      mrp: formData.mrp !== ('' as unknown as number) && formData.mrp !== undefined && formData.mrp !== null ? Number(formData.mrp) : undefined,
-      qtyOnHand: formData.qtyOnHand !== ('' as unknown as number) && formData.qtyOnHand !== undefined && formData.qtyOnHand !== null ? Number(formData.qtyOnHand) : 0,
-      reorderPt: formData.reorderPt !== ('' as unknown as number) && formData.reorderPt !== undefined && formData.reorderPt !== null ? Number(formData.reorderPt) : 5,
-      minStock: formData.minStock !== ('' as unknown as number) && formData.minStock !== undefined && formData.minStock !== null ? Number(formData.minStock) : 10,
-      taxRate: formData.taxRate !== ('' as unknown as number) && formData.taxRate !== undefined && formData.taxRate !== null ? Number(formData.taxRate) : 0,
-      warrantyMonths: formData.warrantyMonths !== ('' as unknown as number) && formData.warrantyMonths !== undefined && formData.warrantyMonths !== null ? Number(formData.warrantyMonths) : 0,
+      mrp:
+        formData.mrp !== ('' as unknown as number) &&
+        formData.mrp !== undefined &&
+        formData.mrp !== null
+          ? Number(formData.mrp)
+          : undefined,
+      qtyOnHand:
+        formData.qtyOnHand !== ('' as unknown as number) &&
+        formData.qtyOnHand !== undefined &&
+        formData.qtyOnHand !== null
+          ? Number(formData.qtyOnHand)
+          : 0,
+      reorderPt:
+        formData.reorderPt !== ('' as unknown as number) &&
+        formData.reorderPt !== undefined &&
+        formData.reorderPt !== null
+          ? Number(formData.reorderPt)
+          : 5,
+      minStock:
+        formData.minStock !== ('' as unknown as number) &&
+        formData.minStock !== undefined &&
+        formData.minStock !== null
+          ? Number(formData.minStock)
+          : 10,
+      taxRate:
+        formData.taxRate !== ('' as unknown as number) &&
+        formData.taxRate !== undefined &&
+        formData.taxRate !== null
+          ? Number(formData.taxRate)
+          : 0,
+      warrantyMonths:
+        formData.warrantyMonths !== ('' as unknown as number) &&
+        formData.warrantyMonths !== undefined &&
+        formData.warrantyMonths !== null
+          ? Number(formData.warrantyMonths)
+          : 0,
       fifoLots: 1,
       lastMovement: 'Created',
       images,
@@ -296,7 +383,11 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
     try {
       if (editItem) {
         await updateItem(editItem.id, payload);
-        addAuditLog('Inventory', 'Update Product', `Updated product: ${payload.name} (${payload.sku})`);
+        addAuditLog(
+          'Inventory',
+          'Update Product',
+          `Updated product: ${payload.name} (${payload.sku})`
+        );
         toast.success(`Product "${payload.name}" updated successfully!`);
         if (onSuccess) onSuccess({ ...editItem, ...payload } as InventoryItem);
       } else {
@@ -304,7 +395,11 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
           ...payload,
           store: payload.store || 'CENTRAL',
         });
-        addAuditLog('Inventory', 'Add Product', `Created new catalog SKU: ${payload.name} (${payload.sku})`);
+        addAuditLog(
+          'Inventory',
+          'Add Product',
+          `Created new catalog SKU: ${payload.name} (${payload.sku})`
+        );
         toast.success(`Product "${payload.name}" added to catalog!`);
         if (onSuccess && created) onSuccess(created);
       }
@@ -322,7 +417,11 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
         open={open}
         onClose={onClose}
         title={editItem ? `Edit Product: ${editItem.name}` : 'Create New Product Record'}
-        subtitle={editItem ? `SKU: ${editItem.sku}` : 'Master product catalog and store inventory definition'}
+        subtitle={
+          editItem
+            ? `SKU: ${editItem.sku}`
+            : 'Master product catalog and store inventory definition'
+        }
         size="lg"
         zIndex={zIndex}
       >
@@ -390,7 +489,9 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
               </div>
 
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Model / Specs</label>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  Model / Specs
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. A2890, Super Retina XDR"
@@ -520,10 +621,22 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
               </div>
 
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">GST Tax Rate (%)</label>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  GST Tax Rate (%)
+                </label>
                 <select
-                  value={formData.taxRate !== undefined && formData.taxRate !== ('' as unknown as number) ? formData.taxRate : ''}
-                  onChange={(e) => setFormData({ ...formData, taxRate: e.target.value === '' ? ('' as unknown as number) : Number(e.target.value) })}
+                  value={
+                    formData.taxRate !== undefined && formData.taxRate !== ('' as unknown as number)
+                      ? formData.taxRate
+                      : ''
+                  }
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      taxRate:
+                        e.target.value === '' ? ('' as unknown as number) : Number(e.target.value),
+                    })
+                  }
                   className="input-field text-xs font-medium"
                 >
                   <option value="">Select GST Rate...</option>
@@ -538,7 +651,9 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">HSN / SAC Code</label>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  HSN / SAC Code
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. 85177090"
@@ -548,7 +663,9 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Warranty (Months)</label>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  Warranty (Months)
+                </label>
                 <NumericInput
                   min={0}
                   step="1"
@@ -598,7 +715,9 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
               </div>
 
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Reorder Alert Qty</label>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  Reorder Alert Qty
+                </label>
                 <NumericInput
                   min={0}
                   step="1"
@@ -611,7 +730,9 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
               </div>
 
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Min Target Stock</label>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  Min Target Stock
+                </label>
                 <NumericInput
                   min={0}
                   step="1"
@@ -645,7 +766,10 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
             {images.length > 0 ? (
               <div className="flex items-center gap-2 overflow-x-auto p-2 border border-border rounded-xl bg-muted/20">
                 {images.map((img, idx) => (
-                  <div key={`img-${idx}`} className="relative group w-14 h-14 rounded-lg overflow-hidden border border-border shrink-0">
+                  <div
+                    key={`img-${idx}`}
+                    className="relative group w-14 h-14 rounded-lg overflow-hidden border border-border shrink-0"
+                  >
                     <img src={img} alt="Product" className="w-full h-full object-cover" />
                     <button
                       type="button"
@@ -686,11 +810,7 @@ export default function ProductFormModal({ open, onClose, editItem, onSuccess, z
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              className="btn-primary text-xs gap-1.5"
-              disabled={isSubmitting}
-            >
+            <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />

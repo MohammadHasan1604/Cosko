@@ -14,7 +14,10 @@ export async function POST(req: NextRequest) {
     const user = auth.user;
 
     if (user.role !== 'Super Admin' || user.securityLevel < 100) {
-      return NextResponse.json({ error: 'Forbidden: Super Admin Level 100 authorization required' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Super Admin Level 100 authorization required' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
@@ -63,9 +66,13 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /api/settings/data-connections/test error:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Cannot reach server or authentication failed. Verify host, port, and read-only credentials.',
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          'Cannot reach server or authentication failed. Verify host, port, and read-only credentials.',
+      },
+      { status: 500 }
+    );
   }
 }

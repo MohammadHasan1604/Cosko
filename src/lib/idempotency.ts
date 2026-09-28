@@ -44,7 +44,12 @@ export function extractIdempotencyKey(req: NextRequest, body?: any): string | nu
   if (headerKey && headerKey.trim()) {
     return headerKey.trim();
   }
-  if (body && typeof body === 'object' && body.idempotencyKey && String(body.idempotencyKey).trim()) {
+  if (
+    body &&
+    typeof body === 'object' &&
+    body.idempotencyKey &&
+    String(body.idempotencyKey).trim()
+  ) {
     return String(body.idempotencyKey).trim();
   }
   return null;
@@ -56,13 +61,16 @@ export function extractIdempotencyKey(req: NextRequest, body?: any): string | nu
 export async function executeWithIdempotency<T = any>(
   req: NextRequest,
   options: IdempotencyOptions,
-  handler: (idempotencyKey: string) => Promise<{ status?: number; data: T; headers?: Record<string, string> }>
+  handler: (
+    idempotencyKey: string
+  ) => Promise<{ status?: number; data: T; headers?: Record<string, string> }>
 ): Promise<NextResponse> {
   cleanMemoryCache();
 
   const providedKey = options.key || extractIdempotencyKey(req);
   // If no key provided, generate one to safeguard the request
-  const idempotencyKey = providedKey || `gen_${options.action}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const idempotencyKey =
+    providedKey || `gen_${options.action}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
   const ttlSeconds = options.ttlSeconds || 86400; // 24 hours default
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
@@ -98,7 +106,8 @@ export async function executeWithIdempotency<T = any>(
         return NextResponse.json(
           {
             success: false,
-            error: 'Duplicate request detected: This action is currently being processed. Please wait...',
+            error:
+              'Duplicate request detected: This action is currently being processed. Please wait...',
             isProcessing: true,
           },
           { status: 409, headers: { 'Retry-After': '2' } }
@@ -162,7 +171,8 @@ export async function executeWithIdempotency<T = any>(
       return NextResponse.json(
         {
           success: false,
-          error: 'Transaction in progress: A request with this transaction key is already being processed.',
+          error:
+            'Transaction in progress: A request with this transaction key is already being processed.',
           isProcessing: true,
         },
         { status: 409, headers: { 'Retry-After': '3' } }

@@ -5,7 +5,13 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApp } from '@/context/AppContext';
 import { isWithinDatePeriod } from '@/lib/dateUtils';
 
-const COLORS = ['var(--primary)', 'var(--positive)', 'var(--accent)', 'var(--warning)', 'var(--muted-foreground)'];
+const COLORS = [
+  'var(--primary)',
+  'var(--positive)',
+  'var(--accent)',
+  'var(--warning)',
+  'var(--muted-foreground)',
+];
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -18,7 +24,9 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   return (
     <div className="bg-card border border-border rounded-xl shadow-modal px-3 py-2.5 text-sm">
       <p className="font-semibold text-foreground">{item.name}</p>
-      <p className="text-muted-foreground text-xs">{item.value}% · {item.payload.amount}</p>
+      <p className="text-muted-foreground text-xs">
+        {item.value}% · {item.payload.amount}
+      </p>
     </div>
   );
 };
@@ -94,9 +102,14 @@ export default function PaymentMethodsChart() {
       <div className="flex-1 space-y-1.5">
         {data.map((item, idx) => (
           <div key={`legend-${item.method}`} className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: COLORS[idx % COLORS.length] }}
+            />
             <span className="text-xs text-muted-foreground flex-1">{item.method}</span>
-            <span className="text-xs font-semibold text-foreground font-tabular">{item.displayPct}%</span>
+            <span className="text-xs font-semibold text-foreground font-tabular">
+              {item.displayPct}%
+            </span>
           </div>
         ))}
       </div>

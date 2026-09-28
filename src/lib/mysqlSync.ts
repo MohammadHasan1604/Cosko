@@ -1,7 +1,7 @@
 /**
  * COSKO Enterprise System — MySQL & Prisma Synchronizer Service
  * Manages client-to-backend database operations and synchronization.
- * 
+ *
  * IMPORTANT: Every function makes a real API call to persist data in MySQL.
  * All mutations go through authenticated API routes that use Prisma ORM to write
  * directly to the authoritative production MySQL database.
@@ -126,7 +126,6 @@ async function apiCall<T = any>(
   return executeCall;
 }
 
-
 export const MySQLDataService = {
   getSystemHealth() {
     return {
@@ -138,7 +137,10 @@ export const MySQLDataService = {
 
   // ─── FETCH AUTHORITATIVE DATA ────────────────────────
   async fetchInventory(store?: string) {
-    const url = store && store !== 'All Stores' ? `/api/inventory?store=${encodeURIComponent(store)}` : '/api/inventory';
+    const url =
+      store && store !== 'All Stores'
+        ? `/api/inventory?store=${encodeURIComponent(store)}`
+        : '/api/inventory';
     return apiCall(url, 'GET');
   },
 
@@ -164,7 +166,10 @@ export const MySQLDataService = {
   },
 
   async fetchExpenses(store?: string) {
-    const url = store && store !== 'All Stores' ? `/api/expenses?store=${encodeURIComponent(store)}` : '/api/expenses';
+    const url =
+      store && store !== 'All Stores'
+        ? `/api/expenses?store=${encodeURIComponent(store)}`
+        : '/api/expenses';
     return apiCall(url, 'GET');
   },
 
@@ -173,7 +178,10 @@ export const MySQLDataService = {
   },
 
   async fetchSales(store?: string) {
-    const url = store && store !== 'All Stores' ? `/api/sales?store=${encodeURIComponent(store)}` : '/api/sales';
+    const url =
+      store && store !== 'All Stores'
+        ? `/api/sales?store=${encodeURIComponent(store)}`
+        : '/api/sales';
     return apiCall(url, 'GET');
   },
 
@@ -197,7 +205,8 @@ export const MySQLDataService = {
       mrp: item.mrp,
       taxRate: item.taxRate,
       warrantyMonths: item.warrantyMonths,
-      imageUrl: item.imageUrl || item.primaryImage || (Array.isArray(item.images) ? item.images[0] : null),
+      imageUrl:
+        item.imageUrl || item.primaryImage || (Array.isArray(item.images) ? item.images[0] : null),
       status: item.status,
       store: item.store,
       qtyOnHand: item.qtyOnHand,
@@ -223,7 +232,8 @@ export const MySQLDataService = {
       mrp: item.mrp,
       taxRate: item.taxRate,
       warrantyMonths: item.warrantyMonths,
-      imageUrl: item.imageUrl || item.primaryImage || (Array.isArray(item.images) ? item.images[0] : null),
+      imageUrl:
+        item.imageUrl || item.primaryImage || (Array.isArray(item.images) ? item.images[0] : null),
       status: item.status,
       store: item.store,
       qtyOnHand: item.qtyOnHand,
@@ -233,7 +243,10 @@ export const MySQLDataService = {
   },
 
   async deleteProduct(id: string, permanent = false) {
-    return apiCall(`/api/inventory?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`, 'DELETE');
+    return apiCall(
+      `/api/inventory?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`,
+      'DELETE'
+    );
   },
 
   // ─── STORES ──────────────────────────────────────────
@@ -252,7 +265,10 @@ export const MySQLDataService = {
   },
 
   async deleteStore(id: string, permanent = false) {
-    return apiCall(`/api/stores?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`, 'DELETE');
+    return apiCall(
+      `/api/stores?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`,
+      'DELETE'
+    );
   },
 
   // ─── STOCK TRANSFERS ─────────────────────────────────
@@ -328,7 +344,10 @@ export const MySQLDataService = {
   },
 
   async deleteCustomer(id: string, permanent = false) {
-    return apiCall(`/api/customers?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`, 'DELETE');
+    return apiCall(
+      `/api/customers?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`,
+      'DELETE'
+    );
   },
 
   // ─── VENDORS ─────────────────────────────────────────
@@ -365,7 +384,10 @@ export const MySQLDataService = {
   },
 
   async deleteVendor(id: string, permanent = false) {
-    return apiCall(`/api/vendors?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`, 'DELETE');
+    return apiCall(
+      `/api/vendors?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`,
+      'DELETE'
+    );
   },
 
   // ─── EXPENSES ────────────────────────────────────────
@@ -409,30 +431,6 @@ export const MySQLDataService = {
     if (params?.store && params.store !== 'All Stores') q.append('store', params.store);
     const qs = q.toString();
     return apiCall(`/api/repairs${qs ? `?${qs}` : ''}`, 'GET');
-  },
-
-  async createRepair(repair: any) {
-    return apiCall('/api/repairs', 'POST', {
-      customerName: repair.customerName,
-      customerPhone: repair.customerPhone,
-      deviceType: repair.deviceType || 'Mobile',
-      deviceName: repair.deviceName,
-      issueDescription: repair.issueDescription,
-      estimatedCost: repair.estimatedCost,
-      status: repair.status || 'Pending Diagnosis',
-      assignedTech: repair.assignedTech,
-      technicianNotes: repair.technicianNotes,
-      storeCode: repair.storeCode || repair.store || 'CENTRAL',
-    });
-  },
-
-  async updateRepair(idOrRepair: string | any, updated?: any) {
-    const payload = typeof idOrRepair === 'string' ? { id: idOrRepair, ...updated } : idOrRepair;
-    return apiCall('/api/repairs', 'PUT', payload);
-  },
-
-  async deleteRepair(id: string) {
-    return apiCall(`/api/repairs?id=${encodeURIComponent(id)}`, 'DELETE');
   },
 
   // ─── SALES & TRANSFERS ───────────────────────────────
@@ -491,7 +489,12 @@ export const MySQLDataService = {
     return apiCall('/api/category-types', 'POST', type);
   },
 
-  async updateCategoryType(type: { id: string; name?: string; description?: string; color?: string }) {
+  async updateCategoryType(type: {
+    id: string;
+    name?: string;
+    description?: string;
+    color?: string;
+  }) {
     return apiCall('/api/category-types', 'PUT', type);
   },
 
@@ -528,7 +531,10 @@ export const MySQLDataService = {
   },
 
   async deleteCategory(id: string, permanent = false) {
-    return apiCall(`/api/categories?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`, 'DELETE');
+    return apiCall(
+      `/api/categories?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`,
+      'DELETE'
+    );
   },
 
   // ─── PAYMENT METHODS ────────────────────────────────
@@ -583,13 +589,27 @@ export const MySQLDataService = {
   },
 
   // Backward compatibility alias methods
-  syncProduct(item: any) { return this.createProduct(item); },
-  syncProfile(user: any) { return this.createProfile(user); },
-  syncCustomer(cust: any) { return this.createCustomer(cust); },
-  syncVendor(vendor: any) { return this.createVendor(vendor); },
-  syncExpense(expense: any) { return this.createExpense(expense); },
-  syncSale(sale: any) { return this.createSale(sale); },
-  syncPurchase(po: any) { return this.createPurchase(po); },
+  syncProduct(item: any) {
+    return this.createProduct(item);
+  },
+  syncProfile(user: any) {
+    return this.createProfile(user);
+  },
+  syncCustomer(cust: any) {
+    return this.createCustomer(cust);
+  },
+  syncVendor(vendor: any) {
+    return this.createVendor(vendor);
+  },
+  syncExpense(expense: any) {
+    return this.createExpense(expense);
+  },
+  syncSale(sale: any) {
+    return this.createSale(sale);
+  },
+  syncPurchase(po: any) {
+    return this.createPurchase(po);
+  },
   async syncAuditLog(log: any) {
     try {
       await fetch('/api/audit-logs', {

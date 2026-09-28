@@ -12,7 +12,15 @@ import PaymentProofUpload from '@/components/ui/PaymentProofUpload';
 import { toast } from 'sonner';
 
 export default function CustomersPage() {
-  const { customers, sales, repairsEnquiries, deleteCustomer, updateCustomer, addAuditLog, currentUser } = useApp();
+  const {
+    customers,
+    sales,
+    repairsEnquiries,
+    deleteCustomer,
+    updateCustomer,
+    addAuditLog,
+    currentUser,
+  } = useApp();
 
   const [registerModal, setRegisterModal] = useState(false);
   const [editCustomerModal, setEditCustomerModal] = useState<Customer | null>(null);
@@ -120,8 +128,14 @@ export default function CustomersPage() {
   // Helper to determine customer segment tag dynamically
   const getCustomerSegmentTag = (cust: Customer) => {
     const custNormPhone = normalizeMobileNumber(cust.phone);
-    const custSales = sales.filter((s) => normalizeMobileNumber(s.customerPhone) === custNormPhone || s.customerName === cust.name);
-    const custRepairs = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === custNormPhone || r.customerName === cust.name);
+    const custSales = sales.filter(
+      (s) =>
+        normalizeMobileNumber(s.customerPhone) === custNormPhone || s.customerName === cust.name
+    );
+    const custRepairs = repairsEnquiries.filter(
+      (r) =>
+        normalizeMobileNumber(r.customerPhone) === custNormPhone || r.customerName === cust.name
+    );
 
     const hasSales = custSales.length > 0;
     const hasRepairs = custRepairs.length > 0;
@@ -139,8 +153,14 @@ export default function CustomersPage() {
   const filteredCustomers = useMemo(() => {
     return customers.filter((cust) => {
       const custNormPhone = normalizeMobileNumber(cust.phone);
-      const custSales = sales.filter((s) => normalizeMobileNumber(s.customerPhone) === custNormPhone || s.customerName === cust.name);
-      const custRepairs = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === custNormPhone || r.customerName === cust.name);
+      const custSales = sales.filter(
+        (s) =>
+          normalizeMobileNumber(s.customerPhone) === custNormPhone || s.customerName === cust.name
+      );
+      const custRepairs = repairsEnquiries.filter(
+        (r) =>
+          normalizeMobileNumber(r.customerPhone) === custNormPhone || r.customerName === cust.name
+      );
       const tag = getCustomerSegmentTag(cust);
 
       // Segment Matching
@@ -154,7 +174,9 @@ export default function CustomersPage() {
         cust.phone.includes(q) ||
         custNormPhone.includes(q) ||
         custSales.some((s) => s.orderNo.toLowerCase().includes(q)) ||
-        custRepairs.some((r) => r.repairRequested.toLowerCase().includes(q) || r.id.toLowerCase().includes(q));
+        custRepairs.some(
+          (r) => r.repairRequested.toLowerCase().includes(q) || r.id.toLowerCase().includes(q)
+        );
 
       return matchSegment && matchSearch;
     });
@@ -167,8 +189,14 @@ export default function CustomersPage() {
   // Build unified chronological timeline for Customer 360
   const buildCustomerTimeline = (cust: Customer) => {
     const custNormPhone = normalizeMobileNumber(cust.phone);
-    const custSales = sales.filter((s) => normalizeMobileNumber(s.customerPhone) === custNormPhone || s.customerName === cust.name);
-    const custRepairs = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === custNormPhone || r.customerName === cust.name);
+    const custSales = sales.filter(
+      (s) =>
+        normalizeMobileNumber(s.customerPhone) === custNormPhone || s.customerName === cust.name
+    );
+    const custRepairs = repairsEnquiries.filter(
+      (r) =>
+        normalizeMobileNumber(r.customerPhone) === custNormPhone || r.customerName === cust.name
+    );
 
     const timelineEvents: any[] = [];
 
@@ -181,7 +209,11 @@ export default function CustomersPage() {
         status: r.repairStatus,
         source: 'Legacy Repair DB',
       });
-      if ((r.repairStatus as string) === 'Completed' || r.repairStatus === 'Delivered' || r.repairStatus === 'Ready for Delivery') {
+      if (
+        (r.repairStatus as string) === 'Completed' ||
+        r.repairStatus === 'Delivered' ||
+        r.repairStatus === 'Ready for Delivery'
+      ) {
         timelineEvents.push({
           date: r.createdAt || '18 Aug 2025',
           title: `Service Completed: ${r.deviceName}`,
@@ -212,9 +244,7 @@ export default function CustomersPage() {
         <div className="flex items-start justify-between gap-3">
           <div className="page-header">
             <h1 className="page-title">Customers</h1>
-            <p className="page-subtitle">
-              {customers.length} accounts · CRM & credit management
-            </p>
+            <p className="page-subtitle">{customers.length} accounts · CRM & credit management</p>
           </div>
           <button
             onClick={() => setRegisterModal(true)}
@@ -230,9 +260,10 @@ export default function CustomersPage() {
         {/* Segment chips - horizontal scroll */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 pb-1">
           {crmSegments.map((segment) => {
-            const count = segment === 'All Customers'
-              ? customers.length
-              : customers.filter((c) => getCustomerSegmentTag(c) === segment).length;
+            const count =
+              segment === 'All Customers'
+                ? customers.length
+                : customers.filter((c) => getCustomerSegmentTag(c) === segment).length;
             const isSelected = selectedSegment === segment;
 
             return (
@@ -243,7 +274,9 @@ export default function CustomersPage() {
                 data-active={isSelected ? 'true' : 'false'}
               >
                 <span>{segment}</span>
-                <span className={`text-3xs font-mono font-bold ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                <span
+                  className={`text-3xs font-mono font-bold ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}
+                >
                   {count}
                 </span>
               </button>
@@ -253,7 +286,11 @@ export default function CustomersPage() {
 
         {/* Search Input */}
         <div className="relative">
-          <Icon name="MagnifyingGlassIcon" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Icon
+            name="MagnifyingGlassIcon"
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <input
             type="text"
             placeholder="Search customers, phone, invoices, repairs..."
@@ -269,9 +306,7 @@ export default function CustomersPage() {
           <div className="px-3 md:px-5 py-3 border-b border-border/60 flex items-center justify-between">
             <h2 className="section-header flex items-center gap-2">
               <span>Directory</span>
-              <span className="badge-neutral text-3xs">
-                {filteredCustomers.length}
-              </span>
+              <span className="badge-neutral text-3xs">{filteredCustomers.length}</span>
             </h2>
           </div>
 
@@ -313,12 +348,17 @@ export default function CustomersPage() {
                           {cust.city}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-3xs font-bold ${
-                            tag === 'Repair + Purchase Customer' ? 'bg-primary/10 text-primary border border-primary/20' :
-                            tag === 'High Value Customer' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' :
-                            tag === 'Repair Customer' ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20' :
-                            'badge-neutral'
-                          }`}>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-3xs font-bold ${
+                              tag === 'Repair + Purchase Customer'
+                                ? 'bg-primary/10 text-primary border border-primary/20'
+                                : tag === 'High Value Customer'
+                                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                  : tag === 'Repair Customer'
+                                    ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20'
+                                    : 'badge-neutral'
+                            }`}
+                          >
                             {tag}
                           </span>
                         </td>
@@ -326,7 +366,9 @@ export default function CustomersPage() {
                           ₹{cust.totalSpend.toLocaleString('en-IN')}
                         </td>
                         <td className="px-4 py-3 text-right font-tabular">
-                          <span className={`font-bold ${cust.creditBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
+                          <span
+                            className={`font-bold ${cust.creditBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}
+                          >
                             ₹{cust.creditBalance.toLocaleString('en-IN')}
                           </span>
                           {cust.creditBalance > 0 && (
@@ -402,7 +444,9 @@ export default function CustomersPage() {
                     </div>
                     <div className="record-content">
                       <p className="record-title">{cust.name}</p>
-                      <p className="record-subtitle">{cust.phone} · {cust.city}</p>
+                      <p className="record-subtitle">
+                        {cust.phone} · {cust.city}
+                      </p>
                     </div>
                     <div className="record-meta">
                       <p className="record-value">₹{cust.totalSpend.toLocaleString('en-IN')}</p>
@@ -451,30 +495,46 @@ export default function CustomersPage() {
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">External Customer ID</span>
-                  <span className="font-mono font-bold text-foreground mt-0.5 block">LEG-CUST-1001</span>
+                  <span className="text-muted-foreground block text-[11px]">
+                    External Customer ID
+                  </span>
+                  <span className="font-mono font-bold text-foreground mt-0.5 block">
+                    LEG-CUST-1001
+                  </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-[11px]">Match Method</span>
-                  <span className="font-semibold text-foreground mt-0.5 block">Canonical Mobile Normalization</span>
+                  <span className="font-semibold text-foreground mt-0.5 block">
+                    Canonical Mobile Normalization
+                  </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-[11px]">Source Database</span>
-                  <span className="font-mono text-muted-foreground mt-0.5 block">LEGACY_MYSQL_DB (R/O)</span>
+                  <span className="font-mono text-muted-foreground mt-0.5 block">
+                    LEGACY_MYSQL_DB (R/O)
+                  </span>
                 </div>
               </div>
 
               {/* Customer Analytics KPI Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="p-3.5 rounded-xl bg-card border border-border">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Total Spend</p>
-                  <p className="text-lg font-extrabold text-foreground font-tabular mt-0.5">₹{crmViewCustomer.totalSpend.toLocaleString('en-IN')}</p>
-                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">Verified Retail Sales</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Total Spend
+                  </p>
+                  <p className="text-lg font-extrabold text-foreground font-tabular mt-0.5">
+                    ₹{crmViewCustomer.totalSpend.toLocaleString('en-IN')}
+                  </p>
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                    Verified Retail Sales
+                  </p>
                 </div>
                 <div className="p-3.5 rounded-xl bg-card border border-border flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Credit Ledger</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Credit Ledger
+                      </p>
                       {crmViewCustomer.creditBalance > 0 && (
                         <button
                           type="button"
@@ -486,21 +546,43 @@ export default function CustomersPage() {
                         </button>
                       )}
                     </div>
-                    <p className="text-lg font-extrabold text-warning font-tabular mt-0.5">₹{crmViewCustomer.creditBalance.toLocaleString('en-IN')}</p>
+                    <p className="text-lg font-extrabold text-warning font-tabular mt-0.5">
+                      ₹{crmViewCustomer.creditBalance.toLocaleString('en-IN')}
+                    </p>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-1">Outstanding Receivable</p>
                 </div>
                 <div className="p-3.5 rounded-xl bg-card border border-border">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Retail Invoices</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Retail Invoices
+                  </p>
                   <p className="text-lg font-extrabold text-foreground font-tabular mt-0.5">
-                    {sales.filter((s) => normalizeMobileNumber(s.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || s.customerName === crmViewCustomer.name).length} Orders
+                    {
+                      sales.filter(
+                        (s) =>
+                          normalizeMobileNumber(s.customerPhone) ===
+                            normalizeMobileNumber(crmViewCustomer.phone) ||
+                          s.customerName === crmViewCustomer.name
+                      ).length
+                    }{' '}
+                    Orders
                   </p>
                   <p className="text-[11px] text-muted-foreground">COSKO Invoices</p>
                 </div>
                 <div className="p-3.5 rounded-xl bg-card border border-border">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Service History</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Service History
+                  </p>
                   <p className="text-lg font-extrabold text-primary font-tabular mt-0.5">
-                    {repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || r.customerName === crmViewCustomer.name).length} Jobs
+                    {
+                      repairsEnquiries.filter(
+                        (r) =>
+                          normalizeMobileNumber(r.customerPhone) ===
+                            normalizeMobileNumber(crmViewCustomer.phone) ||
+                          r.customerName === crmViewCustomer.name
+                      ).length
+                    }{' '}
+                    Jobs
                   </p>
                   <p className="text-[11px] text-primary font-semibold">Mobile, EV, AC</p>
                 </div>
@@ -518,7 +600,9 @@ export default function CustomersPage() {
                       <div className="absolute -left-[23px] top-1 w-3 h-3 rounded-full bg-primary border-2 border-card"></div>
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-foreground text-xs">{evt.title}</span>
-                        <span className="text-[11px] text-muted-foreground font-mono">{evt.date}</span>
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          {evt.date}
+                        </span>
                       </div>
                       <p className="text-xs text-muted-foreground">{evt.description}</p>
                       <span className="inline-block text-[10px] px-2 py-0.2 rounded bg-secondary text-muted-foreground">
@@ -537,9 +621,17 @@ export default function CustomersPage() {
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {repairsEnquiries
-                    .filter((r) => normalizeMobileNumber(r.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || r.customerName === crmViewCustomer.name)
+                    .filter(
+                      (r) =>
+                        normalizeMobileNumber(r.customerPhone) ===
+                          normalizeMobileNumber(crmViewCustomer.phone) ||
+                        r.customerName === crmViewCustomer.name
+                    )
                     .map((r) => (
-                      <div key={r.id} className="p-3.5 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
+                      <div
+                        key={r.id}
+                        className="p-3.5 rounded-xl border border-primary/20 bg-primary/5 space-y-2"
+                      >
                         <div className="flex items-center justify-between">
                           <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-primary/20 text-primary">
                             {r.deviceType || 'Device'}
@@ -577,13 +669,22 @@ export default function CustomersPage() {
                     </thead>
                     <tbody className="divide-y divide-border">
                       {sales
-                        .filter((s) => normalizeMobileNumber(s.customerPhone) === normalizeMobileNumber(crmViewCustomer.phone) || s.customerName === crmViewCustomer.name)
+                        .filter(
+                          (s) =>
+                            normalizeMobileNumber(s.customerPhone) ===
+                              normalizeMobileNumber(crmViewCustomer.phone) ||
+                            s.customerName === crmViewCustomer.name
+                        )
                         .map((s) => (
                           <tr key={s.id} className="hover:bg-secondary/20">
-                            <td className="px-3 py-2 font-mono font-bold text-primary">{s.orderNo}</td>
+                            <td className="px-3 py-2 font-mono font-bold text-primary">
+                              {s.orderNo}
+                            </td>
                             <td className="px-3 py-2 text-muted-foreground">{s.createdAt}</td>
                             <td className="px-3 py-2 font-medium">{s.store}</td>
-                            <td className="px-3 py-2 text-right font-bold font-tabular">₹{s.total.toLocaleString('en-IN')}</td>
+                            <td className="px-3 py-2 text-right font-bold font-tabular">
+                              ₹{s.total.toLocaleString('en-IN')}
+                            </td>
                           </tr>
                         ))}
                     </tbody>
@@ -625,18 +726,42 @@ export default function CustomersPage() {
             <div className="space-y-4 py-2 text-xs">
               {(() => {
                 const norm = normalizeMobileNumber(deleteConfirmModal.phone);
-                const salesCount = sales.filter((s) => normalizeMobileNumber(s.customerPhone) === norm || s.customerName === deleteConfirmModal.name).length;
-                const repairCount = repairsEnquiries.filter((r) => normalizeMobileNumber(r.customerPhone) === norm || r.customerName === deleteConfirmModal.name).length;
-                const hasHistory = salesCount > 0 || repairCount > 0 || deleteConfirmModal.totalSpend > 0 || deleteConfirmModal.creditBalance > 0;
+                const salesCount = sales.filter(
+                  (s) =>
+                    normalizeMobileNumber(s.customerPhone) === norm ||
+                    s.customerName === deleteConfirmModal.name
+                ).length;
+                const repairCount = repairsEnquiries.filter(
+                  (r) =>
+                    normalizeMobileNumber(r.customerPhone) === norm ||
+                    r.customerName === deleteConfirmModal.name
+                ).length;
+                const hasHistory =
+                  salesCount > 0 ||
+                  repairCount > 0 ||
+                  deleteConfirmModal.totalSpend > 0 ||
+                  deleteConfirmModal.creditBalance > 0;
 
                 return (
                   <>
-                    <div className={`p-4 rounded-xl border ${hasHistory ? 'bg-warning/10 border-warning/30 text-foreground' : 'bg-muted/40 border-border text-foreground'}`}>
+                    <div
+                      className={`p-4 rounded-xl border ${hasHistory ? 'bg-warning/10 border-warning/30 text-foreground' : 'bg-muted/40 border-border text-foreground'}`}
+                    >
                       <div className="flex items-start gap-2.5">
-                        <Icon name={hasHistory ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'} size={18} className={hasHistory ? 'text-warning shrink-0 mt-0.5' : 'text-primary shrink-0 mt-0.5'} />
+                        <Icon
+                          name={hasHistory ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'}
+                          size={18}
+                          className={
+                            hasHistory
+                              ? 'text-warning shrink-0 mt-0.5'
+                              : 'text-primary shrink-0 mt-0.5'
+                          }
+                        />
                         <div>
                           <p className="font-bold text-sm">
-                            {hasHistory ? 'Customer Has Transaction History' : 'Unused Customer Record'}
+                            {hasHistory
+                              ? 'Customer Has Transaction History'
+                              : 'Unused Customer Record'}
                           </p>
                           <p className="text-muted-foreground mt-1">
                             {hasHistory
@@ -752,7 +877,11 @@ export default function CustomersPage() {
                 <input
                   type="text"
                   required
-                  placeholder={settleMethod === 'Cash' ? 'e.g. CASH-RCPT-001' : 'e.g. UTR-987654321 or UPI Ref ID'}
+                  placeholder={
+                    settleMethod === 'Cash'
+                      ? 'e.g. CASH-RCPT-001'
+                      : 'e.g. UTR-987654321 or UPI Ref ID'
+                  }
                   value={settleRef}
                   onChange={(e) => setSettleRef(e.target.value)}
                   className="input-field text-xs font-mono"
@@ -769,7 +898,9 @@ export default function CustomersPage() {
 
               {/* Notes */}
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Payment Remarks</label>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  Payment Remarks
+                </label>
                 <input
                   type="text"
                   value={settleNotes}
@@ -814,4 +945,3 @@ export default function CustomersPage() {
     </AppLayout>
   );
 }
-

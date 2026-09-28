@@ -10,11 +10,23 @@
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 import type { SessionUser } from '@/lib/auth';
+import type { AuthenticatedUser } from '@/lib/authPipeline';
+
+export type ApprovalUser = SessionUser | AuthenticatedUser;
 
 // ─── Entity Type Constants ───────────────────────────────────────────────────
 export const DELETABLE_ENTITY_TYPES = [
-  'INVENTORY', 'CUSTOMER', 'VENDOR', 'CATEGORY', 'PURCHASE',
-  'EXPENSE', 'REPAIR', 'BRAND', 'UNIT', 'CATEGORY_TYPE', 'PAYMENT_METHOD',
+  'INVENTORY',
+  'CUSTOMER',
+  'VENDOR',
+  'CATEGORY',
+  'PURCHASE',
+  'EXPENSE',
+  'REPAIR',
+  'BRAND',
+  'UNIT',
+  'CATEGORY_TYPE',
+  'PAYMENT_METHOD',
 ] as const;
 
 export type DeletableEntityType = (typeof DELETABLE_ENTITY_TYPES)[number];
@@ -40,11 +52,17 @@ export interface DependencyAnalysis {
 }
 
 // ─── Entity Lookup & Snapshot ────────────────────────────────────────────────
-async function fetchEntitySnapshot(entityType: DeletableEntityType, entityId: string): Promise<{ name: string; snapshot: any } | null> {
+async function fetchEntitySnapshot(
+  entityType: DeletableEntityType,
+  entityId: string
+): Promise<{ name: string; snapshot: any } | null> {
   try {
     switch (entityType) {
       case 'INVENTORY': {
-        const p = await (prisma as any).product.findUnique({ where: { id: entityId }, include: { inventoryItems: true } });
+        const p = await (prisma as any).product.findUnique({
+          where: { id: entityId },
+          include: { inventoryItems: true },
+        });
         return p ? { name: p.name, snapshot: p } : null;
       }
       case 'CUSTOMER': {
@@ -60,7 +78,10 @@ async function fetchEntitySnapshot(entityType: DeletableEntityType, entityId: st
         return cat ? { name: cat.name, snapshot: cat } : null;
       }
       case 'PURCHASE': {
-        const po = await (prisma as any).purchaseOrder.findUnique({ where: { id: entityId }, include: { items: true, payments: true } });
+        const po = await (prisma as any).purchaseOrder.findUnique({
+          where: { id: entityId },
+          include: { items: true, payments: true },
+        });
         return po ? { name: po.poNo, snapshot: po } : null;
       }
       case 'EXPENSE': {
@@ -96,10 +117,21 @@ async function fetchEntitySnapshot(entityType: DeletableEntityType, entityId: st
 }
 
 // ─── Dependency & Financial Impact Analysis ──────────────────────────────────
-async function analyzeDependencies(entityType: DeletableEntityType, entityId: string, snapshot: any): Promise<DependencyAnalysis> {
+async function analyzeDependencies(
+  entityType: DeletableEntityType,
+  entityId: string,
+  snapshot: any
+): Promise<DependencyAnalysis> {
   const result: DependencyAnalysis = {
-    salesCount: 0, purchaseCount: 0, repairCount: 0, inventoryCount: 0, ledgerCount: 0,
-    hasFinancialHistory: false, totalSpent: 0, outstandingBalance: 0, creditBalance: 0,
+    salesCount: 0,
+    purchaseCount: 0,
+    repairCount: 0,
+    inventoryCount: 0,
+    ledgerCount: 0,
+    hasFinancialHistory: false,
+    totalSpent: 0,
+    outstandingBalance: 0,
+    creditBalance: 0,
     description: 'No dependencies found. Safe to delete.',
   };
 
@@ -122,7 +154,10 @@ async function analyzeDependencies(entityType: DeletableEntityType, entityId: st
         if (poItems > 0) parts.push(`${poItems} purchase order items`);
         if (ledger > 0) parts.push(`${ledger} ledger entries`);
         if (transfers > 0) parts.push(`${transfers} transfer items`);
-        result.description = parts.length > 0 ? `References: ${parts.join(', ')}. Will be archived.` : 'No references. Can be permanently deleted.';
+        result.description =
+          parts.length > 0
+            ? `References: ${parts.join(', ')}. Will be archived.`
+            : 'No references. Can be permanently deleted.';
         break;
       }
       case 'CUSTOMER': {
@@ -140,7 +175,10 @@ async function analyzeDependencies(entityType: DeletableEntityType, entityId: st
         if (repairs > 0) parts.push(`${repairs} repair enquiries`);
         if (result.totalSpent > 0) parts.push(`₹${result.totalSpent} total spent`);
         if (result.creditBalance > 0) parts.push(`₹${result.creditBalance} credit balance`);
-        result.description = parts.length > 0 ? `History: ${parts.join(', ')}. Will be archived.` : 'No history. Can be permanently deleted.';
+        result.description =
+          parts.length > 0
+            ? `History: ${parts.join(', ')}. Will be archived.`
+            : 'No history. Can be permanently deleted.';
         break;
       }
       case 'VENDOR': {
@@ -149,7 +187,8 @@ async function analyzeDependencies(entityType: DeletableEntityType, entityId: st
           select: { totalCost: true, paidAmount: true, creditAmount: true },
         });
         result.purchaseCount = purchases.length;
-        let totalBilled = 0, totalPaid = 0;
+        let totalBilled = 0,
+          totalPaid = 0;
         for (const po of purchases) {
           totalBilled += Number(po.totalCost || 0);
           totalPaid += Number(po.paidAmount || 0) + Number(po.creditAmount || 0);
@@ -158,8 +197,12 @@ async function analyzeDependencies(entityType: DeletableEntityType, entityId: st
         result.hasFinancialHistory = purchases.length > 0 || result.outstandingBalance > 0;
         const parts: string[] = [];
         if (purchases.length > 0) parts.push(`${purchases.length} purchase orders`);
-        if (result.outstandingBalance > 0) parts.push(`₹${result.outstandingBalance.toFixed(2)} outstanding`);
-        result.description = parts.length > 0 ? `Vendor has: ${parts.join(', ')}. Will be archived.` : 'No orders. Can be permanently deleted.';
+        if (result.outstandingBalance > 0)
+          parts.push(`₹${result.outstandingBalance.toFixed(2)} outstanding`);
+        result.description =
+          parts.length > 0
+            ? `Vendor has: ${parts.join(', ')}. Will be archived.`
+            : 'No orders. Can be permanently deleted.';
         break;
       }
       case 'CATEGORY': {
@@ -172,7 +215,10 @@ async function analyzeDependencies(entityType: DeletableEntityType, entityId: st
         const parts: string[] = [];
         if (childCount > 0) parts.push(`${childCount} child categories`);
         if (productCount > 0) parts.push(`${productCount} products`);
-        result.description = parts.length > 0 ? `References: ${parts.join(', ')}. Will be archived.` : 'No references. Can be permanently deleted.';
+        result.description =
+          parts.length > 0
+            ? `References: ${parts.join(', ')}. Will be archived.`
+            : 'No references. Can be permanently deleted.';
         break;
       }
       case 'PURCHASE': {
@@ -181,13 +227,20 @@ async function analyzeDependencies(entityType: DeletableEntityType, entityId: st
           (prisma as any).goodsReceivedNote.count({ where: { purchaseId: entityId } }),
         ]);
         result.purchaseCount = payments;
-        result.outstandingBalance = Math.max(0, Number(snapshot?.totalCost || 0) - Number(snapshot?.paidAmount || 0));
+        result.outstandingBalance = Math.max(
+          0,
+          Number(snapshot?.totalCost || 0) - Number(snapshot?.paidAmount || 0)
+        );
         result.hasFinancialHistory = payments > 0 || grns > 0;
         const parts: string[] = [];
         if (payments > 0) parts.push(`${payments} payments recorded`);
         if (grns > 0) parts.push(`${grns} GRNs received`);
-        if (result.outstandingBalance > 0) parts.push(`₹${result.outstandingBalance.toFixed(2)} outstanding`);
-        result.description = parts.length > 0 ? `PO has: ${parts.join(', ')}. Will be archived.` : 'No payments/GRNs. Can be permanently deleted.';
+        if (result.outstandingBalance > 0)
+          parts.push(`₹${result.outstandingBalance.toFixed(2)} outstanding`);
+        result.description =
+          parts.length > 0
+            ? `PO has: ${parts.join(', ')}. Will be archived.`
+            : 'No payments/GRNs. Can be permanently deleted.';
         break;
       }
       default: {
@@ -204,7 +257,7 @@ async function analyzeDependencies(entityType: DeletableEntityType, entityId: st
 
 // ─── Create Delete Request ───────────────────────────────────────────────────
 export async function createDeleteRequest(
-  user: SessionUser,
+  user: ApprovalUser,
   input: DeleteRequestInput
 ): Promise<{ success: boolean; deleteRequest?: any; error?: string }> {
   if (!input.reason || input.reason.trim().length < 3) {
@@ -218,7 +271,10 @@ export async function createDeleteRequest(
   // Fetch entity snapshot
   const entityData = await fetchEntitySnapshot(input.entityType, input.entityId);
   if (!entityData) {
-    return { success: false, error: `Entity not found: ${input.entityType} with ID ${input.entityId}` };
+    return {
+      success: false,
+      error: `Entity not found: ${input.entityType} with ID ${input.entityId}`,
+    };
   }
 
   // Check for existing pending request (prevent duplicates)
@@ -231,7 +287,10 @@ export async function createDeleteRequest(
   });
 
   if (existingPending) {
-    return { success: false, error: `A pending delete request already exists for this record (submitted ${new Date(existingPending.createdAt).toLocaleDateString()}).` };
+    return {
+      success: false,
+      error: `A pending delete request already exists for this record (submitted ${new Date(existingPending.createdAt).toLocaleDateString()}).`,
+    };
   }
 
   // Analyze dependencies
@@ -292,7 +351,7 @@ export async function createDeleteRequest(
 
 // ─── Approve Delete Request ──────────────────────────────────────────────────
 export async function approveDeleteRequest(
-  adminUser: SessionUser,
+  adminUser: ApprovalUser,
   requestId: string
 ): Promise<{ success: boolean; result?: any; error?: string }> {
   if (adminUser.securityLevel < 100) {
@@ -304,11 +363,17 @@ export async function approveDeleteRequest(
     return { success: false, error: 'Delete request not found.' };
   }
   if (request.status !== 'PENDING') {
-    return { success: false, error: `This request has already been ${request.status.toLowerCase()}.` };
+    return {
+      success: false,
+      error: `This request has already been ${request.status.toLowerCase()}.`,
+    };
   }
 
   // Re-validate entity still exists
-  const entityData = await fetchEntitySnapshot(request.entityType as DeletableEntityType, request.entityId);
+  const entityData = await fetchEntitySnapshot(
+    request.entityType as DeletableEntityType,
+    request.entityId
+  );
   if (!entityData) {
     // Entity already deleted by other means
     await (prisma as any).deleteRequest.update({
@@ -320,12 +385,23 @@ export async function approveDeleteRequest(
         reviewedAt: new Date(),
       },
     });
-    return { success: true, result: { mode: 'ALREADY_DELETED', message: 'Entity was already deleted.' } };
+    return {
+      success: true,
+      result: { mode: 'ALREADY_DELETED', message: 'Entity was already deleted.' },
+    };
   }
 
   // Re-analyze dependencies to decide archive vs hard-delete
-  const deps = await analyzeDependencies(request.entityType as DeletableEntityType, request.entityId, entityData.snapshot);
-  const shouldArchive = deps.hasFinancialHistory || deps.salesCount > 0 || deps.purchaseCount > 0 || deps.repairCount > 0;
+  const deps = await analyzeDependencies(
+    request.entityType as DeletableEntityType,
+    request.entityId,
+    entityData.snapshot
+  );
+  const shouldArchive =
+    deps.hasFinancialHistory ||
+    deps.salesCount > 0 ||
+    deps.purchaseCount > 0 ||
+    deps.repairCount > 0;
   const executionMode = shouldArchive ? 'ARCHIVE' : 'HARD_DELETE';
 
   // Execute deletion in transaction
@@ -333,9 +409,17 @@ export async function approveDeleteRequest(
     let deletionResult: any;
 
     if (shouldArchive) {
-      deletionResult = await executeArchive(tx, request.entityType as DeletableEntityType, request.entityId);
+      deletionResult = await executeArchive(
+        tx,
+        request.entityType as DeletableEntityType,
+        request.entityId
+      );
     } else {
-      deletionResult = await executeHardDelete(tx, request.entityType as DeletableEntityType, request.entityId);
+      deletionResult = await executeHardDelete(
+        tx,
+        request.entityType as DeletableEntityType,
+        request.entityId
+      );
     }
 
     // Create audit log
@@ -402,7 +486,7 @@ export async function approveDeleteRequest(
 
 // ─── Reject Delete Request ───────────────────────────────────────────────────
 export async function rejectDeleteRequest(
-  adminUser: SessionUser,
+  adminUser: ApprovalUser,
   requestId: string,
   rejectionReason: string
 ): Promise<{ success: boolean; error?: string }> {
@@ -419,7 +503,10 @@ export async function rejectDeleteRequest(
     return { success: false, error: 'Delete request not found.' };
   }
   if (request.status !== 'PENDING') {
-    return { success: false, error: `This request has already been ${request.status.toLowerCase()}.` };
+    return {
+      success: false,
+      error: `This request has already been ${request.status.toLowerCase()}.`,
+    };
   }
 
   await prisma.$transaction(async (tx: any) => {
@@ -473,7 +560,11 @@ export async function rejectDeleteRequest(
 }
 
 // ─── Archive Helpers ─────────────────────────────────────────────────────────
-async function executeArchive(tx: any, entityType: DeletableEntityType, entityId: string): Promise<any> {
+async function executeArchive(
+  tx: any,
+  entityType: DeletableEntityType,
+  entityId: string
+): Promise<any> {
   switch (entityType) {
     case 'INVENTORY':
       return tx.product.update({ where: { id: entityId }, data: { status: 'archived' } });
@@ -487,7 +578,11 @@ async function executeArchive(tx: any, entityType: DeletableEntityType, entityId
       return tx.purchaseOrder.update({ where: { id: entityId }, data: { status: 'Archived' } });
     case 'EXPENSE':
       // Expenses don't have status, archive by creating audit evidence
-      return { archived: true, id: entityId, note: 'Expense records are immutable financial evidence; marked via audit log.' };
+      return {
+        archived: true,
+        id: entityId,
+        note: 'Expense records are immutable financial evidence; marked via audit log.',
+      };
     case 'REPAIR':
       return tx.repairEnquiry.update({ where: { id: entityId }, data: { status: 'Cancelled' } });
     case 'BRAND':
@@ -496,7 +591,12 @@ async function executeArchive(tx: any, entityType: DeletableEntityType, entityId
       return tx.unit.update({ where: { id: entityId }, data: { status: 'Inactive' } });
     case 'CATEGORY_TYPE':
       // CategoryTypes don't have status — soft-archive by prefixing name
-      return tx.categoryType.update({ where: { id: entityId }, data: { name: `[ARCHIVED] ${(await tx.categoryType.findUnique({ where: { id: entityId } }))?.name}` } });
+      return tx.categoryType.update({
+        where: { id: entityId },
+        data: {
+          name: `[ARCHIVED] ${(await tx.categoryType.findUnique({ where: { id: entityId } }))?.name}`,
+        },
+      });
     case 'PAYMENT_METHOD':
       return tx.paymentMethod.update({ where: { id: entityId }, data: { status: 'Inactive' } });
     default:
@@ -504,7 +604,11 @@ async function executeArchive(tx: any, entityType: DeletableEntityType, entityId
   }
 }
 
-async function executeHardDelete(tx: any, entityType: DeletableEntityType, entityId: string): Promise<any> {
+async function executeHardDelete(
+  tx: any,
+  entityType: DeletableEntityType,
+  entityId: string
+): Promise<any> {
   switch (entityType) {
     case 'INVENTORY': {
       await tx.inventoryLedger.deleteMany({ where: { productId: entityId } });

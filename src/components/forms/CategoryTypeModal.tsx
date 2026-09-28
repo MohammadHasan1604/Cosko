@@ -13,16 +13,45 @@ interface CategoryTypeModalProps {
 }
 
 const COLOR_OPTIONS = [
-  { value: 'primary', label: 'Indigo / Primary', bg: 'bg-primary/15 text-primary border-primary/30' },
+  {
+    value: 'primary',
+    label: 'Indigo / Primary',
+    bg: 'bg-primary/15 text-primary border-primary/30',
+  },
   { value: 'info', label: 'Sky / Info', bg: 'bg-info/15 text-info border-info/30' },
-  { value: 'success', label: 'Emerald / Success', bg: 'bg-success/15 text-success border-success/30' },
-  { value: 'warning', label: 'Amber / Warning', bg: 'bg-warning/15 text-warning border-warning/30' },
-  { value: 'purple', label: 'Purple / Violet', bg: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30' },
-  { value: 'rose', label: 'Rose / Coral', bg: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30' },
-  { value: 'secondary', label: 'Slate / Neutral', bg: 'bg-muted text-muted-foreground border-border' },
+  {
+    value: 'success',
+    label: 'Emerald / Success',
+    bg: 'bg-success/15 text-success border-success/30',
+  },
+  {
+    value: 'warning',
+    label: 'Amber / Warning',
+    bg: 'bg-warning/15 text-warning border-warning/30',
+  },
+  {
+    value: 'purple',
+    label: 'Purple / Violet',
+    bg: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30',
+  },
+  {
+    value: 'rose',
+    label: 'Rose / Coral',
+    bg: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30',
+  },
+  {
+    value: 'secondary',
+    label: 'Slate / Neutral',
+    bg: 'bg-muted text-muted-foreground border-border',
+  },
 ];
 
-export default function CategoryTypeModal({ open, onClose, onSuccess, zIndex = 120 }: CategoryTypeModalProps) {
+export default function CategoryTypeModal({
+  open,
+  onClose,
+  onSuccess,
+  zIndex = 120,
+}: CategoryTypeModalProps) {
   const { addCategoryType } = useApp();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -135,11 +164,7 @@ export default function CategoryTypeModal({ open, onClose, onSuccess, zIndex = 1
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            className="btn-primary text-xs gap-1.5"
-            disabled={isSubmitting}
-          >
+          <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />

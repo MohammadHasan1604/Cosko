@@ -9,63 +9,63 @@ import WhatsAppIcon from './WhatsAppIcon';
 export type IconVariant = 'outline' | 'solid' | 'brand';
 
 export interface IconProps {
-    name: string; // Changed to string to accept dynamic values
-    variant?: IconVariant;
-    size?: number;
-    className?: string;
-    onClick?: () => void;
-    disabled?: boolean;
-    [key: string]: any;
+  name: string; // Changed to string to accept dynamic values
+  variant?: IconVariant;
+  size?: number;
+  className?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  [key: string]: any;
 }
 
 function Icon({
-    name,
-    variant = 'outline',
-    size = 24,
-    className = '',
-    onClick,
-    disabled = false,
-    ...props
+  name,
+  variant = 'outline',
+  size = 24,
+  className = '',
+  onClick,
+  disabled = false,
+  ...props
 }: IconProps) {
-    const lowerName = (name || '').toLowerCase();
-    if (lowerName === 'whatsapp' || lowerName === 'whatsappicon' || lowerName === 'brandwhatsapp') {
-        return (
-            <WhatsAppIcon
-                size={size}
-                variant={variant as 'outline' | 'solid' | 'brand'}
-                className={className}
-                onClick={onClick}
-                disabled={disabled}
-                {...props}
-            />
-        );
-    }
-
-    const iconSet = variant === 'solid' ? HeroIconsSolid : HeroIcons;
-    const IconComponent = iconSet[name as keyof typeof iconSet] as React.ComponentType<any>;
-
-    if (!IconComponent) {
-        return (
-            <QuestionMarkCircleIcon
-                width={size}
-                height={size}
-                className={`text-gray-400 ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
-                onClick={disabled ? undefined : onClick}
-                {...props}
-            />
-        );
-    }
-
+  const lowerName = (name || '').toLowerCase();
+  if (lowerName === 'whatsapp' || lowerName === 'whatsappicon' || lowerName === 'brandwhatsapp') {
     return (
-        <IconComponent
-            width={size}
-            height={size}
-            className={`${disabled ? 'opacity-50 cursor-not-allowed' : onClick ? 'cursor-pointer hover:opacity-80' : ''} ${className}`}
-            onClick={disabled ? undefined : onClick}
-            {...props}
-        />
+      <WhatsAppIcon
+        size={size}
+        variant={variant as 'outline' | 'solid' | 'brand'}
+        className={className}
+        onClick={onClick}
+        disabled={disabled}
+        {...props}
+      />
     );
+  }
+
+  const iconSet = variant === 'solid' ? HeroIconsSolid : HeroIcons;
+  const IconComponent = iconSet[name as keyof typeof iconSet] as React.ComponentType<any>;
+
+  if (!IconComponent) {
+    return (
+      <QuestionMarkCircleIcon
+        width={size}
+        height={size}
+        className={`text-gray-400 ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+        onClick={disabled ? undefined : onClick}
+        {...props}
+      />
+    );
+  }
+
+  return (
+    <IconComponent
+      width={size}
+      height={size}
+      className={`${disabled ? 'opacity-50 cursor-not-allowed' : onClick ? 'cursor-pointer hover:opacity-80' : ''} ${className}`}
+      onClick={disabled ? undefined : onClick}
+      {...props}
+    />
+  );
 }
 
 export { WhatsAppIcon };
-export default Icon; 
+export default Icon;

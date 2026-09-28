@@ -21,17 +21,23 @@ export async function GET(req: NextRequest) {
 
     const whereClause: any = {};
     if (user.role !== 'Super Admin') {
-      const allowed = user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
+      const allowed =
+        user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
       if (store) {
         if (store === 'All Stores' || store === 'ALL') {
           return NextResponse.json(
-            { error: 'Forbidden: Consolidated view across all stores is restricted to Super Admin only' },
+            {
+              error:
+                'Forbidden: Consolidated view across all stores is restricted to Super Admin only',
+            },
             { status: 403 }
           );
         }
         if (!allowed.includes(store)) {
           return NextResponse.json(
-            { error: `Forbidden: Cross-store expense queries are restricted to Super Admin accounts only` },
+            {
+              error: `Forbidden: Cross-store expense queries are restricted to Super Admin accounts only`,
+            },
             { status: 403 }
           );
         }
@@ -45,10 +51,7 @@ export async function GET(req: NextRequest) {
 
     const expenses = await (prisma as any).expense.findMany({
       where: whereClause,
-      orderBy: [
-        { createdAt: 'desc' },
-        { date: 'desc' },
-      ],
+      orderBy: [{ createdAt: 'desc' }, { date: 'desc' }],
       take: 100,
     });
 
@@ -74,25 +77,45 @@ export async function POST(req: NextRequest) {
     const user = auth.user;
 
     if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient security level to record expenses' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient security level to record expenses' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
 
-    if (!body.category || body.amount === undefined || body.amount === null || body.amount === '' || Number(body.amount) <= 0 || isNaN(Number(body.amount))) {
-      return NextResponse.json({ error: 'Category and a positive Amount are required' }, { status: 400 });
+    if (
+      !body.category ||
+      body.amount === undefined ||
+      body.amount === null ||
+      body.amount === '' ||
+      Number(body.amount) <= 0 ||
+      isNaN(Number(body.amount))
+    ) {
+      return NextResponse.json(
+        { error: 'Category and a positive Amount are required' },
+        { status: 400 }
+      );
     }
 
     // MANDATORY PROOF & REFERENCE VALIDATION (ROOT FIX)
     const proofUrl = body.receiptUrl || body.proofUrl;
     if (!proofUrl || !String(proofUrl).trim()) {
       return NextResponse.json(
-        { error: 'Payment proof is mandatory! Please upload an expense receipt, bill, or payment screenshot.' },
+        {
+          error:
+            'Payment proof is mandatory! Please upload an expense receipt, bill, or payment screenshot.',
+        },
         { status: 400 }
       );
     }
 
-    const cleanRef = body.referenceNo ? String(body.referenceNo).trim() : (body.payRef ? String(body.payRef).trim() : '');
+    const cleanRef = body.referenceNo
+      ? String(body.referenceNo).trim()
+      : body.payRef
+        ? String(body.payRef).trim()
+        : '';
     if (!cleanRef) {
       return NextResponse.json(
         { error: 'Reference / Voucher / Transaction number is mandatory.' },
@@ -108,21 +131,33 @@ export async function POST(req: NextRequest) {
     });
     if (pmRecord && pmRecord.status === 'Inactive') {
       return NextResponse.json(
-        { error: `Payment method "${paymentMethod}" is currently deactivated. Please select an active payment method.` },
+        {
+          error: `Payment method "${paymentMethod}" is currently deactivated. Please select an active payment method.`,
+        },
         { status: 400 }
       );
     }
 
-    if (user.role !== 'Super Admin' && (body.storeCode || body.store) && (body.storeCode || body.store) !== user.store) {
+    if (
+      user.role !== 'Super Admin' &&
+      (body.storeCode || body.store) &&
+      (body.storeCode || body.store) !== user.store
+    ) {
       return NextResponse.json(
-        { error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot record expenses for store "${body.storeCode || body.store}".` },
+        {
+          error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot record expenses for store "${body.storeCode || body.store}".`,
+        },
         { status: 403 }
       );
     }
 
-    const expenseStore = user.role === 'Super Admin' ? (body.storeCode || body.store || 'CENTRAL') : user.store;
+    const expenseStore =
+      user.role === 'Super Admin' ? body.storeCode || body.store || 'CENTRAL' : user.store;
     const expenseAmt = Number(body.amount);
-    const isCentral = expenseStore === 'CENTRAL' || body.category.toLowerCase().includes('freight') || (body.description && body.description.toLowerCase().includes('central'));
+    const isCentral =
+      expenseStore === 'CENTRAL' ||
+      body.category.toLowerCase().includes('freight') ||
+      (body.description && body.description.toLowerCase().includes('central'));
 
     const customKey =
       body.idempotencyKey ||
@@ -139,88 +174,98 @@ export async function POST(req: NextRequest) {
         extractEntityId: (d) => d?.expense?.id || d?.expense?.expenseNo,
       },
       async () => {
-        const result = await prisma.$transaction(async (tx: any) => {
-          const expenseNo = body.expenseNo || await generateSafeSequenceNo('expense', 'expenseNo', 'EXP-2026-', 4, tx);
+        const result = await prisma.$transaction(
+          async (tx: any) => {
+            const expenseNo =
+              body.expenseNo ||
+              (await generateSafeSequenceNo('expense', 'expenseNo', 'EXP-2026-', 4, tx));
 
-          const expense = await tx.expense.create({
-            data: {
+            const expense = await tx.expense.create({
+              data: {
+                expenseNo,
+                category: body.category,
+                amount: expenseAmt,
+                storeCode: expenseStore,
+                description: body.description || '',
+                paymentMethod,
+                referenceNo: cleanRef,
+                receiptUrl: proofUrl,
+                approvedBy: user.name,
+                recordedBy: user.email || user.name,
+                date: expenseDate,
+              },
+            });
+
+            const expLedgerMeta = JSON.stringify({
+              proofUrl,
+              referenceNo: cleanRef,
+              paymentMethod,
               expenseNo,
               category: body.category,
-              amount: expenseAmt,
-              storeCode: expenseStore,
-              description: body.description || '',
-              paymentMethod,
-              referenceNo: cleanRef,
-              receiptUrl: proofUrl,
-              approvedBy: user.name,
-              recordedBy: user.email || user.name,
-              date: expenseDate,
-            },
-          });
+              recordedBy: user.name || user.email,
+              timestamp: new Date().toISOString(),
+            });
 
-          const expLedgerMeta = JSON.stringify({
-            proofUrl,
-            referenceNo: cleanRef,
-            paymentMethod,
-            expenseNo,
-            category: body.category,
-            recordedBy: user.name || user.email,
-            timestamp: new Date().toISOString(),
-          });
+            // Record Double-Entry Financial Ledger Entries for Expense atomically in a single batched query
+            await tx.financialLedgerEntry.createMany({
+              data: [
+                {
+                  entryNo: `JRN-EXP-${expenseNo}`,
+                  entryDate: expenseDate,
+                  storeCode: expenseStore,
+                  accountCategory: isCentral ? 'CENTRAL_EXPENSE' : 'OPERATING_EXPENSE',
+                  accountName: `Operating Expense: ${body.category}`,
+                  debit: expenseAmt,
+                  credit: 0,
+                  amount: expenseAmt,
+                  refType: 'EXPENSE',
+                  refId: expense.id,
+                  refNo: expenseNo,
+                  description: `${body.category} Expense: ${body.description || 'General Operational Expense'} (Ref: ${cleanRef})`,
+                  metadataJson: expLedgerMeta,
+                  createdBy: user.name,
+                },
+                {
+                  entryNo: `JRN-EXP-BANK-${expenseNo}`,
+                  entryDate: expenseDate,
+                  storeCode: expenseStore,
+                  accountCategory: 'ASSET',
+                  accountName: `Cash / Bank (${paymentMethod})`,
+                  debit: 0,
+                  credit: expenseAmt,
+                  amount: -expenseAmt,
+                  refType: 'EXPENSE',
+                  refId: expense.id,
+                  refNo: expenseNo,
+                  description: `Disbursement for ${body.category} (Voucher ${expenseNo}, Ref: ${cleanRef})`,
+                  metadataJson: expLedgerMeta,
+                  createdBy: user.name,
+                },
+              ],
+            });
 
-          // Record Double-Entry Financial Ledger Entries for Expense atomically in a single batched query
-          await tx.financialLedgerEntry.createMany({
-            data: [
-              {
-                entryNo: `JRN-EXP-${expenseNo}`,
-                entryDate: expenseDate,
+            await tx.auditLog.create({
+              data: {
+                module: 'Expenses',
+                action: 'Create Expense',
+                details: `Recorded ₹${expenseAmt.toFixed(2)} for ${body.category} (${expenseStore}) via ${paymentMethod} (Ref: ${cleanRef}, Proof: ${proofUrl})`,
+                userEmail: user.email || user.name,
+                userRole: user.role,
                 storeCode: expenseStore,
-                accountCategory: isCentral ? 'CENTRAL_EXPENSE' : 'OPERATING_EXPENSE',
-                accountName: `Operating Expense: ${body.category}`,
-                debit: expenseAmt,
-                credit: 0,
-                amount: expenseAmt,
-                refType: 'EXPENSE',
-                refId: expense.id,
-                refNo: expenseNo,
-                description: `${body.category} Expense: ${body.description || 'General Operational Expense'} (Ref: ${cleanRef})`,
-                metadataJson: expLedgerMeta,
-                createdBy: user.name,
               },
-              {
-                entryNo: `JRN-EXP-BANK-${expenseNo}`,
-                entryDate: expenseDate,
-                storeCode: expenseStore,
-                accountCategory: 'ASSET',
-                accountName: `Cash / Bank (${paymentMethod})`,
-                debit: 0,
-                credit: expenseAmt,
-                amount: -expenseAmt,
-                refType: 'EXPENSE',
-                refId: expense.id,
-                refNo: expenseNo,
-                description: `Disbursement for ${body.category} (Voucher ${expenseNo}, Ref: ${cleanRef})`,
-                metadataJson: expLedgerMeta,
-                createdBy: user.name,
-              },
-            ],
-          });
+            });
 
-          await tx.auditLog.create({
-            data: {
-              module: 'Expenses',
-              action: 'Create Expense',
-              details: `Recorded ₹${expenseAmt.toFixed(2)} for ${body.category} (${expenseStore}) via ${paymentMethod} (Ref: ${cleanRef}, Proof: ${proofUrl})`,
-              userEmail: user.email || user.name,
-              userRole: user.role,
-              storeCode: expenseStore,
-            },
-          });
+            return { expense, expenseNo };
+          },
+          { maxWait: 15000, timeout: 45000 }
+        );
 
-          return { expense, expenseNo };
-        }, { maxWait: 15000, timeout: 45000 });
-
-        broadcastRealtimeEvent('expenses', 'EXPENSE_CREATED', { expenseNo: result.expenseNo, category: body.category, amount: expenseAmt, storeCode: expenseStore });
+        broadcastRealtimeEvent('expenses', 'EXPENSE_CREATED', {
+          expenseNo: result.expenseNo,
+          category: body.category,
+          amount: expenseAmt,
+          storeCode: expenseStore,
+        });
 
         return {
           status: 201,
@@ -238,7 +283,10 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     console.error('API /api/expenses POST error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to record expense' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to record expense' },
+      { status: 500 }
+    );
   }
 }
 
@@ -254,14 +302,20 @@ export async function PUT(req: NextRequest) {
     const user = auth.user;
 
     if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient security level to edit expenses' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient security level to edit expenses' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
     const id = body.id || body.expenseId;
 
     if (!id && !body.expenseNo) {
-      return NextResponse.json({ error: 'Expense ID or Reference No is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Expense ID or Reference No is required' },
+        { status: 400 }
+      );
     }
 
     const target = id
@@ -289,7 +343,9 @@ export async function PUT(req: NextRequest) {
       });
       if (pmRecord && pmRecord.status === 'Inactive') {
         return NextResponse.json(
-          { error: `Payment method "${pmName}" is currently deactivated. Please select an active payment method.` },
+          {
+            error: `Payment method "${pmName}" is currently deactivated. Please select an active payment method.`,
+          },
           { status: 400 }
         );
       }
@@ -299,7 +355,10 @@ export async function PUT(req: NextRequest) {
       const newProof = body.receiptUrl || body.proofUrl;
       if (!newProof || !String(newProof).trim()) {
         return NextResponse.json(
-          { error: 'Payment proof is strictly mandatory and cannot be removed from an expense record.' },
+          {
+            error:
+              'Payment proof is strictly mandatory and cannot be removed from an expense record.',
+          },
           { status: 400 }
         );
       }
@@ -308,29 +367,37 @@ export async function PUT(req: NextRequest) {
     if (body.storeCode || body.store) updateData.storeCode = body.storeCode || body.store;
     if (body.date) updateData.date = new Date(body.date);
 
-    const updated = await prisma.$transaction(async (tx: any) => {
-      const exp = await tx.expense.update({
-        where: { id: target.id },
-        data: updateData,
-      });
-
-      // Synchronize associated financial ledger entries if amount or category changed
-      if (updateData.amount !== undefined) {
-        const newAmt = Number(updateData.amount);
-        await tx.financialLedgerEntry.updateMany({
-          where: { refType: 'EXPENSE', refNo: target.expenseNo, debit: { gt: 0 } },
-          data: { debit: newAmt, amount: newAmt },
+    const updated = await prisma.$transaction(
+      async (tx: any) => {
+        const exp = await tx.expense.update({
+          where: { id: target.id },
+          data: updateData,
         });
-        await tx.financialLedgerEntry.updateMany({
-          where: { refType: 'EXPENSE', refNo: target.expenseNo, credit: { gt: 0 } },
-          data: { credit: newAmt, amount: -newAmt },
-        });
-      }
 
-      return exp;
-    }, { maxWait: 15000, timeout: 45000 });
+        // Synchronize associated financial ledger entries if amount or category changed
+        if (updateData.amount !== undefined) {
+          const newAmt = Number(updateData.amount);
+          await tx.financialLedgerEntry.updateMany({
+            where: { refType: 'EXPENSE', refNo: target.expenseNo, debit: { gt: 0 } },
+            data: { debit: newAmt, amount: newAmt },
+          });
+          await tx.financialLedgerEntry.updateMany({
+            where: { refType: 'EXPENSE', refNo: target.expenseNo, credit: { gt: 0 } },
+            data: { credit: newAmt, amount: -newAmt },
+          });
+        }
 
-    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id: updated.id, expenseNo: updated.expenseNo, storeCode: updated.storeCode, action: 'updated' });
+        return exp;
+      },
+      { maxWait: 15000, timeout: 45000 }
+    );
+
+    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', {
+      id: updated.id,
+      expenseNo: updated.expenseNo,
+      storeCode: updated.storeCode,
+      action: 'updated',
+    });
 
     return NextResponse.json({
       success: true,
@@ -341,7 +408,10 @@ export async function PUT(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /api/expenses PUT error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to update expense' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to update expense' },
+      { status: 500 }
+    );
   }
 }
 
@@ -358,7 +428,10 @@ export async function DELETE(req: NextRequest) {
     const user = auth.user;
 
     if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient security level' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient security level' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -380,7 +453,10 @@ export async function DELETE(req: NextRequest) {
     // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────
     if (user.securityLevel < 100) {
       if (!reason || reason.trim().length < 3) {
-        return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'A reason for deletion is required (minimum 3 characters)' },
+          { status: 400 }
+        );
       }
       const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
       const result = await createDeleteRequest(user as any, {
@@ -400,32 +476,37 @@ export async function DELETE(req: NextRequest) {
     }
 
     // ─── SUPER ADMIN: Direct delete with ledger cleanup ─────────────────────
-    await prisma.$transaction(async (tx: any) => {
-      await tx.financialLedgerEntry.deleteMany({
-        where: {
-          refType: 'EXPENSE',
-          refNo: target.expenseNo,
-        },
-      });
-      await tx.expense.delete({ where: { id: target.id } });
-      await tx.auditLog.create({
-        data: {
-          module: 'EXPENSES',
-          action: `DELETED: Expense "${target.expenseNo}" (₹${target.amount})`,
-          details: JSON.stringify({ expenseId: target.id, beforeState: target }),
-          userEmail: user.email,
-          userRole: user.role,
-          storeCode: target.storeCode || user.store || 'CENTRAL',
-        },
-      });
-    }, { maxWait: 15000, timeout: 45000 });
+    await prisma.$transaction(
+      async (tx: any) => {
+        await tx.financialLedgerEntry.deleteMany({
+          where: {
+            refType: 'EXPENSE',
+            refNo: target.expenseNo,
+          },
+        });
+        await tx.expense.delete({ where: { id: target.id } });
+        await tx.auditLog.create({
+          data: {
+            module: 'EXPENSES',
+            action: `DELETED: Expense "${target.expenseNo}" (₹${target.amount})`,
+            details: JSON.stringify({ expenseId: target.id, beforeState: target }),
+            userEmail: user.email,
+            userRole: user.role,
+            storeCode: target.storeCode || user.store || 'CENTRAL',
+          },
+        });
+      },
+      { maxWait: 15000, timeout: 45000 }
+    );
 
     broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id: target.id, action: 'deleted' });
 
     return NextResponse.json({ success: true, message: 'Expense record deleted' });
   } catch (error: any) {
     console.error('API /api/expenses DELETE error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to delete expense' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete expense' },
+      { status: 500 }
+    );
   }
 }
-

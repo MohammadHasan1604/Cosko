@@ -81,9 +81,12 @@ export async function executePOSCheckout(input: CreateSaleInput) {
   };
   const store3Digit = storeNumericMap[storeCode] || storeCode.slice(0, 3);
   const invoicePrefix = `CS26${store3Digit}`;
-  const effectiveProofUrl = input.paymentProofUrl || (input.photos && input.photos.length > 0 ? input.photos[0] : null);
+  const effectiveProofUrl =
+    input.paymentProofUrl || (input.photos && input.photos.length > 0 ? input.photos[0] : null);
   if (!effectiveProofUrl || !String(effectiveProofUrl).trim()) {
-    throw new Error('Payment proof is mandatory! Please upload a valid receipt or transaction screenshot.');
+    throw new Error(
+      'Payment proof is mandatory! Please upload a valid receipt or transaction screenshot.'
+    );
   }
   if (!input.referenceNo || !String(input.referenceNo).trim()) {
     throw new Error('Payment Reference / UTR / Voucher number is strictly mandatory.');
@@ -167,10 +170,16 @@ export async function executePOSCheckout(input: CreateSaleInput) {
           grossProfit,
           paymentMethod: input.paymentMethod,
           referenceNo: input.referenceNo || null,
-          paymentProofUrl: input.paymentProofUrl || (input.photos && input.photos.length > 0 ? input.photos[0] : null),
+          paymentProofUrl:
+            input.paymentProofUrl ||
+            (input.photos && input.photos.length > 0 ? input.photos[0] : null),
           status: 'Completed',
           cashierName: input.cashierName,
-          photosJson: input.photos ? JSON.stringify(input.photos) : (input.paymentProofUrl ? JSON.stringify([input.paymentProofUrl]) : null),
+          photosJson: input.photos
+            ? JSON.stringify(input.photos)
+            : input.paymentProofUrl
+              ? JSON.stringify([input.paymentProofUrl])
+              : null,
           items: {
             create: preparedItems,
           },
@@ -180,7 +189,8 @@ export async function executePOSCheckout(input: CreateSaleInput) {
         },
       });
 
-      const effectiveProofUrl = input.paymentProofUrl || (input.photos && input.photos.length > 0 ? input.photos[0] : null);
+      const effectiveProofUrl =
+        input.paymentProofUrl || (input.photos && input.photos.length > 0 ? input.photos[0] : null);
 
       // 6. Batch create double-entry financial ledger records
       const financialEntries: any[] = [

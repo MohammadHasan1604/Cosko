@@ -2,8 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
-import { authenticateRequest, createAuditLog, invalidateUserSessions, hasPermission, generateSecureTemporaryPassword } from '@/lib/authPipeline';
-import { ROLE_SECURITY_LEVELS, SUPER_ADMIN_PROTECTED_PERMISSIONS, type UserRole } from '@/lib/rbacEngine';
+import {
+  authenticateRequest,
+  createAuditLog,
+  invalidateUserSessions,
+  hasPermission,
+  generateSecureTemporaryPassword,
+} from '@/lib/authPipeline';
+import { ensureStoredImage } from '@/lib/objectStorage';
+import {
+  ROLE_SECURITY_LEVELS,
+  SUPER_ADMIN_PROTECTED_PERMISSIONS,
+  type UserRole,
+} from '@/lib/rbacEngine';
 
 // Whitelist allowed roles and map to security levels — prevent mass assignment
 const ROLE_LEVEL_MAP: Record<string, number> = {
@@ -26,7 +37,10 @@ export async function GET(req: NextRequest) {
     const user = auth.user;
 
     if (!hasPermission(user, 'users.view')) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to view users' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient permissions to view users' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -63,15 +77,21 @@ export async function GET(req: NextRequest) {
       email: u.email,
       role: u.role,
       securityLevel: u.securityLevel,
-      store: u.storeScope || u.storeAssignments?.[0]?.storeCode || (u.role === 'Super Admin' ? 'All Stores' : 'CENTRAL'),
+      store:
+        u.storeScope ||
+        u.storeAssignments?.[0]?.storeCode ||
+        (u.role === 'Super Admin' ? 'All Stores' : 'CENTRAL'),
       status: u.status,
       shiftStatus: u.shiftStatus || 'On Shift',
       assignedStores: u.storeAssignments?.map((a: any) => a.storeCode) || [],
-      allowedStores: u.storeAssignments?.map((a: any) => a.storeCode) || [u.storeScope || 'CENTRAL'],
-      overrides: u.permissionOverrides?.map((o: any) => ({
-        permissionCode: o.permissionCode,
-        overrideType: o.overrideType,
-      })) || [],
+      allowedStores: u.storeAssignments?.map((a: any) => a.storeCode) || [
+        u.storeScope || 'CENTRAL',
+      ],
+      overrides:
+        u.permissionOverrides?.map((o: any) => ({
+          permissionCode: o.permissionCode,
+          overrideType: o.overrideType,
+        })) || [],
       avatarUrl: u.avatarUrl,
       createdAt: u.createdAt,
       lastLoginAt: u.lastLogin,
@@ -99,27 +119,41 @@ export async function POST(req: NextRequest) {
     const authUser = auth.user;
 
     if (!hasPermission(authUser, 'users.create')) {
-      return NextResponse.json({ success: false, error: 'Forbidden: Insufficient permissions to create users' }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Insufficient permissions to create users' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
     const { name, email, password, phone, store, status } = body;
 
     if (!email || !name) {
-      return NextResponse.json({ success: false, error: 'Name and email are required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Name and email are required' },
+        { status: 400 }
+      );
     }
 
     if (!password || password.length < 8) {
-      return NextResponse.json({ success: false, error: 'Password is required (minimum 8 characters)' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Password is required (minimum 8 characters)' },
+        { status: 400 }
+      );
     }
 
     const requestedRole = body.role || 'POS Cashier';
-    const requestedLevel = body.securityLevel !== undefined ? Number(body.securityLevel) : undefined;
+    const requestedLevel =
+      body.securityLevel !== undefined ? Number(body.securityLevel) : undefined;
 
     // 🔒 STRICT SUPER ADMIN SINGLETON: No user can create another Super Admin
     if (requestedRole === 'Super Admin' || requestedLevel === 100) {
       return NextResponse.json(
-        { success: false, error: 'Forbidden: System enforces exactly ONE protected Super Admin. Creating additional Super Admin accounts is prohibited.' },
+        {
+          success: false,
+          error:
+            'Forbidden: System enforces exactly ONE protected Super Admin. Creating additional Super Admin accounts is prohibited.',
+        },
         { status: 403 }
       );
     }
@@ -127,7 +161,10 @@ export async function POST(req: NextRequest) {
     // Validate role is in the allowed set
     if (!ROLE_LEVEL_MAP[requestedRole]) {
       return NextResponse.json(
-        { success: false, error: `Invalid role: "${requestedRole}". Allowed roles: ${Object.keys(ROLE_LEVEL_MAP).join(', ')}` },
+        {
+          success: false,
+          error: `Invalid role: "${requestedRole}". Allowed roles: ${Object.keys(ROLE_LEVEL_MAP).join(', ')}`,
+        },
         { status: 400 }
       );
     }
@@ -138,7 +175,10 @@ export async function POST(req: NextRequest) {
     // 🔒 LEVEL CEILING: Caller cannot create users at or above their own level
     if (authUser.role !== 'Super Admin' && targetLevel >= authUser.securityLevel) {
       return NextResponse.json(
-        { success: false, error: `Forbidden: You cannot create users at or above your own security level (${authUser.securityLevel}).` },
+        {
+          success: false,
+          error: `Forbidden: You cannot create users at or above your own security level (${authUser.securityLevel}).`,
+        },
         { status: 403 }
       );
     }
@@ -150,38 +190,62 @@ export async function POST(req: NextRequest) {
     });
 
     if (existing) {
-      return NextResponse.json({ success: false, error: 'User with this email already exists' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'User with this email already exists' },
+        { status: 400 }
+      );
     }
 
     // Resolve assigned stores
-    const rawStores: string[] = Array.isArray(body.assignedStores) && body.assignedStores.length > 0
-      ? body.assignedStores
-      : Array.isArray(body.allowedStores) && body.allowedStores.length > 0
-      ? body.allowedStores
-      : [store || 'BLR'];
+    const rawStores: string[] =
+      Array.isArray(body.assignedStores) && body.assignedStores.length > 0
+        ? body.assignedStores
+        : Array.isArray(body.allowedStores) && body.allowedStores.length > 0
+          ? body.allowedStores
+          : [store || 'BLR'];
 
     const validHubs = await prisma.storeHub.findMany({ select: { code: true } });
     const validCodes = new Set(validHubs.map((s) => s.code));
     const targetAssignedStores = rawStores.filter((c: string) => validCodes.has(c));
 
     if (targetAssignedStores.length === 0) {
-      return NextResponse.json({ success: false, error: 'User must be assigned to at least one valid store' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'User must be assigned to at least one valid store' },
+        { status: 400 }
+      );
     }
 
     // 🔒 Non-Super-Admin callers can only assign stores they have access to
     if (authUser.role !== 'Super Admin') {
-      const callerAllowed = authUser.allowedStores.length > 0 ? authUser.allowedStores : [authUser.store];
+      const callerAllowed =
+        authUser.allowedStores.length > 0 ? authUser.allowedStores : [authUser.store];
       const hasInvalidAssignment = targetAssignedStores.some((s) => !callerAllowed.includes(s));
       if (hasInvalidAssignment) {
-        return NextResponse.json({ success: false, error: 'Forbidden: You can only assign users to stores you are authorized for' }, { status: 403 });
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Forbidden: You can only assign users to stores you are authorized for',
+          },
+          { status: 403 }
+        );
       }
     }
 
     // 🔒 Check protected permission overrides
     if (Array.isArray(body.overrides)) {
       for (const ov of body.overrides) {
-        if (ov.overrideType === 'ALLOW' && SUPER_ADMIN_PROTECTED_PERMISSIONS.includes(ov.permissionCode) && targetLevel < 100) {
-          return NextResponse.json({ success: false, error: `Cannot grant protected permission "${ov.permissionCode}" to roles below Level 100` }, { status: 403 });
+        if (
+          ov.overrideType === 'ALLOW' &&
+          SUPER_ADMIN_PROTECTED_PERMISSIONS.includes(ov.permissionCode) &&
+          targetLevel < 100
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Cannot grant protected permission "${ov.permissionCode}" to roles below Level 100`,
+            },
+            { status: 403 }
+          );
         }
       }
     }
@@ -216,7 +280,11 @@ export async function POST(req: NextRequest) {
         for (const ov of body.overrides) {
           if (ov.permissionCode && (ov.overrideType === 'ALLOW' || ov.overrideType === 'DENY')) {
             await tx.userPermissionOverride.create({
-              data: { userId: user.id, permissionCode: ov.permissionCode, overrideType: ov.overrideType },
+              data: {
+                userId: user.id,
+                permissionCode: ov.permissionCode,
+                overrideType: ov.overrideType,
+              },
             });
           }
         }
@@ -226,8 +294,12 @@ export async function POST(req: NextRequest) {
     });
 
     // Audit log
-    await createAuditLog(authUser, 'Users', 'User Created', 
-      `Created user "${newUser.name}" (${newUser.email}) with role ${requestedRole} at stores [${targetAssignedStores.join(', ')}]`);
+    await createAuditLog(
+      authUser,
+      'Users',
+      'User Created',
+      `Created user "${newUser.name}" (${newUser.email}) with role ${requestedRole} at stores [${targetAssignedStores.join(', ')}]`
+    );
 
     const sanitizedUser = {
       id: newUser.id,
@@ -244,17 +316,27 @@ export async function POST(req: NextRequest) {
       mustChangePassword: true,
     };
 
-    broadcastRealtimeEvent('users', 'USER_CREATED', { userId: newUser.id, email: newUser.email, stores: targetAssignedStores });
-
-    return NextResponse.json({
-      success: true,
-      user: sanitizedUser,
+    broadcastRealtimeEvent('users', 'USER_CREATED', {
       userId: newUser.id,
-      message: `User "${newUser.name}" provisioned successfully.`,
-    }, { status: 201 });
+      email: newUser.email,
+      stores: targetAssignedStores,
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        user: sanitizedUser,
+        userId: newUser.id,
+        message: `User "${newUser.name}" provisioned successfully.`,
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     console.error('API /api/users POST error:', error);
-    return NextResponse.json({ success: false, error: error.message || 'Server error' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error.message || 'Server error' },
+      { status: 500 }
+    );
   }
 }
 
@@ -270,14 +352,31 @@ export async function PUT(req: NextRequest) {
     const authUser = auth.user;
 
     if (!hasPermission(authUser, 'users.edit')) {
-      return NextResponse.json({ success: false, error: 'Forbidden: Insufficient permissions to modify users' }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Insufficient permissions to modify users' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
-    const { id, email, name, store, status, password, shiftStatus, allowedStores, assignedStores, overrides } = body;
+    const {
+      id,
+      email,
+      name,
+      store,
+      status,
+      password,
+      shiftStatus,
+      allowedStores,
+      assignedStores,
+      overrides,
+    } = body;
 
     if (!id && !email) {
-      return NextResponse.json({ success: false, error: 'User ID or Email is required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'User ID or Email is required' },
+        { status: 400 }
+      );
     }
 
     const targetUser = await prisma.userAccount.findFirst({
@@ -285,65 +384,127 @@ export async function PUT(req: NextRequest) {
     });
 
     if (!targetUser) {
-      return NextResponse.json({ success: false, error: 'User account not found' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: 'User account not found' },
+        { status: 404 }
+      );
     }
 
     const requestedRole = body.role;
-    const requestedLevel = body.securityLevel !== undefined ? Number(body.securityLevel) : undefined;
+    const requestedLevel =
+      body.securityLevel !== undefined ? Number(body.securityLevel) : undefined;
 
     // 🔒 STRICT SUPER ADMIN SINGLETON: Cannot promote any user to Super Admin
-    if (targetUser.role !== 'Super Admin' && (requestedRole === 'Super Admin' || requestedLevel === 100)) {
-      return NextResponse.json({
-        success: false,
-        error: 'Forbidden: System enforces exactly ONE protected Super Admin. Promoting accounts to Super Admin is prohibited.',
-      }, { status: 403 });
+    if (
+      targetUser.role !== 'Super Admin' &&
+      (requestedRole === 'Super Admin' || requestedLevel === 100)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Forbidden: System enforces exactly ONE protected Super Admin. Promoting accounts to Super Admin is prohibited.',
+        },
+        { status: 403 }
+      );
     }
 
     // 🔒 Super Admin cannot be demoted/deleted/deactivated
     if (targetUser.role === 'Super Admin') {
       if (requestedRole && requestedRole !== 'Super Admin') {
-        return NextResponse.json({ success: false, error: 'Forbidden: Super Admin cannot be demoted' }, { status: 403 });
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: Super Admin cannot be demoted' },
+          { status: 403 }
+        );
       }
       if (status === 'Inactive' || status === 'Suspended') {
-        return NextResponse.json({ success: false, error: 'Forbidden: Super Admin cannot be deactivated or suspended' }, { status: 403 });
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: Super Admin cannot be deactivated or suspended' },
+          { status: 403 }
+        );
       }
     }
 
     if (authUser.role !== 'Super Admin') {
       if (targetUser.role === 'Super Admin') {
-        return NextResponse.json({ success: false, error: 'Forbidden: Only Super Admin can modify Super Admin accounts' }, { status: 403 });
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: Only Super Admin can modify Super Admin accounts' },
+          { status: 403 }
+        );
       }
       // Store scope check
-      const callerAllowed = authUser.allowedStores.length > 0 ? authUser.allowedStores : [authUser.store];
+      const callerAllowed =
+        authUser.allowedStores.length > 0 ? authUser.allowedStores : [authUser.store];
       if (targetUser.storeScope && !callerAllowed.includes(targetUser.storeScope)) {
-        return NextResponse.json({ success: false, error: 'Forbidden: You cannot modify users outside your assigned stores' }, { status: 403 });
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Forbidden: You cannot modify users outside your assigned stores',
+          },
+          { status: 403 }
+        );
       }
       // Level ceiling
       if (requestedRole && ROLE_LEVEL_MAP[requestedRole] !== undefined) {
         if (ROLE_LEVEL_MAP[requestedRole] >= authUser.securityLevel) {
-          return NextResponse.json({ success: false, error: `Forbidden: Cannot assign role "${requestedRole}" at or above your own level.` }, { status: 403 });
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Forbidden: Cannot assign role "${requestedRole}" at or above your own level.`,
+            },
+            { status: 403 }
+          );
         }
       }
       // Cannot edit users at equal or higher level
       if (targetUser.securityLevel >= authUser.securityLevel) {
-        return NextResponse.json({ success: false, error: 'Forbidden: Cannot modify users at equal or higher security level' }, { status: 403 });
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Forbidden: Cannot modify users at equal or higher security level',
+          },
+          { status: 403 }
+        );
       }
       // Validate store assignments are within caller's scope
-      const rawStoresToCheck = Array.isArray(assignedStores) ? assignedStores : Array.isArray(allowedStores) ? allowedStores : null;
+      const rawStoresToCheck = Array.isArray(assignedStores)
+        ? assignedStores
+        : Array.isArray(allowedStores)
+          ? allowedStores
+          : null;
       if (rawStoresToCheck) {
-        const hasInvalidAssignment = rawStoresToCheck.some((s: string) => !callerAllowed.includes(s));
+        const hasInvalidAssignment = rawStoresToCheck.some(
+          (s: string) => !callerAllowed.includes(s)
+        );
         if (hasInvalidAssignment) {
-          return NextResponse.json({ success: false, error: 'Forbidden: You can only assign stores you are authorized for' }, { status: 403 });
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Forbidden: You can only assign stores you are authorized for',
+            },
+            { status: 403 }
+          );
         }
       }
     }
 
     // 🔒 Check protected permission overrides
     if (Array.isArray(overrides)) {
-      const effectiveTargetLevel = (requestedRole && ROLE_LEVEL_MAP[requestedRole]) || targetUser.securityLevel;
+      const effectiveTargetLevel =
+        (requestedRole && ROLE_LEVEL_MAP[requestedRole]) || targetUser.securityLevel;
       for (const ov of overrides) {
-        if (ov.overrideType === 'ALLOW' && SUPER_ADMIN_PROTECTED_PERMISSIONS.includes(ov.permissionCode) && effectiveTargetLevel < 100) {
-          return NextResponse.json({ success: false, error: `Cannot grant protected permission "${ov.permissionCode}" to roles below Level 100` }, { status: 403 });
+        if (
+          ov.overrideType === 'ALLOW' &&
+          SUPER_ADMIN_PROTECTED_PERMISSIONS.includes(ov.permissionCode) &&
+          effectiveTargetLevel < 100
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Cannot grant protected permission "${ov.permissionCode}" to roles below Level 100`,
+            },
+            { status: 403 }
+          );
         }
       }
     }
@@ -358,6 +519,10 @@ export async function PUT(req: NextRequest) {
     }
     if (status) updateData.status = status;
     if (shiftStatus) updateData.shiftStatus = shiftStatus;
+    if (body.avatarUrl !== undefined || body.avatar !== undefined) {
+      const rawAvatar = body.avatarUrl !== undefined ? body.avatarUrl : body.avatar;
+      updateData.avatarUrl = await ensureStoredImage(rawAvatar, 'branding', authUser.name);
+    }
 
     // 🔒 Protected Super Admin preserves role and scope unconditionally
     if (targetUser.role === 'Super Admin') {
@@ -368,7 +533,10 @@ export async function PUT(req: NextRequest) {
 
     if (password) {
       if (password.length < 8) {
-        return NextResponse.json({ success: false, error: 'Password must be at least 8 characters' }, { status: 400 });
+        return NextResponse.json(
+          { success: false, error: 'Password must be at least 8 characters' },
+          { status: 400 }
+        );
       }
       updateData.passwordHash = await hashPassword(password);
       updateData.mustChangePassword = true;
@@ -380,10 +548,10 @@ export async function PUT(req: NextRequest) {
     const rawStoresToSync: string[] | null = Array.isArray(assignedStores)
       ? assignedStores
       : Array.isArray(allowedStores)
-      ? allowedStores
-      : store
-      ? [store]
-      : null;
+        ? allowedStores
+        : store
+          ? [store]
+          : null;
 
     let targetStores: string[] | null = null;
     if (rawStoresToSync && !isSuperAdmin) {
@@ -419,7 +587,11 @@ export async function PUT(req: NextRequest) {
         for (const ov of overrides) {
           if (ov.permissionCode && (ov.overrideType === 'ALLOW' || ov.overrideType === 'DENY')) {
             await tx.userPermissionOverride.create({
-              data: { userId: user.id, permissionCode: ov.permissionCode, overrideType: ov.overrideType },
+              data: {
+                userId: user.id,
+                permissionCode: ov.permissionCode,
+                overrideType: ov.overrideType,
+              },
             });
           }
         }
@@ -440,10 +612,18 @@ export async function PUT(req: NextRequest) {
     if (status) changes.push(`status=${status}`);
     if (password) changes.push('password=reset');
     if (targetStores) changes.push(`stores=[${targetStores.join(',')}]`);
-    await createAuditLog(authUser, 'Users', 'User Updated',
-      `Updated user "${targetUser.name}" (${targetUser.email}): ${changes.join(', ')}`);
+    await createAuditLog(
+      authUser,
+      'Users',
+      'User Updated',
+      `Updated user "${targetUser.name}" (${targetUser.email}): ${changes.join(', ')}`
+    );
 
-    broadcastRealtimeEvent('users', 'USER_UPDATED', { userId: updatedUser.id, email: updatedUser.email, action: 'updated' });
+    broadcastRealtimeEvent('users', 'USER_UPDATED', {
+      userId: updatedUser.id,
+      email: updatedUser.email,
+      action: 'updated',
+    });
 
     return NextResponse.json({
       success: true,
@@ -460,7 +640,10 @@ export async function PUT(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /api/users PUT error:', error);
-    return NextResponse.json({ success: false, error: error.message || 'Server error' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error.message || 'Server error' },
+      { status: 500 }
+    );
   }
 }
 
@@ -476,7 +659,10 @@ export async function DELETE(req: NextRequest) {
     const session = auth.user;
 
     if (session.role !== 'Super Admin') {
-      return NextResponse.json({ success: false, error: 'Unauthorized: Only Super Admin can deactivate or delete users' }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Only Super Admin can deactivate or delete users' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -493,12 +679,17 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (!id && !email) {
-      return NextResponse.json({ success: false, error: 'User ID or Email is required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'User ID or Email is required' },
+        { status: 400 }
+      );
     }
 
     let target = id ? await prisma.userAccount.findUnique({ where: { id } }) : null;
     if (!target && email) {
-      target = await prisma.userAccount.findUnique({ where: { email: email.toLowerCase().trim() } });
+      target = await prisma.userAccount.findUnique({
+        where: { email: email.toLowerCase().trim() },
+      });
     }
 
     if (!target) {
@@ -507,14 +698,21 @@ export async function DELETE(req: NextRequest) {
 
     // 🔒 STRICT SUPER ADMIN SINGLETON: Protected account cannot be deleted or deactivated
     if (target.role === 'Super Admin') {
-      return NextResponse.json({
-        success: false,
-        error: 'Forbidden: The protected Super Admin root account cannot be deleted or deactivated.',
-      }, { status: 403 });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Forbidden: The protected Super Admin root account cannot be deleted or deactivated.',
+        },
+        { status: 403 }
+      );
     }
 
     if (target.email === session.email) {
-      return NextResponse.json({ success: false, error: 'You cannot delete or deactivate your own logged-in account' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'You cannot delete or deactivate your own logged-in account' },
+        { status: 400 }
+      );
     }
 
     // Check if user has audit logs or sales orders
@@ -534,10 +732,18 @@ export async function DELETE(req: NextRequest) {
         data: { status: 'Inactive' },
       });
 
-      await createAuditLog(session, 'Users', 'User Deactivated',
-        `Deactivated user "${target.name}" (${target.email}). History: ${auditCount} audit logs, ${salesCount} sales`);
+      await createAuditLog(
+        session,
+        'Users',
+        'User Deactivated',
+        `Deactivated user "${target.name}" (${target.email}). History: ${auditCount} audit logs, ${salesCount} sales`
+      );
 
-      broadcastRealtimeEvent('users', 'USER_UPDATED', { userId: target.id, email: target.email, action: 'deactivated' });
+      broadcastRealtimeEvent('users', 'USER_UPDATED', {
+        userId: target.id,
+        email: target.email,
+        action: 'deactivated',
+      });
 
       return NextResponse.json({
         success: true,
@@ -557,10 +763,18 @@ export async function DELETE(req: NextRequest) {
       await tx.userAccount.delete({ where: { id: target.id } });
     });
 
-    await createAuditLog(session, 'Users', 'User Deleted',
-      `Permanently deleted user "${target.name}" (${target.email})`);
+    await createAuditLog(
+      session,
+      'Users',
+      'User Deleted',
+      `Permanently deleted user "${target.name}" (${target.email})`
+    );
 
-    broadcastRealtimeEvent('users', 'USER_UPDATED', { userId: target.id, email: target.email, action: 'deleted' });
+    broadcastRealtimeEvent('users', 'USER_UPDATED', {
+      userId: target.id,
+      email: target.email,
+      action: 'deleted',
+    });
 
     return NextResponse.json({
       success: true,
@@ -569,6 +783,9 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /api/users DELETE error:', error);
-    return NextResponse.json({ success: false, error: error.message || 'Server error' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error.message || 'Server error' },
+      { status: 500 }
+    );
   }
 }

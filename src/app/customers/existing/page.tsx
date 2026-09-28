@@ -162,11 +162,10 @@ export default function ExistingCustomersPage() {
               </span>
               <span className="text-xs text-muted-foreground">Historical Bridge Layer</span>
             </div>
-            <h1 className="page-title">
-              Existing / Historical Customers
-            </h1>
+            <h1 className="page-title">Existing / Historical Customers</h1>
             <p className="text-sm text-muted-foreground">
-              Review, verify, and link legacy customer identities and repair history with the active COSKO Customer Master.
+              Review, verify, and link legacy customer identities and repair history with the active
+              COSKO Customer Master.
             </p>
           </div>
 
@@ -177,13 +176,6 @@ export default function ExistingCustomersPage() {
             >
               <Icon name="UserGroupIcon" className="w-4 h-4 text-primary" />
               <span>COSKO Customer Master</span>
-            </Link>
-            <Link
-              href="/repairs"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm"
-            >
-              <Icon name="WrenchScrewdriverIcon" className="w-4 h-4" />
-              <span>Repairs Module</span>
             </Link>
           </div>
         </div>
@@ -199,7 +191,10 @@ export default function ExistingCustomersPage() {
         {/* Search & Filter Bar */}
         <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
           <div className="relative flex-1">
-            <Icon name="MagnifyingGlassIcon" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Icon
+              name="MagnifyingGlassIcon"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
+            />
             <input
               type="text"
               placeholder="Search legacy customers by name, phone, or ID..."
@@ -269,9 +264,7 @@ export default function ExistingCustomersPage() {
                 ) : (
                   customers.map((c) => (
                     <tr key={c.id} className="hover:bg-secondary/30 transition-colors">
-                      <td className="px-4 py-3.5 font-medium text-foreground">
-                        {c.name}
-                      </td>
+                      <td className="px-4 py-3.5 font-medium text-foreground">{c.name}</td>
                       <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">
                         {c.phone}
                       </td>
@@ -301,7 +294,9 @@ export default function ExistingCustomersPage() {
                         {c.firstSeenDate}
                       </td>
                       <td className="px-4 py-3.5">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getLinkStatusBadge(c.linkStatus)}`}>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getLinkStatusBadge(c.linkStatus)}`}
+                        >
                           {c.linkStatus}
                         </span>
                       </td>

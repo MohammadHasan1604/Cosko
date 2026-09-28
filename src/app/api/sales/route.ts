@@ -21,17 +21,23 @@ export async function GET(req: NextRequest) {
     // Store isolation check
     const whereClause: any = {};
     if (user.role !== 'Super Admin') {
-      const allowed = user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
+      const allowed =
+        user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
       if (requestedStore) {
         if (requestedStore === 'All Stores' || requestedStore === 'ALL') {
           return NextResponse.json(
-            { error: 'Forbidden: Consolidated view across all stores is restricted to Super Admin only' },
+            {
+              error:
+                'Forbidden: Consolidated view across all stores is restricted to Super Admin only',
+            },
             { status: 403 }
           );
         }
         if (!allowed.includes(requestedStore)) {
           return NextResponse.json(
-            { error: `Forbidden: Cross-store sales queries are restricted to Super Admin accounts only` },
+            {
+              error: `Forbidden: Cross-store sales queries are restricted to Super Admin accounts only`,
+            },
             { status: 403 }
           );
         }
@@ -87,15 +93,22 @@ export async function POST(req: NextRequest) {
 
     if (body.storeCode === 'All Stores' || body.storeCode === 'ALL') {
       return NextResponse.json(
-        { error: '"All Stores" is a reporting scope only. Sales must be processed under a real store outlet or Central Warehouse.' },
+        {
+          error:
+            '"All Stores" is a reporting scope only. Sales must be processed under a real store outlet or Central Warehouse.',
+        },
         { status: 400 }
       );
     }
 
     // Verify cashier store authorization
-    const callerAllowed = user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
+    const callerAllowed =
+      user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
     if (user.role !== 'Super Admin' && !callerAllowed.includes(body.storeCode)) {
-      return NextResponse.json({ error: 'Store Scope Lock: Cashier cannot execute sales for unauthorized store' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Store Scope Lock: Cashier cannot execute sales for unauthorized store' },
+        { status: 403 }
+      );
     }
 
     if (!body.items || body.items.length === 0) {
@@ -115,28 +128,30 @@ export async function POST(req: NextRequest) {
     // Validate payment method dynamically against centralized master
     const paymentMethodName = body.paymentMethod ? String(body.paymentMethod).trim() : '';
     if (!paymentMethodName) {
-      return NextResponse.json(
-        { error: 'Payment method is required.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Payment method is required.' }, { status: 400 });
     }
     const pmRecord = await prisma.paymentMethod.findFirst({
       where: { name: paymentMethodName },
     });
     if (pmRecord && pmRecord.status === 'Inactive') {
       return NextResponse.json(
-        { error: `Payment method "${paymentMethodName}" is currently deactivated. Please select an active payment method.` },
+        {
+          error: `Payment method "${paymentMethodName}" is currently deactivated. Please select an active payment method.`,
+        },
         { status: 400 }
       );
     }
     body.paymentMethod = paymentMethodName;
 
-
     // MANDATORY PROOF & REFERENCE VALIDATION (ROOT FIX - ZERO BYPASS)
-    const effectiveProofUrl = body.paymentProofUrl || (body.photos && body.photos.length > 0 ? body.photos[0] : null);
+    const effectiveProofUrl =
+      body.paymentProofUrl || (body.photos && body.photos.length > 0 ? body.photos[0] : null);
     if (!effectiveProofUrl || !String(effectiveProofUrl).trim()) {
       return NextResponse.json(
-        { error: 'Payment proof is mandatory! Please upload a receipt or transaction screenshot before completing sale checkout.' },
+        {
+          error:
+            'Payment proof is mandatory! Please upload a receipt or transaction screenshot before completing sale checkout.',
+        },
         { status: 400 }
       );
     }
@@ -147,7 +162,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const itemFingerprint = body.items.map((i) => `${i.productId}:${i.qty}:${i.unitPrice}`).join('|');
+    const itemFingerprint = body.items
+      .map((i) => `${i.productId}:${i.qty}:${i.unitPrice}`)
+      .join('|');
     const customKey =
       body.idempotencyKey ||
       req.headers.get('x-idempotency-key') ||
@@ -188,7 +205,10 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     console.error('API /api/sales POST error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to process checkout transaction' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to process checkout transaction' },
+      { status: 500 }
+    );
   }
 }
 
@@ -204,7 +224,10 @@ export async function PUT(req: NextRequest) {
     const user = auth.user;
 
     if (!hasPermission(user, 'sales.cancel') && !hasPermission(user, 'sales.refund')) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to modify sales orders' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient permissions to modify sales orders' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
@@ -221,7 +244,9 @@ export async function PUT(req: NextRequest) {
       });
       if (pmRecord && pmRecord.status === 'Inactive') {
         return NextResponse.json(
-          { error: `Payment method "${pmName}" is currently deactivated. Please select an active payment method.` },
+          {
+            error: `Payment method "${pmName}" is currently deactivated. Please select an active payment method.`,
+          },
           { status: 400 }
         );
       }
@@ -238,194 +263,211 @@ export async function PUT(req: NextRequest) {
 
     // Check store scope
     if (user.role !== 'Super Admin' && user.store !== existing.storeCode) {
-      return NextResponse.json({ error: 'Store Scope Lock: You cannot modify orders from another store' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Store Scope Lock: You cannot modify orders from another store' },
+        { status: 403 }
+      );
     }
 
     const isVoidingOrRefunding =
       existing.status === 'Completed' &&
       (status === 'Cancelled' || status === 'Refunded' || status === 'Voided');
 
-    const updatedSale = await prisma.$transaction(async (tx: any) => {
-      // If voiding or refunding a completed sale, restock inventory and revert customer totals
-      if (isVoidingOrRefunding && existing.items && existing.items.length > 0) {
-        const productIds = existing.items.map((it: any) => it.productId);
-        const invRecords = await tx.inventory.findMany({
-          where: { storeCode: existing.storeCode, productId: { in: productIds } },
-        });
-        const invMap = new Map<string, any>(invRecords.map((r: any) => [r.productId, r]));
-
-        // Concurrently upsert inventory balances with atomic increment
-        await Promise.all(
-          existing.items.map((item: any) => {
-            const prev = invMap.get(item.productId);
-            const newQty = (prev?.qtyOnHand || 0) + item.qty;
-            return tx.inventory.upsert({
-              where: { productId_storeCode: { productId: item.productId, storeCode: existing.storeCode } },
-              create: { productId: item.productId, storeCode: existing.storeCode, qtyOnHand: newQty, reorderPt: 5 },
-              update: { qtyOnHand: { increment: item.qty } },
-            });
-          })
-        );
-
-        // Batch create inventory ledger entries
-        await tx.inventoryLedger.createMany({
-          data: existing.items.map((item: any) => {
-            const prev = invMap.get(item.productId);
-            const newQty = (prev?.qtyOnHand || 0) + item.qty;
-            return {
-              productId: item.productId,
-              storeCode: existing.storeCode,
-              refNo: existing.orderNo,
-              type: 'POS Sale Refund / Void In',
-              qtyChange: item.qty,
-              costPerUnit: item.unitCost,
-              sellingPricePerUnit: item.unitPrice,
-              balanceAfter: newQty,
-              notes: `Order ${existing.orderNo} ${status} by ${user.name}`,
-              createdBy: user.name,
-            };
-          }),
-        });
-
-        // Decrement customer total spend if linked
-        if (existing.customerId) {
-          const cust = await tx.customer.findUnique({ where: { id: existing.customerId } });
-          if (cust) {
-            await tx.customer.update({
-              where: { id: cust.id },
-              data: {
-                totalSpent: Math.max(0, Number(cust.totalSpent) - Number(existing.grandTotal)),
-                totalOrders: Math.max(0, (cust.totalOrders || 1) - 1),
-              },
-            });
-          }
-        }
-
-        // Record Financial Ledger Reversal Entries in a single batched query
-        const netRev = Number(existing.subtotal) - Number(existing.discountAmount || 0);
-        const taxAmt = Number(existing.taxAmount || 0);
-        const gTotal = Number(existing.grandTotal);
-        const cogsAmt = Number(existing.totalCost);
-
-        const financialEntries: any[] = [
-          {
-            entryNo: `JRN-VOID-REV-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
-            entryDate: new Date(),
-            storeCode: existing.storeCode,
-            accountCategory: 'REVENUE',
-            accountName: 'Sales Returns & Refunds',
-            debit: netRev,
-            credit: 0,
-            amount: -netRev,
-            refType: 'SALE',
-            refId: existing.id,
-            refNo: existing.orderNo,
-            entityName: existing.customerName || 'Customer',
-            description: `Order ${existing.orderNo} ${status} reversal by ${user.name}`,
-            createdBy: user.name,
-          },
-          {
-            entryNo: `JRN-VOID-ASST-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
-            entryDate: new Date(),
-            storeCode: existing.storeCode,
-            accountCategory: 'ASSET',
-            accountName: `Cash / Bank Refund (${existing.paymentMethod})`,
-            debit: 0,
-            credit: gTotal,
-            amount: -gTotal,
-            refType: 'SALE',
-            refId: existing.id,
-            refNo: existing.orderNo,
-            entityName: existing.customerName || 'Customer',
-            description: `Refund payout for Order ${existing.orderNo}`,
-            createdBy: user.name,
-          },
-        ];
-
-        if (taxAmt > 0) {
-          financialEntries.push({
-            entryNo: `JRN-VOID-TAX-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
-            entryDate: new Date(),
-            storeCode: existing.storeCode,
-            accountCategory: 'LIABILITY',
-            accountName: 'GST Output Tax Liability (Reversal)',
-            debit: taxAmt,
-            credit: 0,
-            amount: -taxAmt,
-            refType: 'SALE',
-            refId: existing.id,
-            refNo: existing.orderNo,
-            entityName: existing.customerName || 'Customer',
-            description: `GST Reversal on Order ${existing.orderNo} ${status}`,
-            createdBy: user.name,
+    const updatedSale = await prisma.$transaction(
+      async (tx: any) => {
+        // If voiding or refunding a completed sale, restock inventory and revert customer totals
+        if (isVoidingOrRefunding && existing.items && existing.items.length > 0) {
+          const productIds = existing.items.map((it: any) => it.productId);
+          const invRecords = await tx.inventory.findMany({
+            where: { storeCode: existing.storeCode, productId: { in: productIds } },
           });
-        }
+          const invMap = new Map<string, any>(invRecords.map((r: any) => [r.productId, r]));
 
-        if (cogsAmt > 0) {
-          financialEntries.push(
+          // Concurrently upsert inventory balances with atomic increment
+          await Promise.all(
+            existing.items.map((item: any) => {
+              const prev = invMap.get(item.productId);
+              const newQty = (prev?.qtyOnHand || 0) + item.qty;
+              return tx.inventory.upsert({
+                where: {
+                  productId_storeCode: { productId: item.productId, storeCode: existing.storeCode },
+                },
+                create: {
+                  productId: item.productId,
+                  storeCode: existing.storeCode,
+                  qtyOnHand: newQty,
+                  reorderPt: 5,
+                },
+                update: { qtyOnHand: { increment: item.qty } },
+              });
+            })
+          );
+
+          // Batch create inventory ledger entries
+          await tx.inventoryLedger.createMany({
+            data: existing.items.map((item: any) => {
+              const prev = invMap.get(item.productId);
+              const newQty = (prev?.qtyOnHand || 0) + item.qty;
+              return {
+                productId: item.productId,
+                storeCode: existing.storeCode,
+                refNo: existing.orderNo,
+                type: 'POS Sale Refund / Void In',
+                qtyChange: item.qty,
+                costPerUnit: item.unitCost,
+                sellingPricePerUnit: item.unitPrice,
+                balanceAfter: newQty,
+                notes: `Order ${existing.orderNo} ${status} by ${user.name}`,
+                createdBy: user.name,
+              };
+            }),
+          });
+
+          // Decrement customer total spend if linked
+          if (existing.customerId) {
+            const cust = await tx.customer.findUnique({ where: { id: existing.customerId } });
+            if (cust) {
+              await tx.customer.update({
+                where: { id: cust.id },
+                data: {
+                  totalSpent: Math.max(0, Number(cust.totalSpent) - Number(existing.grandTotal)),
+                  totalOrders: Math.max(0, (cust.totalOrders || 1) - 1),
+                },
+              });
+            }
+          }
+
+          // Record Financial Ledger Reversal Entries in a single batched query
+          const netRev = Number(existing.subtotal) - Number(existing.discountAmount || 0);
+          const taxAmt = Number(existing.taxAmount || 0);
+          const gTotal = Number(existing.grandTotal);
+          const cogsAmt = Number(existing.totalCost);
+
+          const financialEntries: any[] = [
             {
-              entryNo: `JRN-VOID-COGS-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
+              entryNo: `JRN-VOID-REV-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
               entryDate: new Date(),
               storeCode: existing.storeCode,
-              accountCategory: 'COGS',
-              accountName: 'Cost of Goods Sold (Reversal)',
-              debit: 0,
-              credit: cogsAmt,
-              amount: -cogsAmt,
+              accountCategory: 'REVENUE',
+              accountName: 'Sales Returns & Refunds',
+              debit: netRev,
+              credit: 0,
+              amount: -netRev,
               refType: 'SALE',
               refId: existing.id,
               refNo: existing.orderNo,
               entityName: existing.customerName || 'Customer',
-              description: `COGS Reversal on Order ${existing.orderNo} ${status}`,
+              description: `Order ${existing.orderNo} ${status} reversal by ${user.name}`,
               createdBy: user.name,
             },
             {
-              entryNo: `JRN-VOID-INVR-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
+              entryNo: `JRN-VOID-ASST-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
               entryDate: new Date(),
               storeCode: existing.storeCode,
               accountCategory: 'ASSET',
-              accountName: 'Inventory Asset (Restocked)',
-              debit: cogsAmt,
-              credit: 0,
-              amount: cogsAmt,
+              accountName: `Cash / Bank Refund (${existing.paymentMethod})`,
+              debit: 0,
+              credit: gTotal,
+              amount: -gTotal,
               refType: 'SALE',
               refId: existing.id,
               refNo: existing.orderNo,
               entityName: existing.customerName || 'Customer',
-              description: `Stock Restocked for Voided/Refunded Order ${existing.orderNo}`,
+              description: `Refund payout for Order ${existing.orderNo}`,
               createdBy: user.name,
-            }
-          );
+            },
+          ];
+
+          if (taxAmt > 0) {
+            financialEntries.push({
+              entryNo: `JRN-VOID-TAX-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
+              entryDate: new Date(),
+              storeCode: existing.storeCode,
+              accountCategory: 'LIABILITY',
+              accountName: 'GST Output Tax Liability (Reversal)',
+              debit: taxAmt,
+              credit: 0,
+              amount: -taxAmt,
+              refType: 'SALE',
+              refId: existing.id,
+              refNo: existing.orderNo,
+              entityName: existing.customerName || 'Customer',
+              description: `GST Reversal on Order ${existing.orderNo} ${status}`,
+              createdBy: user.name,
+            });
+          }
+
+          if (cogsAmt > 0) {
+            financialEntries.push(
+              {
+                entryNo: `JRN-VOID-COGS-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
+                entryDate: new Date(),
+                storeCode: existing.storeCode,
+                accountCategory: 'COGS',
+                accountName: 'Cost of Goods Sold (Reversal)',
+                debit: 0,
+                credit: cogsAmt,
+                amount: -cogsAmt,
+                refType: 'SALE',
+                refId: existing.id,
+                refNo: existing.orderNo,
+                entityName: existing.customerName || 'Customer',
+                description: `COGS Reversal on Order ${existing.orderNo} ${status}`,
+                createdBy: user.name,
+              },
+              {
+                entryNo: `JRN-VOID-INVR-${existing.orderNo}-${Date.now().toString().slice(-4)}`,
+                entryDate: new Date(),
+                storeCode: existing.storeCode,
+                accountCategory: 'ASSET',
+                accountName: 'Inventory Asset (Restocked)',
+                debit: cogsAmt,
+                credit: 0,
+                amount: cogsAmt,
+                refType: 'SALE',
+                refId: existing.id,
+                refNo: existing.orderNo,
+                entityName: existing.customerName || 'Customer',
+                description: `Stock Restocked for Voided/Refunded Order ${existing.orderNo}`,
+                createdBy: user.name,
+              }
+            );
+          }
+
+          await tx.financialLedgerEntry.createMany({ data: financialEntries });
+
+          // Log to Audit Log
+          await tx.auditLog.create({
+            data: {
+              module: 'Sales',
+              action: `Order ${status}`,
+              details: `Voided/refunded invoice ${existing.orderNo} (₹${Number(existing.grandTotal).toFixed(2)}) and restocked ${existing.items.length} item line(s) into ${existing.storeCode}`,
+              userEmail: user.email || user.name,
+              userRole: user.role,
+              storeCode: existing.storeCode,
+            },
+          });
         }
 
-        await tx.financialLedgerEntry.createMany({ data: financialEntries });
-
-        // Log to Audit Log
-        await tx.auditLog.create({
+        const sale = await tx.salesOrder.update({
+          where: { id },
           data: {
-            module: 'Sales',
-            action: `Order ${status}`,
-            details: `Voided/refunded invoice ${existing.orderNo} (₹${Number(existing.grandTotal).toFixed(2)}) and restocked ${existing.items.length} item line(s) into ${existing.storeCode}`,
-            userEmail: user.email || user.name,
-            userRole: user.role,
-            storeCode: existing.storeCode,
+            ...(status ? { status } : {}),
+            ...(paymentMethod ? { paymentMethod } : {}),
           },
+          include: { items: true },
         });
-      }
 
-      const sale = await tx.salesOrder.update({
-        where: { id },
-        data: {
-          ...(status ? { status } : {}),
-          ...(paymentMethod ? { paymentMethod } : {}),
-        },
-        include: { items: true },
-      });
+        return sale;
+      },
+      { maxWait: 15000, timeout: 45000 }
+    );
 
-      return sale;
-    }, { maxWait: 15000, timeout: 45000 });
-
-    broadcastRealtimeEvent('sales', 'SALE_UPDATED', { id: updatedSale.id, orderNo: updatedSale.orderNo, status: updatedSale.status });
+    broadcastRealtimeEvent('sales', 'SALE_UPDATED', {
+      id: updatedSale.id,
+      orderNo: updatedSale.orderNo,
+      status: updatedSale.status,
+    });
     if (isVoidingOrRefunding) {
       broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.storeCode });
     }
@@ -437,7 +479,10 @@ export async function PUT(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /api/sales PUT error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to update sales order' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to update sales order' },
+      { status: 500 }
+    );
   }
 }
 
@@ -453,7 +498,10 @@ export async function DELETE(req: NextRequest) {
     const user = auth.user;
 
     if (!hasPermission(user, 'sales.cancel')) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to void sales orders' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient permissions to void sales orders' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -469,90 +517,110 @@ export async function DELETE(req: NextRequest) {
     });
 
     if (!existing) {
-      return NextResponse.json({ success: true, message: 'Sales order already removed or non-existent' });
+      return NextResponse.json({
+        success: true,
+        message: 'Sales order already removed or non-existent',
+      });
     }
 
     // Check store scope
     if (user.role !== 'Super Admin' && user.store !== existing.storeCode) {
-      return NextResponse.json({ error: 'Store Scope Lock: You cannot delete orders from another store' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Store Scope Lock: You cannot delete orders from another store' },
+        { status: 403 }
+      );
     }
 
     // Always safe-cancel completed sales orders rather than erasing historical financial records
-    const cancelled = await prisma.$transaction(async (tx: any) => {
-      if (existing.status === 'Completed' && existing.items && existing.items.length > 0) {
-        const productIds = existing.items.map((it: any) => it.productId);
-        const invRecords = await tx.inventory.findMany({
-          where: { storeCode: existing.storeCode, productId: { in: productIds } },
-        });
-        const invMap = new Map<string, any>(invRecords.map((r: any) => [r.productId, r]));
+    const cancelled = await prisma.$transaction(
+      async (tx: any) => {
+        if (existing.status === 'Completed' && existing.items && existing.items.length > 0) {
+          const productIds = existing.items.map((it: any) => it.productId);
+          const invRecords = await tx.inventory.findMany({
+            where: { storeCode: existing.storeCode, productId: { in: productIds } },
+          });
+          const invMap = new Map<string, any>(invRecords.map((r: any) => [r.productId, r]));
 
-        // Concurrently upsert inventory balances with atomic increment
-        await Promise.all(
-          existing.items.map((item: any) => {
-            const prev = invMap.get(item.productId);
-            const newQty = (prev?.qtyOnHand || 0) + item.qty;
-            return tx.inventory.upsert({
-              where: { productId_storeCode: { productId: item.productId, storeCode: existing.storeCode } },
-              create: { productId: item.productId, storeCode: existing.storeCode, qtyOnHand: newQty, reorderPt: 5 },
-              update: { qtyOnHand: { increment: item.qty } },
-            });
-          })
-        );
+          // Concurrently upsert inventory balances with atomic increment
+          await Promise.all(
+            existing.items.map((item: any) => {
+              const prev = invMap.get(item.productId);
+              const newQty = (prev?.qtyOnHand || 0) + item.qty;
+              return tx.inventory.upsert({
+                where: {
+                  productId_storeCode: { productId: item.productId, storeCode: existing.storeCode },
+                },
+                create: {
+                  productId: item.productId,
+                  storeCode: existing.storeCode,
+                  qtyOnHand: newQty,
+                  reorderPt: 5,
+                },
+                update: { qtyOnHand: { increment: item.qty } },
+              });
+            })
+          );
 
-        // Batch create inventory ledger entries
-        await tx.inventoryLedger.createMany({
-          data: existing.items.map((item: any) => {
-            const prev = invMap.get(item.productId);
-            const newQty = (prev?.qtyOnHand || 0) + item.qty;
-            return {
-              productId: item.productId,
-              storeCode: existing.storeCode,
-              refNo: existing.orderNo,
-              type: 'POS Sale Refund / Void In',
-              qtyChange: item.qty,
-              costPerUnit: item.unitCost,
-              sellingPricePerUnit: item.unitPrice,
-              balanceAfter: newQty,
-              notes: `Order ${existing.orderNo} Voided by ${user.name}`,
-              createdBy: user.name,
-            };
-          }),
-        });
+          // Batch create inventory ledger entries
+          await tx.inventoryLedger.createMany({
+            data: existing.items.map((item: any) => {
+              const prev = invMap.get(item.productId);
+              const newQty = (prev?.qtyOnHand || 0) + item.qty;
+              return {
+                productId: item.productId,
+                storeCode: existing.storeCode,
+                refNo: existing.orderNo,
+                type: 'POS Sale Refund / Void In',
+                qtyChange: item.qty,
+                costPerUnit: item.unitCost,
+                sellingPricePerUnit: item.unitPrice,
+                balanceAfter: newQty,
+                notes: `Order ${existing.orderNo} Voided by ${user.name}`,
+                createdBy: user.name,
+              };
+            }),
+          });
 
-        if (existing.customerId) {
-          const cust = await tx.customer.findUnique({ where: { id: existing.customerId } });
-          if (cust) {
-            await tx.customer.update({
-              where: { id: cust.id },
-              data: {
-                totalSpent: Math.max(0, Number(cust.totalSpent) - Number(existing.grandTotal)),
-                totalOrders: Math.max(0, (cust.totalOrders || 1) - 1),
-              },
-            });
+          if (existing.customerId) {
+            const cust = await tx.customer.findUnique({ where: { id: existing.customerId } });
+            if (cust) {
+              await tx.customer.update({
+                where: { id: cust.id },
+                data: {
+                  totalSpent: Math.max(0, Number(cust.totalSpent) - Number(existing.grandTotal)),
+                  totalOrders: Math.max(0, (cust.totalOrders || 1) - 1),
+                },
+              });
+            }
           }
         }
-      }
 
-      const updated = await tx.salesOrder.update({
-        where: { id },
-        data: { status: 'Cancelled' },
-      });
+        const updated = await tx.salesOrder.update({
+          where: { id },
+          data: { status: 'Cancelled' },
+        });
 
-      await tx.auditLog.create({
-        data: {
-          module: 'Sales',
-          action: 'Void Sales Order',
-          details: `Voided and cancelled sales order ${existing.orderNo} (Total: ₹${Number(existing.grandTotal).toFixed(2)}) and restocked inventory items`,
-          userEmail: user.email || user.name,
-          userRole: user.role,
-          storeCode: existing.storeCode,
-        },
-      });
+        await tx.auditLog.create({
+          data: {
+            module: 'Sales',
+            action: 'Void Sales Order',
+            details: `Voided and cancelled sales order ${existing.orderNo} (Total: ₹${Number(existing.grandTotal).toFixed(2)}) and restocked inventory items`,
+            userEmail: user.email || user.name,
+            userRole: user.role,
+            storeCode: existing.storeCode,
+          },
+        });
 
-      return updated;
-    }, { maxWait: 15000, timeout: 45000 });
+        return updated;
+      },
+      { maxWait: 15000, timeout: 45000 }
+    );
 
-    broadcastRealtimeEvent('sales', 'SALE_UPDATED', { id: existing.id, orderNo: existing.orderNo, status: 'Cancelled' });
+    broadcastRealtimeEvent('sales', 'SALE_UPDATED', {
+      id: existing.id,
+      orderNo: existing.orderNo,
+      status: 'Cancelled',
+    });
     broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.storeCode });
 
     return NextResponse.json({
@@ -563,6 +631,9 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /api/sales DELETE error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to void sales order' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to void sales order' },
+      { status: 500 }
+    );
   }
 }

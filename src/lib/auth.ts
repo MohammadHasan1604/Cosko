@@ -6,9 +6,13 @@ import crypto from 'crypto';
 const AUTH_SECRET = process.env.AUTH_SECRET;
 if (!AUTH_SECRET) {
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('FATAL: AUTH_SECRET environment variable is required in production. Refusing to start with missing secret.');
+    throw new Error(
+      'FATAL: AUTH_SECRET environment variable is required in production. Refusing to start with missing secret.'
+    );
   }
-  console.warn('⚠️  WARNING: AUTH_SECRET is not set. Authentication will fail. Set AUTH_SECRET in your .env file.');
+  console.warn(
+    '⚠️  WARNING: AUTH_SECRET is not set. Authentication will fail. Set AUTH_SECRET in your .env file.'
+  );
 }
 
 // Reject the known insecure default even if set
@@ -18,7 +22,9 @@ function getSecret(): string {
     throw new Error('AUTH_SECRET is not configured. Cannot sign or verify tokens.');
   }
   if (AUTH_SECRET === INSECURE_DEFAULT && process.env.NODE_ENV === 'production') {
-    throw new Error('FATAL: AUTH_SECRET is set to the insecure default value. Generate a strong random secret for production.');
+    throw new Error(
+      'FATAL: AUTH_SECRET is set to the insecure default value. Generate a strong random secret for production.'
+    );
   }
   return AUTH_SECRET;
 }
@@ -29,7 +35,13 @@ export interface SessionUser {
   id: string;
   name: string;
   email: string;
-  role: 'Super Admin' | 'Store Manager' | 'Inventory Manager' | 'Sales Executive' | 'POS Cashier' | 'Restricted Employee';
+  role:
+    | 'Super Admin'
+    | 'Store Manager'
+    | 'Inventory Manager'
+    | 'Sales Executive'
+    | 'POS Cashier'
+    | 'Restricted Employee';
   securityLevel: number;
   store: string;
   allowedStores?: string[];
@@ -116,7 +128,10 @@ export function isValidAuthOrigin(req: Request): boolean {
       }
     }
     // Allow localhost during dev only
-    if (process.env.NODE_ENV !== 'production' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')
+    ) {
       return true;
     }
   } catch {}

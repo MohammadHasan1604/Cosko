@@ -39,9 +39,12 @@ export default function Modal({
   const titleId = useId();
   const subtitleId = useId();
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
-  }, [onClose]);
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    },
+    [onClose]
+  );
 
   // Focus trap and scroll lock
   useEffect(() => {
@@ -66,7 +69,9 @@ export default function Modal({
       ref={overlayRef}
       style={{ zIndex }}
       className="fixed inset-0 flex items-end md:items-center justify-center overflow-hidden"
-      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+      onClick={(e) => {
+        if (e.target === overlayRef.current) onClose();
+      }}
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] animate-backdrop-in" />
@@ -88,8 +93,20 @@ export default function Modal({
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 border-b border-border/60 bg-card flex-shrink-0">
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-sm md:text-base font-bold text-foreground tracking-tight truncate">{title}</h2>
-            {subtitle && <p id={subtitleId} className="text-xs text-muted-foreground mt-0.5 leading-normal truncate">{subtitle}</p>}
+            <h2
+              id={titleId}
+              className="text-sm md:text-base font-bold text-foreground tracking-tight truncate"
+            >
+              {title}
+            </h2>
+            {subtitle && (
+              <p
+                id={subtitleId}
+                className="text-xs text-muted-foreground mt-0.5 leading-normal truncate"
+              >
+                {subtitle}
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -107,7 +124,10 @@ export default function Modal({
 
         {/* Footer */}
         {footer && (
-          <div className="border-t border-border/60 px-4 py-3 md:px-5 md:py-3.5 bg-muted/15 flex-shrink-0" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+          <div
+            className="border-t border-border/60 px-4 py-3 md:px-5 md:py-3.5 bg-muted/15 flex-shrink-0"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
             {footer}
           </div>
         )}

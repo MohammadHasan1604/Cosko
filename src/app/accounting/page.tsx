@@ -112,7 +112,15 @@ interface DrillDownRecord {
 }
 
 export default function AccountingPage() {
-  const { storesList, selectedStore, setSelectedStore, datePeriod, setDatePeriod, customDateRange, currentUser } = useApp();
+  const {
+    storesList,
+    selectedStore,
+    setSelectedStore,
+    datePeriod,
+    setDatePeriod,
+    customDateRange,
+    currentUser,
+  } = useApp();
 
   // Active view tab (Consolidated is Super Admin only; normal managers default to store view)
   const [activeTab, setActiveTab] = useState<'consolidated' | 'store' | 'central' | 'ledger'>(
@@ -282,12 +290,13 @@ export default function AccountingPage() {
   const filteredDrillDownRows = useMemo(() => {
     if (!drillDownSearch.trim()) return drillDownRecords;
     const q = drillDownSearch.toLowerCase();
-    return drillDownRecords.filter((r) =>
-      r.refNo.toLowerCase().includes(q) ||
-      (r.entity && r.entity.toLowerCase().includes(q)) ||
-      (r.description && r.description.toLowerCase().includes(q)) ||
-      (r.items && r.items.toLowerCase().includes(q)) ||
-      (r.storeCode && r.storeCode.toLowerCase().includes(q))
+    return drillDownRecords.filter(
+      (r) =>
+        r.refNo.toLowerCase().includes(q) ||
+        (r.entity && r.entity.toLowerCase().includes(q)) ||
+        (r.description && r.description.toLowerCase().includes(q)) ||
+        (r.items && r.items.toLowerCase().includes(q)) ||
+        (r.storeCode && r.storeCode.toLowerCase().includes(q))
     );
   }, [drillDownRecords, drillDownSearch]);
 
@@ -303,13 +312,14 @@ export default function AccountingPage() {
         </div>
 
         <div className="card p-3 md:p-4 space-y-3">
-
           {/* Action Bar & Controls */}
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Store Filter (SUPER ADMIN ONLY) */}
             {currentUser.role === 'Super Admin' && (
               <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/80">
-                <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground pl-2">Store:</span>
+                <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground pl-2">
+                  Store:
+                </span>
                 <select
                   value={selectedStore}
                   onChange={(e) => setSelectedStore(e.target.value)}
@@ -327,7 +337,9 @@ export default function AccountingPage() {
 
             {/* Time Period Filter */}
             <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/80">
-              <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground pl-2">Period:</span>
+              <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground pl-2">
+                Period:
+              </span>
               <select
                 value={datePeriod}
                 onChange={(e) => setDatePeriod(e.target.value)}
@@ -388,7 +400,9 @@ export default function AccountingPage() {
             >
               <Icon name="BuildingOffice2Icon" size={15} />
               <span>Consolidated Company P&L</span>
-              <span className="text-3xs px-1.5 py-0.5 rounded-full bg-primary-foreground/20 font-mono">Eliminated</span>
+              <span className="text-3xs px-1.5 py-0.5 rounded-full bg-primary-foreground/20 font-mono">
+                Eliminated
+              </span>
             </button>
           )}
 
@@ -445,15 +459,27 @@ export default function AccountingPage() {
             {/* Elimination Accounting Rule Notice */}
             <div className="p-4 rounded-2xl border border-primary/20 bg-primary/5 flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
-                <Icon name="InformationCircleIcon" size={20} className="text-primary flex-shrink-0 mt-0.5" />
+                <Icon
+                  name="InformationCircleIcon"
+                  size={20}
+                  className="text-primary flex-shrink-0 mt-0.5"
+                />
                 <div className="text-xs space-y-1">
-                  <p className="font-bold text-foreground">Consolidated Enterprise Accounting Standard</p>
+                  <p className="font-bold text-foreground">
+                    Consolidated Enterprise Accounting Standard
+                  </p>
                   <p className="text-muted-foreground leading-relaxed">
                     Internal Central → Retail store transfer revenue (
-                    <strong className="text-foreground">₹{consolidatedData.eliminatedTransferRevenue.toLocaleString('en-IN')}</strong>) 
-                    and transfer markups (
-                    <strong className="text-foreground">₹{consolidatedData.eliminatedTransferMarkup.toLocaleString('en-IN')}</strong>) 
-                    have been <strong>eliminated</strong> to prevent double-counting. Consolidated Profit reflects external sales to billed customers minus authoritative vendor procurement cost.
+                    <strong className="text-foreground">
+                      ₹{consolidatedData.eliminatedTransferRevenue.toLocaleString('en-IN')}
+                    </strong>
+                    ) and transfer markups (
+                    <strong className="text-foreground">
+                      ₹{consolidatedData.eliminatedTransferMarkup.toLocaleString('en-IN')}
+                    </strong>
+                    ) have been <strong>eliminated</strong> to prevent double-counting. Consolidated
+                    Profit reflects external sales to billed customers minus authoritative vendor
+                    procurement cost.
                   </p>
                 </div>
               </div>
@@ -469,8 +495,12 @@ export default function AccountingPage() {
                 className="card p-5 cursor-pointer hover:border-primary hover:shadow-md transition-all group relative overflow-hidden"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">External Sales Revenue</p>
-                  <span className="text-3xs font-bold text-primary group-hover:underline">Click to drill down →</span>
+                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                    External Sales Revenue
+                  </p>
+                  <span className="text-3xs font-bold text-primary group-hover:underline">
+                    Click to drill down →
+                  </span>
                 </div>
                 <p className="text-2xl font-black text-foreground font-tabular mt-2">
                   ₹{consolidatedData.netExternalRevenue.toLocaleString('en-IN')}
@@ -486,8 +516,12 @@ export default function AccountingPage() {
                 className="card p-5 cursor-pointer hover:border-info hover:shadow-md transition-all group relative overflow-hidden"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Vendor COGS (Purchase Cost)</p>
-                  <span className="text-3xs font-bold text-info group-hover:underline">Click to drill down →</span>
+                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Vendor COGS (Purchase Cost)
+                  </p>
+                  <span className="text-3xs font-bold text-info group-hover:underline">
+                    Click to drill down →
+                  </span>
                 </div>
                 <p className="text-2xl font-black text-info font-tabular mt-2">
                   ₹{consolidatedData.vendorCOGS.toLocaleString('en-IN')}
@@ -502,24 +536,34 @@ export default function AccountingPage() {
                 className="card p-5 cursor-pointer hover:border-danger hover:shadow-md transition-all group relative overflow-hidden"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Operating Expenses</p>
-                  <span className="text-3xs font-bold text-danger group-hover:underline">Click to drill down →</span>
+                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Operating Expenses
+                  </p>
+                  <span className="text-3xs font-bold text-danger group-hover:underline">
+                    Click to drill down →
+                  </span>
                 </div>
                 <p className="text-2xl font-black text-danger font-tabular mt-2">
                   ₹{consolidatedData.totalExpenses.toLocaleString('en-IN')}
                 </p>
                 <p className="text-2xs text-muted-foreground mt-1">
-                  Store (₹{consolidatedData.storeOperatingExpenses.toLocaleString('en-IN')}) + Central (₹{consolidatedData.centralExpenses.toLocaleString('en-IN')})
+                  Store (₹{consolidatedData.storeOperatingExpenses.toLocaleString('en-IN')}) +
+                  Central (₹{consolidatedData.centralExpenses.toLocaleString('en-IN')})
                 </p>
               </div>
 
               <div className="card p-5 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/30 relative overflow-hidden">
-                <p className="text-2xs font-bold uppercase tracking-wider text-primary">Consolidated Net Profit</p>
-                <p className={`text-2xl font-black font-tabular mt-2 ${consolidatedData.consolidatedNetProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                <p className="text-2xs font-bold uppercase tracking-wider text-primary">
+                  Consolidated Net Profit
+                </p>
+                <p
+                  className={`text-2xl font-black font-tabular mt-2 ${consolidatedData.consolidatedNetProfit >= 0 ? 'text-success' : 'text-danger'}`}
+                >
                   ₹{consolidatedData.consolidatedNetProfit.toLocaleString('en-IN')}
                 </p>
                 <p className="text-2xs text-muted-foreground mt-1 font-tabular">
-                  Net Margin: <strong className="text-foreground">{consolidatedData.netMarginPercent}%</strong>
+                  Net Margin:{' '}
+                  <strong className="text-foreground">{consolidatedData.netMarginPercent}%</strong>
                 </p>
               </div>
             </div>
@@ -528,10 +572,16 @@ export default function AccountingPage() {
             <div className="card p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-border pb-3">
                 <div>
-                  <h3 className="text-base font-bold text-foreground">Consolidated Financial Income Statement</h3>
-                  <p className="text-xs text-muted-foreground">Authoritative double-entry balances for {selectedStore} ({datePeriod})</p>
+                  <h3 className="text-base font-bold text-foreground">
+                    Consolidated Financial Income Statement
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Authoritative double-entry balances for {selectedStore} ({datePeriod})
+                  </p>
                 </div>
-                <span className="badge-neutral text-xs font-mono font-bold">Scope: {selectedStore}</span>
+                <span className="badge-neutral text-xs font-mono font-bold">
+                  Scope: {selectedStore}
+                </span>
               </div>
 
               <div className="space-y-2 text-sm font-tabular">
@@ -543,7 +593,9 @@ export default function AccountingPage() {
                     <span className="w-2 h-2 rounded-full bg-success" />
                     Gross External Sales Revenue (Billed to Customers)
                   </span>
-                  <span className="font-bold text-foreground">₹{consolidatedData.netExternalRevenue.toLocaleString('en-IN')}</span>
+                  <span className="font-bold text-foreground">
+                    ₹{consolidatedData.netExternalRevenue.toLocaleString('en-IN')}
+                  </span>
                 </div>
 
                 <div
@@ -554,40 +606,56 @@ export default function AccountingPage() {
                     <span className="w-2 h-2 rounded-full bg-info" />
                     Less: Cost of Goods Sold (Authoritative Vendor Purchase Cost)
                   </span>
-                  <span className="font-semibold text-info">-₹{consolidatedData.vendorCOGS.toLocaleString('en-IN')}</span>
+                  <span className="font-semibold text-info">
+                    -₹{consolidatedData.vendorCOGS.toLocaleString('en-IN')}
+                  </span>
                 </div>
 
                 {/* Gross Profit Subtotal */}
                 <div className="flex justify-between items-center py-3 px-4 bg-muted/50 rounded-xl font-extrabold text-foreground border border-border">
                   <span className="text-base">Consolidated Gross Profit</span>
                   <div className="text-right">
-                    <span className="text-lg text-primary">₹{consolidatedData.consolidatedGrossProfit.toLocaleString('en-IN')}</span>
-                    <span className="text-xs text-muted-foreground ml-2">({consolidatedData.grossMarginPercent}% margin)</span>
+                    <span className="text-lg text-primary">
+                      ₹{consolidatedData.consolidatedGrossProfit.toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ({consolidatedData.grossMarginPercent}% margin)
+                    </span>
                   </div>
                 </div>
 
                 {/* Expenses Breakdown */}
                 <div
-                  onClick={() => handleDrillDown('storeOperatingExpenses', 'Store Operating Expenses')}
+                  onClick={() =>
+                    handleDrillDown('storeOperatingExpenses', 'Store Operating Expenses')
+                  }
                   className="flex justify-between items-center py-2 px-3 rounded-lg hover:bg-muted/40 cursor-pointer transition-colors text-muted-foreground pt-3"
                 >
                   <span>Store Operational Expenses (Rent, Salaries, Electricity, Repairs):</span>
-                  <span className="font-semibold text-danger">-₹{consolidatedData.storeOperatingExpenses.toLocaleString('en-IN')}</span>
+                  <span className="font-semibold text-danger">
+                    -₹{consolidatedData.storeOperatingExpenses.toLocaleString('en-IN')}
+                  </span>
                 </div>
 
                 <div
-                  onClick={() => handleDrillDown('centralExpenses', 'Central Logistics & Transport Expenses')}
+                  onClick={() =>
+                    handleDrillDown('centralExpenses', 'Central Logistics & Transport Expenses')
+                  }
                   className="flex justify-between items-center py-2 px-3 rounded-lg hover:bg-muted/40 cursor-pointer transition-colors text-muted-foreground border-b border-border pb-3"
                 >
                   <span>Central Operations & Freight Logistics Expenses:</span>
-                  <span className="font-semibold text-danger">-₹{consolidatedData.centralExpenses.toLocaleString('en-IN')}</span>
+                  <span className="font-semibold text-danger">
+                    -₹{consolidatedData.centralExpenses.toLocaleString('en-IN')}
+                  </span>
                 </div>
 
                 {/* Net Operating Profit */}
                 <div className="flex justify-between items-center py-4 px-5 bg-primary/10 rounded-2xl font-black text-foreground border border-primary/20">
                   <span className="text-base sm:text-lg">Consolidated Net Operating Profit</span>
                   <div className="text-right">
-                    <span className={`text-xl sm:text-2xl ${consolidatedData.consolidatedNetProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                    <span
+                      className={`text-xl sm:text-2xl ${consolidatedData.consolidatedNetProfit >= 0 ? 'text-success' : 'text-danger'}`}
+                    >
                       ₹{consolidatedData.consolidatedNetProfit.toLocaleString('en-IN')}
                     </span>
                     <span className="text-xs font-semibold text-muted-foreground block">
@@ -603,10 +671,16 @@ export default function AccountingPage() {
               <div className="card overflow-hidden">
                 <div className="p-4 border-b border-border flex items-center justify-between">
                   <div>
-                    <h3 className="text-base font-bold text-foreground">Outlet Profitability Contribution Breakdown</h3>
-                    <p className="text-xs text-muted-foreground">Store-level external revenue, cost, and net operational result</p>
+                    <h3 className="text-base font-bold text-foreground">
+                      Outlet Profitability Contribution Breakdown
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Store-level external revenue, cost, and net operational result
+                    </p>
                   </div>
-                  <span className="badge-info text-2xs font-bold">{consolidatedData.storeContributions.length} Outlets Active</span>
+                  <span className="badge-info text-2xs font-bold">
+                    {consolidatedData.storeContributions.length} Outlets Active
+                  </span>
                 </div>
 
                 <div className="overflow-x-auto scrollbar-thin">
@@ -625,15 +699,34 @@ export default function AccountingPage() {
                     </thead>
                     <tbody className="divide-y divide-border text-sm font-tabular">
                       {consolidatedData.storeContributions.map((sc) => (
-                        <tr key={`sc-${sc.storeCode}`} className="hover:bg-muted/40 transition-colors">
-                          <td className="px-4 py-3 font-mono font-bold text-primary">{sc.storeCode}</td>
-                          <td className="px-4 py-3 text-right font-bold text-muted-foreground">{sc.ordersCount}</td>
-                          <td className="px-4 py-3 text-right font-bold text-foreground">₹{sc.revenue.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 text-right text-info font-medium">₹{sc.cogs.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 text-right font-bold text-success">₹{sc.grossProfit.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 text-right text-muted-foreground">{sc.grossMarginPercent.toFixed(1)}%</td>
-                          <td className="px-4 py-3 text-right text-danger font-medium">₹{sc.expenses.toLocaleString('en-IN')}</td>
-                          <td className={`px-4 py-3 text-right font-black ${sc.netProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                        <tr
+                          key={`sc-${sc.storeCode}`}
+                          className="hover:bg-muted/40 transition-colors"
+                        >
+                          <td className="px-4 py-3 font-mono font-bold text-primary">
+                            {sc.storeCode}
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-muted-foreground">
+                            {sc.ordersCount}
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-foreground">
+                            ₹{sc.revenue.toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-4 py-3 text-right text-info font-medium">
+                            ₹{sc.cogs.toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-success">
+                            ₹{sc.grossProfit.toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-4 py-3 text-right text-muted-foreground">
+                            {sc.grossMarginPercent.toFixed(1)}%
+                          </td>
+                          <td className="px-4 py-3 text-right text-danger font-medium">
+                            ₹{sc.expenses.toLocaleString('en-IN')}
+                          </td>
+                          <td
+                            className={`px-4 py-3 text-right font-black ${sc.netProfit >= 0 ? 'text-success' : 'text-danger'}`}
+                          >
                             ₹{sc.netProfit.toLocaleString('en-IN')}
                           </td>
                         </tr>
@@ -655,44 +748,67 @@ export default function AccountingPage() {
                 className="card p-5 cursor-pointer hover:border-primary hover:shadow-md transition-all group"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Store Sales Revenue</p>
-                  <span className="text-3xs font-bold text-primary group-hover:underline">Drill down →</span>
+                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Store Sales Revenue
+                  </p>
+                  <span className="text-3xs font-bold text-primary group-hover:underline">
+                    Drill down →
+                  </span>
                 </div>
                 <p className="text-2xl font-black text-foreground font-tabular mt-2">
                   ₹{storePnLData.storeSalesRevenue.toLocaleString('en-IN')}
                 </p>
-                <p className="text-2xs text-muted-foreground mt-1">Scope: {storePnLData.storeScope}</p>
+                <p className="text-2xs text-muted-foreground mt-1">
+                  Scope: {storePnLData.storeScope}
+                </p>
               </div>
 
               <div className="card p-5">
-                <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Store COGS (Transfer Price)</p>
+                <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Store COGS (Transfer Price)
+                </p>
                 <p className="text-2xl font-black text-info font-tabular mt-2">
                   ₹{storePnLData.storeCOGS.toLocaleString('en-IN')}
                 </p>
-                <p className="text-2xs text-muted-foreground mt-1">Inventory cost billed by Central</p>
+                <p className="text-2xs text-muted-foreground mt-1">
+                  Inventory cost billed by Central
+                </p>
               </div>
 
               <div
-                onClick={() => handleDrillDown('storeOperatingExpenses', 'Store Operating Expenses')}
+                onClick={() =>
+                  handleDrillDown('storeOperatingExpenses', 'Store Operating Expenses')
+                }
                 className="card p-5 cursor-pointer hover:border-danger hover:shadow-md transition-all group"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Store Operating Expenses</p>
-                  <span className="text-3xs font-bold text-danger group-hover:underline">Drill down →</span>
+                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Store Operating Expenses
+                  </p>
+                  <span className="text-3xs font-bold text-danger group-hover:underline">
+                    Drill down →
+                  </span>
                 </div>
                 <p className="text-2xl font-black text-danger font-tabular mt-2">
                   ₹{storePnLData.storeOperatingExpenses.toLocaleString('en-IN')}
                 </p>
-                <p className="text-2xs text-muted-foreground mt-1">Store rent, bills & maintenance</p>
+                <p className="text-2xs text-muted-foreground mt-1">
+                  Store rent, bills & maintenance
+                </p>
               </div>
 
               <div className="card p-5 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/30">
-                <p className="text-2xs font-bold uppercase tracking-wider text-primary">Store Net Operating Profit</p>
-                <p className={`text-2xl font-black font-tabular mt-2 ${storePnLData.storeNetProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                <p className="text-2xs font-bold uppercase tracking-wider text-primary">
+                  Store Net Operating Profit
+                </p>
+                <p
+                  className={`text-2xl font-black font-tabular mt-2 ${storePnLData.storeNetProfit >= 0 ? 'text-success' : 'text-danger'}`}
+                >
                   ₹{storePnLData.storeNetProfit.toLocaleString('en-IN')}
                 </p>
                 <p className="text-2xs text-muted-foreground mt-1 font-tabular">
-                  Store Margin: <strong className="text-foreground">{storePnLData.storeNetMarginPercent}%</strong>
+                  Store Margin:{' '}
+                  <strong className="text-foreground">{storePnLData.storeNetMarginPercent}%</strong>
                 </p>
               </div>
             </div>
@@ -709,21 +825,28 @@ export default function AccountingPage() {
                 </div>
                 <div className="flex justify-between py-2 text-muted-foreground border-b border-border pb-3">
                   <span>Less: Store COGS (Based on Transfer Price billed by Central):</span>
-                  <span className="text-info font-semibold">-₹{storePnLData.storeCOGS.toLocaleString('en-IN')}</span>
+                  <span className="text-info font-semibold">
+                    -₹{storePnLData.storeCOGS.toLocaleString('en-IN')}
+                  </span>
                 </div>
                 <div className="flex justify-between py-3 px-4 bg-muted/50 rounded-xl font-extrabold text-foreground">
                   <span>Store Gross Operating Profit:</span>
                   <span className="text-primary font-bold">
-                    ₹{storePnLData.storeGrossProfit.toLocaleString('en-IN')} ({storePnLData.storeGrossMarginPercent}%)
+                    ₹{storePnLData.storeGrossProfit.toLocaleString('en-IN')} (
+                    {storePnLData.storeGrossMarginPercent}%)
                   </span>
                 </div>
                 <div className="flex justify-between py-2 text-muted-foreground pt-3 border-b border-border pb-3">
                   <span>Less: Store Operating Expenses:</span>
-                  <span className="text-danger font-semibold">-₹{storePnLData.storeOperatingExpenses.toLocaleString('en-IN')}</span>
+                  <span className="text-danger font-semibold">
+                    -₹{storePnLData.storeOperatingExpenses.toLocaleString('en-IN')}
+                  </span>
                 </div>
                 <div className="flex justify-between py-4 px-5 bg-primary/10 rounded-2xl font-black text-foreground border border-primary/20">
                   <span className="text-base">Store Net Profit Result:</span>
-                  <span className={`text-xl ${storePnLData.storeNetProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                  <span
+                    className={`text-xl ${storePnLData.storeNetProfit >= 0 ? 'text-success' : 'text-danger'}`}
+                  >
                     ₹{storePnLData.storeNetProfit.toLocaleString('en-IN')}
                   </span>
                 </div>
@@ -737,21 +860,31 @@ export default function AccountingPage() {
           <div className="space-y-6 fade-in">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div
-                onClick={() => handleDrillDown('centralTransferRevenue', 'Central Transfer Billed Value')}
+                onClick={() =>
+                  handleDrillDown('centralTransferRevenue', 'Central Transfer Billed Value')
+                }
                 className="card p-5 cursor-pointer hover:border-primary hover:shadow-md transition-all group"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Transfer Billed Revenue</p>
-                  <span className="text-3xs font-bold text-primary group-hover:underline">Drill down →</span>
+                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Transfer Billed Revenue
+                  </p>
+                  <span className="text-3xs font-bold text-primary group-hover:underline">
+                    Drill down →
+                  </span>
                 </div>
                 <p className="text-2xl font-black text-foreground font-tabular mt-2">
                   ₹{centralPnLData.centralTransferRevenue.toLocaleString('en-IN')}
                 </p>
-                <p className="text-2xs text-muted-foreground mt-1">Billed to outlets @ Transfer Price</p>
+                <p className="text-2xs text-muted-foreground mt-1">
+                  Billed to outlets @ Transfer Price
+                </p>
               </div>
 
               <div className="card p-5">
-                <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Central Inventory Cost</p>
+                <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Central Inventory Cost
+                </p>
                 <p className="text-2xl font-black text-info font-tabular mt-2">
                   ₹{centralPnLData.centralInventoryCost.toLocaleString('en-IN')}
                 </p>
@@ -759,12 +892,18 @@ export default function AccountingPage() {
               </div>
 
               <div
-                onClick={() => handleDrillDown('grossTransferProfit', 'Central Gross Transfer Markup')}
+                onClick={() =>
+                  handleDrillDown('grossTransferProfit', 'Central Gross Transfer Markup')
+                }
                 className="card p-5 cursor-pointer hover:border-success hover:shadow-md transition-all group"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Gross Transfer Margin</p>
-                  <span className="text-3xs font-bold text-success group-hover:underline">Drill down →</span>
+                  <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Gross Transfer Margin
+                  </p>
+                  <span className="text-3xs font-bold text-success group-hover:underline">
+                    Drill down →
+                  </span>
                 </div>
                 <p className="text-2xl font-black text-success font-tabular mt-2">
                   ₹{centralPnLData.grossTransferProfit.toLocaleString('en-IN')}
@@ -775,8 +914,12 @@ export default function AccountingPage() {
               </div>
 
               <div className="card p-5 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/30">
-                <p className="text-2xs font-bold uppercase tracking-wider text-primary">Net Central Profit</p>
-                <p className={`text-2xl font-black font-tabular mt-2 ${centralPnLData.netCentralProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                <p className="text-2xs font-bold uppercase tracking-wider text-primary">
+                  Net Central Profit
+                </p>
+                <p
+                  className={`text-2xl font-black font-tabular mt-2 ${centralPnLData.netCentralProfit >= 0 ? 'text-success' : 'text-danger'}`}
+                >
                   ₹{centralPnLData.netCentralProfit.toLocaleString('en-IN')}
                 </p>
                 <p className="text-2xs text-muted-foreground mt-1">
@@ -789,10 +932,16 @@ export default function AccountingPage() {
             <div className="card overflow-hidden">
               <div className="p-4 border-b border-border flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-foreground">Stock Transfer Profit by Destination Outlet</h3>
-                  <p className="text-xs text-muted-foreground">Margin realized on stock dispatched from Central Warehouse</p>
+                  <h3 className="text-base font-bold text-foreground">
+                    Stock Transfer Profit by Destination Outlet
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Margin realized on stock dispatched from Central Warehouse
+                  </p>
                 </div>
-                <span className="badge-info text-2xs font-bold">{centralPnLData.totalUnitsTransferred} Total Units Dispatched</span>
+                <span className="badge-info text-2xs font-bold">
+                  {centralPnLData.totalUnitsTransferred} Total Units Dispatched
+                </span>
               </div>
 
               <div className="overflow-x-auto scrollbar-thin">
@@ -809,13 +958,26 @@ export default function AccountingPage() {
                   </thead>
                   <tbody className="divide-y divide-border text-sm font-tabular">
                     {centralPnLData.outletBreakdown.map((ob) => (
-                      <tr key={`ob-${ob.destStore}`} className="hover:bg-muted/40 transition-colors">
-                        <td className="px-4 py-3 font-mono font-bold text-primary">{ob.destStore}</td>
+                      <tr
+                        key={`ob-${ob.destStore}`}
+                        className="hover:bg-muted/40 transition-colors"
+                      >
+                        <td className="px-4 py-3 font-mono font-bold text-primary">
+                          {ob.destStore}
+                        </td>
                         <td className="px-4 py-3 text-right text-muted-foreground">{ob.count}</td>
-                        <td className="px-4 py-3 text-right font-bold text-foreground">{ob.units}</td>
-                        <td className="px-4 py-3 text-right text-info">₹{ob.inventoryCost.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-bold text-foreground">₹{ob.transferValue.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 text-right font-black text-success">₹{ob.markupProfit.toLocaleString('en-IN')}</td>
+                        <td className="px-4 py-3 text-right font-bold text-foreground">
+                          {ob.units}
+                        </td>
+                        <td className="px-4 py-3 text-right text-info">
+                          ₹{ob.inventoryCost.toLocaleString('en-IN')}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-foreground">
+                          ₹{ob.transferValue.toLocaleString('en-IN')}
+                        </td>
+                        <td className="px-4 py-3 text-right font-black text-success">
+                          ₹{ob.markupProfit.toLocaleString('en-IN')}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -831,8 +993,19 @@ export default function AccountingPage() {
             {/* Ledger Filter & Search Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/30 p-4 rounded-2xl border border-border">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-2xs font-bold uppercase text-muted-foreground">Filter Category:</span>
-                {['ALL', 'REVENUE', 'COGS', 'OPERATING_EXPENSE', 'CENTRAL_EXPENSE', 'TRANSFER_MARKUP', 'ASSET', 'LIABILITY'].map((cat) => (
+                <span className="text-2xs font-bold uppercase text-muted-foreground">
+                  Filter Category:
+                </span>
+                {[
+                  'ALL',
+                  'REVENUE',
+                  'COGS',
+                  'OPERATING_EXPENSE',
+                  'CENTRAL_EXPENSE',
+                  'TRANSFER_MARKUP',
+                  'ASSET',
+                  'LIABILITY',
+                ].map((cat) => (
                   <button
                     key={`cat-${cat}`}
                     onClick={() => setLedgerCategoryFilter(cat)}
@@ -861,17 +1034,31 @@ export default function AccountingPage() {
             {/* Ledger Totals Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="card p-4">
-                <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Total Journal Debits</p>
-                <p className="text-xl font-bold text-foreground font-tabular mt-1">₹{ledgerTotalDebit.toLocaleString('en-IN')}</p>
+                <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Total Journal Debits
+                </p>
+                <p className="text-xl font-bold text-foreground font-tabular mt-1">
+                  ₹{ledgerTotalDebit.toLocaleString('en-IN')}
+                </p>
               </div>
               <div className="card p-4">
-                <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Total Journal Credits</p>
-                <p className="text-xl font-bold text-foreground font-tabular mt-1">₹{ledgerTotalCredit.toLocaleString('en-IN')}</p>
+                <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Total Journal Credits
+                </p>
+                <p className="text-xl font-bold text-foreground font-tabular mt-1">
+                  ₹{ledgerTotalCredit.toLocaleString('en-IN')}
+                </p>
               </div>
               <div className="card p-4">
-                <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">Double-Entry Balance Check</p>
-                <p className={`text-xl font-bold font-tabular mt-1 ${Math.abs(ledgerTotalDebit - ledgerTotalCredit) < 0.05 ? 'text-success' : 'text-danger'}`}>
-                  {Math.abs(ledgerTotalDebit - ledgerTotalCredit) < 0.05 ? '✓ 100% Balanced' : `Diff: ₹${Math.abs(ledgerTotalDebit - ledgerTotalCredit).toFixed(2)}`}
+                <p className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Double-Entry Balance Check
+                </p>
+                <p
+                  className={`text-xl font-bold font-tabular mt-1 ${Math.abs(ledgerTotalDebit - ledgerTotalCredit) < 0.05 ? 'text-success' : 'text-danger'}`}
+                >
+                  {Math.abs(ledgerTotalDebit - ledgerTotalCredit) < 0.05
+                    ? '✓ 100% Balanced'
+                    : `Diff: ₹${Math.abs(ledgerTotalDebit - ledgerTotalCredit).toFixed(2)}`}
                 </p>
               </div>
             </div>
@@ -879,14 +1066,18 @@ export default function AccountingPage() {
             {/* General Ledger Table */}
             <div className="card overflow-hidden">
               <div className="p-4 border-b border-border flex items-center justify-between">
-                <h3 className="text-base font-bold text-foreground">Double-Entry General Journal ({ledgerTotalCount} records)</h3>
+                <h3 className="text-base font-bold text-foreground">
+                  Double-Entry General Journal ({ledgerTotalCount} records)
+                </h3>
                 <span className="badge-info text-2xs font-bold">Authoritative MySQL Records</span>
               </div>
 
               {ledgerLoading ? (
                 <div className="p-12 text-center text-muted-foreground">Loading Ledger...</div>
               ) : ledgerEntries.length === 0 ? (
-                <div className="p-12 text-center text-muted-foreground">No ledger records match the selected filters.</div>
+                <div className="p-12 text-center text-muted-foreground">
+                  No ledger records match the selected filters.
+                </div>
               ) : (
                 <div className="overflow-x-auto scrollbar-thin">
                   <table className="w-full text-left min-w-[900px]">
@@ -907,17 +1098,30 @@ export default function AccountingPage() {
                     <tbody className="divide-y divide-border text-xs font-tabular">
                       {ledgerEntries.map((le) => (
                         <tr key={`le-${le.id}`} className="hover:bg-muted/40 transition-colors">
-                          <td className="px-4 py-3 font-mono font-bold text-primary whitespace-nowrap">{le.entryNo}</td>
-                          <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                            {new Date(le.entryDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          <td className="px-4 py-3 font-mono font-bold text-primary whitespace-nowrap">
+                            {le.entryNo}
                           </td>
-                          <td className="px-4 py-3 font-semibold text-foreground">{le.storeCode}</td>
+                          <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                            {new Date(le.entryDate).toLocaleDateString('en-IN', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-foreground">
+                            {le.storeCode}
+                          </td>
                           <td className="px-4 py-3">
-                            <span className="badge-neutral text-3xs font-bold">{le.accountCategory}</span>
+                            <span className="badge-neutral text-3xs font-bold">
+                              {le.accountCategory}
+                            </span>
                           </td>
                           <td className="px-4 py-3 font-bold text-foreground">{le.accountName}</td>
                           <td className="px-4 py-3 font-mono text-muted-foreground">{le.refNo}</td>
-                          <td className="px-4 py-3 max-w-[260px] truncate text-muted-foreground" title={le.description}>
+                          <td
+                            className="px-4 py-3 max-w-[260px] truncate text-muted-foreground"
+                            title={le.description}
+                          >
                             {le.description}
                           </td>
                           <td className="px-4 py-3 text-right font-bold text-foreground">
@@ -929,17 +1133,19 @@ export default function AccountingPage() {
                           <td className="px-4 py-3 text-center">
                             {le.proofUrl ? (
                               <button
-                                onClick={() => setSelectedProof({
-                                  url: le.proofUrl!,
-                                  referenceNo: le.referenceNo || le.refNo || le.entryNo,
-                                  amount: le.debit > 0 ? le.debit : le.credit,
-                                  paymentMethod: le.paymentMethod || 'Journal Voucher',
-                                  paymentDate: le.entryDate,
-                                  payeeOrPayer: le.entityName || le.accountName,
-                                  recordedBy: le.createdBy || 'Finance Dept',
-                                  timestamp: le.entryDate,
-                                  notes: le.description,
-                                })}
+                                onClick={() =>
+                                  setSelectedProof({
+                                    url: le.proofUrl!,
+                                    referenceNo: le.referenceNo || le.refNo || le.entryNo,
+                                    amount: le.debit > 0 ? le.debit : le.credit,
+                                    paymentMethod: le.paymentMethod || 'Journal Voucher',
+                                    paymentDate: le.entryDate,
+                                    payeeOrPayer: le.entityName || le.accountName,
+                                    recordedBy: le.createdBy || 'Finance Dept',
+                                    timestamp: le.entryDate,
+                                    notes: le.description,
+                                  })
+                                }
                                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-3xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors shadow-2xs"
                                 title="View Attached Payment Proof"
                               >
@@ -971,7 +1177,8 @@ export default function AccountingPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/40 p-4 rounded-xl border border-border">
               <div>
                 <p className="text-xs text-muted-foreground">
-                  Scope: <strong className="text-foreground">{selectedStore}</strong> · Period: <strong className="text-foreground">{datePeriod}</strong>
+                  Scope: <strong className="text-foreground">{selectedStore}</strong> · Period:{' '}
+                  <strong className="text-foreground">{datePeriod}</strong>
                 </p>
                 <p className="text-xs text-success font-semibold mt-0.5">
                   ✓ Reconciled: Sum of underlying rows exactly equals displayed statement value.
@@ -979,8 +1186,12 @@ export default function AccountingPage() {
               </div>
 
               <div className="text-right">
-                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground block">Authoritative Total</span>
-                <span className="text-2xl font-black text-primary font-tabular">₹{drillDownTotal.toLocaleString('en-IN')}</span>
+                <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground block">
+                  Authoritative Total
+                </span>
+                <span className="text-2xl font-black text-primary font-tabular">
+                  ₹{drillDownTotal.toLocaleString('en-IN')}
+                </span>
               </div>
             </div>
 
@@ -996,9 +1207,13 @@ export default function AccountingPage() {
             </div>
 
             {drillDownLoading ? (
-              <div className="p-12 text-center text-muted-foreground">Loading constituent transaction records...</div>
+              <div className="p-12 text-center text-muted-foreground">
+                Loading constituent transaction records...
+              </div>
             ) : filteredDrillDownRows.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">No records found for this metric.</div>
+              <div className="p-12 text-center text-muted-foreground">
+                No records found for this metric.
+              </div>
             ) : (
               <div className="max-h-[420px] overflow-y-auto scrollbar-thin border border-border rounded-xl">
                 <table className="w-full text-left text-xs font-tabular min-w-[650px]">
@@ -1020,8 +1235,12 @@ export default function AccountingPage() {
                         </td>
                         <td className="px-4 py-3 font-semibold text-foreground">{row.storeCode}</td>
                         <td className="px-4 py-3 max-w-[320px]">
-                          <p className="font-bold text-foreground truncate">{row.entity || row.description}</p>
-                          {row.items && <p className="text-3xs text-muted-foreground truncate">{row.items}</p>}
+                          <p className="font-bold text-foreground truncate">
+                            {row.entity || row.description}
+                          </p>
+                          {row.items && (
+                            <p className="text-3xs text-muted-foreground truncate">{row.items}</p>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right font-black text-foreground">
                           ₹{row.amount.toLocaleString('en-IN')}
@@ -1034,7 +1253,9 @@ export default function AccountingPage() {
             )}
 
             <div className="flex justify-between items-center text-xs text-muted-foreground pt-2 border-t border-border">
-              <span>Showing {filteredDrillDownRows.length} of {drillDownRecords.length} records</span>
+              <span>
+                Showing {filteredDrillDownRows.length} of {drillDownRecords.length} records
+              </span>
               <button
                 onClick={() => setDrillDownModalOpen(false)}
                 className="btn-neutral text-xs py-1.5 px-4"
@@ -1055,33 +1276,44 @@ export default function AccountingPage() {
           {auditLoading ? (
             <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-3 border-success/30 border-t-success rounded-full animate-spin" />
-              <p className="text-sm font-semibold">Running multi-table mathematical reconciliation...</p>
+              <p className="text-sm font-semibold">
+                Running multi-table mathematical reconciliation...
+              </p>
             </div>
           ) : auditData ? (
             <div className="space-y-5">
               {/* Audit Status Banner */}
-              <div className={`p-4 rounded-2xl border flex items-center justify-between ${
-                auditData.status === 'RECONCILED'
-                  ? 'bg-success/10 border-success/30 text-success'
-                  : 'bg-danger/10 border-danger/30 text-danger'
-              }`}>
+              <div
+                className={`p-4 rounded-2xl border flex items-center justify-between ${
+                  auditData.status === 'RECONCILED'
+                    ? 'bg-success/10 border-success/30 text-success'
+                    : 'bg-danger/10 border-danger/30 text-danger'
+                }`}
+              >
                 <div className="flex items-center gap-3">
                   <Icon name="CheckCircleIcon" size={24} />
                   <div>
                     <h4 className="text-sm font-black uppercase tracking-wider">
-                      {auditData.status === 'RECONCILED' ? 'Root Reconciliation 100% Verified' : 'Discrepancy Detected'}
+                      {auditData.status === 'RECONCILED'
+                        ? 'Root Reconciliation 100% Verified'
+                        : 'Discrepancy Detected'}
                     </h4>
                     <p className="text-2xs text-muted-foreground">
-                      All persisted database transactions match the displayed totals down to the rupee.
+                      All persisted database transactions match the displayed totals down to the
+                      rupee.
                     </p>
                   </div>
                 </div>
-                <span className="badge-success text-xs font-mono font-bold">Zero Mathematical Drift</span>
+                <span className="badge-success text-xs font-mono font-bold">
+                  Zero Mathematical Drift
+                </span>
               </div>
 
               {/* Verification Proofs */}
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mathematical Invariant Proofs:</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Mathematical Invariant Proofs:
+                </p>
                 <div className="space-y-2 text-xs font-tabular">
                   {auditData.proofs?.map((p: any, idx: number) => (
                     <div
@@ -1090,9 +1322,14 @@ export default function AccountingPage() {
                     >
                       <div className="space-y-0.5">
                         <p className="font-bold text-foreground">{p.test}</p>
-                        <p className="text-3xs text-muted-foreground">Left: ₹{p.leftValue?.toLocaleString('en-IN')} | Right: ₹{p.rightValue?.toLocaleString('en-IN')}</p>
+                        <p className="text-3xs text-muted-foreground">
+                          Left: ₹{p.leftValue?.toLocaleString('en-IN')} | Right: ₹
+                          {p.rightValue?.toLocaleString('en-IN')}
+                        </p>
                       </div>
-                      <span className={`badge-${p.isReconciled ? 'success' : 'danger'} text-2xs font-bold`}>
+                      <span
+                        className={`badge-${p.isReconciled ? 'success' : 'danger'} text-2xs font-bold`}
+                      >
                         {p.isReconciled ? '✓ RECONCILED' : 'DISCREPANCY'}
                       </span>
                     </div>
@@ -1103,26 +1340,46 @@ export default function AccountingPage() {
               {/* Subsystem Totals Breakdown */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-tabular">
                 <div className="p-3 bg-card border border-border rounded-xl">
-                  <span className="text-3xs font-bold uppercase text-muted-foreground block">Net Sales Revenue</span>
-                  <span className="text-sm font-bold text-foreground mt-1 block">₹{auditData.sales?.netRevenue?.toLocaleString('en-IN')}</span>
-                  <span className="text-3xs text-muted-foreground">{auditData.sales?.ordersCount} orders</span>
+                  <span className="text-3xs font-bold uppercase text-muted-foreground block">
+                    Net Sales Revenue
+                  </span>
+                  <span className="text-sm font-bold text-foreground mt-1 block">
+                    ₹{auditData.sales?.netRevenue?.toLocaleString('en-IN')}
+                  </span>
+                  <span className="text-3xs text-muted-foreground">
+                    {auditData.sales?.ordersCount} orders
+                  </span>
                 </div>
 
                 <div className="p-3 bg-card border border-border rounded-xl">
-                  <span className="text-3xs font-bold uppercase text-muted-foreground block">Vendor COGS</span>
-                  <span className="text-sm font-bold text-info mt-1 block">₹{auditData.sales?.cogs?.toLocaleString('en-IN')}</span>
+                  <span className="text-3xs font-bold uppercase text-muted-foreground block">
+                    Vendor COGS
+                  </span>
+                  <span className="text-sm font-bold text-info mt-1 block">
+                    ₹{auditData.sales?.cogs?.toLocaleString('en-IN')}
+                  </span>
                   <span className="text-3xs text-muted-foreground">Actual cost</span>
                 </div>
 
                 <div className="p-3 bg-card border border-border rounded-xl">
-                  <span className="text-3xs font-bold uppercase text-muted-foreground block">Inventory Asset</span>
-                  <span className="text-sm font-bold text-foreground mt-1 block">₹{auditData.inventory?.totalAssetValue?.toLocaleString('en-IN')}</span>
-                  <span className="text-3xs text-muted-foreground">{auditData.inventory?.unitsOnHand} units on hand</span>
+                  <span className="text-3xs font-bold uppercase text-muted-foreground block">
+                    Inventory Asset
+                  </span>
+                  <span className="text-sm font-bold text-foreground mt-1 block">
+                    ₹{auditData.inventory?.totalAssetValue?.toLocaleString('en-IN')}
+                  </span>
+                  <span className="text-3xs text-muted-foreground">
+                    {auditData.inventory?.unitsOnHand} units on hand
+                  </span>
                 </div>
 
                 <div className="p-3 bg-card border border-border rounded-xl">
-                  <span className="text-3xs font-bold uppercase text-muted-foreground block">Vendor Payables</span>
-                  <span className="text-sm font-bold text-danger mt-1 block">₹{auditData.payables?.outstandingPayables?.toLocaleString('en-IN')}</span>
+                  <span className="text-3xs font-bold uppercase text-muted-foreground block">
+                    Vendor Payables
+                  </span>
+                  <span className="text-sm font-bold text-danger mt-1 block">
+                    ₹{auditData.payables?.outstandingPayables?.toLocaleString('en-IN')}
+                  </span>
                   <span className="text-3xs text-muted-foreground">Unpaid balance</span>
                 </div>
               </div>
@@ -1140,10 +1397,7 @@ export default function AccountingPage() {
         </Modal>
 
         {/* Full-Screen Payment Proof Viewer */}
-        <ProofViewerModal
-          proof={selectedProof}
-          onClose={() => setSelectedProof(null)}
-        />
+        <ProofViewerModal proof={selectedProof} onClose={() => setSelectedProof(null)} />
       </div>
     </AppLayout>
   );

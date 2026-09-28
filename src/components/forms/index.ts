@@ -18,7 +18,6 @@ export { default as PurchaseOrderFormModal } from './PurchaseOrderFormModal';
 export { default as UserFormModal } from './UserFormModal';
 export { default as SupplierPaymentModal } from './SupplierPaymentModal';
 export { default as ExpenseFormModal } from './ExpenseFormModal';
-export { default as RepairFormModal } from './RepairFormModal';
 export { default as StockTransferModal } from './StockTransferModal';
 export { default as StockAdjustmentModal } from './StockAdjustmentModal';
 export { default as PaymentMethodModal } from './PaymentMethodModal';
