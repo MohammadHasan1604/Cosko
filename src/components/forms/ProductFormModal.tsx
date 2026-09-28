@@ -793,7 +793,7 @@ export default function ProductFormModal({
             </label>
             <textarea
               rows={2}
-              placeholder="Item specifications, repair notes, and details..."
+              placeholder="Item specifications, warranty notes, and details..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="input-field text-xs resize-none"

@@ -130,7 +130,7 @@ export default function CustomerFormModal({
       ],
       warningMessage: isEdit
         ? 'Customer updates will reflect immediately across all POS customer lookups and CRM history.'
-        : 'Once registered, this customer profile can immediately be selected for sales billing and repair tickets.',
+        : 'Once registered, this customer profile can immediately be selected for sales billing and CRM history.',
     });
 
     if (!confirmed) return;
@@ -212,7 +212,7 @@ export default function CustomerFormModal({
       subtitle={
         isEdit
           ? `Account: ${customer?.phone}`
-          : 'Unified customer profile across POS, Repairs, and Billing'
+          : 'Unified customer profile across POS, Orders, and Billing'
       }
       size={quickMode ? 'sm' : 'md'}
     >
