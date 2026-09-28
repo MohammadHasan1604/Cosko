@@ -113,15 +113,13 @@ export default function StockTransfersPage() {
 
         {/* Transfers Directory Table */}
         <div className="card overflow-hidden">
-          <div className="p-4 sm:p-5 border-b border-border/80 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm sm:text-base font-extrabold text-foreground">Stock Transfer Manifests</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Authoritative inter-store movement records</p>
-            </div>
-            <span className="badge-neutral text-3xs font-semibold">{filteredTransfers.length} total transfers</span>
+          <div className="px-3 md:px-4 py-3 border-b border-border/60 flex items-center justify-between">
+            <h3 className="section-header">Transfers</h3>
+            <span className="badge-neutral text-3xs">{filteredTransfers.length} records</span>
           </div>
 
-          <div className="overflow-x-auto scrollbar-thin">
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto scrollbar-thin">
             <table className="w-full text-left border-collapse text-xs min-w-[780px]">
               <thead>
                 <tr className="table-header">
@@ -192,6 +190,38 @@ export default function StockTransfersPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile card list */}
+          <div className="md:hidden divide-y divide-border/60">
+            {filteredTransfers.length === 0 ? (
+              <div className="empty-state">
+                <p className="empty-state-title">No transfers</p>
+                <p className="empty-state-text">Create a new stock transfer to get started</p>
+              </div>
+            ) : (
+              filteredTransfers.map((t: any) => (
+                <div key={`m-tr-${t.id || t.transferNo}`} className="record-item" onClick={() => setViewModalTransfer(t)}>
+                  <div className="record-content">
+                    <p className="record-title font-mono">{t.transferNo}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="badge-neutral text-3xs">{t.sourceStore}</span>
+                      <Icon name="ArrowRightIcon" size={10} className="text-muted-foreground/60" />
+                      <span className="badge-info text-3xs">{t.destStore}</span>
+                    </div>
+                    <p className="text-3xs text-muted-foreground mt-0.5">
+                      {t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN') : 'Recent'} · {t.totalUnits || t.qty} units
+                    </p>
+                  </div>
+                  <div className="record-meta">
+                    <p className="record-value">{formatTransferINR(Number(t.totalTransferValue) > 0 ? Number(t.totalTransferValue) : ((Number(t.transferPrice) || 0) * (t.totalUnits || t.qty || 1)))}</p>
+                    <span className={t.status === 'Cancelled' ? 'badge-danger text-3xs' : 'badge-success text-3xs'}>
+                      {t.status || 'Received'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

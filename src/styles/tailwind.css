@@ -702,6 +702,16 @@
     @apply text-xs text-muted-foreground;
   }
 
+  /* ─── Small Buttons ─── */
+  .btn-sm {
+    @apply text-xs py-1.5 px-2.5 rounded-lg font-semibold;
+  }
+
+  /* ─── Section Header ─── */
+  .section-header {
+    @apply text-sm font-bold text-foreground;
+  }
+
   /* ─── Empty States ─── */
   .empty-state {
     @apply flex flex-col items-center justify-center py-12 px-4 text-center;

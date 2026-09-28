@@ -367,35 +367,35 @@ export default function SettingsPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-1.5 border-b border-border/80 pb-2 flex-wrap">
+        <div className="flex items-center gap-1.5 border-b border-border/80 pb-2 overflow-x-auto scrollbar-none -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0">
           {(
             [
-              { id: 'branding', label: 'White-Label Branding', icon: 'SparklesIcon' },
-              { id: 'profile', label: 'Business Profile', icon: 'BuildingStorefrontIcon' },
-              { id: 'tax', label: 'Tax & GST Profile', icon: 'DocumentCheckIcon' },
-              { id: 'invoice', label: 'Invoice Template', icon: 'DocumentTextIcon' },
-              { id: 'security', label: 'Security & RBAC', icon: 'ShieldCheckIcon' },
-              { id: 'alerts', label: 'Automated Alerts', icon: 'BellIcon' },
-              { id: 'payment-methods', label: 'Payment Methods', icon: 'CreditCardIcon' },
+              { id: 'branding', label: 'Branding', icon: 'SparklesIcon' },
+              { id: 'profile', label: 'Profile', icon: 'BuildingStorefrontIcon' },
+              { id: 'tax', label: 'Tax & GST', icon: 'DocumentCheckIcon' },
+              { id: 'invoice', label: 'Invoice', icon: 'DocumentTextIcon' },
+              { id: 'security', label: 'Security', icon: 'ShieldCheckIcon' },
+              { id: 'alerts', label: 'Alerts', icon: 'BellIcon' },
+              { id: 'payment-methods', label: 'Payments', icon: 'CreditCardIcon' },
             ] as const
           ).map((tab) => (
             <button
               key={`tab-set-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-150 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.id
                   ? 'bg-primary text-primary-foreground shadow-xs'
-                  : 'bg-card border border-border/80 text-muted-foreground hover:text-foreground hover:bg-muted/40 hover:border-border'
+                  : 'bg-card border border-border/80 text-muted-foreground hover:text-foreground hover:bg-muted/40'
               }`}
             >
-              <Icon name={tab.icon as any} size={15} />
+              <Icon name={tab.icon as any} size={14} />
               {tab.label}
             </button>
           ))}
         </div>
 
         {/* Main Form Container */}
-        <form onSubmit={handleSave} className="card p-6 space-y-6">
+        <form onSubmit={handleSave} className="card p-4 md:p-6 space-y-5 md:space-y-6">
           {/* ──────────────────────────────────────────── */}
           {/* TAB 1: WHITE-LABEL BRANDING                  */}
           {/* ──────────────────────────────────────────── */}
