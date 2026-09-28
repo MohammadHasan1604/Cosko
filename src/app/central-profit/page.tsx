@@ -285,29 +285,24 @@ export default function CentralProfitPage() {
     <AppLayout activeRoute="/central-profit">
       <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header & Primary Actions */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
             <div className="flex items-center gap-2">
-              <h1 className="page-title">Central Profit & Stock Distribution</h1>
-              <span className="badge-primary text-2xs uppercase tracking-wider">CENTRAL WAREHOUSE</span>
+              <h1 className="page-title">Central Profit</h1>
+              <span className="badge-primary text-3xs">CENTRAL</span>
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Manage Central inventory distribution, set custom store transfer pricing, and analyze inter-store operational profit.
-            </p>
+            <p className="page-subtitle">Stock distribution & transfer pricing</p>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={openCreateModal} className="btn-primary text-xs sm:text-sm gap-2">
-              <Icon name="PlusIcon" size={18} />
-              + Create Stock Transfer
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button onClick={openCreateModal} className="btn-primary btn-sm gap-1">
+              <Icon name="PlusIcon" size={14} />
+              <span className="hidden sm:inline">Transfer</span>
+              <span className="sm:hidden">+</span>
             </button>
-            <button onClick={() => setManagePricesModal(true)} className="btn-secondary text-xs sm:text-sm gap-2">
-              <Icon name="AdjustmentsHorizontalIcon" size={18} />
-              Manage Transfer Prices
-            </button>
-            <button onClick={() => toast.info('Exporting Central Profit Report...')} className="btn-ghost text-xs sm:text-sm gap-1.5">
-              <Icon name="ArrowDownTrayIcon" size={16} />
-              Export Report
+            <button onClick={() => setManagePricesModal(true)} className="btn-secondary btn-sm gap-1 hidden sm:inline-flex">
+              <Icon name="AdjustmentsHorizontalIcon" size={14} />
+              Prices
             </button>
           </div>
         </div>

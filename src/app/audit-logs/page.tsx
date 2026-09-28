@@ -18,24 +18,22 @@ export default function AuditLogsPage() {
     <AppLayout activeRoute="/audit-logs">
       <div className="space-y-4 md:space-y-6 fade-in">
         {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="page-title">System Audit Logs & Security Trail</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Immutable audit trail recording all user transactions, stock adjustments, role changes, and IP addresses.
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Audit Logs</h1>
+            <p className="page-subtitle">System security trail & transactions</p>
           </div>
 
           <select
             value={filterModule}
             onChange={(e) => setFilterModule(e.target.value)}
-            className="input-field py-2 text-xs sm:text-sm w-auto min-w-[160px] self-start sm:self-auto"
+            className="input-field py-1.5 text-xs w-auto min-w-[120px] flex-shrink-0"
           >
-            <option value="All">All Modules</option>
+            <option value="All">All</option>
             <option value="Inventory">Inventory</option>
             <option value="Sales">Sales</option>
-            <option value="Authentication">Authentication</option>
-            <option value="Organization">Organization</option>
+            <option value="Authentication">Auth</option>
+            <option value="Organization">Org</option>
           </select>
         </div>
 

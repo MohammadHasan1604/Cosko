@@ -134,48 +134,31 @@ export default function RepairsPage() {
 
   return (
     <AppLayout activeRoute="/repairs">
-      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+      <div className="space-y-4 md:space-y-6 fade-in max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                Connected Service Engine
-              </span>
-              <span className="text-xs text-muted-foreground">Real-time MySQL Synchronized</span>
-            </div>
-            <h1 className="page-title">
-              Repairs & Service Management
-            </h1>
-            <p className="page-subtitle">
-              Directly query, track, log, and bridge device repair records with COSKO retail sales and Customer 360.
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Repairs</h1>
+            <p className="page-subtitle">Service tickets & device tracking</p>
           </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/customers/existing"
-              className="btn-secondary gap-2 text-xs sm:text-sm font-semibold shadow-xs"
-            >
-              <Icon name="UsersIcon" size={16} className="text-primary" />
-              <span>Existing Customers</span>
-            </Link>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
               onClick={() => {
                 setEditingRepair(null);
                 setCreateModalOpen(true);
               }}
-              className="btn-primary gap-2 text-xs sm:text-sm font-semibold shadow-xs"
+              className="btn-primary btn-sm gap-1"
             >
-              <Icon name="PlusIcon" size={16} />
-              Log New Repair Ticket
+              <Icon name="PlusIcon" size={14} />
+              <span className="hidden sm:inline">New Ticket</span>
+              <span className="sm:hidden">+</span>
             </button>
           </div>
         </div>
 
         {/* Top KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          <div className="card p-4 flex flex-col justify-between">
+        <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 md:grid md:grid-cols-6 md:gap-3 pb-1 md:pb-0">
+          <div className="card p-3 md:p-4 flex flex-col justify-between min-w-[130px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Total Enquiries</span>
             <div className="text-2xl font-extrabold text-foreground font-tabular mt-1">{kpis.totalEnquiries}</div>
             <span className="text-3xs text-muted-foreground mt-1 flex items-center gap-1 font-medium">
@@ -183,7 +166,7 @@ export default function RepairsPage() {
             </span>
           </div>
 
-          <div className="card p-4 flex flex-col justify-between">
+          <div className="card p-3 md:p-4 flex flex-col justify-between min-w-[130px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Pending Diagnosis</span>
             <div className="text-2xl font-extrabold text-amber-500 font-tabular mt-1">{kpis.pendingCount}</div>
             <span className="text-3xs text-amber-500 mt-1 flex items-center gap-1 font-semibold">
@@ -191,7 +174,7 @@ export default function RepairsPage() {
             </span>
           </div>
 
-          <div className="card p-4 flex flex-col justify-between">
+          <div className="card p-3 md:p-4 flex flex-col justify-between min-w-[130px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">In Progress</span>
             <div className="text-2xl font-extrabold text-sky-500 font-tabular mt-1">{kpis.inProgressCount}</div>
             <span className="text-3xs text-sky-500 mt-1 flex items-center gap-1 font-semibold">
@@ -199,7 +182,7 @@ export default function RepairsPage() {
             </span>
           </div>
 
-          <div className="card p-4 flex flex-col justify-between">
+          <div className="card p-3 md:p-4 flex flex-col justify-between min-w-[130px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Completed</span>
             <div className="text-2xl font-extrabold text-emerald-500 font-tabular mt-1">{kpis.completedCount}</div>
             <span className="text-3xs text-emerald-500 mt-1 flex items-center gap-1 font-semibold">
@@ -207,7 +190,7 @@ export default function RepairsPage() {
             </span>
           </div>
 
-          <div className="card p-4 flex flex-col justify-between">
+          <div className="card p-3 md:p-4 flex flex-col justify-between min-w-[130px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Unique Customers</span>
             <div className="text-2xl font-extrabold text-purple-500 font-tabular mt-1">{kpis.customersWithRepairs}</div>
             <span className="text-3xs text-purple-500 mt-1 flex items-center gap-1 font-semibold">
@@ -215,7 +198,7 @@ export default function RepairsPage() {
             </span>
           </div>
 
-          <div className="card p-4 flex flex-col justify-between">
+          <div className="card p-3 md:p-4 flex flex-col justify-between min-w-[130px] md:min-w-0 flex-shrink-0 md:flex-shrink">
             <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">Retail Cross-Sale</span>
             <div className="text-2xl font-extrabold text-cyan-500 font-tabular mt-1">{kpis.repairAndPurchaseCount}</div>
             <span className="text-3xs text-cyan-500 mt-1 flex items-center gap-1 font-semibold">

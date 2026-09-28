@@ -151,24 +151,19 @@ export default function DeleteRequestsPage() {
       <AppLayout activeRoute="/delete-requests">
         <div className="space-y-4 md:space-y-6 fade-in">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-                <Icon name="ShieldExclamationIcon" size={24} className="text-red-400" />
-                Delete Request Reviews
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                Review and approve/reject pending delete requests from Store Managers.
+          <div className="flex items-start justify-between gap-3">
+            <div className="page-header">
+              <h1 className="page-title flex items-center gap-1.5">
+                Delete Requests
                 {pendingCount > 0 && (
-                  <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30">
-                    {pendingCount} pending
-                  </span>
+                  <span className="badge-danger text-3xs">{pendingCount}</span>
                 )}
-              </p>
+              </h1>
+              <p className="page-subtitle">Review & approve pending deletions</p>
             </div>
-            <button onClick={() => fetchRequests()} className="btn-secondary gap-1.5 text-xs sm:text-sm" disabled={loading}>
-              <Icon name="ArrowPathIcon" size={16} className={loading ? 'animate-spin' : ''} />
-              Refresh
+            <button onClick={() => fetchRequests()} className="btn-secondary btn-sm gap-1 flex-shrink-0" disabled={loading}>
+              <Icon name="ArrowPathIcon" size={13} className={loading ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Refresh</span>
             </button>
           </div>
 
