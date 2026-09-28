@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/auth';
+import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 
@@ -10,10 +10,11 @@ import { executeWithIdempotency } from '@/lib/idempotency';
  */
 export async function POST(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     if (user.securityLevel < 60) {
       return NextResponse.json({ error: 'Forbidden: Insufficient security level for stock adjustment' }, { status: 403 });

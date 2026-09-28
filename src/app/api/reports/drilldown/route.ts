@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/auth';
+import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 
 /**
@@ -13,10 +13,11 @@ import { prisma } from '@/lib/db';
  */
 export async function GET(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     if ((user.securityLevel || 0) < 60 && user.role !== 'Super Admin' && user.role !== 'Store Manager') {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });

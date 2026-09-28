@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/auth';
+import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 import { generateSafeSequenceNo, generateDateSequenceNo } from '@/lib/sequenceUtils';
@@ -10,11 +10,11 @@ import { executeWithIdempotency } from '@/lib/idempotency';
  */
 export async function GET(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     const { searchParams } = new URL(req.url);
     const includeArchived = searchParams.get('includeArchived') === 'true';
@@ -138,11 +138,11 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     if (user.securityLevel < 60) {
       return NextResponse.json({ error: 'Forbidden: Insufficient security level for purchases' }, { status: 403 });
@@ -562,11 +562,11 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     const body = await req.json();
     if (!body.id) {
@@ -871,11 +871,11 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     if (user.securityLevel < 80) {
       return NextResponse.json({ error: 'Forbidden: Insufficient security level' }, { status: 403 });
@@ -903,7 +903,7 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
       }
       const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
-      const result = await createDeleteRequest(user, { entityType: 'PURCHASE', entityId: id, reason: reason.trim() });
+      const result = await createDeleteRequest(user as any, { entityType: 'PURCHASE', entityId: id, reason: reason.trim() });
       if (!result.success) return NextResponse.json({ error: result.error }, { status: 409 });
       return NextResponse.json({ success: true, mode: 'pending_approval', deleteRequest: result.deleteRequest, message: `Delete request for purchase order "${existing.poNo}" submitted for Super Admin approval.` });
     }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/auth';
+import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import {
   createDeleteRequest,
@@ -15,10 +15,11 @@ import {
  */
 export async function GET(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     if (user.securityLevel < 80) {
       return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
@@ -84,10 +85,11 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     if (user.securityLevel < 80) {
       return NextResponse.json({ error: 'Forbidden: Insufficient permissions to request deletions' }, { status: 403 });
@@ -100,7 +102,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'entityType, entityId, and reason are required' }, { status: 400 });
     }
 
-    const result = await createDeleteRequest(user, { entityType, entityId, reason });
+    const result = await createDeleteRequest(user as any, { entityType, entityId, reason });
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 409 });
@@ -124,10 +126,11 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     if (user.securityLevel < 100) {
       return NextResponse.json({ error: 'Forbidden: Only Super Admin can review delete requests' }, { status: 403 });

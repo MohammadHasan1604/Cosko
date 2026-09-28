@@ -42,14 +42,15 @@
     "dev": "next dev -p 4028",
     "build": "prisma generate && next build",
     "postinstall": "prisma generate",
-    "start": "next dev -p 4028",
+    "start": "next start -p 4028",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md,json}\"",
-    "serve": "next start",
+    "serve": "next start -p 4028",
     "type-check": "tsc --noEmit",
     "seed": "npx tsx scripts/seed-mysql.ts",
-    "test:security": "npx tsx scripts/run-security-tests.ts"
+    "test:security": "npx tsx scripts/run-security-tests.ts",
+    "test:phase1": "npx tsx tests/phase1-security.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1121.0",

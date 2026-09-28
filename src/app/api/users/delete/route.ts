@@ -1,86 +1,23 @@
+/**
+ * DEPRECATED: /api/users/delete is consolidated into DELETE /api/users
+ * This file redirects to the authoritative endpoint to prevent weaker alternate paths.
+ * Phase 1 Security: Eliminate duplicate user-management endpoints.
+ */
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/auth';
-import { prisma } from '@/lib/db';
-import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { authenticateRequest } from '@/lib/authPipeline';
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = getAuthUserFromRequest(request);
-
-    if (!session || session.role !== 'Super Admin') {
-      return NextResponse.json({ success: false, error: 'Unauthorized: Only Super Admin can deactivate or delete users' }, { status: 403 });
-    }
-
-    const { id, email, permanent } = await request.json();
-
-    if (!id && !email) {
-      return NextResponse.json({ success: false, error: 'User ID or Email is required' }, { status: 400 });
-    }
-
-    let target = id ? await prisma.userAccount.findUnique({ where: { id } }) : null;
-    if (!target && email) {
-      target = await prisma.userAccount.findUnique({ where: { email: email.toLowerCase().trim() } });
-    }
-
-    if (!target) {
-      return NextResponse.json({ success: true, message: 'User already removed or non-existent' });
-    }
-
-    // 🔒 STRICT SUPER ADMIN SINGLETON: Protected account cannot be deleted or deactivated
-    if (target.role === 'Super Admin') {
-      return NextResponse.json({
-        success: false,
-        error: 'Forbidden: The protected Super Admin root account cannot be deleted or deactivated.',
-      }, { status: 403 });
-    }
-
-    if (target.email === session.email) {
-      return NextResponse.json({ success: false, error: 'You cannot delete or deactivate your own logged-in account' }, { status: 400 });
-    }
-
-    // Check if user has audit logs or sales orders
-    const [auditCount, salesCount] = await Promise.all([
-      prisma.auditLog.count({ where: { userEmail: target.email } }),
-      prisma.salesOrder.count({ where: { cashierName: target.name } }),
-    ]);
-
-    const hasHistory = auditCount > 0 || salesCount > 0;
-
-    if (hasHistory || !permanent) {
-      await prisma.userAccount.update({
-        where: { id: target.id },
-        data: { status: 'Inactive' },
-      });
-
-      broadcastRealtimeEvent('users', 'USER_UPDATED', { userId: target.id, email: target.email, action: 'deactivated' });
-
-      return NextResponse.json({
-        success: true,
-        mode: 'archived',
-        hasHistory,
-        message: hasHistory
-          ? `User "${target.name}" has business audit logs (${auditCount} logs, ${salesCount} sales) and was deactivated safely.`
-          : `User "${target.name}" deactivated successfully.`,
-      });
-    }
-
-    // Hard-delete if 0 history
-    await prisma.$transaction(async (tx: any) => {
-      await tx.userStoreAssignment.deleteMany({ where: { userId: target.id } });
-      await tx.userAccount.delete({ where: { id: target.id } });
-    }, { maxWait: 15000, timeout: 45000 });
-
-    // Broadcast SSE realtime event
-    broadcastRealtimeEvent('users', 'USER_UPDATED', { userId: target.id, email: target.email, action: 'deleted' });
-
-    return NextResponse.json({
-      success: true,
-      mode: 'deleted',
-      message: `User account "${target.name}" permanently deleted from MySQL database.`,
-    });
-  } catch (error: any) {
-    console.error('API /api/users/delete error:', error);
-    return NextResponse.json({ success: false, error: error.message || 'Server error' }, { status: 500 });
+export async function POST(req: NextRequest) {
+  const auth = await authenticateRequest(req);
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
-}
 
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'This endpoint has been consolidated. Use DELETE /api/users instead.',
+      redirect: '/api/users',
+    },
+    { status: 410 }
+  );
+}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/auth';
+import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 
 /**
@@ -7,7 +7,11 @@ import { prisma } from '@/lib/db';
  */
 export async function POST(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
+    const _authResult = await authenticateRequest(req);
+    if (!_authResult.user) {
+      return NextResponse.json({ error: _authResult.error }, { status: _authResult.status });
+    }
+    const user = _authResult.user;
 
     if (!user || user.role !== 'Super Admin' || user.securityLevel < 100) {
       return NextResponse.json({ error: 'Unauthorized: Super Admin only' }, { status: 403 });

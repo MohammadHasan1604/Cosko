@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { verifySessionToken, comparePassword, hashPassword, signSessionToken, isValidAuthOrigin } from '@/lib/auth';
+import { comparePassword, hashPassword, signSessionToken, hashToken, isValidAuthOrigin } from '@/lib/auth';
+import { authenticateRequest, invalidateUserSessions, createAuditLog } from '@/lib/authPipeline';
 
 /**
  * POST /api/auth/change-password
- * Secure password change for currently authenticated user
+ * Secure password change for currently authenticated user.
+ * Invalidates all other sessions after password change.
  */
 export async function POST(req: NextRequest) {
   if (!isValidAuthOrigin(req)) {
@@ -12,14 +14,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const authHeader = req.headers.get('authorization');
-    const cookieToken = req.cookies.get('cosko_session')?.value;
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : cookieToken;
-
-    const session = token ? verifySessionToken(token) : null;
-
-    if (!session || !session.user || !session.user.id) {
-      return NextResponse.json({ success: false, message: 'Unauthorized: Active session required' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ success: false, message: auth.error || 'Unauthorized' }, { status: auth.status });
     }
 
     const body = await req.json().catch(() => null);
@@ -53,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     // Lookup user in MySQL
     const user = await prisma.userAccount.findUnique({
-      where: { id: session.user.id },
+      where: { id: auth.user.id },
       include: { storeAssignments: true },
     });
 
@@ -72,14 +69,21 @@ export async function POST(req: NextRequest) {
 
     // Commit new password and reset mustChangePassword flag
     const updatedUser = await prisma.userAccount.update({
-      where: { id: session.user.id },
+      where: { id: auth.user.id },
       data: {
         passwordHash: newPasswordHash,
         mustChangePassword: false,
       },
     });
 
-    // Issue updated token
+    // 🔒 SECURITY: Invalidate all OTHER sessions (password change = force re-login on other devices)
+    await invalidateUserSessions(user.id, auth.user.sessionId);
+
+    // Audit log
+    await createAuditLog(auth.user, 'Auth', 'Password Changed', 
+      `User "${user.name}" changed their password. Other sessions invalidated.`);
+
+    // Issue new token with updated session
     const allowedStores = user.storeAssignments.map((a) => a.storeCode);
     const updatedSessionUser = {
       id: updatedUser.id,
@@ -93,14 +97,25 @@ export async function POST(req: NextRequest) {
       shiftStatus: updatedUser.shiftStatus as any,
       avatarUrl: updatedUser.avatarUrl || undefined,
       mustChangePassword: false,
+      sessionId: auth.user.sessionId,
     };
 
-    const newToken = signSessionToken(updatedSessionUser);
+    const newToken = signSessionToken(updatedSessionUser, auth.user.sessionId);
+
+    // Update DB session with new token hash
+    if (auth.user.sessionId && auth.user.sessionId !== 'jwt-only') {
+      try {
+        const newTokenHash = hashToken(newToken);
+        await (prisma as any).userSession.update({
+          where: { id: auth.user.sessionId },
+          data: { tokenHash: newTokenHash },
+        });
+      } catch {}
+    }
 
     const response = NextResponse.json({
       success: true,
-      message: 'Password changed successfully. Your new credentials are now active.',
-      token: newToken,
+      message: 'Password changed successfully. Other sessions have been invalidated.',
       user: updatedSessionUser,
     });
 
@@ -108,8 +123,8 @@ export async function POST(req: NextRequest) {
     response.cookies.set('cosko_session', newToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      maxAge: 60 * 60 * 24 * 30,
       path: '/',
     });
 
@@ -117,7 +132,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Error changing password:', error);
     return NextResponse.json(
-      { success: false, message: 'Failed to change password. Database temporarily unavailable.' },
+      { success: false, message: 'Failed to change password.' },
       { status: 500 }
     );
   }

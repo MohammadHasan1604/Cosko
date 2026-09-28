@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest, getRawTokenFromRequest, hashToken } from '@/lib/auth';
+import { getRawTokenFromRequest, hashToken } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { authenticateRequest } from '@/lib/authPipeline';
 
 export async function POST(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
+    const auth = await authenticateRequest(req);
     const rawToken = getRawTokenFromRequest(req);
 
-    // Revoke database-backed session
+    // Revoke database-backed session by token hash
     if (rawToken) {
       const tokenDigest = hashToken(rawToken);
       try {
@@ -20,21 +21,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Also revoke by session ID from JWT
-    if (user?.sessionId) {
+    // Also revoke by session ID from auth pipeline
+    if (auth.user?.sessionId && auth.user.sessionId !== 'jwt-only') {
       try {
         await (prisma as any).userSession.update({
-          where: { id: user.sessionId },
+          where: { id: auth.user.sessionId },
           data: { revokedAt: new Date() },
         });
       } catch {}
     }
 
     // Close work sessions
-    if (user?.id) {
+    if (auth.user?.id) {
       await prisma.userWorkSession.updateMany({
         where: {
-          userId: user.id,
+          userId: auth.user.id,
           isClosed: false,
         },
         data: {

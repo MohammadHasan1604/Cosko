@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { executePOSCheckout, CreateSaleInput } from '@/lib/services/salesService';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 
 /**
  * GET /api/sales - Retrieve sales orders with store isolation
  */
 export async function GET(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     const { searchParams } = new URL(req.url);
     const requestedStore = searchParams.get('store');
@@ -73,10 +73,14 @@ import { executeWithIdempotency } from '@/lib/idempotency';
  */
 export async function POST(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    const user = auth.user;
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!hasPermission(user, 'sales.create')) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
     }
 
     const body: CreateSaleInput = await req.json();
@@ -193,13 +197,13 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
-    if (user.securityLevel < 60) {
+    if (!hasPermission(user, 'sales.cancel') && !hasPermission(user, 'sales.refund')) {
       return NextResponse.json({ error: 'Forbidden: Insufficient permissions to modify sales orders' }, { status: 403 });
     }
 
@@ -442,14 +446,14 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
-    if (user.securityLevel < 80) {
-      return NextResponse.json({ error: 'Forbidden: Only Store Managers and Super Admins can void or delete sales orders' }, { status: 403 });
+    if (!hasPermission(user, 'sales.cancel')) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to void sales orders' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);

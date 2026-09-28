@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/auth';
+import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { buildUserActivitySummary, formatHHMMSS, getLocalDateString } from '@/lib/services/activityCalculationService';
 
@@ -58,10 +58,8 @@ function computeDateRange(range: string, customStart?: string, customEnd?: strin
 
 export async function GET(req: NextRequest) {
   try {
-    const caller = getAuthUserFromRequest(req);
-    if (!caller) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const _auth = await authenticateRequest(req); if (!_auth.user) { return NextResponse.json({ error: _auth.error }, { status: _auth.status }); } const caller = _auth.user;
+    
 
     const { searchParams } = new URL(req.url);
     const range = searchParams.get('range') || 'today';

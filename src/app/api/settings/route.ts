@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/auth';
+import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 
@@ -91,10 +91,11 @@ function invalidateSettingsCache() {
 export async function GET(req: NextRequest) {
   try {
     // SECURITY: Settings contain sensitive business data (GSTIN, UPI, bank details, security config)
-    const user = getAuthUserFromRequest(req);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized: Authentication required to access settings' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
     if (user.role !== 'Super Admin') {
       return NextResponse.json({ error: 'Forbidden: Only Super Admin can access system settings' }, { status: 403 });
     }
@@ -188,11 +189,11 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     if (user.role !== 'Super Admin') {
       return NextResponse.json({ error: 'Forbidden: Only Super Admin can modify system settings' }, { status: 403 });

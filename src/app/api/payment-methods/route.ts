@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getAuthUserFromRequest } from '@/lib/auth';
+import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 export const dynamic = 'force-dynamic';
@@ -75,7 +75,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const authUser = await getAuthUserFromRequest(req);
+    const _ar = await authenticateRequest(req);
+    if (!_ar.user) { return NextResponse.json({ error: _ar.error }, { status: _ar.status }); }
+    const authUser = _ar.user;
     const body = await req.json();
 
     const name = body?.name?.trim();
@@ -142,7 +144,9 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const authUser = await getAuthUserFromRequest(req);
+    const _ar = await authenticateRequest(req);
+    if (!_ar.user) { return NextResponse.json({ error: _ar.error }, { status: _ar.status }); }
+    const authUser = _ar.user;
     const body = await req.json();
 
     const id = body?.id?.trim();
@@ -192,7 +196,9 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const authUser = await getAuthUserFromRequest(req);
+    const _ar = await authenticateRequest(req);
+    if (!_ar.user) { return NextResponse.json({ error: _ar.error }, { status: _ar.status }); }
+    const authUser = _ar.user;
     if (!authUser) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
@@ -233,7 +239,7 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ success: false, error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
       }
       const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
-      const result = await createDeleteRequest(authUser, {
+      const result = await createDeleteRequest(authUser as any, {
         entityType: 'PAYMENT_METHOD',
         entityId: id,
         reason: reason.trim(),

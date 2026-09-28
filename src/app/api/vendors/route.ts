@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/auth';
+import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 import { validateAndNormalizeGstin } from '@/lib/gstUtils';
@@ -10,11 +10,11 @@ import { executeWithIdempotency } from '@/lib/idempotency';
  */
 export async function GET(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     const { searchParams } = new URL(req.url);
     const includeArchived = searchParams.get('includeArchived') === 'true';
@@ -116,11 +116,11 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     if (user.securityLevel < 60) {
       return NextResponse.json({ error: 'Forbidden: Insufficient security level to create vendor' }, { status: 403 });
@@ -229,11 +229,11 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     if (user.securityLevel < 60) {
       return NextResponse.json({ error: 'Forbidden: Insufficient security level to update vendor' }, { status: 403 });
@@ -299,11 +299,11 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const user = getAuthUserFromRequest(req);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     if (user.securityLevel < 80) {
       return NextResponse.json({ error: 'Forbidden: Insufficient security level to archive/delete vendor' }, { status: 403 });
@@ -333,7 +333,7 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ error: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
       }
       const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
-      const result = await createDeleteRequest(user, {
+      const result = await createDeleteRequest(user as any, {
         entityType: 'VENDOR',
         entityId: target.id,
         reason: reason.trim(),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getAuthUserFromRequest } from '@/lib/auth';
+import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 const DEFAULT_CATEGORY_TYPES = [
@@ -123,7 +123,11 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const session = getAuthUserFromRequest(req);
+    const _authResult = await authenticateRequest(req);
+    if (!_authResult.user) {
+      return NextResponse.json({ error: _authResult.error }, { status: _authResult.status });
+    }
+    const session = _authResult.user;
     if (!session || (session.role !== 'Super Admin' && session.role !== 'Store Manager')) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized: Only Admin or Store Manager can create Category Types' },
@@ -191,7 +195,11 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const session = getAuthUserFromRequest(req);
+    const _authResult = await authenticateRequest(req);
+    if (!_authResult.user) {
+      return NextResponse.json({ error: _authResult.error }, { status: _authResult.status });
+    }
+    const session = _authResult.user;
     if (!session || (session.role !== 'Super Admin' && session.role !== 'Store Manager')) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized: Only Admin or Store Manager can update Category Types' },
@@ -283,10 +291,11 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const session = getAuthUserFromRequest(req);
-    if (!session) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    const auth = await authenticateRequest(req);
+    if (!auth.user) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const session = auth.user;
     if (session.securityLevel < 80) {
       return NextResponse.json({ success: false, message: 'Forbidden: Insufficient security level' }, { status: 403 });
     }
@@ -315,7 +324,7 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ success: false, message: 'A reason for deletion is required (minimum 3 characters)' }, { status: 400 });
       }
       const { createDeleteRequest } = await import('@/lib/services/deleteApprovalService');
-      const result = await createDeleteRequest(session, { entityType: 'CATEGORY_TYPE', entityId: id, reason: reason.trim() });
+      const result = await createDeleteRequest(session as any, { entityType: 'CATEGORY_TYPE', entityId: id, reason: reason.trim() });
       if (!result.success) return NextResponse.json({ success: false, message: result.error }, { status: 409 });
       return NextResponse.json({ success: true, mode: 'pending_approval', deleteRequest: result.deleteRequest, message: `Delete request for category type "${targetType.name}" submitted for Super Admin approval.` });
     }
