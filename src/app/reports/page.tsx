@@ -537,7 +537,9 @@ export default function ReportsPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-border text-2xs uppercase tracking-wider text-muted-foreground bg-muted/30">
-                    <th className="px-4 py-3">Supplier Name</th>
+                    <th className="px-4 py-3 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                      Supplier Name
+                    </th>
                     <th className="px-4 py-3">Contact</th>
                     <th className="px-4 py-3 text-right">Orders</th>
                     <th className="px-4 py-3 text-right">Units Purchased</th>
@@ -568,7 +570,9 @@ export default function ReportsPage() {
                         }
                         className="hover:bg-muted/40 transition-colors cursor-pointer"
                       >
-                        <td className="px-4 py-3 font-bold text-foreground">{s.vendorName}</td>
+                        <td className="px-4 py-3 font-bold text-foreground sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                          {s.vendorName}
+                        </td>
                         <td className="px-4 py-3 text-muted-foreground font-mono text-2xs">
                           {s.vendorPhone}
                         </td>
@@ -597,7 +601,7 @@ export default function ReportsPage() {
                   {/* Totals Row */}
                   {supplierData.totals && supplierData.suppliers?.length > 0 && (
                     <tr className="border-t-2 border-foreground/20 bg-muted/20 font-bold">
-                      <td className="px-4 py-3 text-foreground">
+                      <td className="px-4 py-3 text-foreground sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                         TOTAL ({supplierData.recordCount} suppliers)
                       </td>
                       <td className="px-4 py-3"></td>
@@ -667,8 +671,9 @@ export default function ReportsPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-border text-2xs uppercase tracking-wider text-muted-foreground bg-muted/30">
-                    <th className="px-4 py-3 w-8">#</th>
-                    <th className="px-4 py-3">Product Name</th>
+                    <th className="px-4 py-3 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                      Product Name
+                    </th>
                     <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3 text-right">Units Sold</th>
                     <th className="px-4 py-3 text-right">Revenue</th>
@@ -680,7 +685,7 @@ export default function ReportsPage() {
                 <tbody className="divide-y divide-border text-xs">
                   {sortedProducts.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                         No product sales recorded for this period.
                       </td>
                     </tr>
@@ -693,10 +698,12 @@ export default function ReportsPage() {
                         }
                         className="hover:bg-muted/40 transition-colors cursor-pointer"
                       >
-                        <td className="px-4 py-3 text-muted-foreground font-mono text-2xs">
-                          {idx + 1}
+                        <td className="px-4 py-3 font-bold text-foreground sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                          <span className="text-muted-foreground font-mono text-2xs mr-2">
+                            {idx + 1}.
+                          </span>
+                          {p.productName}
                         </td>
-                        <td className="px-4 py-3 font-bold text-foreground">{p.productName}</td>
                         <td className="px-4 py-3 text-muted-foreground font-mono text-2xs">
                           {p.sku}
                         </td>
@@ -721,8 +728,7 @@ export default function ReportsPage() {
                   {/* Totals Row */}
                   {productData.totals && sortedProducts.length > 0 && (
                     <tr className="border-t-2 border-foreground/20 bg-muted/20 font-bold">
-                      <td className="px-4 py-3"></td>
-                      <td className="px-4 py-3 text-foreground">
+                      <td className="px-4 py-3 text-foreground sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                         TOTAL ({productData.recordCount} products)
                       </td>
                       <td className="px-4 py-3"></td>
@@ -780,7 +786,9 @@ export default function ReportsPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-border text-2xs uppercase tracking-wider text-muted-foreground bg-muted/30">
-                    <th className="px-4 py-3">Employee Name</th>
+                    <th className="px-4 py-3 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                      Employee Name
+                    </th>
                     <th className="px-4 py-3">Store(s)</th>
                     <th className="px-4 py-3 text-right">Invoices</th>
                     <th className="px-4 py-3 text-right">Unique Customers</th>
@@ -809,7 +817,9 @@ export default function ReportsPage() {
                         }
                         className="hover:bg-muted/40 transition-colors cursor-pointer"
                       >
-                        <td className="px-4 py-3 font-bold text-foreground">{emp.employeeName}</td>
+                        <td className="px-4 py-3 font-bold text-foreground sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                          {emp.employeeName}
+                        </td>
                         <td className="px-4 py-3">
                           {emp.stores?.map((s: string) => (
                             <span key={s} className="badge-info text-3xs mr-1">
@@ -836,7 +846,7 @@ export default function ReportsPage() {
                   {/* Totals Row */}
                   {employeeData.totals && employeeData.employees?.length > 0 && (
                     <tr className="border-t-2 border-foreground/20 bg-muted/20 font-bold">
-                      <td className="px-4 py-3 text-foreground">
+                      <td className="px-4 py-3 text-foreground sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                         TOTAL ({employeeData.recordCount} employees)
                       </td>
                       <td className="px-4 py-3"></td>

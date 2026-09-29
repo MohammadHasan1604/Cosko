@@ -687,7 +687,9 @@ export default function AccountingPage() {
                   <table className="w-full text-left min-w-[700px]">
                     <thead>
                       <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
-                        <th className="px-4 py-3">Store Code</th>
+                        <th className="px-4 py-3 sticky left-0 z-20 bg-muted border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                          Store Code
+                        </th>
                         <th className="px-4 py-3 text-right">Orders</th>
                         <th className="px-4 py-3 text-right font-tabular">Net Revenue</th>
                         <th className="px-4 py-3 text-right font-tabular">COGS</th>
@@ -703,7 +705,7 @@ export default function AccountingPage() {
                           key={`sc-${sc.storeCode}`}
                           className="hover:bg-muted/40 transition-colors"
                         >
-                          <td className="px-4 py-3 font-mono font-bold text-primary">
+                          <td className="px-4 py-3 font-mono font-bold text-primary sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                             {sc.storeCode}
                           </td>
                           <td className="px-4 py-3 text-right font-bold text-muted-foreground">
@@ -948,7 +950,9 @@ export default function AccountingPage() {
                 <table className="w-full text-left min-w-[700px]">
                   <thead>
                     <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
-                      <th className="px-4 py-3">Destination Outlet</th>
+                      <th className="px-4 py-3 sticky left-0 z-20 bg-muted border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                        Destination Outlet
+                      </th>
                       <th className="px-4 py-3 text-right font-tabular">Transfers</th>
                       <th className="px-4 py-3 text-right font-tabular">Units</th>
                       <th className="px-4 py-3 text-right font-tabular">Vendor Cost</th>
@@ -962,7 +966,7 @@ export default function AccountingPage() {
                         key={`ob-${ob.destStore}`}
                         className="hover:bg-muted/40 transition-colors"
                       >
-                        <td className="px-4 py-3 font-mono font-bold text-primary">
+                        <td className="px-4 py-3 font-mono font-bold text-primary sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                           {ob.destStore}
                         </td>
                         <td className="px-4 py-3 text-right text-muted-foreground">{ob.count}</td>
@@ -1083,7 +1087,9 @@ export default function AccountingPage() {
                   <table className="w-full text-left min-w-[900px]">
                     <thead>
                       <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
-                        <th className="px-4 py-3">Entry #</th>
+                        <th className="px-4 py-3 sticky left-0 z-20 bg-muted border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                          Entry #
+                        </th>
                         <th className="px-4 py-3">Date</th>
                         <th className="px-4 py-3">Store</th>
                         <th className="px-4 py-3">Category</th>
@@ -1098,7 +1104,7 @@ export default function AccountingPage() {
                     <tbody className="divide-y divide-border text-xs font-tabular">
                       {ledgerEntries.map((le) => (
                         <tr key={`le-${le.id}`} className="hover:bg-muted/40 transition-colors">
-                          <td className="px-4 py-3 font-mono font-bold text-primary whitespace-nowrap">
+                          <td className="px-4 py-3 font-mono font-bold text-primary whitespace-nowrap sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                             {le.entryNo}
                           </td>
                           <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
@@ -1219,7 +1225,9 @@ export default function AccountingPage() {
                 <table className="w-full text-left text-xs font-tabular min-w-[650px]">
                   <thead className="bg-muted sticky top-0 border-b border-border text-2xs font-bold uppercase text-muted-foreground z-10">
                     <tr>
-                      <th className="px-4 py-3">Reference #</th>
+                      <th className="px-4 py-3 sticky left-0 z-20 bg-muted border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                        Reference #
+                      </th>
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Store</th>
                       <th className="px-4 py-3">Entity / Details</th>
@@ -1229,7 +1237,9 @@ export default function AccountingPage() {
                   <tbody className="divide-y divide-border">
                     {filteredDrillDownRows.map((row) => (
                       <tr key={`dd-${row.id}`} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3 font-mono font-bold text-primary">{row.refNo}</td>
+                        <td className="px-4 py-3 font-mono font-bold text-primary sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                          {row.refNo}
+                        </td>
                         <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                           {new Date(row.date).toLocaleDateString('en-IN')}
                         </td>

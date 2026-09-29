@@ -94,7 +94,9 @@ export default function ExpensesPage() {
             <table className="w-full text-left min-w-[750px] text-xs">
               <thead>
                 <tr className="table-header">
-                  <th className="px-4 py-3">Ref No</th>
+                  <th className="px-4 py-3 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                    Ref No
+                  </th>
                   <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3">Description</th>
                   <th className="px-4 py-3">Store</th>
@@ -120,7 +122,7 @@ export default function ExpensesPage() {
                 ) : (
                   filteredExpenses.map((exp) => (
                     <tr key={`exp-${exp.id}`} className="table-row">
-                      <td className="px-4 py-3 font-mono text-xs font-bold text-primary">
+                      <td className="px-4 py-3 font-mono text-xs font-bold text-primary sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                         {exp.referenceNo}
                       </td>
                       <td className="px-4 py-3 font-semibold text-foreground">{exp.category}</td>

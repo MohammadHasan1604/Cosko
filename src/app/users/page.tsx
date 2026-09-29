@@ -386,7 +386,9 @@ export default function UsersPage() {
               <table className="w-full text-left border-collapse min-w-[750px]">
                 <thead>
                   <tr className="table-header">
-                    <th className="py-3 px-4">User Identity</th>
+                    <th className="py-3 px-4 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                      User Identity
+                    </th>
                     <th className="py-3 px-4">Role & Security Level</th>
                     <th className="py-3 px-4">Store Scope & Access</th>
                     <th className="py-3 px-4">Account Status</th>
@@ -404,7 +406,7 @@ export default function UsersPage() {
 
                     return (
                       <tr key={`usr-row-${u.id}`} className="table-row">
-                        <td className="py-3 px-4 font-medium text-foreground">
+                        <td className="py-3 px-4 font-medium text-foreground sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                           <div className="flex items-center gap-2.5">
                             {u.avatarUrl ? (
                               <img
