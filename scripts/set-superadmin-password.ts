@@ -2,8 +2,8 @@ import { prisma } from '../src/lib/db';
 import { hashPassword, comparePassword } from '../src/lib/auth';
 
 async function setSuperAdminPassword() {
-  const email = process.env.SUPERADMIN_EMAIL || 'cosko@gmail.com';
-  const newPassword = process.env.SUPERADMIN_PASSWORD || 'CoskoWajid2026@';
+  const email = process.argv[2] || process.env.SUPERADMIN_EMAIL || 'cosko@gmail.com';
+  const newPassword = process.argv[3] || process.env.SUPERADMIN_PASSWORD || 'Cosko2026@';
 
   console.log(`Setting password for Super Admin: ${email}...`);
 
