@@ -79,10 +79,7 @@ export default function SalesPage() {
   // Permissions
   const canOverridePrice =
     currentUser.role === 'Super Admin' || currentUser.role === 'Store Manager';
-  const canViewCost =
-    currentUser.role === 'Super Admin' ||
-    currentUser.role === 'Store Manager' ||
-    currentUser.role === 'Inventory Manager';
+  const canViewCost = currentUser.role === 'Super Admin' || currentUser.role === 'Store Manager';
 
   // Customer State - Starts clean, no prefilled customer
   const [customerPhoneDigits, setCustomerPhoneDigits] = useState('');

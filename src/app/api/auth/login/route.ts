@@ -200,7 +200,6 @@ export async function POST(req: NextRequest) {
             ? allowedStores
             : [effectiveStore],
       avatar: user.name.substring(0, 2).toUpperCase(),
-      shiftStatus: user.shiftStatus as any,
       avatarUrl: user.avatarUrl || undefined,
       mustChangePassword: user.mustChangePassword || false,
     };

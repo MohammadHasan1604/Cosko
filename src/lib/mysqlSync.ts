@@ -282,7 +282,7 @@ export const MySQLDataService = {
 
   // ─── USER PROFILES ───────────────────────────────────
   async createProfile(user: any) {
-    return apiCall('/api/users/create', 'POST', {
+    return apiCall('/api/users', 'POST', {
       name: user.name,
       email: user.email,
       password: user.password || 'Cosko2026@',
@@ -297,7 +297,7 @@ export const MySQLDataService = {
   },
 
   async updateProfile(user: any) {
-    return apiCall('/api/users/update', 'POST', {
+    return apiCall('/api/users', 'PUT', {
       id: user.id,
       name: user.name,
       email: user.email,
@@ -305,16 +305,13 @@ export const MySQLDataService = {
       store: user.store,
       status: user.status,
       securityLevel: user.securityLevel,
-      shiftStatus: user.shiftStatus,
       assignedStores: user.assignedStores || user.allowedStores,
       allowedStores: user.assignedStores || user.allowedStores,
-      overrides: user.overrides,
-      permissionOverride: user.permissionOverride,
     });
   },
 
   async deleteProfile(id: string, permanent = false) {
-    return apiCall('/api/users/delete', 'POST', { id, permanent });
+    return apiCall(`/api/users?id=${encodeURIComponent(id)}&permanent=${permanent}`, 'DELETE');
   },
 
   // ─── CUSTOMERS ───────────────────────────────────────

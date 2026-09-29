@@ -37,7 +37,7 @@ async function main() {
   console.log('  SUMMARY OF PRESERVED SYSTEM INFRASTRUCTURE:');
   console.log(`  - Store Hub Outlets: ${await prisma.storeHub.count()} stores preserved`);
   console.log(`  - User Accounts:     ${await prisma.userAccount.count()} user accounts preserved`);
-  console.log(`  - Roles & Privileges: ${await prisma.role.count()} system roles preserved`);
+  console.log('  - Roles & Privileges: 3 system roles (Super Admin, Store Manager, Sales Manager)');
   console.log(`  - Products Count:     ${await prisma.product.count()} (CLEARED FOR REAL DATA)`);
   console.log(`  - Categories Count:   ${await (prisma as any).category.count()} (CLEARED FOR REAL DATA)`);
   console.log(`  - Customers Count:    ${await prisma.customer.count()} (CLEARED FOR REAL DATA)`);

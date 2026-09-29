@@ -7,13 +7,16 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
 // 1. STORE HUBS
+// ──────────────────────────────────────────────────────────────────────────────
 model StoreHub {
   id          String   @id @default(uuid())
   code        String   @unique @db.VarChar(16)
   name        String   @db.VarChar(128)
   city        String   @db.VarChar(64)
   address     String   @db.VarChar(255)
+  timezone    String   @default("Asia/Kolkata") @db.VarChar(64)
   ownerName   String?  @map("owner_name") @db.VarChar(128)
   managerName String?  @map("manager_name") @db.VarChar(128)
   phone       String?  @db.VarChar(32)
@@ -26,18 +29,19 @@ model StoreHub {
   @@map("stores")
 }
 
-// 2. USER ACCOUNTS & PROFILES
+// ──────────────────────────────────────────────────────────────────────────────
+// 2. USER ACCOUNTS (Exactly 3 roles: Super Admin, Store Manager, Sales Manager)
+// ──────────────────────────────────────────────────────────────────────────────
 model UserAccount {
   id                  String    @id @default(uuid())
   email               String    @unique @db.VarChar(128)
   passwordHash        String    @map("password_hash") @db.VarChar(255)
   name                String    @db.VarChar(128)
   phone               String?   @db.VarChar(32)
-  role                String    @default("Store Manager") @db.VarChar(32)
-  securityLevel       Int       @default(80) @map("security_level")
+  role                String    @default("Sales Manager") @db.VarChar(32)
+  securityLevel       Int       @default(40) @map("security_level")
   storeScope          String    @default("BLR") @map("store_scope") @db.VarChar(64)
   status              String    @default("Active") @db.VarChar(16)
-  shiftStatus         String    @default("On Shift") @map("shift_status") @db.VarChar(16)
   mustChangePassword  Boolean   @default(false) @map("must_change_password")
   avatarUrl           String?   @map("avatar_url") @db.LongText
   lastLogin           DateTime? @map("last_login")
@@ -46,14 +50,13 @@ model UserAccount {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  storeAssignments    UserStoreAssignment[]
-  permissionOverrides UserPermissionOverride[]
-  workSessions        UserWorkSession[]
-  dailyActivities     UserDailyActivity[]
-  sessions            UserSession[]
-  deleteRequests      DeleteRequest[]
-  notifications       Notification[]
-  activityEvents      WorkActivityEvent[]
+  storeAssignments UserStoreAssignment[]
+  sessions         UserSession[]
+  attendanceDays   AttendanceDay[]
+  deleteRequests   DeleteRequest[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]            @relation("AuditLogUser")
+  fileAssets       FileAsset[]
 
   @@index([role])
   @@index([status])
@@ -61,7 +64,9 @@ model UserAccount {
   @@map("users")
 }
 
-// 2B. DATABASE-BACKED SESSIONS — Durable session management, revocation & expiry
+// ──────────────────────────────────────────────────────────────────────────────
+// 2B. DATABASE-BACKED SESSIONS — 30-day durable sessions with revocation
+// ──────────────────────────────────────────────────────────────────────────────
 model UserSession {
   id        String    @id @default(uuid())
   userId    String    @map("user_id")
@@ -80,7 +85,9 @@ model UserSession {
   @@map("user_sessions")
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
 // 3. USER STORE ASSIGNMENTS
+// ──────────────────────────────────────────────────────────────────────────────
 model UserStoreAssignment {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
@@ -94,44 +101,9 @@ model UserStoreAssignment {
   @@map("user_store_assignments")
 }
 
-// 4. ROLES & PERMISSIONS
-model Role {
-  id            String   @id @default(uuid())
-  name          String   @unique @db.VarChar(64)
-  securityLevel Int      @default(10) @map("security_level")
-  description   String?  @db.VarChar(255)
-  isSystemRole  Boolean  @default(true) @map("is_system_role")
-  createdAt     DateTime @default(now()) @map("created_at")
-
-  @@map("roles")
-}
-
-model Permission {
-  id               String   @id @default(uuid())
-  code             String   @unique @db.VarChar(128)
-  name             String   @db.VarChar(128)
-  category         String   @db.VarChar(64)
-  isProtected      Boolean  @default(false) @map("is_protected")
-  minSecurityLevel Int      @default(10) @map("min_security_level")
-  createdAt        DateTime @default(now()) @map("created_at")
-
-  @@map("permissions")
-}
-
-model UserPermissionOverride {
-  id             String   @id @default(uuid())
-  userId         String   @map("user_id")
-  permissionCode String   @map("permission_code") @db.VarChar(128)
-  overrideType   String   @map("override_type") @db.VarChar(8)
-  createdAt      DateTime @default(now()) @map("created_at")
-
-  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, permissionCode])
-  @@map("user_permission_overrides")
-}
-
-// 4B. CATEGORIES & TAXONOMY
+// ──────────────────────────────────────────────────────────────────────────────
+// 4. CATEGORIES & TAXONOMY
+// ──────────────────────────────────────────────────────────────────────────────
 model Category {
   id               String   @id @default(uuid())
   name             String   @db.VarChar(128)
@@ -158,7 +130,6 @@ model Category {
   @@map("categories")
 }
 
-// 4C. DYNAMIC CATEGORY TYPES
 model CategoryType {
   id          String   @id @default(uuid())
   name        String   @unique @db.VarChar(64)
@@ -172,7 +143,9 @@ model CategoryType {
   @@map("category_types")
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
 // 5. PRODUCTS & CATALOG
+// ──────────────────────────────────────────────────────────────────────────────
 model Product {
   id               String   @id @default(uuid())
   sku              String   @unique @db.VarChar(64)
@@ -208,7 +181,9 @@ model Product {
   @@map("products")
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
 // 6. INVENTORY
+// ──────────────────────────────────────────────────────────────────────────────
 model Inventory {
   id          String   @id @default(uuid())
   productId   String   @map("product_id")
@@ -229,7 +204,9 @@ model Inventory {
   @@map("inventory")
 }
 
-// 7. INVENTORY LEDGER
+// ──────────────────────────────────────────────────────────────────────────────
+// 7. INVENTORY LEDGER — Immutable movement history
+// ──────────────────────────────────────────────────────────────────────────────
 model InventoryLedger {
   id                  String   @id @default(uuid())
   productId           String   @map("product_id")
@@ -255,7 +232,9 @@ model InventoryLedger {
   @@map("inventory_ledger")
 }
 
-// 8. STOCK TRANSFERS & CENTRAL PROFIT
+// ──────────────────────────────────────────────────────────────────────────────
+// 8. STOCK TRANSFERS
+// ──────────────────────────────────────────────────────────────────────────────
 model StockTransfer {
   id                 String    @id @default(uuid())
   transferNo         String    @unique @map("transfer_no") @db.VarChar(64)
@@ -303,7 +282,9 @@ model StockTransferItem {
   @@map("stock_transfer_items")
 }
 
-// 9. CUSTOMERS & REPAIRS
+// ──────────────────────────────────────────────────────────────────────────────
+// 9. CUSTOMERS — Store-scoped via CustomerStoreProfile
+// ──────────────────────────────────────────────────────────────────────────────
 model Customer {
   id              String   @id @default(uuid())
   name            String   @db.VarChar(128)
@@ -312,13 +293,11 @@ model Customer {
   email           String?  @db.VarChar(128)
   city            String   @default("Bengaluru") @db.VarChar(64)
   address         String?  @db.VarChar(255)
-  creditBalance   Decimal  @default(0.00) @map("credit_balance") @db.Decimal(12, 2)
-  totalSpent      Decimal  @default(0.00) @map("total_spent") @db.Decimal(15, 2)
-  totalOrders     Int      @default(0) @map("total_orders")
   status          String   @default("Active") @db.VarChar(16)
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
+  storeProfiles CustomerStoreProfile[]
   repairs       RepairEnquiry[]
   sales         SalesOrder[]
   externalLinks CustomerExternalLink[]
@@ -329,6 +308,25 @@ model Customer {
   @@index([name])
   @@index([phone])
   @@map("customers")
+}
+
+/// Tracks per-store relationship data for customers (store-scoped privacy)
+model CustomerStoreProfile {
+  id            String   @id @default(uuid())
+  customerId    String   @map("customer_id")
+  storeCode     String   @map("store_code") @db.VarChar(16)
+  creditBalance Decimal  @default(0.00) @map("credit_balance") @db.Decimal(12, 2)
+  totalSpent    Decimal  @default(0.00) @map("total_spent") @db.Decimal(15, 2)
+  totalOrders   Int      @default(0) @map("total_orders")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, storeCode])
+  @@index([storeCode])
+  @@index([customerId])
+  @@map("customer_store_profiles")
 }
 
 model CustomerExternalLink {
@@ -354,6 +352,7 @@ model CustomerExternalLink {
   @@map("customer_external_links")
 }
 
+/// Read-only historical repair records — no new repairs created
 model RepairEnquiry {
   id               String   @id @default(uuid())
   ticketNo         String   @unique @map("ticket_no") @db.VarChar(32)
@@ -366,6 +365,7 @@ model RepairEnquiry {
   estimatedCost    Decimal  @map("estimated_cost") @db.Decimal(12, 2)
   status           String   @default("Pending Diagnosis") @db.VarChar(32)
   assignedTech     String?  @map("assigned_tech") @db.VarChar(128)
+  storeCode        String?  @map("store_code") @db.VarChar(16)
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -378,7 +378,9 @@ model RepairEnquiry {
   @@map("repair_enquiries")
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
 // 10. VENDORS & PURCHASES
+// ──────────────────────────────────────────────────────────────────────────────
 model Vendor {
   id            String   @id @default(uuid())
   code          String   @unique @db.VarChar(32)
@@ -393,6 +395,7 @@ model Vendor {
   paymentTerms  String   @default("Net 30") @map("payment_terms") @db.VarChar(32)
   leadTimeDays  Int?     @map("lead_time_days")
   rating        Decimal? @db.Decimal(3, 1)
+  storeCode     String?  @map("store_code") @db.VarChar(16)
   status        String   @default("Active") @db.VarChar(16)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -401,6 +404,7 @@ model Vendor {
 
   @@index([status])
   @@index([createdAt])
+  @@index([storeCode])
   @@map("vendors")
 }
 
@@ -442,14 +446,13 @@ model PurchaseOrder {
   @@map("purchases")
 }
 
-// Purchase Payment Records
 model PurchasePayment {
   id            String   @id @default(uuid())
   purchaseId    String   @map("purchase_id")
   voucherNo     String?  @map("voucher_no") @db.VarChar(64)
   amount        Decimal  @db.Decimal(15, 2)
   paymentDate   DateTime @default(now()) @map("payment_date")
-  paymentMethod String   @default("Bank Transfer") @map("payment_method") @db.VarChar(32)
+  paymentMethod String   @default("UPI") @map("payment_method") @db.VarChar(32)
   referenceNo   String?  @map("reference_no") @db.VarChar(64)
   receiptUrl    String?  @map("receipt_url") @db.LongText
   notes         String?  @db.VarChar(255)
@@ -464,7 +467,6 @@ model PurchasePayment {
   @@map("purchase_payments")
 }
 
-// Goods Received Notes
 model GoodsReceivedNote {
   id           String   @id @default(uuid())
   grnNo        String   @unique @map("grn_no") @db.VarChar(64)
@@ -504,7 +506,9 @@ model PurchaseOrderItem {
   @@map("purchase_items")
 }
 
-// 11. SALES & POS ORDERS
+// ──────────────────────────────────────────────────────────────────────────────
+// 11. SALES & POS
+// ──────────────────────────────────────────────────────────────────────────────
 model SalesOrder {
   id              String   @id @default(uuid())
   orderNo         String   @unique @map("order_no") @db.VarChar(64)
@@ -561,7 +565,9 @@ model SalesOrderItem {
   @@map("sale_items")
 }
 
-// 12. EXPENSES & CENTRAL EXPENSES
+// ──────────────────────────────────────────────────────────────────────────────
+// 12. EXPENSES
+// ──────────────────────────────────────────────────────────────────────────────
 model Expense {
   id            String   @id @default(uuid())
   expenseNo     String   @unique @map("expense_no") @db.VarChar(64)
@@ -569,7 +575,7 @@ model Expense {
   category      String   @db.VarChar(64)
   amount        Decimal  @db.Decimal(12, 2)
   description   String   @db.VarChar(255)
-  paymentMethod String   @default("Bank Transfer") @map("payment_method") @db.VarChar(32)
+  paymentMethod String   @default("UPI") @map("payment_method") @db.VarChar(32)
   referenceNo   String?  @map("reference_no") @db.VarChar(64)
   receiptUrl    String?  @map("receipt_url") @db.LongText
   approvedBy    String   @map("approved_by") @db.VarChar(128)
@@ -591,7 +597,7 @@ model CentralExpense {
   category      String   @db.VarChar(64)
   amount        Decimal  @db.Decimal(12, 2)
   description   String   @db.VarChar(255)
-  paymentMethod String   @default("Bank Transfer") @map("payment_method") @db.VarChar(32)
+  paymentMethod String   @default("UPI") @map("payment_method") @db.VarChar(32)
   referenceNo   String?  @map("reference_no") @db.VarChar(64)
   receiptUrl    String?  @map("receipt_url") @db.LongText
   approvedBy    String   @map("approved_by") @db.VarChar(128)
@@ -605,26 +611,34 @@ model CentralExpense {
   @@map("central_expenses")
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
 // 13. AUDIT LOGS
+// ──────────────────────────────────────────────────────────────────────────────
 model AuditLog {
   id        String   @id @default(uuid())
   module    String   @db.VarChar(64)
   action    String   @db.VarChar(128)
   details   String   @db.Text
+  userId    String?  @map("user_id")
   userEmail String   @map("user_email") @db.VarChar(128)
   userRole  String   @map("user_role") @db.VarChar(64)
   storeCode String   @map("store_code") @db.VarChar(16)
   ipAddress String?  @map("ip_address") @db.VarChar(64)
   createdAt DateTime @default(now()) @map("created_at")
 
+  user UserAccount? @relation("AuditLogUser", fields: [userId], references: [id], onDelete: SetNull)
+
   @@index([module])
   @@index([userEmail])
   @@index([createdAt])
   @@index([storeCode])
+  @@index([userId])
   @@map("audit_logs")
 }
 
-// 14. BRANDING & SYSTEM SETTINGS
+// ──────────────────────────────────────────────────────────────────────────────
+// 14. SYSTEM SETTINGS & BRANDING
+// ──────────────────────────────────────────────────────────────────────────────
 model BrandingSetting {
   id              String   @id @default("cosko_branding_config")
   appName         String   @default("COSKO") @map("app_name") @db.VarChar(128)
@@ -645,7 +659,6 @@ model BrandingSetting {
   @@map("branding_settings")
 }
 
-// 14B. SYSTEM SETTINGS — Tax, Invoice, Security, Alerts (Single-Row Config)
 model SystemSettings {
   id                     String  @id @default("cosko_system_config")
   // ─── GST / Tax ───
@@ -692,45 +705,20 @@ model SystemSettings {
   @@map("system_settings")
 }
 
-// 15. SECURE LEGACY DATA CONNECTIONS
-model LegacyDataSourceConfig {
-  id                String    @id @default("legacy_customer_repair_db")
-  name              String    @default("Legacy Customer & Repair Database")
-  dbType            String    @default("MySQL") @map("db_type") @db.VarChar(32)
-  host              String    @default("127.0.0.1") @db.VarChar(128)
-  port              Int       @default(3306)
-  databaseName      String    @default("cosko_legacy_store") @map("database_name") @db.VarChar(64)
-  username          String    @default("cosko_legacy_reader") @db.VarChar(64)
-  encryptedPassword String?   @map("encrypted_password") @db.Text
-  sslMode           String    @default("Preferred") @map("ssl_mode") @db.VarChar(32)
-  connectionTimeout Int       @default(2500) @map("connection_timeout")
-  readTimeout       Int       @default(3000) @map("read_timeout")
-  status            String    @default("Connected") @db.VarChar(32)
-  isReadOnly        Boolean   @default(true) @map("is_read_only")
-  customerTable     String    @default("legacy_customers") @map("customer_table") @db.VarChar(64)
-  repairTable       String    @default("legacy_repair_enquiries") @map("repair_table") @db.VarChar(64)
-  fieldMappings     String?   @map("field_mappings") @db.Text
-  lastCheckedAt     DateTime? @map("last_checked_at")
-  lastLatencyMs     Int?      @default(12) @map("last_latency_ms")
-  updatedBy         String?   @map("updated_by") @db.VarChar(128)
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-
-  @@map("legacy_data_source_configs")
-}
-
-// 16. FINANCIAL & GENERAL LEDGER
+// ──────────────────────────────────────────────────────────────────────────────
+// 15. FINANCIAL & GENERAL LEDGER
+// ──────────────────────────────────────────────────────────────────────────────
 model FinancialLedgerEntry {
   id              String   @id @default(uuid())
   entryNo         String   @unique @map("entry_no") @db.VarChar(64)
   entryDate       DateTime @default(now()) @map("entry_date")
   storeCode       String   @map("store_code") @db.VarChar(16)
-  accountCategory String   @map("account_category") @db.VarChar(32) // REVENUE, COGS, OPERATING_EXPENSE, CENTRAL_EXPENSE, TRANSFER_MARKUP, ASSET, LIABILITY
+  accountCategory String   @map("account_category") @db.VarChar(32)
   accountName     String   @map("account_name") @db.VarChar(64)
   debit           Decimal  @default(0.00) @db.Decimal(15, 2)
   credit          Decimal  @default(0.00) @db.Decimal(15, 2)
   amount          Decimal  @db.Decimal(15, 2)
-  refType         String   @map("ref_type") @db.VarChar(32) // SALE, PURCHASE_GRN, VENDOR_PAYMENT, EXPENSE, STOCK_TRANSFER, INVENTORY_ADJUSTMENT
+  refType         String   @map("ref_type") @db.VarChar(32)
   refId           String?  @map("ref_id") @db.VarChar(64)
   refNo           String   @map("ref_no") @db.VarChar(64)
   entityName      String?  @map("entity_name") @db.VarChar(128)
@@ -750,12 +738,14 @@ model FinancialLedgerEntry {
   @@map("financial_ledger")
 }
 
-// 17. IDEMPOTENCY & TRANSACTION-SAFE DUPLICATE PROTECTION
+// ──────────────────────────────────────────────────────────────────────────────
+// 16. IDEMPOTENCY & DUPLICATE PROTECTION
+// ──────────────────────────────────────────────────────────────────────────────
 model IdempotencyRecord {
   id           String   @id @default(uuid())
   key          String   @unique @db.VarChar(128)
   action       String   @db.VarChar(64)
-  status       String   @default("PROCESSING") @db.VarChar(32) // PROCESSING, COMPLETED, FAILED
+  status       String   @default("PROCESSING") @db.VarChar(32)
   responseCode Int?     @map("response_code")
   responseData String?  @map("response_data") @db.LongText
   entityId     String?  @map("entity_id") @db.VarChar(64)
@@ -772,12 +762,14 @@ model IdempotencyRecord {
   @@map("idempotency_records")
 }
 
-// 18. PAYMENT METHODS
+// ──────────────────────────────────────────────────────────────────────────────
+// 17. PAYMENT METHODS (Cash, UPI, Other only)
+// ──────────────────────────────────────────────────────────────────────────────
 model PaymentMethod {
   id          String   @id @default(uuid())
   name        String   @unique @db.VarChar(64)
   code        String   @unique @db.VarChar(64)
-  type        String   @default("Bank") @db.VarChar(32) // Cash, Bank, Digital, Card, Credit, Other
+  type        String   @default("Digital") @db.VarChar(32)
   description String?  @db.VarChar(255)
   status      String   @default("Active") @db.VarChar(16)
   isSystem    Boolean  @default(false) @map("is_system")
@@ -790,7 +782,9 @@ model PaymentMethod {
   @@map("payment_methods")
 }
 
-// 19. BRANDS MASTER
+// ──────────────────────────────────────────────────────────────────────────────
+// 18. BRANDS & UNITS
+// ──────────────────────────────────────────────────────────────────────────────
 model Brand {
   id          String   @id @default(uuid())
   name        String   @unique @db.VarChar(64)
@@ -804,7 +798,6 @@ model Brand {
   @@map("brands")
 }
 
-// 20. UNITS OF MEASUREMENT
 model Unit {
   id          String   @id @default(uuid())
   name        String   @unique @db.VarChar(64)
@@ -819,69 +812,48 @@ model Unit {
   @@map("units")
 }
 
-// 21. USER WORK SESSIONS & ACTIVITY TRACKING
-model UserWorkSession {
+// ──────────────────────────────────────────────────────────────────────────────
+// 19. ATTENDANCE — Server-authoritative, one shift per user per local date
+// ──────────────────────────────────────────────────────────────────────────────
+model AttendanceDay {
   id            String    @id @default(uuid())
   userId        String    @map("user_id")
-  sessionToken  String?   @map("session_token") @db.VarChar(128)
+  localDate     String    @map("local_date") @db.VarChar(10) // YYYY-MM-DD in store timezone
   storeCode     String    @map("store_code") @db.VarChar(16)
-  startedAt     DateTime  @default(now()) @map("started_at")
-  lastActiveAt  DateTime  @default(now()) @map("last_active_at")
-  endedAt       DateTime? @map("ended_at")
-  activeSeconds Int       @default(0) @map("active_seconds")
-  idleSeconds   Int       @default(0) @map("idle_seconds")
-  isClosed      Boolean   @default(false) @map("is_closed")
-  ipAddress     String?   @map("ip_address") @db.VarChar(64)
-  userAgent     String?   @map("user_agent") @db.VarChar(255)
-  device        String?   @db.VarChar(64)
+  shiftStartUtc DateTime  @map("shift_start_utc")
+  shiftEndUtc   DateTime? @map("shift_end_utc")
+  totalSeconds  Int       @default(0) @map("total_seconds")
+  status        String    @default("ACTIVE") @db.VarChar(16) // ACTIVE, COMPLETED
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([startedAt])
-  @@index([lastActiveAt])
+  @@unique([userId, localDate])
   @@index([storeCode])
-  @@index([isClosed])
-  @@map("user_work_sessions")
+  @@index([localDate])
+  @@index([status])
+  @@index([userId, storeCode])
+  @@map("attendance_days")
 }
 
-model UserDailyActivity {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  date          String   @db.VarChar(10) // YYYY-MM-DD
-  activeSeconds Int      @default(0) @map("active_seconds")
-  idleSeconds   Int      @default(0) @map("idle_seconds")
-  firstLogin    DateTime @default(now()) @map("first_login")
-  lastActivity  DateTime @default(now()) @map("last_activity")
-  sessionsCount Int      @default(1) @map("sessions_count")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, date])
-  @@index([date])
-  @@index([userId])
-  @@map("user_daily_activity")
-}
-
-// 22. DELETE APPROVAL WORKFLOW
+// ──────────────────────────────────────────────────────────────────────────────
+// 20. DELETE APPROVAL WORKFLOW
+// ──────────────────────────────────────────────────────────────────────────────
 model DeleteRequest {
   id               String    @id @default(uuid())
   requesterId      String    @map("requester_id")
   requesterRole    String    @map("requester_role") @db.VarChar(32)
   requesterStore   String    @map("requester_store") @db.VarChar(16)
-  entityType       String    @map("entity_type") @db.VarChar(32) // INVENTORY, CUSTOMER, VENDOR, CATEGORY, PURCHASE, EXPENSE, REPAIR, BRAND, UNIT, CATEGORY_TYPE, PAYMENT_METHOD
+  entityType       String    @map("entity_type") @db.VarChar(32)
   entityId         String    @map("entity_id") @db.VarChar(64)
   entityName       String    @map("entity_name") @db.VarChar(255)
   reason           String    @db.VarChar(500)
   beforeStateJson  String    @map("before_state_json") @db.LongText
-  dependencyImpact String?   @map("dependency_impact") @db.Text // JSON: {salesCount, poCount, repairCount, ...}
-  financialImpact  String?   @map("financial_impact") @db.Text // JSON: {outstandingBalance, totalSpent, ...}
-  status           String    @default("PENDING") @db.VarChar(16) // PENDING, APPROVED, REJECTED, EXPIRED
-  executionMode    String?   @map("execution_mode") @db.VarChar(16) // ARCHIVE, HARD_DELETE
+  dependencyImpact String?   @map("dependency_impact") @db.Text
+  financialImpact  String?   @map("financial_impact") @db.Text
+  status           String    @default("PENDING") @db.VarChar(16)
+  executionMode    String?   @map("execution_mode") @db.VarChar(16)
   reviewedBy       String?   @map("reviewed_by") @db.VarChar(128)
   reviewedAt       DateTime? @map("reviewed_at")
   rejectionReason  String?   @map("rejection_reason") @db.VarChar(500)
@@ -899,14 +871,16 @@ model DeleteRequest {
   @@map("delete_requests")
 }
 
-// 23. PERSISTENT IN-APP NOTIFICATIONS
+// ──────────────────────────────────────────────────────────────────────────────
+// 21. NOTIFICATIONS
+// ──────────────────────────────────────────────────────────────────────────────
 model Notification {
   id                String   @id @default(uuid())
   userId            String   @map("user_id")
   title             String   @db.VarChar(255)
   message           String   @db.Text
-  type              String   @default("info") @db.VarChar(16) // info, warning, success, danger
-  category          String   @default("SYSTEM") @db.VarChar(32) // DELETE_REQUEST, DELETE_APPROVED, DELETE_REJECTED, SYSTEM
+  type              String   @default("info") @db.VarChar(16)
+  category          String   @default("SYSTEM") @db.VarChar(32)
   relatedEntityType String?  @map("related_entity_type") @db.VarChar(32)
   relatedEntityId   String?  @map("related_entity_id") @db.VarChar(64)
   actionUrl         String?  @map("action_url") @db.VarChar(255)
@@ -922,23 +896,29 @@ model Notification {
   @@map("notifications")
 }
 
-// 24. WORK ACTIVITY EVENT LOG (Immutable Server-Timestamped Events)
-model WorkActivityEvent {
-  id              String    @id @default(uuid())
-  userId          String    @map("user_id")
-  sessionId       String?   @map("session_id") @db.VarChar(64)
-  eventType       String    @map("event_type") @db.VarChar(32) // LOGIN, LOGOUT, SESSION_START, SESSION_END, HEARTBEAT_ACTIVE, HEARTBEAT_IDLE, VISIBILITY_HIDDEN, VISIBILITY_VISIBLE, TAB_FOCUS, TAB_BLUR, BREAK_START, BREAK_END, MIDNIGHT_ROLLOVER, CRASH_RECOVERY
-  serverTimestamp DateTime  @default(now()) @map("server_timestamp")
-  clientTimestamp DateTime? @map("client_timestamp")
-  metadataJson    String?   @map("metadata_json") @db.Text // JSON: {path, tabId, device, ip, userAgent, ...}
-  createdAt       DateTime  @default(now()) @map("created_at")
+// ──────────────────────────────────────────────────────────────────────────────
+// 22. FILE ASSETS — Durable proof/upload storage metadata
+// ──────────────────────────────────────────────────────────────────────────────
+model FileAsset {
+  id                String   @id @default(uuid())
+  objectKey         String   @unique @map("object_key") @db.VarChar(512)
+  storageProvider   String   @default("s3") @map("storage_provider") @db.VarChar(32)
+  mimeType          String   @map("mime_type") @db.VarChar(128)
+  byteSize          Int      @map("byte_size")
+  sha256Hash        String?  @map("sha256_hash") @db.VarChar(64)
+  originalFilename  String   @map("original_filename") @db.VarChar(255)
+  createdByUserId   String   @map("created_by_user_id")
+  storeCode         String?  @map("store_code") @db.VarChar(16)
+  relatedEntityType String?  @map("related_entity_type") @db.VarChar(32)
+  relatedEntityId   String?  @map("related_entity_id") @db.VarChar(64)
+  privacyLevel      String   @default("STORE_PRIVATE") @map("privacy_level") @db.VarChar(32)
+  createdAt         DateTime @default(now()) @map("created_at")
 
-  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdBy UserAccount @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([sessionId])
-  @@index([eventType])
-  @@index([serverTimestamp])
-  @@index([userId, serverTimestamp])
-  @@map("work_activity_events")
+  @@index([storeCode])
+  @@index([relatedEntityType, relatedEntityId])
+  @@index([createdByUserId])
+  @@index([createdAt])
+  @@map("file_assets")
 }

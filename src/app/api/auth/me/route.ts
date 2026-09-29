@@ -104,7 +104,6 @@ export async function GET(request: NextRequest) {
             ? allowedStores
             : [effectiveStore],
       avatar: dbUser.name.substring(0, 2).toUpperCase(),
-      shiftStatus: dbUser.shiftStatus as any,
       avatarUrl: dbUser.avatarUrl || undefined,
       mustChangePassword: dbUser.mustChangePassword || false,
     };

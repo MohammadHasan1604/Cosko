@@ -1,21 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { verifySessionToken, signSessionToken, SessionUser } from '@/lib/auth';
+import { signSessionToken, hashToken, SessionUser, isValidAuthOrigin } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/authPipeline';
 
 /**
  * POST /api/auth/update-profile
  * Updates user profile (name, phone, avatar)
+ * Secure authoritative update tied to DB session.
  */
 export async function POST(req: NextRequest) {
-  try {
-    const token = req.cookies.get('cosko_session')?.value;
-    const session = token ? verifySessionToken(token) : null;
+  if (!isValidAuthOrigin(req)) {
+    return NextResponse.json(
+      { success: false, message: 'Forbidden: Invalid request origin' },
+      { status: 403 }
+    );
+  }
 
-    if (!session || !session.user || !session.user.id) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth.user || !auth.user.id) {
+      return NextResponse.json(
+        { success: false, message: auth.error || 'Unauthorized' },
+        { status: auth.status }
+      );
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid request payload' },
+        { status: 400 }
+      );
+    }
+
     const { name, phone, avatarUrl } = body;
 
     if (name && !name.trim()) {
@@ -26,7 +43,7 @@ export async function POST(req: NextRequest) {
     }
 
     const updatedUser = await prisma.userAccount.update({
-      where: { id: session.user.id },
+      where: { id: auth.user.id },
       data: {
         ...(name ? { name: name.trim() } : {}),
         ...(phone !== undefined ? { phone: phone ? phone.trim() : null } : {}),
@@ -41,6 +58,7 @@ export async function POST(req: NextRequest) {
       role: updatedUser.role as SessionUser['role'],
       securityLevel: updatedUser.securityLevel,
       store: updatedUser.storeScope,
+      allowedStores: auth.user.allowedStores,
       avatar: updatedUser.name
         .split(' ')
         .map((n) => n[0])
@@ -48,8 +66,23 @@ export async function POST(req: NextRequest) {
         .toUpperCase()
         .substring(0, 2),
       avatarUrl: updatedUser.avatarUrl || undefined,
-      shiftStatus: (updatedUser.shiftStatus as 'On Shift' | 'On Leave') || 'On Shift',
+      sessionId: auth.user.sessionId,
     };
+
+    const newToken = signSessionToken(updatedSessionUser, auth.user.sessionId);
+
+    // Update DB session token hash if applicable
+    if (auth.user.sessionId && auth.user.sessionId !== 'jwt-only') {
+      try {
+        const newTokenHash = hashToken(newToken);
+        await prisma.userSession.update({
+          where: { id: auth.user.sessionId },
+          data: { tokenHash: newTokenHash },
+        });
+      } catch (err) {
+        console.warn('Could not update session token hash:', err);
+      }
+    }
 
     const response = NextResponse.json({
       success: true,
@@ -57,14 +90,13 @@ export async function POST(req: NextRequest) {
       message: 'Profile updated successfully',
     });
 
-    // Refresh JWT session cookie
-    const newToken = signSessionToken(updatedSessionUser);
+    // Refresh JWT session cookie (30-day lifetime)
     response.cookies.set('cosko_session', newToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * 30,
     });
 
     return response;

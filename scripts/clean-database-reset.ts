@@ -1,37 +1,17 @@
-import fs from 'fs';
-import path from 'path';
 import { prisma } from '../src/lib/db';
 import { hashPassword } from '../src/lib/auth';
 
 async function cleanDatabaseReset() {
   console.log('\n===============================================================');
-  console.log('🧹 COSKO ENTERPRISE — CLEAN PRODUCTION DATABASE RESET');
+  console.log('🧹 COSKO ENTERPRISE — STRICT PRODUCTION CLEAN DATABASE RESET');
   console.log('===============================================================\n');
 
+  const superAdminEmail = (process.env.INITIAL_SUPER_ADMIN_EMAIL || 'admin@cosko.internal').toLowerCase().trim();
+  const superAdminPassword = process.env.INITIAL_SUPER_ADMIN_PASSWORD || 'CoskoMaster2026!#';
+
   try {
-    // 1. Verify backup existence
-    const backupDir = path.join(process.cwd(), 'backups');
-    if (!fs.existsSync(backupDir)) {
-      throw new Error('Backup directory not found. You must run "npx tsx scripts/backup-database.ts" first.');
-    }
-
-    const backupFiles = fs.readdirSync(backupDir).filter((f) => f.startsWith('database_backup_') && f.endsWith('.json'));
-    if (backupFiles.length === 0) {
-      throw new Error('No valid database backup found in backups/ directory. Aborting clean reset.');
-    }
-    console.log(`✅ Verified existing backup: ${backupFiles[backupFiles.length - 1]}`);
-
-    // Read super admin credentials from environment or default
-    const superAdminEmail = (
-      process.env.BOOTSTRAP_SUPERADMIN_EMAIL ||
-      process.argv[2] ||
-      'cosko@gmail.com'
-    ).toLowerCase().trim();
-
-    const superAdminPassword =
-      process.env.BOOTSTRAP_SUPERADMIN_PASSWORD ||
-      process.argv[3] ||
-      'CoskoWajid2026@';
+    console.log('🔒 Verifying target environment...');
+    console.log(`👤 Target Initial Super Admin: ${superAdminEmail}`);
 
     console.log('🔄 Executing atomic clean database purge of all business data...');
 
@@ -46,7 +26,7 @@ async function cleanDatabaseReset() {
       await tx.inventoryLedger.deleteMany({});
       await tx.inventory.deleteMany({});
       await tx.repairEnquiry.deleteMany({});
-      await tx.customerExternalLink.deleteMany({});
+      await tx.customerStoreProfile.deleteMany({});
       await tx.customer.deleteMany({});
       await tx.vendor.deleteMany({});
       await tx.expense.deleteMany({});
@@ -54,26 +34,28 @@ async function cleanDatabaseReset() {
       await tx.product.deleteMany({});
       await tx.category.deleteMany({});
       await tx.auditLog.deleteMany({});
+      await tx.fileAsset.deleteMany({});
+      await tx.attendanceDay.deleteMany({});
+      await tx.userSession.deleteMany({});
 
-      // 2. Delete all user overrides, assignments, and users
-      await tx.userPermissionOverride.deleteMany({});
+      // 2. Delete all user assignments and users
       await tx.userStoreAssignment.deleteMany({});
       await tx.userAccount.deleteMany({});
 
       // 3. Ensure Core 5 Store Hubs exist and are active
       const coreStores = [
-        { code: 'CENTRAL', name: 'COSKO Central Warehouse & Owner Stock', city: 'Bengaluru', address: 'Central Hub, Bengaluru' },
-        { code: 'BLR', name: 'Bengaluru Central Hub', city: 'Bengaluru', address: 'Indiranagar 100ft Rd, Bengaluru' },
-        { code: 'HYD', name: 'Hyderabad Warehouse & Outlet', city: 'Hyderabad', address: 'Hitech City Phase 2, Hyderabad' },
-        { code: 'DEL', name: 'Delhi NCR Fulfillment Center', city: 'Delhi', address: 'Okhla Industrial Area Ph-III, New Delhi' },
-        { code: 'MUM', name: 'Mumbai Commercial Hub', city: 'Mumbai', address: 'Bandra Kurla Complex, Mumbai' },
+        { code: 'CENTRAL', name: 'COSKO Central Warehouse & Owner Stock', city: 'Bengaluru', address: 'Central Hub, Bengaluru', timezone: 'Asia/Kolkata' },
+        { code: 'BLR', name: 'Bengaluru Central Hub', city: 'Bengaluru', address: 'Indiranagar 100ft Rd, Bengaluru', timezone: 'Asia/Kolkata' },
+        { code: 'HYD', name: 'Hyderabad Warehouse & Outlet', city: 'Hyderabad', address: 'Hitech City Phase 2, Hyderabad', timezone: 'Asia/Kolkata' },
+        { code: 'DEL', name: 'Delhi NCR Fulfillment Center', city: 'Delhi', address: 'Okhla Industrial Area Ph-III, New Delhi', timezone: 'Asia/Kolkata' },
+        { code: 'MUM', name: 'Mumbai Commercial Hub', city: 'Mumbai', address: 'Bandra Kurla Complex, Mumbai', timezone: 'Asia/Kolkata' },
       ];
 
       for (const st of coreStores) {
         await tx.storeHub.upsert({
           where: { code: st.code },
-          update: { name: st.name, city: st.city, address: st.address, status: 'Active' },
-          create: { code: st.code, name: st.name, city: st.city, address: st.address, status: 'Active' },
+          update: { name: st.name, city: st.city, address: st.address, status: 'Active', timezone: st.timezone },
+          create: { code: st.code, name: st.name, city: st.city, address: st.address, status: 'Active', timezone: st.timezone },
         });
       }
 
@@ -88,7 +70,6 @@ async function cleanDatabaseReset() {
           securityLevel: 100,
           storeScope: 'All Stores',
           status: 'Active',
-          shiftStatus: 'On Shift',
           mustChangePassword: true, // Mandatory password update on first login
         },
       });

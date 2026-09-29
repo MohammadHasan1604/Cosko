@@ -73,7 +73,6 @@ async function runFullSyncVerification() {
         securityLevel: 80,
         storeScope: targetStore ? targetStore.code : 'BLR',
         status: 'Active',
-        shiftStatus: 'On Shift',
         storeAssignments: targetStore ? {
           create: {
             storeCode: targetStore.code,
@@ -204,6 +203,12 @@ async function runFullSyncVerification() {
         normalizedPhone: testPhone.replace(/\D/g, ''),
         email: `ramesh.${Date.now()}@example.com`,
         city: 'Bengaluru',
+      },
+    });
+    await (prisma as any).customerStoreProfile.create({
+      data: {
+        customerId: testCustomer.id,
+        storeCode: 'BLR',
         creditBalance: 0,
         totalSpent: 0,
       },

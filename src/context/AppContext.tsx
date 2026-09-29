@@ -436,17 +436,10 @@ export interface UserAccount {
   email: string;
   phone?: string;
   password?: string;
-  role:
-    | 'Super Admin'
-    | 'Store Manager'
-    | 'Inventory Manager'
-    | 'Sales Executive'
-    | 'POS Cashier'
-    | 'Restricted Employee';
+  role: 'Super Admin' | 'Store Manager' | 'Sales Manager';
   securityLevel?: number;
   store: string;
   status: 'Active' | 'Inactive' | 'Suspended';
-  shiftStatus: 'On Shift' | 'On Leave';
   lastLogin: string;
   permissions: string[];
   overrides?: UserPermissionOverride[];
@@ -613,7 +606,7 @@ export const initialPaymentMethods: PaymentMethodItem[] = [
     name: 'Cash',
     code: 'CASH',
     type: 'Cash',
-    description: 'Cash on counter / cash disbursement',
+    description: 'Cash on counter / cash payment',
     isSystem: true,
     sortOrder: 1,
     status: 'Active',
@@ -629,63 +622,13 @@ export const initialPaymentMethods: PaymentMethodItem[] = [
     status: 'Active',
   },
   {
-    id: 'pm-card',
-    name: 'Card',
-    code: 'CARD',
-    type: 'Card',
-    description: 'Credit or Debit Card swipe / POS terminal',
+    id: 'pm-other',
+    name: 'Other',
+    code: 'OTHER',
+    type: 'Other',
+    description: 'Other verified payment method',
     isSystem: true,
     sortOrder: 3,
-    status: 'Active',
-  },
-  {
-    id: 'pm-bank',
-    name: 'Bank Transfer',
-    code: 'BANK_TRANSFER',
-    type: 'Bank',
-    description: 'Direct Bank NEFT / RTGS / IMPS wire',
-    isSystem: true,
-    sortOrder: 4,
-    status: 'Active',
-  },
-  {
-    id: 'pm-corp-card',
-    name: 'Corporate Card',
-    code: 'CORP_CARD',
-    type: 'Card',
-    description: 'Company / Corporate Card payment',
-    isSystem: true,
-    sortOrder: 5,
-    status: 'Active',
-  },
-  {
-    id: 'pm-debit',
-    name: 'Direct Debit',
-    code: 'DIRECT_DEBIT',
-    type: 'Bank',
-    description: 'Automated bank ECS / ACH direct debit',
-    isSystem: true,
-    sortOrder: 6,
-    status: 'Active',
-  },
-  {
-    id: 'pm-cheque',
-    name: 'Cheque',
-    code: 'CHEQUE',
-    type: 'Bank',
-    description: 'Physical bank cheque clearing',
-    isSystem: true,
-    sortOrder: 7,
-    status: 'Active',
-  },
-  {
-    id: 'pm-credit',
-    name: 'Credit',
-    code: 'CREDIT',
-    type: 'Credit',
-    description: 'Store credit / customer ledger credit',
-    isSystem: true,
-    sortOrder: 8,
     status: 'Active',
   },
 ];
@@ -759,7 +702,6 @@ interface AppContextType {
     store: string;
     allowedStores?: string[];
     avatar: string;
-    shiftStatus: 'On Shift' | 'On Leave';
     avatarUrl?: string;
     mustChangePassword?: boolean;
   };
@@ -777,7 +719,7 @@ interface AppContextType {
   usersList: UserAccount[];
   addUserAccount: (user: Omit<UserAccount, 'id' | 'lastLogin' | 'permissions'>) => Promise<any>;
   updateUserAccount: (id: string, updated: Partial<UserAccount>) => Promise<any>;
-  toggleUserShiftStatus: (id: string) => void;
+
   toggleUserStatus: (id: string, nextStatus: 'Active' | 'Inactive' | 'Suspended') => void;
   setUserPermissionOverride: (
     userId: string,
@@ -1102,10 +1044,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     id: '',
     name: 'Unauthenticated User',
     email: '',
-    role: 'Restricted Employee' as const,
+    role: 'Sales Manager' as const,
     store: '',
     avatar: 'UN',
-    shiftStatus: 'On Leave' as const,
   };
 
   const [authStatus, setAuthStatus] = useState<
@@ -1119,7 +1060,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     store: string;
     allowedStores?: string[];
     avatar: string;
-    shiftStatus: 'On Shift' | 'On Leave';
     avatarUrl?: string;
   }>(unauthenticatedUser);
 
@@ -1723,7 +1663,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             store: u.store,
             allowedStores: u.allowedStores || u.assignedStores || [u.store || 'CENTRAL'],
             status: u.status || 'Active',
-            shiftStatus: u.shiftStatus || 'On Shift',
+
             lastLogin: u.lastLoginAt
               ? new Date(u.lastLoginAt).toLocaleDateString('en-IN')
               : 'Recent',
@@ -2313,19 +2253,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleCurrentUserShift = async () => {
-    if (authStatus !== 'AUTHENTICATED') return;
-    const nextStatus = currentUser.shiftStatus === 'On Shift' ? 'On Leave' : 'On Shift';
-    setCurrentUserState((prev) => ({ ...prev, shiftStatus: nextStatus }));
-    setUsersList((prev) =>
-      prev.map((u) => (u.id === currentUser.id ? { ...u, shiftStatus: nextStatus } : u))
-    );
-    addAuditLog('Employees', 'Toggle Shift Status', `Changed shift status to ${nextStatus}`);
-    toast.success(`You are now ${nextStatus}`);
-    try {
-      await MySQLDataService.updateProfile({ id: currentUser.id, shiftStatus: nextStatus });
-    } catch (err: any) {
-      console.error('Failed to sync current user shift to DB:', err);
-    }
+    // Shift status now handled by AttendanceDay model
+    toast.info('Use the Attendance system to manage shift status');
   };
 
   const updateProfileAvatar = (avatarUrl: string | null) => {
@@ -2465,7 +2394,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           store: res.user.store,
           allowedStores: res.user.assignedStores || [res.user.store],
           status: res.user.status,
-          shiftStatus: 'On Shift',
+
           lastLogin: 'Never',
           permissions: res.user.role === 'Super Admin' ? ['ALL_PERMISSIONS'] : [],
           createdAt: res.user.createdAt,
@@ -2514,26 +2443,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const toggleUserShiftStatus = async (id: string) => {
-    const u = usersList.find((usr) => usr.id === id);
-    if (!u) return;
-    const nextShift = u.shiftStatus === 'On Shift' ? 'On Leave' : 'On Shift';
-    const updatedUser = { ...u, shiftStatus: nextShift as any };
-    try {
-      const res = await MySQLDataService.updateProfile(updatedUser);
-      if (res?.success) {
-        setUsersList((prev) => prev.map((usr) => (usr.id === id ? updatedUser : usr)));
-        if (id === currentUser.id) {
-          setCurrentUserState((prev) => ({ ...prev, shiftStatus: nextShift as any }));
-        }
-        toast.success(`Shift status changed to ${nextShift}`);
-        await refreshAllData();
-      } else {
-        toast.error(res?.error || 'Failed to update shift status');
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Error updating shift status');
-    }
+  const toggleUserShiftStatus = async (_id: string) => {
+    // Shift status now handled by AttendanceDay model
+    toast.info('Use the Attendance system to manage shift status');
   };
 
   const toggleUserStatus = async (id: string, nextStatus: 'Active' | 'Inactive' | 'Suspended') => {

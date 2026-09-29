@@ -57,7 +57,6 @@ async function bootstrapSuperAdmin() {
             securityLevel: 100,
             storeScope: 'All Stores',
             status: 'Active',
-            shiftStatus: 'On Shift',
             passwordHash: hashedPassword,
             mustChangePassword: true, // Mandatory password update on first login
           },
@@ -105,7 +104,6 @@ async function bootstrapSuperAdmin() {
             securityLevel: 100,
             storeScope: 'All Stores',
             status: 'Active',
-            shiftStatus: 'On Shift',
             mustChangePassword: true, // Mandatory password update on first login
           },
         });

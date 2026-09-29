@@ -868,8 +868,8 @@ export async function runRootFinancialReconciliation() {
     prisma.inventory.findMany({
       include: { product: true },
     }),
-    // Customers Receivables
-    prisma.customer.aggregate({
+    // Customers Receivables (from store profiles)
+    prisma.customerStoreProfile.aggregate({
       _sum: { creditBalance: true, totalSpent: true },
       _count: { id: true },
     }),

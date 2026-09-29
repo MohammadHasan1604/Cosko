@@ -6,7 +6,7 @@
  *
  * 1. Valid authenticated session (HttpOnly cookie or Bearer token)
  * 2. Cryptographically valid JWT (signed with AUTH_SECRET)
- * 3. DB UserSession exists
+ * 3. DB UserSession MUST exist
  * 4. Session not revoked
  * 5. Session not expired
  * 6. UserAccount still exists in DB
@@ -15,14 +15,8 @@
  * 9. Assigned stores come from DB
  * 10. Current permissions come from DB
  *
- * Production FAILS CLOSED - any check failure returns null.
- *
- * NEVER trusts:
- * - localStorage tokens
- * - x-user-role headers
- * - x-user-store headers
- * - x-user-email headers
- * - client-supplied securityLevel
+ * FAILS CLOSED — any check failure returns null.
+ * NO JWT-ONLY FALLBACK. DB session is MANDATORY.
  */
 
 import crypto from 'crypto';
@@ -32,7 +26,6 @@ import { prisma } from './db';
 import {
   RBACEngine,
   ROLE_SECURITY_LEVELS,
-  PERMISSION_CATALOGUE,
   SUPER_ADMIN_PROTECTED_PERMISSIONS,
   DEFAULT_ROLE_PERMISSIONS,
   type UserRole,
@@ -48,7 +41,6 @@ export interface AuthenticatedUser {
   store: string;
   allowedStores: string[];
   status: string;
-  shiftStatus: string;
   avatarUrl?: string;
   mustChangePassword: boolean;
   sessionId: string;
@@ -86,10 +78,7 @@ function extractToken(req: NextRequest | Request): string | null {
 /**
  * AUTHORITATIVE SERVER-SIDE AUTHENTICATION PIPELINE
  *
- * Must be called by every protected API route. Returns the fully validated
- * user with DB-authoritative role, permissions, and store assignments.
- *
- * Returns { user: null, error, status } on any failure (fail closed).
+ * FAIL CLOSED. No JWT-only fallback. DB session is MANDATORY.
  */
 export async function authenticateRequest(req: NextRequest | Request): Promise<AuthResult> {
   // Step 1: Extract token
@@ -104,53 +93,43 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
     return { user: null, error: 'Unauthorized: Invalid or expired session token', status: 401 };
   }
 
-  // Step 3-5: DB session verification (exists, not revoked, not expired)
+  // Step 3-5: DB session verification — MANDATORY. NO FALLBACK.
   const tokenDigest = hashToken(token);
-  let dbSessionId: string | null = null;
+  let dbSessionId: string;
 
   try {
-    const dbSession = await (prisma as any).userSession.findUnique({
+    // Primary lookup by token hash
+    let dbSession = await (prisma as any).userSession.findUnique({
       where: { tokenHash: tokenDigest },
     });
 
-    if (dbSession) {
-      if (dbSession.revokedAt) {
-        return { user: null, error: 'Session has been revoked. Please log in again.', status: 401 };
-      }
-      if (dbSession.expiresAt < new Date()) {
-        return { user: null, error: 'Session has expired. Please log in again.', status: 401 };
-      }
-      dbSessionId = dbSession.id;
-    } else {
-      // If no DB session found, check if session ID from JWT exists
-      if (jwtResult.sid) {
-        const sidSession = await (prisma as any).userSession.findUnique({
-          where: { id: jwtResult.sid },
-        });
-        if (sidSession) {
-          if (sidSession.revokedAt) {
-            return {
-              user: null,
-              error: 'Session has been revoked. Please log in again.',
-              status: 401,
-            };
-          }
-          if (sidSession.expiresAt < new Date()) {
-            return { user: null, error: 'Session has expired. Please log in again.', status: 401 };
-          }
-          dbSessionId = sidSession.id;
-        }
-      }
-      // Allow JWT-only sessions for backward compatibility during migration
-      // In production, this should eventually be strict
-      if (!dbSessionId) {
-        dbSessionId = jwtResult.sid || 'jwt-only';
-      }
+    // Secondary lookup by session ID from JWT (covers re-signed tokens)
+    if (!dbSession && jwtResult.sid) {
+      dbSession = await (prisma as any).userSession.findUnique({
+        where: { id: jwtResult.sid },
+      });
     }
+
+    // FAIL CLOSED: No DB session found → reject
+    if (!dbSession) {
+      return { user: null, error: 'Session not found. Please log in again.', status: 401 };
+    }
+
+    // Check revocation
+    if (dbSession.revokedAt) {
+      return { user: null, error: 'Session has been revoked. Please log in again.', status: 401 };
+    }
+
+    // Check expiration
+    if (dbSession.expiresAt < new Date()) {
+      return { user: null, error: 'Session has expired. Please log in again.', status: 401 };
+    }
+
+    dbSessionId = dbSession.id;
   } catch (sessionCheckErr) {
-    // DB session check failed — allow JWT-only auth as fallback to avoid blocking users
-    console.warn('[AuthPipeline] DB session check failed (allowing JWT-only):', sessionCheckErr);
-    dbSessionId = jwtResult.sid || 'jwt-only';
+    console.error('[AuthPipeline] DB session check failed:', sessionCheckErr);
+    // FAIL CLOSED on DB error — do NOT fall back to JWT-only
+    return { user: null, error: 'Authentication service temporarily unavailable', status: 503 };
   }
 
   // Step 6: Verify UserAccount exists in DB
@@ -160,7 +139,6 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
       where: { id: jwtResult.user.id },
       include: {
         storeAssignments: true,
-        permissionOverrides: true,
       },
     });
   } catch (dbErr) {
@@ -196,12 +174,6 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
   const dbRole = dbUser.role as UserRole;
   const dbSecurityLevel = (ROLE_SECURITY_LEVELS[dbRole] ?? dbUser.securityLevel) as SecurityLevel;
 
-  // Build permissions from DB
-  const dbOverrides = (dbUser.permissionOverrides || []).map((o: any) => ({
-    permissionCode: o.permissionCode,
-    overrideType: o.overrideType as 'ALLOW' | 'DENY',
-  }));
-
   const rolePerms = DEFAULT_ROLE_PERMISSIONS[dbRole] || [];
 
   const authenticatedUser: AuthenticatedUser = {
@@ -220,12 +192,11 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
           ? allowedStores
           : [effectiveStore],
     status: dbUser.status,
-    shiftStatus: dbUser.shiftStatus || 'On Shift',
     avatarUrl: dbUser.avatarUrl || undefined,
     mustChangePassword: dbUser.mustChangePassword || false,
-    sessionId: dbSessionId || 'unknown',
+    sessionId: dbSessionId,
     permissions: rolePerms,
-    overrides: dbOverrides,
+    overrides: [],
   };
 
   return { user: authenticatedUser, error: null, status: 200 };
@@ -233,7 +204,6 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
 
 /**
  * Check if the authenticated user has a specific permission.
- * Uses the centralized RBACEngine for evaluation.
  */
 export function hasPermission(
   user: AuthenticatedUser,
@@ -261,7 +231,7 @@ export function hasPermission(
     {
       resourceName: permissionCode,
       classification: 'STORE_SCOPED',
-      minSecurityLevel: 10,
+      minSecurityLevel: 40,
       requiredPermission: permissionCode,
       targetStore: targetStore,
     }
@@ -300,6 +270,7 @@ export async function createAuditLog(
         module,
         action,
         details: details.substring(0, 65535),
+        userId: user.id,
         userEmail: user.email,
         userRole: user.role,
         storeCode: storeCode || user.store || 'CENTRAL',
@@ -324,7 +295,7 @@ export async function invalidateUserSessions(
       userId,
       revokedAt: null,
     };
-    if (excludeSessionId && excludeSessionId !== 'jwt-only') {
+    if (excludeSessionId) {
       whereClause.id = { not: excludeSessionId };
     }
     await (prisma as any).userSession.updateMany({

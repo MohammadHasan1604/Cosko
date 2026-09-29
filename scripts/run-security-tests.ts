@@ -1,6 +1,9 @@
 /**
  * Command line runner for COSKO Security Audit Test Suite
  */
+if (!process.env.AUTH_SECRET) {
+  process.env.AUTH_SECRET = 'cosko_security_test_audit_secret_key_32chars_len!';
+}
 import { runSecurityAuditTestSuite } from '../src/lib/securityAuditTest';
 
 async function main() {

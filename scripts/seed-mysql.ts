@@ -1,30 +1,95 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log('🌱 Starting COSKO MySQL Production Database Seeding...');
+/**
+ * Generate a cryptographically secure temporary password.
+ */
+function generateSecurePassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  const bytes = crypto.randomBytes(16);
+  let password = '';
+  for (let i = 0; i < 14; i++) {
+    password += chars[bytes[i] % chars.length];
+  }
+  return password;
+}
 
-  // 1. STORES / HUBS
+async function main() {
+  console.log('🌱 Starting COSKO Clean Database Seeding...');
+  console.log('   Only genuine system master data — no fake business data.');
+
+  // ──────────────────────────────────────────────────────────────────
+  // 1. STORES / HUBS (system infrastructure)
+  // ──────────────────────────────────────────────────────────────────
   const storesData = [
-    { code: 'CENTRAL', name: 'Central Warehouse & Hub', city: 'Bengaluru', address: 'Plot 42, Electronic City Phase 1', managerName: 'Rohan Sharma', phone: '+91 9876543210' },
-    { code: 'BLR', name: 'Bengaluru Flagship Store', city: 'Bengaluru', address: 'Indiranagar 100ft Road', managerName: 'Ananya Rao', phone: '+91 9876543211' },
-    { code: 'HYD', name: 'Hyderabad Tech Hub Store', city: 'Hyderabad', address: 'HITEC City Cyber Towers', managerName: 'Priya Sharma', phone: '+91 9876543212' },
-    { code: 'DEL', name: 'Delhi NCR Experience Store', city: 'Delhi', address: 'Connaught Place Block A', managerName: 'Vikram Singh', phone: '+91 9876543213' },
-    { code: 'MUM', name: 'Mumbai Retail Store', city: 'Mumbai', address: 'Linking Road, Bandra West', managerName: 'Rakesh Patel', phone: '+91 9876543214' },
+    { code: 'CENTRAL', name: 'Central Warehouse & Hub', city: 'Bengaluru', address: 'Plot 42, Electronic City Phase 1', timezone: 'Asia/Kolkata' },
+    { code: 'BLR', name: 'Bengaluru Flagship Store', city: 'Bengaluru', address: 'Indiranagar 100ft Road', timezone: 'Asia/Kolkata' },
+    { code: 'HYD', name: 'Hyderabad Tech Hub Store', city: 'Hyderabad', address: 'HITEC City Cyber Towers', timezone: 'Asia/Kolkata' },
+    { code: 'DEL', name: 'Delhi NCR Experience Store', city: 'Delhi', address: 'Connaught Place Block A', timezone: 'Asia/Kolkata' },
+    { code: 'MUM', name: 'Mumbai Retail Store', city: 'Mumbai', address: 'Linking Road, Bandra West', timezone: 'Asia/Kolkata' },
   ];
 
   for (const s of storesData) {
     await prisma.storeHub.upsert({
       where: { code: s.code },
-      update: s,
+      update: { name: s.name, city: s.city, address: s.address, timezone: s.timezone },
       create: s,
     });
   }
   console.log('✅ 5 Store Hubs created');
 
-  // 1B. CATEGORIES & TAXONOMY
+  // ──────────────────────────────────────────────────────────────────
+  // 2. SUPER ADMIN ACCOUNT (ONE protected account)
+  //    Password is generated securely and printed to console ONCE.
+  // ──────────────────────────────────────────────────────────────────
+  const superAdminEmail = 'cosko@gmail.com';
+  const existingSuperAdmin = await prisma.userAccount.findUnique({
+    where: { email: superAdminEmail },
+  });
+
+  if (!existingSuperAdmin) {
+    const tempPassword = generateSecurePassword();
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+    const superAdmin = await prisma.userAccount.create({
+      data: {
+        email: superAdminEmail,
+        passwordHash,
+        name: 'Abdul Wajid',
+        role: 'Super Admin',
+        securityLevel: 100,
+        storeScope: 'All Stores',
+        status: 'Active',
+        mustChangePassword: true,
+      },
+    });
+
+    // Assign Super Admin to all stores
+    for (const s of storesData) {
+      await prisma.userStoreAssignment.upsert({
+        where: { userId_storeCode: { userId: superAdmin.id, storeCode: s.code } },
+        update: {},
+        create: { userId: superAdmin.id, storeCode: s.code },
+      });
+    }
+
+    console.log('✅ Super Admin created');
+    console.log('╔══════════════════════════════════════════════════╗');
+    console.log('║  SUPER ADMIN CREDENTIALS (save securely!)       ║');
+    console.log(`║  Email:    ${superAdminEmail.padEnd(38)}║`);
+    console.log(`║  Password: ${tempPassword.padEnd(38)}║`);
+    console.log('║  MUST change password on first login.           ║');
+    console.log('╚══════════════════════════════════════════════════╝');
+  } else {
+    console.log('ℹ️  Super Admin already exists, skipping creation');
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // 3. CATEGORIES & TAXONOMY (system master data)
+  // ──────────────────────────────────────────────────────────────────
   const rootCategories = [
     { id: 'cat-mobiles', name: 'Mobile / Device', slug: 'mobile-device', categoryType: 'Device', description: 'Smartphones, Tablets, Smartwatches, and Laptops', status: 'Active', sortOrder: 1 },
     { id: 'cat-mobile-parts', name: 'Mobile Parts / Repair-Related', slug: 'mobile-parts-repair', categoryType: 'Spare Part', description: 'Displays, Batteries, Cameras, Ports, Charging Accessories', status: 'Active', sortOrder: 10 },
@@ -46,19 +111,14 @@ async function main() {
     { id: 'cat-smartwatches', name: 'Apple Watch / Smart Watch', slug: 'smartwatches', parentCategoryId: 'cat-mobiles', categoryType: 'Device', description: 'Smartwatches & Wearables', status: 'Active', sortOrder: 4 },
     { id: 'cat-laptops', name: 'Laptops', slug: 'laptops', parentCategoryId: 'cat-mobiles', categoryType: 'Device', description: 'Laptops & MacBooks', status: 'Active', sortOrder: 5 },
     { id: 'cat-display', name: 'Screen / Display', slug: 'screen-display', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Touchscreen displays and LCD assemblies', status: 'Active', sortOrder: 11 },
-    { id: 'cat-backglass', name: 'Back Glass', slug: 'back-glass', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Rear housing and glass replacements', status: 'Active', sortOrder: 12 },
     { id: 'cat-battery', name: 'Battery', slug: 'battery', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'OEM & High-capacity lithium replacement batteries', status: 'Active', sortOrder: 13 },
     { id: 'cat-charging-port', name: 'Charging Port', slug: 'charging-port', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Type-C & Lightning charging flex cables', status: 'Active', sortOrder: 14 },
-    { id: 'cat-speaker', name: 'Speaker', slug: 'speaker', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Loudspeakers and ringer buzzers', status: 'Active', sortOrder: 15 },
-    { id: 'cat-mic', name: 'Mic / Microphone', slug: 'microphone', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Microphone flex modules and noise cancel mics', status: 'Active', sortOrder: 16 },
     { id: 'cat-camera', name: 'Camera', slug: 'camera', parentCategoryId: 'cat-mobile-parts', categoryType: 'Spare Part', description: 'Rear and front selfie camera modules', status: 'Active', sortOrder: 18 },
     { id: 'cat-chargers', name: 'Adapters / Chargers', slug: 'adapters-chargers', parentCategoryId: 'cat-mobile-parts', categoryType: 'Accessory', description: 'Fast chargers and power bricks', status: 'Active', sortOrder: 19 },
     { id: 'cat-cables', name: 'Cables', slug: 'cables', parentCategoryId: 'cat-mobile-parts', categoryType: 'Accessory', description: 'Braided Type-C, Lightning, USB cables', status: 'Active', sortOrder: 20 },
     { id: 'cat-ev-service', name: 'General Service', slug: 'ev-general-service', parentCategoryId: 'cat-ev', categoryType: 'Service', description: 'EV Periodic maintenance and servicing kits', status: 'Active', sortOrder: 31 },
     { id: 'cat-ev-brakes', name: 'Brake Parts', slug: 'ev-brake-parts', parentCategoryId: 'cat-ev', categoryType: 'Spare Part', description: 'Disc pads, brake shoes, calipers', status: 'Active', sortOrder: 32 },
     { id: 'cat-ev-battery', name: 'Battery / Electrical', slug: 'ev-battery-electrical', parentCategoryId: 'cat-ev', categoryType: 'EV', description: 'Lithium battery packs, BMS, and motor controllers', status: 'Active', sortOrder: 37 },
-    { id: 'cat-ac', name: 'AC (Air Conditioner)', slug: 'ac-air-conditioner', parentCategoryId: 'cat-home-appliances', categoryType: 'Home Appliance', description: 'Inverter ACs, Copper Coils, PCB, Gas kits', status: 'Active', sortOrder: 51 },
-    { id: 'cat-tv', name: 'TV (Television)', slug: 'tv-television', parentCategoryId: 'cat-home-appliances', categoryType: 'Home Appliance', description: 'LED Panels, Smart TV Motherboards, Backlights', status: 'Active', sortOrder: 52 },
   ];
 
   for (const cat of subCategories) {
@@ -70,146 +130,131 @@ async function main() {
   }
   console.log('✅ Categories and subcategories taxonomy seeded');
 
-  // 2. USER ACCOUNTS & PROFILES (Salted Bcrypt Password Hashes)
-  const defaultPasswordHash = await bcrypt.hash('Cosko2026@', 12);
-  const superAdminPasswordHash = await bcrypt.hash('CoskoWajid2026@', 12);
-
-  const usersData = [
-    { email: 'cosko@gmail.com', name: 'Abdul Wajid', role: 'Super Admin', securityLevel: 100, storeScope: 'All Stores', shiftStatus: 'On Shift' },
-    { email: 'ananya.blr@cosko.com', name: 'Ananya Rao', role: 'Store Manager', securityLevel: 80, storeScope: 'BLR', shiftStatus: 'On Shift' },
-    { email: 'priya.hyd@cosko.com', name: 'Priya Sharma', role: 'Store Manager', securityLevel: 80, storeScope: 'HYD', shiftStatus: 'On Shift' },
-    { email: 'vikram.del@cosko.com', name: 'Vikram Singh', role: 'Store Manager', securityLevel: 80, storeScope: 'DEL', shiftStatus: 'On Shift' },
-    { email: 'rakesh.mum@cosko.com', name: 'Rakesh Patel', role: 'Store Manager', securityLevel: 80, storeScope: 'MUM', shiftStatus: 'On Shift' },
-    { email: 'kavita.auditor@cosko.com', name: 'Kavita Iyer', role: 'Inventory Auditor', securityLevel: 60, storeScope: 'BLR', shiftStatus: 'On Shift' },
-    { email: 'suresh.sales@cosko.com', name: 'Suresh Kumar', role: 'Sales Executive', securityLevel: 40, storeScope: 'BLR', shiftStatus: 'On Shift' },
-    { email: 'rahul.cashier@cosko.com', name: 'Rahul Verma', role: 'POS Cashier', securityLevel: 20, storeScope: 'BLR', shiftStatus: 'On Shift' },
+  // ──────────────────────────────────────────────────────────────────
+  // 4. CATEGORY TYPES (system master data)
+  // ──────────────────────────────────────────────────────────────────
+  const categoryTypes = [
+    { name: 'Product', code: 'PRODUCT', description: 'General retail product', isSystem: true },
+    { name: 'Device', code: 'DEVICE', description: 'Electronic device', isSystem: true },
+    { name: 'Spare Part', code: 'SPARE_PART', description: 'Replacement component', isSystem: true },
+    { name: 'Accessory', code: 'ACCESSORY', description: 'Device accessory', isSystem: true },
+    { name: 'Service', code: 'SERVICE', description: 'Service item', isSystem: true },
+    { name: 'EV', code: 'EV', description: 'Electric vehicle component', isSystem: true },
+    { name: 'Home Appliance', code: 'HOME_APPLIANCE', description: 'Home appliance product', isSystem: true },
   ];
 
-  for (const u of usersData) {
-    const isSuperAdmin = u.email === 'cosko@gmail.com';
-    const pwdHash = isSuperAdmin ? superAdminPasswordHash : defaultPasswordHash;
-
-    const userObj = await prisma.userAccount.upsert({
-      where: { email: u.email },
-      update: {
-        name: u.name,
-        role: u.role,
-        securityLevel: u.securityLevel,
-        storeScope: u.storeScope,
-        shiftStatus: u.shiftStatus,
-        status: 'Active',
-      },
-      create: {
-        email: u.email,
-        passwordHash: pwdHash,
-        name: u.name,
-        role: u.role,
-        securityLevel: u.securityLevel,
-        storeScope: u.storeScope,
-        status: 'Active',
-        shiftStatus: u.shiftStatus,
-      },
+  for (const ct of categoryTypes) {
+    await prisma.categoryType.upsert({
+      where: { code: ct.code },
+      update: ct,
+      create: ct,
     });
-
-    if (u.storeScope && u.storeScope !== 'All Stores') {
-      await prisma.userStoreAssignment.upsert({
-        where: { userId_storeCode: { userId: userObj.id, storeCode: u.storeScope } },
-        update: {},
-        create: { userId: userObj.id, storeCode: u.storeScope },
-      });
-    }
   }
-  console.log('✅ 8 User Accounts seeded with salted bcrypt password hashes');
+  console.log('✅ Category types seeded');
 
-  // 3. PRODUCTS CATALOG
-  const productsData = [
-    { sku: 'CSK-APL-IP15P-128', barcode: '890123456701', name: 'iPhone 15 Pro 128GB Titanium', brand: 'Apple', category: 'Smartphones', baseCostPrice: 105000, baseSellingPrice: 134900, warrantyMonths: 12 },
-    { sku: 'CSK-SAM-S24U-256', barcode: '890123456702', name: 'Samsung Galaxy S24 Ultra 256GB', brand: 'Samsung', category: 'Smartphones', baseCostPrice: 98000, baseSellingPrice: 129999, warrantyMonths: 12 },
-    { sku: 'CSK-APL-MBA-M3', barcode: '890123456703', name: 'MacBook Air M3 8GB 512GB', brand: 'Apple', category: 'Laptops', baseCostPrice: 110000, baseSellingPrice: 134900, warrantyMonths: 12 },
-    { sku: 'CSK-SNY-WH1000XM5', barcode: '890123456704', name: 'Sony WH-1000XM5 Wireless Headphones', brand: 'Sony', category: 'Audio', baseCostPrice: 22000, baseSellingPrice: 29990, warrantyMonths: 12 },
-    { sku: 'CSK-DEL-XPS13-9320', barcode: '890123456705', name: 'Dell XPS 13 Plus Intel i7 16GB', brand: 'Dell', category: 'Laptops', baseCostPrice: 125000, baseSellingPrice: 159990, warrantyMonths: 24 },
+  // ──────────────────────────────────────────────────────────────────
+  // 5. PAYMENT METHODS — Exactly 3: Cash, UPI, Other
+  // ──────────────────────────────────────────────────────────────────
+  const paymentMethods = [
+    { name: 'Cash', code: 'CASH', type: 'Cash', description: 'Cash payment', isSystem: true, sortOrder: 1, status: 'Active' },
+    { name: 'UPI', code: 'UPI', type: 'Digital', description: 'UPI QR / online transfer', isSystem: true, sortOrder: 2, status: 'Active' },
+    { name: 'Other', code: 'OTHER', type: 'Other', description: 'Other payment method', isSystem: true, sortOrder: 3, status: 'Active' },
   ];
 
-  for (const p of productsData) {
-    const productObj = await prisma.product.upsert({
-      where: { sku: p.sku },
-      update: p,
-      create: p,
+  // Remove any non-system payment methods first
+  await prisma.paymentMethod.deleteMany({
+    where: { code: { notIn: ['CASH', 'UPI', 'OTHER'] } },
+  });
+
+  for (const pm of paymentMethods) {
+    await prisma.paymentMethod.upsert({
+      where: { code: pm.code },
+      update: pm,
+      create: pm,
     });
-
-    // Seed Inventory across Central and BLR stores
-    for (const storeCode of ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM']) {
-      const qtyOnHand = storeCode === 'CENTRAL' ? 50 : 15;
-      await prisma.inventory.upsert({
-        where: { productId_storeCode: { productId: productObj.id, storeCode } },
-        update: { qtyOnHand },
-        create: { productId: productObj.id, storeCode, qtyOnHand, reorderPt: 5, maxStock: 50 },
-      });
-    }
   }
-  console.log('✅ 5 Products and store inventory records seeded');
+  console.log('✅ Payment methods seeded (Cash, UPI, Other only)');
 
-  // 4. CUSTOMERS & REPAIRS
-  const customerObj = await prisma.customer.upsert({
-    where: { id: 'cust_001_seed' },
-    update: {},
-    create: {
-      id: 'cust_001_seed',
-      name: 'Rajesh Sharma',
-      phone: '+91 98765 43210',
-      normalizedPhone: '9876543210',
-      email: 'rajesh.sharma@gmail.com',
-      city: 'Bengaluru',
-      totalSpent: 45000,
-      totalOrders: 3,
-    },
-  });
+  // ──────────────────────────────────────────────────────────────────
+  // 6. BRANDS MASTER (system master data)
+  // ──────────────────────────────────────────────────────────────────
+  const brands = [
+    { name: 'Apple', code: 'APPLE', description: 'Apple Inc.' },
+    { name: 'Samsung', code: 'SAMSUNG', description: 'Samsung Electronics' },
+    { name: 'Sony', code: 'SONY', description: 'Sony Corporation' },
+    { name: 'Dell', code: 'DELL', description: 'Dell Technologies' },
+    { name: 'Xiaomi', code: 'XIAOMI', description: 'Xiaomi Corporation' },
+    { name: 'OnePlus', code: 'ONEPLUS', description: 'OnePlus Technology' },
+    { name: 'Asus', code: 'ASUS', description: 'ASUSTeK Computer Inc.' },
+    { name: 'Lenovo', code: 'LENOVO', description: 'Lenovo Group Limited' },
+  ];
 
-  await prisma.repairEnquiry.upsert({
-    where: { ticketNo: 'REP-2026-0042' },
-    update: {},
-    create: {
-      ticketNo: 'REP-2026-0042',
-      customerId: customerObj.id,
-      customerName: 'Rajesh Sharma',
-      customerPhone: '+91 98765 43210',
-      normalizedPhone: '9876543210',
-      deviceName: 'iPhone 13 Pro',
-      issueDescription: 'Screen flickering & glass replacement',
-      estimatedCost: 12500,
-      status: 'In Repair',
-      assignedTech: 'Arun Kumar',
-    },
-  });
-  console.log('✅ Customer master & repair enquiry seeded');
+  for (const b of brands) {
+    await prisma.brand.upsert({
+      where: { code: b.code },
+      update: b,
+      create: b,
+    });
+  }
+  console.log('✅ Brand master data seeded');
 
-  // 5. WHITE-LABEL BRANDING
+  // ──────────────────────────────────────────────────────────────────
+  // 7. UNITS OF MEASUREMENT (system master data)
+  // ──────────────────────────────────────────────────────────────────
+  const units = [
+    { name: 'Piece', code: 'PCS', symbol: 'pcs', description: 'Individual piece/unit' },
+    { name: 'Box', code: 'BOX', symbol: 'box', description: 'Box/carton unit' },
+    { name: 'Set', code: 'SET', symbol: 'set', description: 'Set of items' },
+    { name: 'Kilogram', code: 'KG', symbol: 'kg', description: 'Weight in kilograms' },
+    { name: 'Meter', code: 'MTR', symbol: 'm', description: 'Length in meters' },
+  ];
+
+  for (const u of units) {
+    await prisma.unit.upsert({
+      where: { code: u.code },
+      update: u,
+      create: u,
+    });
+  }
+  console.log('✅ Units of measurement seeded');
+
+  // ──────────────────────────────────────────────────────────────────
+  // 8. SYSTEM SETTINGS & BRANDING (single-row defaults)
+  // ──────────────────────────────────────────────────────────────────
   await prisma.brandingSetting.upsert({
     where: { id: 'cosko_branding_config' },
-    update: {
-      appName: 'COSKO',
-      logoUrl: null,
-      tagline: 'Multi-Store Enterprise Retail & POS System',
-      supportEmail: 'support@cosko.com',
-    },
+    update: {},
     create: {
       id: 'cosko_branding_config',
       appName: 'COSKO',
-      logoUrl: null,
       tagline: 'Multi-Store Enterprise Retail & POS System',
       supportEmail: 'support@cosko.com',
+      baseCurrency: 'INR (₹)',
     },
   });
-  console.log('✅ White-label branding settings seeded');
 
-  console.log('🎉 COSKO MySQL Database Seeding Completed Successfully!');
+  await prisma.systemSettings.upsert({
+    where: { id: 'cosko_system_config' },
+    update: {},
+    create: {
+      id: 'cosko_system_config',
+      sessionTimeoutMins: 43200, // 30 days
+      maxLoginAttempts: 5,
+    },
+  });
+  console.log('✅ System settings and branding defaults seeded');
+
+  console.log('\n🎉 COSKO Clean Database Seeding Complete!');
+  console.log('   No fake demo business data was created.');
+  console.log('   Only system master data (stores, categories, brands, units, payment methods).');
 }
 
 main()
-  .catch((e) => {
-    console.error('Seeding error:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
+  .then(async () => {
     await prisma.$disconnect();
+  })
+  .catch(async (e) => {
+    console.error('Seed error:', e);
+    await prisma.$disconnect();
+    process.exit(1);
   });

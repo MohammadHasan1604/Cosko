@@ -178,8 +178,8 @@ export async function runSecurityAuditTestSuite(): Promise<{
     id: 'aud-1',
     name: 'Rohan Sharma',
     email: 'rohan@cosko.com',
-    role: 'Inventory Manager',
-    securityLevel: 60,
+    role: 'Sales Manager',
+    securityLevel: 40,
     storeScope: 'DEL',
     allowedStores: ['DEL'],
     status: 'Active',
@@ -189,8 +189,8 @@ export async function runSecurityAuditTestSuite(): Promise<{
     id: 'c-1',
     name: 'Karan Verma',
     email: 'karan@cosko.com',
-    role: 'POS Cashier',
-    securityLevel: 20,
+    role: 'Sales Manager',
+    securityLevel: 40,
     storeScope: 'HYD',
     allowedStores: ['HYD'],
     status: 'Active',
@@ -224,25 +224,25 @@ export async function runSecurityAuditTestSuite(): Promise<{
   );
 
   const cashierEditReq: ResourceRequest = {
-    resourceName: 'Edit Inventory Price',
+    resourceName: 'Edit Store Manager Config',
     classification: 'STORE_SCOPED',
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
     requiredPermission: 'inventory.edit',
     targetStore: 'HYD',
   };
   const cashierEditRes = RBACEngine.authorize(cashierUser, cashierEditReq);
   assertTest(
     '3. RBAC Hierarchy',
-    'Level 20 Cashier Denied Higher Security Level Action (inventory.edit)',
+    'Level 40 Sales Manager Denied Higher Security Level Action (inventory.edit Level 80)',
     'DENIED',
     cashierEditRes.allowed ? 'PASS' : 'DENIED',
-    cashierEditRes.reason || 'Denied level 20 access'
+    cashierEditRes.reason || 'Denied level 40 access'
   );
 
   const suspReq: ResourceRequest = {
     resourceName: 'POS Sales',
     classification: 'STORE_SCOPED',
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
     requiredPermission: 'sales.view',
     targetStore: 'BLR',
   };
@@ -284,7 +284,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const crossStoreReq: ResourceRequest = {
     resourceName: 'HYD Sales Data',
     classification: 'STORE_SCOPED',
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
     targetStore: 'HYD',
   };
   const crossStoreRes = RBACEngine.authorize(storeManagerUser, crossStoreReq);
@@ -299,7 +299,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const allStoreReq: ResourceRequest = {
     resourceName: 'HYD Sales Data',
     classification: 'STORE_SCOPED',
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
     targetStore: 'HYD',
   };
   const allStoreRes = RBACEngine.authorize(superAdminUser, allStoreReq);
@@ -504,7 +504,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const idorReq: ResourceRequest = {
     resourceName: 'View Sale ORD-2026-9900 (HYD)',
     classification: 'STORE_SCOPED',
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
     requiredPermission: 'sales.view',
     targetStore: 'HYD',
   };
@@ -523,7 +523,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const cashierPosReq: ResourceRequest = {
     resourceName: 'Create POS Sale',
     classification: 'STORE_SCOPED',
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
     requiredPermission: 'sales.create',
     targetStore: 'HYD',
   };
@@ -539,7 +539,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const grnReq: ResourceRequest = {
     resourceName: 'Receive GRN PO-2026-0041',
     classification: 'STORE_SCOPED',
-    minSecurityLevel: 60,
+    minSecurityLevel: 40,
     requiredPermission: 'purchases.receive_grn',
     targetStore: 'DEL',
   };
@@ -559,14 +559,14 @@ export async function runSecurityAuditTestSuite(): Promise<{
     RBACEngine.authorize(cashierUser, {
       resourceName: 'POS Sale',
       classification: 'STORE_SCOPED',
-      minSecurityLevel: 20,
+      minSecurityLevel: 40,
       requiredPermission: 'sales.create',
       targetStore: 'HYD',
     }).allowed &&
     RBACEngine.authorize(cashierUser, {
       resourceName: 'Customer Credit',
       classification: 'STORE_SCOPED',
-      minSecurityLevel: 20,
+      minSecurityLevel: 40,
       requiredPermission: 'customers.view',
       targetStore: 'HYD',
     }).allowed;
@@ -677,12 +677,12 @@ export async function runSecurityAuditTestSuite(): Promise<{
     intRes.reason || 'Integrations permission unresolvable'
   );
 
-  // Test 15.2: Sales Executive Default Focused Role Access (Sales & POS Authorized, Admin Modules Denied)
+  // Test 15.2: Sales Manager Default Focused Role Access (Sales & POS Authorized, Admin Modules Denied)
   const salesExecUser: RBACUser = {
     id: 'usr-6',
     name: 'Pooja Deshmukh',
     email: 'pooja@cosko.com',
-    role: 'Sales Executive',
+    role: 'Sales Manager',
     securityLevel: 40,
     storeScope: 'BLR',
     allowedStores: ['BLR'],
@@ -692,10 +692,8 @@ export async function runSecurityAuditTestSuite(): Promise<{
       'sales.create',
       'sales.pay_cash',
       'sales.pay_upi',
-      'sales.pay_card',
       'sales.print_receipt',
       'sales.history',
-      'sales.attach_photo',
       'customers.view',
       'customers.add',
     ],
@@ -704,17 +702,17 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const seSalesReq: ResourceRequest = {
     resourceName: 'POS Checkout',
     classification: 'STORE_SCOPED',
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
     requiredPermission: 'sales.create',
     targetStore: 'BLR',
   };
   const seSalesRes = RBACEngine.authorize(salesExecUser, seSalesReq);
   assertTest(
     '15. Regression & UX',
-    'Sales Executive Default Sales & POS Authorized Access',
+    'Sales Manager Default Sales & POS Authorized Access',
     'PASS',
     seSalesRes.allowed ? 'PASS' : 'DENIED',
-    'Sales Executive authorized for POS checkout'
+    'Sales Manager authorized for POS checkout'
   );
 
   const seAdminReq: ResourceRequest = {
@@ -726,13 +724,13 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const seAdminRes = RBACEngine.authorize(salesExecUser, seAdminReq);
   assertTest(
     '15. Regression & UX',
-    'Sales Executive Blocked from Admin Modules (Users & Roles Denied)',
+    'Sales Manager Blocked from Admin Modules (Users & Roles Denied)',
     'DENIED',
     seAdminRes.allowed ? 'PASS' : 'DENIED',
-    seAdminRes.reason || 'Blocked Sales Executive from Users Directory'
+    seAdminRes.reason || 'Blocked Sales Manager from Users Directory'
   );
 
-  // Test 15.3: Sales Executive Super Admin Custom Toggle Enforcement
+  // Test 15.3: Sales Manager Super Admin Custom Toggle Enforcement
   const salesExecWithDiscount: RBACUser = {
     ...salesExecUser,
     overrides: [{ permissionCode: 'sales.discount', overrideType: 'ALLOW' }],
@@ -740,7 +738,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const seDiscountReq: ResourceRequest = {
     resourceName: 'Apply Order Discount',
     classification: 'STORE_SCOPED',
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
     requiredPermission: 'sales.discount',
     targetStore: 'BLR',
   };

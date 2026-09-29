@@ -130,7 +130,6 @@ export async function POST(req: NextRequest) {
             ? ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM']
             : [updatedUser.storeScope],
       avatar: updatedUser.name.substring(0, 2).toUpperCase(),
-      shiftStatus: updatedUser.shiftStatus as any,
       avatarUrl: updatedUser.avatarUrl || undefined,
       mustChangePassword: false,
       sessionId: auth.user.sessionId,

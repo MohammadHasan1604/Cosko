@@ -54,7 +54,7 @@ export default function Sidebar({
     (p) => p.status === 'Sent' || p.status === 'Draft'
   ).length;
 
-  // Strict RBAC Navigation — Super Admin-only modules enforced per requirements
+  // Strict RBAC Navigation — Exactly 3 roles
   const roleAllowedHrefs: Record<string, string[]> = {
     'Super Admin': [
       '/dashboard',
@@ -89,20 +89,10 @@ export default function Sidebar({
       '/reports',
       '/employees',
     ],
-    'Inventory Manager': [
-      '/dashboard',
-      '/inventory-management',
-      '/categories',
-      '/purchases',
-      '/vendors',
-      '/reports',
-    ],
-    'Sales Executive': ['/dashboard', '/sales', '/customers'],
-    'POS Cashier': ['/sales', '/customers'],
-    'Restricted Employee': ['/dashboard'],
+    'Sales Manager': ['/sales', '/inventory-management', '/customers'],
   };
 
-  const allowedHrefs = roleAllowedHrefs[currentUser.role] || ['/sales', '/work-activity'];
+  const allowedHrefs = roleAllowedHrefs[currentUser.role] || ['/sales'];
 
   const rawNavGroups: NavGroup[] = [
     {

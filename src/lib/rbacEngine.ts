@@ -1,31 +1,23 @@
 /**
- * COSKO Hierarchical Role-Based & Permission Access Control Engine
+ * COSKO RBAC Engine — Exactly 3 Roles
  *
- * SECURITY HIERARCHY LEVELS:
- * LEVEL 100 — Super Admin (Full Enterprise Authority)
- * LEVEL 80  — Store Manager (Assigned Store Scope)
- * LEVEL 60  — Department Manager / Accountant / Procurement / Inventory Manager
- * LEVEL 40  — Sales Executive / Inventory Staff
- * LEVEL 20  — POS Cashier / Billing Staff
- * LEVEL 10  — Employee / Restricted (Deny by default)
+ * SECURITY HIERARCHY:
+ * LEVEL 100 — Super Admin (Full Enterprise Authority, ONE protected account)
+ * LEVEL 80  — Store Manager (Assigned Store Scope, full local operations)
+ * LEVEL 40  — Sales Manager (Assigned Store Scope, POS/sales/inventory only)
+ *
+ * NO OTHER ROLES EXIST. Period.
  */
 
-export type SecurityLevel = 100 | 80 | 60 | 40 | 20 | 10;
+export type SecurityLevel = 100 | 80 | 40;
 
-export type UserRole =
-  | 'Super Admin'
-  | 'Store Manager'
-  | 'Inventory Manager'
-  | 'Sales Executive'
-  | 'POS Cashier'
-  | 'Restricted Employee';
+export type UserRole = 'Super Admin' | 'Store Manager' | 'Sales Manager';
 
 export type ResourceClassification =
   | 'PUBLIC'
   | 'AUTHENTICATED'
   | 'SELF_ONLY'
   | 'STORE_SCOPED'
-  | 'DEPARTMENT_SCOPED'
   | 'ENTERPRISE'
   | 'SUPER_ADMIN_ONLY';
 
@@ -49,7 +41,8 @@ export interface PermissionDefinition {
     | 'Settings'
     | 'Branding'
     | 'Delete Approval'
-    | 'System';
+    | 'System'
+    | 'Attendance';
   isProtected: boolean;
   minSecurityLevel: SecurityLevel;
 }
@@ -65,15 +58,14 @@ export interface RBACUser {
   email: string;
   role: UserRole;
   securityLevel: SecurityLevel;
-  storeScope: string; // 'All Stores' | 'BLR' | 'HYD' | 'DEL'
-  allowedStores?: string[]; // Specific store access assignments e.g. ['BLR', 'HYD']
+  storeScope: string;
+  allowedStores?: string[];
   status: 'Active' | 'Inactive' | 'Suspended';
-  permissions: string[]; // Granted role permissions
-  overrides?: UserPermissionOverride[]; // Custom user permission overrides
-  sessionToken?: string;
+  permissions: string[];
+  overrides?: UserPermissionOverride[];
+  avatarUrl?: string | null;
+  shiftStatus?: string;
   isSessionValid?: boolean;
-  avatarUrl?: string;
-  shiftStatus?: 'On Shift' | 'On Leave';
 }
 
 export interface ResourceRequest {
@@ -90,20 +82,15 @@ export interface ResourceRequest {
 export const ROLE_SECURITY_LEVELS: Record<UserRole, SecurityLevel> = {
   'Super Admin': 100,
   'Store Manager': 80,
-  'Inventory Manager': 60,
-  'Sales Executive': 40,
-  'POS Cashier': 20,
-  'Restricted Employee': 10,
+  'Sales Manager': 40,
 };
 
 /**
  * Modules restricted to Super Admin only (Level 100).
- * These modules MUST NOT be accessible via navigation, API, or direct URL by any other role.
  */
 export const SUPER_ADMIN_ONLY_MODULES = [
   'Stock Transfers',
   'Central Profit',
-  'Work Activity',
   'Audit Logs',
   'Stores',
   'Users & Roles',
@@ -111,23 +98,21 @@ export const SUPER_ADMIN_ONLY_MODULES = [
 ] as const;
 
 /**
- * Check if caller can manage a target role based on the security hierarchy.
- * A user can only manage roles with a LOWER security level than their own.
+ * Check if caller can manage a target role.
  */
 export function canManageRole(callerLevel: number, targetLevel: number): boolean {
   return callerLevel > targetLevel;
 }
 
 /**
- * Returns the maximum security level a caller can assign to users they create or modify.
+ * Returns the maximum security level a caller can assign.
  */
 export function getMaxAssignableLevel(callerLevel: number): number {
-  return Math.max(10, callerLevel - 1);
+  return Math.max(40, callerLevel - 1);
 }
 
 /**
- * PROTECTED PERMISSIONS — ABSOLUTE SECURITY BOUNDARY
- * Under no circumstances can these permissions be assigned to roles below Level 100.
+ * PROTECTED PERMISSIONS — Only Super Admin (Level 100) can hold these.
  */
 export const SUPER_ADMIN_PROTECTED_PERMISSIONS = [
   'super_admin.create',
@@ -141,10 +126,13 @@ export const SUPER_ADMIN_PROTECTED_PERMISSIONS = [
   'branding.edit_logo',
   'branding.edit_favicon',
   'branding.edit_receipt',
+  'stores.manage',
+  'transfers.manage',
+  'delete_requests.review',
 ];
 
 /**
- * MASTER SYSTEM PERMISSION CATALOGUE (NO INTEGRATIONS)
+ * MASTER PERMISSION CATALOGUE
  */
 export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
   // Dashboard
@@ -153,23 +141,23 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
     name: 'Dashboard Module Access',
     category: 'Dashboard',
     isProtected: false,
-    minSecurityLevel: 10,
+    minSecurityLevel: 40,
   },
 
-  // Sales Page & Actions
+  // Sales
   {
     code: 'sales.view',
     name: 'Sales & POS Page Access',
     category: 'Sales',
     isProtected: false,
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
   },
   {
     code: 'sales.create',
     name: 'Create Sale / Checkout',
     category: 'Sales',
     isProtected: false,
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
   },
   {
     code: 'sales.discount',
@@ -183,42 +171,28 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
     name: 'Accept Cash Payment',
     category: 'Sales',
     isProtected: false,
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
   },
   {
     code: 'sales.pay_upi',
-    name: 'Accept UPI QR Payment',
+    name: 'Accept UPI Payment',
     category: 'Sales',
     isProtected: false,
-    minSecurityLevel: 20,
-  },
-  {
-    code: 'sales.pay_card',
-    name: 'Accept Card Payment',
-    category: 'Sales',
-    isProtected: false,
-    minSecurityLevel: 20,
-  },
-  {
-    code: 'sales.pay_credit',
-    name: 'Accept Store Credit Payment',
-    category: 'Sales',
-    isProtected: false,
-    minSecurityLevel: 80,
+    minSecurityLevel: 40,
   },
   {
     code: 'sales.print_receipt',
     name: 'Print Sales Receipt',
     category: 'Sales',
     isProtected: false,
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
   },
   {
     code: 'sales.history',
     name: 'View Sale History',
     category: 'Sales',
     isProtected: false,
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
   },
   {
     code: 'sales.cancel',
@@ -239,10 +213,10 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
     name: 'Attach Sale Photo Proof',
     category: 'Sales',
     isProtected: false,
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
   },
 
-  // Inventory Page & Actions
+  // Inventory
   {
     code: 'inventory.view',
     name: 'Inventory Page Access',
@@ -255,14 +229,14 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
     name: 'Add New Product',
     category: 'Inventory',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 40,
   },
   {
     code: 'inventory.edit',
     name: 'Edit Product Details',
     category: 'Inventory',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 40,
   },
   {
     code: 'inventory.archive',
@@ -276,14 +250,14 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
     name: 'Perform Stock Adjustment',
     category: 'Inventory',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 40,
   },
   {
     code: 'inventory.transfer',
     name: 'Initiate Stock Transfer',
     category: 'Inventory',
-    isProtected: false,
-    minSecurityLevel: 80,
+    isProtected: true,
+    minSecurityLevel: 100,
   },
   {
     code: 'inventory.history',
@@ -292,42 +266,35 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
     isProtected: false,
     minSecurityLevel: 40,
   },
-  {
-    code: 'inventory.images',
-    name: 'Manage Product Images',
-    category: 'Inventory',
-    isProtected: false,
-    minSecurityLevel: 60,
-  },
 
-  // Purchases Page & Actions
+  // Purchases
   {
     code: 'purchases.view',
     name: 'Purchases Page Access',
     category: 'Purchases',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'purchases.create',
     name: 'Create Purchase Order',
     category: 'Purchases',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'purchases.edit',
     name: 'Edit Purchase Order',
     category: 'Purchases',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'purchases.cancel',
     name: 'Cancel Purchase Order',
     category: 'Purchases',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'purchases.approve',
@@ -338,26 +305,26 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
   },
   {
     code: 'purchases.receive_grn',
-    name: 'Receive Goods Receiving Note (GRN)',
+    name: 'Receive Goods (GRN)',
     category: 'Purchases',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
 
-  // Customers Page & Actions
+  // Customers
   {
     code: 'customers.view',
     name: 'Customers Page Access',
     category: 'Customers',
     isProtected: false,
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
   },
   {
     code: 'customers.add',
-    name: 'Add New Customer Profile',
+    name: 'Add New Customer',
     category: 'Customers',
     isProtected: false,
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
   },
   {
     code: 'customers.edit',
@@ -375,40 +342,40 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
   },
   {
     code: 'customers.view_credit',
-    name: 'View Customer Credit Balance',
+    name: 'View Customer Credit',
     category: 'Customers',
     isProtected: false,
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
   },
   {
     code: 'customers.adjust_credit',
-    name: 'Adjust Customer Store Credit',
+    name: 'Adjust Customer Credit',
     category: 'Customers',
     isProtected: false,
     minSecurityLevel: 80,
   },
 
-  // Vendors Page & Actions
+  // Vendors
   {
     code: 'vendors.view',
     name: 'Vendors Page Access',
     category: 'Vendors',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'vendors.add',
     name: 'Add New Vendor',
     category: 'Vendors',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'vendors.edit',
     name: 'Edit Vendor Details',
     category: 'Vendors',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'vendors.archive',
@@ -419,84 +386,77 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
   },
   {
     code: 'vendors.view_payables',
-    name: 'View Vendor Outstanding Payables',
+    name: 'View Vendor Payables',
     category: 'Vendors',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
 
-  // Expenses Page & Actions
+  // Expenses
   {
     code: 'expenses.view',
     name: 'Expenses Page Access',
     category: 'Expenses',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'expenses.create',
     name: 'Create Expense Record',
     category: 'Expenses',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'expenses.edit',
     name: 'Edit Expense Record',
     category: 'Expenses',
     isProtected: false,
-    minSecurityLevel: 60,
-  },
-  {
-    code: 'expenses.approve',
-    name: 'Approve Expense Request',
-    category: 'Expenses',
-    isProtected: false,
     minSecurityLevel: 80,
   },
   {
-    code: 'expenses.reject',
-    name: 'Reject Expense Request',
+    code: 'expenses.approve',
+    name: 'Approve Expense',
     category: 'Expenses',
     isProtected: false,
     minSecurityLevel: 80,
   },
 
-  // Accounting Page & Actions
+  // Accounting
   {
     code: 'accounting.view',
     name: 'Accounting Page Access',
     category: 'Accounting',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'accounting.pnl',
-    name: 'View Profit & Loss Statement',
+    name: 'View P&L Statement',
     category: 'Accounting',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'accounting.balance_sheet',
-    name: 'View Balance Sheet Summary',
+    name: 'View Balance Sheet',
     category: 'Accounting',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'accounting.gst',
-    name: 'View GST Filing Reports',
+    name: 'View GST Reports',
     category: 'Accounting',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'accounting.margin',
-    name: 'View Product Gross Margins',
+    name: 'View Gross Margins',
     category: 'Accounting',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'accounting.export',
@@ -506,37 +466,37 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
     minSecurityLevel: 80,
   },
 
-  // Reports Page & Actions
+  // Reports
   {
     code: 'reports.view',
     name: 'Reports Page Access',
     category: 'Reports',
     isProtected: false,
-    minSecurityLevel: 60,
+    minSecurityLevel: 80,
   },
   {
     code: 'reports.export',
-    name: 'Export Performance Reports',
-    category: 'Reports',
-    isProtected: false,
-    minSecurityLevel: 60,
-  },
-  {
-    code: 'reports.store_comparison',
-    name: 'View Multi-Store Comparison',
+    name: 'Export Reports',
     category: 'Reports',
     isProtected: false,
     minSecurityLevel: 80,
   },
   {
+    code: 'reports.store_comparison',
+    name: 'Multi-Store Comparison',
+    category: 'Reports',
+    isProtected: true,
+    minSecurityLevel: 100,
+  },
+  {
     code: 'reports.user_performance',
-    name: 'View User Sales Performance',
+    name: 'User Performance',
     category: 'Reports',
     isProtected: false,
     minSecurityLevel: 80,
   },
 
-  // Employees Page & Actions
+  // Employees
   {
     code: 'employees.view',
     name: 'Employees Page Access',
@@ -546,238 +506,217 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
   },
   {
     code: 'employees.add',
-    name: 'Add Employee Profile',
+    name: 'Add Employee',
     category: 'Employees',
     isProtected: false,
     minSecurityLevel: 80,
   },
   {
     code: 'employees.edit',
-    name: 'Edit Employee Details',
+    name: 'Edit Employee',
     category: 'Employees',
     isProtected: false,
     minSecurityLevel: 80,
   },
   {
     code: 'employees.archive',
-    name: 'Archive / Delete Employee',
-    category: 'Employees',
-    isProtected: false,
-    minSecurityLevel: 80,
-  },
-  {
-    code: 'employees.shifts',
-    name: 'Manage Employee Shifts',
-    category: 'Employees',
-    isProtected: false,
-    minSecurityLevel: 80,
-  },
-  {
-    code: 'employees.attendance',
-    name: 'Manage Staff Attendance',
+    name: 'Archive Employee',
     category: 'Employees',
     isProtected: false,
     minSecurityLevel: 80,
   },
 
-  // Stores Page & Actions
+  // Attendance
+  {
+    code: 'attendance.view_own',
+    name: 'View Own Attendance',
+    category: 'Attendance',
+    isProtected: false,
+    minSecurityLevel: 40,
+  },
+  {
+    code: 'attendance.view_store',
+    name: 'View Store Attendance',
+    category: 'Attendance',
+    isProtected: false,
+    minSecurityLevel: 80,
+  },
+  {
+    code: 'attendance.view_all',
+    name: 'View All Attendance',
+    category: 'Attendance',
+    isProtected: true,
+    minSecurityLevel: 100,
+  },
+  {
+    code: 'attendance.start_shift',
+    name: 'Start Shift',
+    category: 'Attendance',
+    isProtected: false,
+    minSecurityLevel: 40,
+  },
+  {
+    code: 'attendance.end_shift',
+    name: 'End Shift',
+    category: 'Attendance',
+    isProtected: false,
+    minSecurityLevel: 40,
+  },
+
+  // Stores
   {
     code: 'stores.view',
     name: 'Stores Page Access',
     category: 'Stores',
-    isProtected: false,
-    minSecurityLevel: 80,
+    isProtected: true,
+    minSecurityLevel: 100,
   },
   {
     code: 'stores.edit',
-    name: 'Edit Store Hub Details',
+    name: 'Edit Store Details',
     category: 'Stores',
-    isProtected: false,
-    minSecurityLevel: 80,
+    isProtected: true,
+    minSecurityLevel: 100,
   },
   {
-    code: 'stores.staff',
-    name: 'Manage Store Staff Allocation',
+    code: 'stores.manage',
+    name: 'Manage Stores',
     category: 'Stores',
-    isProtected: false,
-    minSecurityLevel: 80,
-  },
-  {
-    code: 'stores.change_active',
-    name: 'Change Active Store Scope',
-    category: 'Stores',
-    isProtected: false,
-    minSecurityLevel: 10,
+    isProtected: true,
+    minSecurityLevel: 100,
   },
 
-  // Users & Roles Page & Actions
+  // Users
   {
     code: 'users.view',
-    name: 'Users Directory Page Access',
+    name: 'Users Directory Access',
     category: 'Users & Roles',
     isProtected: false,
     minSecurityLevel: 80,
   },
   {
     code: 'users.create',
-    name: 'Provision New User Account',
+    name: 'Create User Account',
     category: 'Users & Roles',
     isProtected: false,
     minSecurityLevel: 80,
   },
   {
     code: 'users.edit',
-    name: 'Edit User Credentials & Details',
+    name: 'Edit User',
     category: 'Users & Roles',
     isProtected: false,
     minSecurityLevel: 80,
   },
   {
     code: 'users.suspend',
-    name: 'Suspend User Account',
+    name: 'Suspend User',
     category: 'Users & Roles',
     isProtected: false,
     minSecurityLevel: 80,
   },
   {
     code: 'users.activate',
-    name: 'Activate User Account',
+    name: 'Activate User',
     category: 'Users & Roles',
     isProtected: false,
     minSecurityLevel: 80,
   },
   {
     code: 'users.assign_role',
-    name: 'Assign User Security Role',
+    name: 'Assign Role',
     category: 'Users & Roles',
     isProtected: false,
     minSecurityLevel: 80,
   },
   {
     code: 'users.assign_store',
-    name: 'Assign Store Access Scope',
-    category: 'Users & Roles',
-    isProtected: false,
-    minSecurityLevel: 80,
-  },
-  {
-    code: 'users.change_permissions',
-    name: 'Configure Custom User Permissions',
+    name: 'Assign Store',
     category: 'Users & Roles',
     isProtected: false,
     minSecurityLevel: 80,
   },
   {
     code: 'users.reset_password',
-    name: 'Reset User Password',
-    category: 'Users & Roles',
-    isProtected: false,
-    minSecurityLevel: 80,
-  },
-  {
-    code: 'users.custom_role',
-    name: 'Create / Edit Custom Roles',
+    name: 'Reset Password',
     category: 'Users & Roles',
     isProtected: false,
     minSecurityLevel: 80,
   },
 
-  // Audit Logs Page & Actions
+  // Audit Logs
   {
     code: 'audit_logs.view',
-    name: 'View Store Audit Logs',
+    name: 'View Audit Logs',
     category: 'Audit Logs',
-    isProtected: false,
-    minSecurityLevel: 80,
+    isProtected: true,
+    minSecurityLevel: 100,
   },
   {
     code: 'audit_logs.enterprise_view',
-    name: 'View Enterprise Audit Logs',
+    name: 'Enterprise Audit Logs',
     category: 'Audit Logs',
     isProtected: true,
     minSecurityLevel: 100,
   },
 
-  // Settings Page & Actions
+  // Settings
   {
     code: 'settings.view',
     name: 'Settings Page Access',
     category: 'Settings',
-    isProtected: false,
-    minSecurityLevel: 80,
-  },
-  {
-    code: 'settings.edit_store',
-    name: 'Edit Store Settings',
-    category: 'Settings',
-    isProtected: false,
-    minSecurityLevel: 80,
+    isProtected: true,
+    minSecurityLevel: 100,
   },
   {
     code: 'settings.global_manage',
-    name: 'Manage Global System Settings',
+    name: 'Manage Global Settings',
     category: 'Settings',
     isProtected: true,
     minSecurityLevel: 100,
   },
 
-  // Branding Page & Actions
+  // Branding
   {
     code: 'branding.view',
-    name: 'View White-Label Branding',
+    name: 'View Branding',
     category: 'Branding',
-    isProtected: false,
-    minSecurityLevel: 80,
+    isProtected: true,
+    minSecurityLevel: 100,
   },
   {
     code: 'branding.edit_name',
-    name: 'Edit Business / App Name',
+    name: 'Edit Business Name',
     category: 'Branding',
     isProtected: true,
     minSecurityLevel: 100,
   },
   {
     code: 'branding.edit_logo',
-    name: 'Edit Custom Business Logo',
+    name: 'Edit Logo',
     category: 'Branding',
     isProtected: true,
     minSecurityLevel: 100,
   },
   {
     code: 'branding.edit_favicon',
-    name: 'Edit Dynamic Tab Favicon',
+    name: 'Edit Favicon',
     category: 'Branding',
     isProtected: true,
     minSecurityLevel: 100,
   },
   {
     code: 'branding.edit_receipt',
-    name: 'Edit Receipt Footer Branding',
+    name: 'Edit Receipt Branding',
     category: 'Branding',
     isProtected: true,
     minSecurityLevel: 100,
   },
 
-  // Work Activity Tracking
-  {
-    code: 'activity.view',
-    name: 'View Own Work Activity',
-    category: 'Employees',
-    isProtected: false,
-    minSecurityLevel: 10,
-  },
-  {
-    code: 'activity.view_all',
-    name: 'View All Users Work Activity',
-    category: 'Employees',
-    isProtected: true,
-    minSecurityLevel: 100,
-  },
-
-  // Delete Approval Workflow
+  // Delete Approval
   {
     code: 'delete_requests.view',
-    name: 'View Own Delete Requests',
+    name: 'View Delete Requests',
     category: 'Delete Approval',
     isProtected: false,
     minSecurityLevel: 80,
@@ -791,7 +730,7 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
   },
   {
     code: 'delete_requests.review',
-    name: 'Approve / Reject Delete Requests',
+    name: 'Approve/Reject Deletes',
     category: 'Delete Approval',
     isProtected: true,
     minSecurityLevel: 100,
@@ -803,10 +742,29 @@ export const PERMISSION_CATALOGUE: PermissionDefinition[] = [
     name: 'View Notifications',
     category: 'System',
     isProtected: false,
-    minSecurityLevel: 10,
+    minSecurityLevel: 40,
+  },
+
+  // Stock Transfers
+  {
+    code: 'transfers.view',
+    name: 'View Transfers',
+    category: 'Inventory',
+    isProtected: true,
+    minSecurityLevel: 100,
+  },
+  {
+    code: 'transfers.manage',
+    name: 'Manage Transfers',
+    category: 'Inventory',
+    isProtected: true,
+    minSecurityLevel: 100,
   },
 ];
 
+/**
+ * Default permissions per role — EXACTLY 3 ROLES
+ */
 export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   'Super Admin': ['ALL_PERMISSIONS'],
   'Store Manager': [
@@ -816,189 +774,166 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'sales.discount',
     'sales.pay_cash',
     'sales.pay_upi',
-    'sales.pay_card',
-    'sales.pay_credit',
     'sales.print_receipt',
     'sales.history',
+    'sales.cancel',
+    'sales.refund',
     'sales.attach_photo',
     'inventory.view',
     'inventory.add',
     'inventory.edit',
+    'inventory.archive',
     'inventory.adjust',
-    'inventory.transfer',
     'inventory.history',
     'purchases.view',
     'purchases.create',
     'purchases.edit',
+    'purchases.cancel',
     'purchases.receive_grn',
     'customers.view',
     'customers.add',
     'customers.edit',
+    'customers.archive',
+    'customers.view_credit',
+    'customers.adjust_credit',
     'vendors.view',
+    'vendors.add',
+    'vendors.edit',
+    'vendors.view_payables',
     'expenses.view',
     'expenses.create',
+    'expenses.edit',
+    'expenses.approve',
     'accounting.view',
+    'accounting.pnl',
+    'accounting.balance_sheet',
+    'accounting.gst',
+    'accounting.margin',
     'reports.view',
+    'reports.export',
+    'reports.user_performance',
     'employees.view',
-    'stores.view',
-    'activity.view',
+    'employees.add',
+    'employees.edit',
+    'attendance.view_own',
+    'attendance.view_store',
+    'attendance.start_shift',
+    'attendance.end_shift',
+    'users.view',
+    'users.create',
+    'users.edit',
+    'users.assign_role',
+    'users.reset_password',
     'delete_requests.view',
     'delete_requests.create',
     'notifications.view',
   ],
-  'Inventory Manager': [
+  'Sales Manager': [
     'dashboard.view',
+    'sales.view',
+    'sales.create',
+    'sales.pay_cash',
+    'sales.pay_upi',
+    'sales.print_receipt',
+    'sales.history',
+    'sales.attach_photo',
     'inventory.view',
     'inventory.add',
     'inventory.edit',
     'inventory.adjust',
     'inventory.history',
-    'purchases.view',
-    'purchases.create',
-    'purchases.edit',
-    'purchases.receive_grn',
-    'vendors.view',
-    'vendors.add',
-    'vendors.edit',
-    'reports.view',
-    'activity.view',
-  ],
-  'Sales Executive': [
-    'dashboard.view',
-    'sales.view',
-    'sales.create',
-    'sales.pay_cash',
-    'sales.pay_upi',
-    'sales.pay_card',
-    'sales.print_receipt',
-    'sales.history',
-    'sales.attach_photo',
     'customers.view',
     'customers.add',
-    'activity.view',
+    'customers.edit',
+    'customers.view_credit',
+    'attendance.view_own',
+    'attendance.start_shift',
+    'attendance.end_shift',
+    'notifications.view',
   ],
-  'POS Cashier': [
-    'sales.view',
-    'sales.create',
-    'sales.pay_cash',
-    'sales.pay_upi',
-    'sales.pay_card',
-    'sales.print_receipt',
-    'customers.view',
-    'activity.view',
-  ],
-  'Restricted Employee': ['dashboard.view', 'activity.view'],
 };
 
 export class RBACEngine {
   /**
-   * Evaluates access request strictly following COSKO 11-step Permission Resolution Pipeline:
-   * 1. User Authenticated Check
-   * 2. Session Validity Check
-   * 3. Account Active Status Check (ACTIVE vs INACTIVE vs SUSPENDED)
-   * 4. Resource Classification Check
-   * 5. Security Level Check
-   * 6. Explicit Deny List Check
-   * 7. Required Permission Check
-   * 8. User Specific Override Check
-   * 9. Role Permission Check
-   * 10. Store Isolation Check
-   * 11. Target Resource Protection Check
+   * COSKO Permission Resolution Pipeline:
+   * 1. User Authenticated
+   * 2. Session Valid
+   * 3. Account Active
+   * 4. Super Admin bypass
+   * 5. Resource Classification
+   * 6. Security Level
+   * 7. Explicit Deny
+   * 8. Required Permission
+   * 9. User Override
+   * 10. Role Permission
+   * 11. Store Isolation
+   * 12. Target Protection
    */
   static authorize(
     user: RBACUser | null,
     request: ResourceRequest
   ): { allowed: boolean; reason?: string } {
-    // Step 1: User Authenticated Check
     if (!user) {
-      return { allowed: false, reason: 'Deny by Default: User is not authenticated' };
+      return { allowed: false, reason: 'Deny: Not authenticated' };
     }
 
-    // Step 2: Session Validity Check
     if (user.isSessionValid === false) {
-      return { allowed: false, reason: 'Deny Access: User session is invalid or revoked' };
+      return { allowed: false, reason: 'Deny: Session invalid or revoked' };
     }
 
-    // Step 3: Account Active Status Check
     if (user.status === 'Suspended') {
-      return {
-        allowed: false,
-        reason: 'Deny Access: User account is SUSPENDED. All access revoked immediately.',
-      };
+      return { allowed: false, reason: 'Deny: Account SUSPENDED' };
     }
     if (user.status === 'Inactive') {
-      return { allowed: false, reason: 'Deny Access: User account is INACTIVE' };
+      return { allowed: false, reason: 'Deny: Account INACTIVE' };
     }
 
-    // Non-existent permission check: reject deleted / removed system permissions
-    if (request.requiredPermission && request.requiredPermission !== 'ALL_PERMISSIONS') {
-      const permDef = PERMISSION_CATALOGUE.find((p) => p.code === request.requiredPermission);
-      if (!permDef) {
-        return {
-          allowed: false,
-          reason: `404 Not Found: Permission "${request.requiredPermission}" has been removed from system`,
-        };
+    // Validate that required permission exists in system catalogue
+    if (request.requiredPermission) {
+      const exists = PERMISSION_CATALOGUE.some((p) => p.code === request.requiredPermission);
+      if (!exists) {
+        return { allowed: false, reason: 'Integrations permission unresolvable' };
       }
     }
 
-    // ROOT-LEVEL SUPER ADMIN ACCESS BYPASS:
-    // Super Admin accounts always hold full, unrestricted root-level access across every
-    // store, module, page, feature, and action. Access never depends on configurable role permissions.
+    // Super Admin always passes valid permissions
     if (user.role === 'Super Admin' || user.securityLevel === 100) {
       return { allowed: true };
     }
 
-    // Step 4: Resource Classification Check
+    // SUPER_ADMIN_ONLY resource
     if (request.classification === 'SUPER_ADMIN_ONLY' && user.securityLevel < 100) {
-      return {
-        allowed: false,
-        reason: '403 Forbidden: Resource is classified as SUPER_ADMIN_ONLY',
-      };
+      return { allowed: false, reason: '403: SUPER_ADMIN_ONLY resource' };
     }
 
-    // Step 5: Security Level Check
+    // Security level floor
     if (user.securityLevel < request.minSecurityLevel) {
       return {
         allowed: false,
-        reason: `Deny Access: User Security Level (${user.securityLevel}) is below required Level (${request.minSecurityLevel})`,
+        reason: `Deny: Level ${user.securityLevel} below required ${request.minSecurityLevel}`,
       };
     }
 
-    // Step 6: Explicit Deny List Check
+    // Explicit deny list
     if (
       request.explicitDenyList &&
       request.requiredPermission &&
       request.explicitDenyList.includes(request.requiredPermission)
     ) {
-      return {
-        allowed: false,
-        reason: 'Deny Access: Permission is explicitly revoked for this scope',
-      };
+      return { allowed: false, reason: 'Deny: Permission explicitly revoked' };
     }
 
-    // Step 7: Required Permission Check
+    // Permission check
     if (request.requiredPermission) {
-      // Reject removed or non-existent permissions
-      const permDef = PERMISSION_CATALOGUE.find((p) => p.code === request.requiredPermission);
-      if (!permDef && request.requiredPermission !== 'ALL_PERMISSIONS') {
-        return {
-          allowed: false,
-          reason: `404 Not Found: Permission "${request.requiredPermission}" has been removed from system`,
-        };
-      }
-
-      // Prevent custom overrides from granting Level 100 protected permissions to lower levels
+      // Protected permissions cannot be granted to non-100
       if (
         SUPER_ADMIN_PROTECTED_PERMISSIONS.includes(request.requiredPermission) &&
         user.securityLevel < 100
       ) {
-        return {
-          allowed: false,
-          reason: 'Deny Access: Protected Level 100 permission cannot be granted to lower roles',
-        };
+        return { allowed: false, reason: 'Deny: Protected permission requires Level 100' };
       }
 
-      // Step 8: User Specific Override Check
+      // User override check
       const userOverride = user.overrides?.find(
         (o) => o.permissionCode === request.requiredPermission
       );
@@ -1006,59 +941,50 @@ export class RBACEngine {
         if (userOverride.overrideType === 'DENY') {
           return {
             allowed: false,
-            reason: `Deny Access: User has explicit custom DENY override for "${request.requiredPermission}"`,
+            reason: `Deny: Custom DENY for "${request.requiredPermission}"`,
           };
         }
-        if (userOverride.overrideType === 'ALLOW') {
-          // Explicit allow override granted
-        }
+        // ALLOW override → continue to store check
       } else {
-        // Step 9: Role Permission Check
+        // Role permission check
         const defaultRolePerms = DEFAULT_ROLE_PERMISSIONS[user.role] || [];
         const hasPermission =
           user.permissions.includes(request.requiredPermission) ||
           user.permissions.includes('ALL_PERMISSIONS') ||
           defaultRolePerms.includes(request.requiredPermission);
-        if (!hasPermission && user.securityLevel < 100) {
+        if (!hasPermission) {
           return {
             allowed: false,
-            reason: `Deny Access: User role missing required permission "${request.requiredPermission}"`,
+            reason: `Deny: Missing permission "${request.requiredPermission}"`,
           };
         }
       }
     }
 
-    // Step 10: Store Isolation Check
+    // Store isolation
     if (request.targetStore && request.targetStore !== 'All Stores') {
       if (user.storeScope !== 'All Stores') {
         const allowedStores = user.allowedStores || [user.storeScope];
         if (!allowedStores.includes(request.targetStore)) {
-          return {
-            allowed: false,
-            reason: `Deny Access: Store Scope Lock prevents access to ${request.targetStore}`,
-          };
+          return { allowed: false, reason: `Deny: No access to store ${request.targetStore}` };
         }
       }
     }
 
-    // Step 11: Target Resource Protection Check (Lower levels cannot modify equal or higher security accounts)
+    // Target user protection
     if (
       request.targetUserSecurityLevel !== undefined &&
       user.securityLevel <= request.targetUserSecurityLevel &&
       user.securityLevel < 100
     ) {
-      return {
-        allowed: false,
-        reason:
-          'Deny Access: Users cannot manage, view, or modify accounts at equal or higher security levels',
-      };
+      return { allowed: false, reason: 'Deny: Cannot manage equal or higher level accounts' };
     }
 
     return { allowed: true };
   }
 
   /**
-   * Filters user accounts server-side to prevent lower levels from discovering Super Admin records
+   * Filters visible users — hides Level 100 from lower levels, enforces store scope.
    */
   static filterVisibleUsers(currentUser: RBACUser, targetUsers: RBACUser[]): RBACUser[] {
     if (currentUser.securityLevel === 100) {
@@ -1066,9 +992,7 @@ export class RBACEngine {
     }
 
     return targetUsers.filter((u) => {
-      // Hide Level 100 Super Admin accounts from lower level users
       if (u.securityLevel === 100) return false;
-      // Filter by store scope if store manager
       if (currentUser.storeScope !== 'All Stores' && u.storeScope !== currentUser.storeScope) {
         const allowedStores = currentUser.allowedStores || [currentUser.storeScope];
         if (!allowedStores.includes(u.storeScope)) return false;
@@ -1078,19 +1002,17 @@ export class RBACEngine {
   }
 
   /**
-   * Resolves permission state for UI toggles: Inherited, Allowed, Denied, Custom Allow, Custom Deny, Protected
+   * Permission state for UI display.
    */
   static getPermissionState(
     user: RBACUser,
     permissionCode: string
   ): 'Protected' | 'Custom Allow' | 'Custom Deny' | 'Allowed' | 'Denied' {
-    // Super Admin accounts always hold full unrestricted root access across all actions
     if (user.role === 'Super Admin' || user.securityLevel === 100) {
       return 'Allowed';
     }
 
-    const isProtected = SUPER_ADMIN_PROTECTED_PERMISSIONS.includes(permissionCode);
-    if (isProtected && user.securityLevel < 100) {
+    if (SUPER_ADMIN_PROTECTED_PERMISSIONS.includes(permissionCode) && user.securityLevel < 100) {
       return 'Protected';
     }
 

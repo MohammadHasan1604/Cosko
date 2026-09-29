@@ -105,7 +105,7 @@ async function runVerification() {
     const res = RBACEngine.authorize(superAdmin, {
       resourceName: `${st} Inventory Data`,
       classification: 'STORE_SCOPED',
-      minSecurityLevel: 60,
+      minSecurityLevel: 40,
       requiredPermission: 'inventory.view',
       targetStore: st,
     });
@@ -206,7 +206,7 @@ async function runVerification() {
   const smAllowedStore = RBACEngine.authorize(storeManager, {
     resourceName: 'BLR Sales',
     classification: 'STORE_SCOPED',
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
     requiredPermission: 'sales.create',
     targetStore: 'BLR',
   });
@@ -216,7 +216,7 @@ async function runVerification() {
   const smBlockedCrossStore = RBACEngine.authorize(storeManager, {
     resourceName: 'HYD Sales',
     classification: 'STORE_SCOPED',
-    minSecurityLevel: 20,
+    minSecurityLevel: 40,
     requiredPermission: 'sales.create',
     targetStore: 'HYD',
   });

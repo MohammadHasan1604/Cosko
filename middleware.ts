@@ -96,9 +96,9 @@ export async function middleware(request: NextRequest) {
   const sessionCookie = request.cookies.get('cosko_session')?.value;
   const isAuth = !!sessionCookie && isValidJWT(sessionCookie);
 
-  // If authenticated and visits login or root, redirect to dashboard
+  // If authenticated and visits login or root, redirect to /sales (default landing)
   if (isAuth && (pathname === '/sign-up-login' || pathname === '/')) {
-    return addSecurityHeaders(NextResponse.redirect(new URL('/dashboard', request.url)));
+    return addSecurityHeaders(NextResponse.redirect(new URL('/sales', request.url)));
   }
 
   // If visiting public path, allow

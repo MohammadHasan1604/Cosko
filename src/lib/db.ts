@@ -19,19 +19,16 @@ const MODELS_WITH_CREATED_AT = new Set([
   'auditLog',
   'storeHub',
   'userAccount',
-  'role',
-  'permission',
-  'userPermissionOverride',
   'category',
   'categoryType',
   'systemSettings',
   'brandingSetting',
-  'legacyDataSourceConfig',
   'financialLedgerEntry',
   'idempotencyRecord',
   'deleteRequest',
   'notification',
-  'workActivityEvent',
+  'attendanceDay',
+  'fileAsset',
 ]);
 
 function createPrismaClient() {

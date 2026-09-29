@@ -4,7 +4,6 @@ async function main() {
   const users = await prisma.userAccount.findMany({
     include: {
       storeAssignments: true,
-      permissionOverrides: true,
     },
   });
 

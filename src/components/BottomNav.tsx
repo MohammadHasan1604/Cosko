@@ -49,17 +49,7 @@ const roleAllowedHrefs: Record<string, string[]> = {
     '/reports',
     '/employees',
   ],
-  'Inventory Manager': [
-    '/dashboard',
-    '/inventory-management',
-    '/categories',
-    '/purchases',
-    '/vendors',
-    '/reports',
-  ],
-  'Sales Executive': ['/dashboard', '/sales', '/customers'],
-  'POS Cashier': ['/sales', '/customers'],
-  'Restricted Employee': ['/dashboard'],
+  'Sales Manager': ['/sales', '/inventory-management', '/customers'],
 };
 
 // Primary bottom nav destinations per role (max ~4 + More)
@@ -76,23 +66,10 @@ const rolePrimaryNav: Record<string, NavDestination[]> = {
     { id: 'bnav-inventory', label: 'Inventory', icon: 'CubeIcon', href: '/inventory-management' },
     { id: 'bnav-reports', label: 'Reports', icon: 'ChartBarIcon', href: '/reports' },
   ],
-  'Inventory Manager': [
-    { id: 'bnav-dashboard', label: 'Home', icon: 'HomeIcon', href: '/dashboard' },
+  'Sales Manager': [
+    { id: 'bnav-sales', label: 'Sales', icon: 'ShoppingCartIcon', href: '/sales' },
     { id: 'bnav-inventory', label: 'Inventory', icon: 'CubeIcon', href: '/inventory-management' },
-    { id: 'bnav-purchases', label: 'Purchases', icon: 'TruckIcon', href: '/purchases' },
-    { id: 'bnav-reports', label: 'Reports', icon: 'ChartBarIcon', href: '/reports' },
-  ],
-  'Sales Executive': [
-    { id: 'bnav-dashboard', label: 'Home', icon: 'HomeIcon', href: '/dashboard' },
-    { id: 'bnav-sales', label: 'Sales', icon: 'ShoppingCartIcon', href: '/sales' },
     { id: 'bnav-customers', label: 'Customers', icon: 'UsersIcon', href: '/customers' },
-  ],
-  'POS Cashier': [
-    { id: 'bnav-sales', label: 'Sales', icon: 'ShoppingCartIcon', href: '/sales' },
-    { id: 'bnav-customers', label: 'Customers', icon: 'UsersIcon', href: '/customers' },
-  ],
-  'Restricted Employee': [
-    { id: 'bnav-dashboard', label: 'Home', icon: 'HomeIcon', href: '/dashboard' },
   ],
 };
 

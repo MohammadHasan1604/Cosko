@@ -49,7 +49,7 @@
     "serve": "next start -p 4028",
     "type-check": "tsc --noEmit",
     "seed": "npx tsx scripts/seed-mysql.ts",
-    "test:security": "npx tsx scripts/run-security-tests.ts",
+    "test:security": "npx tsx --env-file=.env scripts/run-security-tests.ts",
     "test:phase1": "npx tsx tests/phase1-security.test.ts",
     "test:phase2": "npx tsx tests/phase2.test.ts",
     "test:phase3": "npx tsx tests/phase3.test.ts",

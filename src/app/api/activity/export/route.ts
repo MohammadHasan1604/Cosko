@@ -91,12 +91,12 @@ export async function GET(req: NextRequest) {
 
     const userIds = users.map((u) => u.id);
 
-    const dailyRecords = await prisma.userDailyActivity.findMany({
+    const dailyRecords = await prisma.attendanceDay.findMany({
       where: {
         userId: { in: userIds },
-        date: { gte: startDate, lte: endDate },
+        localDate: { gte: startDate, lte: endDate },
       },
-      orderBy: { date: 'desc' },
+      orderBy: { shiftStartUtc: 'desc' },
     });
 
     // Create Audit Log
@@ -134,30 +134,29 @@ export async function GET(req: NextRequest) {
       ],
     ];
 
+    const now = new Date();
     for (const u of users) {
-      const userDaily = dailyRecords.filter((d) => d.userId === u.id);
-      const totalActiveSeconds = userDaily.reduce(
-        (acc, curr) => acc + (curr.activeSeconds || 0),
-        0
-      );
-      const totalIdleSeconds = userDaily.reduce((acc, curr) => acc + (curr.idleSeconds || 0), 0);
-      const workingDays = userDaily.filter((d) => (d.activeSeconds || 0) >= 60).length;
-      const sessionsCount = userDaily.reduce((acc, curr) => acc + (curr.sessionsCount || 0), 0);
+      const userDays = dailyRecords.filter((d) => d.userId === u.id);
+      const totalActiveSeconds = userDays.reduce((acc, curr) => {
+        let dur = curr.totalSeconds;
+        if (curr.status === 'ACTIVE') {
+          dur = Math.max(
+            0,
+            Math.floor((now.getTime() - new Date(curr.shiftStartUtc).getTime()) / 1000)
+          );
+        }
+        return acc + dur;
+      }, 0);
+      const totalIdleSeconds = 0;
+      const workingDays = userDays.length;
+      const sessionsCount = userDays.length;
 
       const firstLogin =
-        userDaily.length > 0
-          ? userDaily.reduce(
-              (earliest, curr) => (curr.firstLogin < earliest ? curr.firstLogin : earliest),
-              userDaily[0].firstLogin
-            )
-          : u.lastLogin;
-
+        userDays.length > 0 ? userDays[userDays.length - 1].shiftStartUtc : u.lastLogin;
       const lastActivity =
-        userDaily.length > 0
-          ? userDaily.reduce(
-              (latest, curr) => (curr.lastActivity > latest ? curr.lastActivity : latest),
-              userDaily[0].lastActivity
-            )
+        userDays.length > 0
+          ? userDays[0].shiftEndUtc ||
+            (userDays[0].status === 'ACTIVE' ? now : userDays[0].shiftStartUtc)
           : u.lastLogin;
 
       rows.push([

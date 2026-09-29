@@ -25,31 +25,22 @@ interface AppLayoutProps {
 
 const superAdminOnly = ['Super Admin'];
 const managerRoles = ['Super Admin', 'Store Manager'];
-const inventoryRoles = ['Super Admin', 'Store Manager', 'Inventory Manager'];
-const cashierRoles = ['Super Admin', 'Store Manager', 'Sales Executive', 'POS Cashier'];
-const allRoles = [
-  'Super Admin',
-  'Store Manager',
-  'Inventory Manager',
-  'Sales Executive',
-  'POS Cashier',
-  'Restricted Employee',
-];
+const allRoles = ['Super Admin', 'Store Manager', 'Sales Manager'];
 
 const routePermissions: Record<string, string[]> = {
-  '/dashboard': allRoles,
-  '/sales': cashierRoles,
-  '/inventory-management': inventoryRoles,
-  '/categories': inventoryRoles,
-  '/purchases': inventoryRoles,
-  '/customers': cashierRoles,
-  '/customers/existing': cashierRoles,
-  '/customers/360': cashierRoles,
-  '/vendors': inventoryRoles,
+  '/dashboard': managerRoles,
+  '/sales': allRoles,
+  '/inventory-management': allRoles,
+  '/categories': managerRoles,
+  '/purchases': managerRoles,
+  '/customers': allRoles,
+  '/customers/existing': allRoles,
+  '/customers/360': allRoles,
+  '/vendors': managerRoles,
   '/expenses': managerRoles,
   '/accounting': managerRoles,
   '/central-profit': superAdminOnly,
-  '/reports': inventoryRoles,
+  '/reports': managerRoles,
   '/employees': managerRoles,
   '/stores': superAdminOnly,
   '/users': superAdminOnly,

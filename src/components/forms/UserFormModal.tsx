@@ -14,23 +14,14 @@ interface UserFormModalProps {
   zIndex?: number;
 }
 
-// 🔒 STRICT RBAC: Super Admin is completely removed from role options.
-// Only exactly ONE protected Super Admin exists in the system.
+// 🔒 STRICT RBAC: Exactly 2 assignable roles. Super Admin is singleton.
 const AVAILABLE_ROLES: Array<{
-  role:
-    | 'Store Manager'
-    | 'Inventory Manager'
-    | 'Sales Executive'
-    | 'POS Cashier'
-    | 'Restricted Employee';
+  role: 'Store Manager' | 'Sales Manager';
   level: number;
   desc: string;
 }> = [
   { role: 'Store Manager', level: 80, desc: 'Full Store Operations, Staff & Inventory Control' },
-  { role: 'Inventory Manager', level: 60, desc: 'Stock Adjustments, Purchases & Catalog Master' },
-  { role: 'Sales Executive', level: 40, desc: 'Customer Consultations & POS Sales Operations' },
-  { role: 'POS Cashier', level: 20, desc: 'Billing, Checkout Registers & Quick Sales' },
-  { role: 'Restricted Employee', level: 10, desc: 'Dashboard view only — restricted access' },
+  { role: 'Sales Manager', level: 40, desc: 'POS Sales, Inventory View & Customer Management' },
 ];
 
 export default function UserFormModal({
@@ -47,18 +38,12 @@ export default function UserFormModal({
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<
-    | 'Store Manager'
-    | 'Inventory Manager'
-    | 'Sales Executive'
-    | 'POS Cashier'
-    | 'Restricted Employee'
-  >('Store Manager');
+  const [role, setRole] = useState<'Store Manager' | 'Sales Manager'>('Store Manager');
   // Single source of truth for store access: assignedStores
   const [assignedStores, setAssignedStores] = useState<string[]>(['BLR']);
   const [storeSearch, setStoreSearch] = useState('');
   const [status, setStatus] = useState<'Active' | 'Inactive' | 'Suspended'>('Active');
-  const [shiftStatus, setShiftStatus] = useState<'On Shift' | 'On Leave'>('On Shift');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEdit = Boolean(user);
@@ -118,7 +103,6 @@ export default function UserFormModal({
               : [callerAccessibleStores[0] || 'BLR'];
         setAssignedStores(initialStores);
         setStatus((user.status as any) || 'Active');
-        setShiftStatus((user.shiftStatus as any) || 'On Shift');
       } else {
         setName('');
         setEmail('');
@@ -129,7 +113,6 @@ export default function UserFormModal({
         const defaultStore = callerAccessibleStores[0] || 'BLR';
         setAssignedStores([defaultStore]);
         setStatus('Active');
-        setShiftStatus('On Shift');
       }
     }
   }, [open, user, callerAccessibleStores]);
@@ -207,7 +190,6 @@ export default function UserFormModal({
           value: `${assignedSummary} (${assignedStores.length} store${assignedStores.length > 1 ? 's' : ''})`,
         },
         { label: 'Account Status', value: status },
-        { label: 'Shift Status', value: shiftStatus },
       ],
       warningMessage: isProtectedSuperAdmin
         ? 'NOTE: Modifying profile details for the protected system Super Admin.'
@@ -226,7 +208,7 @@ export default function UserFormModal({
           email: cleanEmail,
           phone: phone.trim() || undefined,
           status,
-          shiftStatus,
+
           assignedStores: isProtectedSuperAdmin ? undefined : assignedStores,
           allowedStores: isProtectedSuperAdmin ? undefined : assignedStores,
           store: isProtectedSuperAdmin ? 'All Stores' : primaryStore,
@@ -253,7 +235,6 @@ export default function UserFormModal({
               store: isProtectedSuperAdmin ? 'All Stores' : primaryStore,
               allowedStores: assignedStores,
               status,
-              shiftStatus,
             });
           }
           onClose();
@@ -269,7 +250,6 @@ export default function UserFormModal({
           assignedStores,
           allowedStores: assignedStores,
           status,
-          shiftStatus,
         } as any);
 
         if (res?.success !== false) {
@@ -529,8 +509,8 @@ export default function UserFormModal({
           </div>
         </div>
 
-        {/* 5. Account Status & Shift Status */}
-        <div className="grid grid-cols-2 gap-3 p-3 rounded-xl border border-border bg-card">
+        {/* 5. Account Status */}
+        <div className="p-3 rounded-xl border border-border bg-card">
           <div>
             <label className="text-2xs font-semibold text-foreground block mb-1">
               Account Status
@@ -543,20 +523,6 @@ export default function UserFormModal({
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
               <option value="Suspended">Suspended</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-2xs font-semibold text-foreground block mb-1">
-              Shift Status
-            </label>
-            <select
-              value={shiftStatus}
-              onChange={(e) => setShiftStatus(e.target.value as any)}
-              className="input-field text-xs font-medium"
-            >
-              <option value="On Shift">On Shift</option>
-              <option value="On Leave">On Leave</option>
             </select>
           </div>
         </div>

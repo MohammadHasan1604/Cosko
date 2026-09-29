@@ -35,18 +35,12 @@ export interface SessionUser {
   id: string;
   name: string;
   email: string;
-  role:
-    | 'Super Admin'
-    | 'Store Manager'
-    | 'Inventory Manager'
-    | 'Sales Executive'
-    | 'POS Cashier'
-    | 'Restricted Employee';
+  role: 'Super Admin' | 'Store Manager' | 'Sales Manager';
   securityLevel: number;
   store: string;
   allowedStores?: string[];
   avatar: string;
-  shiftStatus: 'On Shift' | 'On Leave';
+  shiftStatus?: 'On Shift' | 'On Leave';
   avatarUrl?: string;
   mustChangePassword?: boolean;
   sessionId?: string; // DB session ID for revocation checks

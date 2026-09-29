@@ -38,11 +38,15 @@ async function main() {
     console.log(`Expense: ${e.expenseNo}, store: ${e.storeCode}, cat: ${e.category}, amount: ${e.amount}, date: ${e.date}`);
   }
 
-  const customers = await prisma.customer.findMany();
+  const customers = await prisma.customer.findMany({
+    include: { storeProfiles: true },
+  });
   console.log('\n=== CUSTOMERS COUNT:', customers.length);
   for (const c of customers) {
-    if (Number(c.creditBalance) > 0 || Number(c.totalSpent) > 0) {
-      console.log(`Customer: ${c.name}, phone: ${c.phone}, creditBalance: ${c.creditBalance}, totalSpent: ${c.totalSpent}`);
+    for (const p of c.storeProfiles) {
+      if (Number(p.creditBalance) > 0 || Number(p.totalSpent) > 0) {
+        console.log(`Customer: ${c.name}, phone: ${c.phone}, store: ${p.storeCode}, creditBalance: ${p.creditBalance}, totalSpent: ${p.totalSpent}`);
+      }
     }
   }
 

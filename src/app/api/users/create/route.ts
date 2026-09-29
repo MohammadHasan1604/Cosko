@@ -7,7 +7,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/authPipeline';
 
 export async function POST(req: NextRequest) {
-  // Verify authentication first
   const auth = await authenticateRequest(req);
   if (!auth.user) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });

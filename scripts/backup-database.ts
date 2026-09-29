@@ -26,11 +26,10 @@ async function backupDatabase() {
       },
       tables: {
         stores: await prisma.storeHub.findMany(),
-        users: await prisma.userAccount.findMany({ select: { id: true, email: true, name: true, phone: true, role: true, securityLevel: true, storeScope: true, status: true, shiftStatus: true, mustChangePassword: true, avatarUrl: true, lastLogin: true, createdAt: true, updatedAt: true } }),
+        users: await prisma.userAccount.findMany({ select: { id: true, email: true, name: true, phone: true, role: true, securityLevel: true, storeScope: true, status: true, mustChangePassword: true, avatarUrl: true, lastLogin: true, createdAt: true, updatedAt: true } }),
         userStoreAssignments: await prisma.userStoreAssignment.findMany(),
-        roles: await prisma.role.findMany(),
-        permissions: await prisma.permission.findMany(),
-        userPermissionOverrides: await prisma.userPermissionOverride.findMany(),
+        userSessions: await prisma.userSession.findMany(),
+        attendanceDays: await prisma.attendanceDay.findMany(),
         categories: await prisma.category.findMany(),
         products: await prisma.product.findMany(),
         inventory: await prisma.inventory.findMany(),
@@ -42,14 +41,14 @@ async function backupDatabase() {
         purchaseOrders: await prisma.purchaseOrder.findMany({ include: { items: true } }),
         purchaseOrderItems: await prisma.purchaseOrderItem.findMany(),
         customers: await prisma.customer.findMany(),
-        customerExternalLinks: await prisma.customerExternalLink.findMany(),
+        customerStoreProfiles: await prisma.customerStoreProfile.findMany(),
         vendors: await prisma.vendor.findMany(),
         expenses: await prisma.expense.findMany(),
         centralExpenses: await prisma.centralExpense.findMany(),
         repairEnquiries: await prisma.repairEnquiry.findMany(),
         auditLogs: await prisma.auditLog.findMany(),
         brandingSettings: await prisma.brandingSetting.findMany(),
-        legacyDataSources: await prisma.legacyDataSourceConfig.findMany(),
+        fileAssets: await prisma.fileAsset.findMany(),
       },
       counts: {} as Record<string, number>,
     };
@@ -72,7 +71,7 @@ async function backupDatabase() {
     console.log('\n===============================================================');
     console.log(`✅ Backup successfully created!`);
     console.log(`📁 File: ${backupFilePath}`);
-    console.log(`📊 Total Records: ${totalRecords} records across 25 tables`);
+    console.log(`📊 Total Records: ${totalRecords} records across tables`);
     console.log(`💾 Size: ${(stats.size / 1024).toFixed(2)} KB`);
     console.log('===============================================================\n');
 

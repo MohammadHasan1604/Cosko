@@ -67,7 +67,6 @@ async function verifyCleanDbState() {
     assert(superAdmin?.securityLevel === 100, 'Security Level is 100');
     assert(superAdmin?.storeScope === 'All Stores', 'Store Scope is "All Stores"');
     assert(superAdmin?.status === 'Active', 'Status is Active');
-    assert(superAdmin?.shiftStatus === 'On Shift', 'Shift Status is On Shift');
     assert(Boolean((superAdmin as any)?.mustChangePassword), 'mustChangePassword flag is Active (Mandatory change on first login)');
     assert((superAdmin?.storeAssignments?.length || 0) === 5, `Assigned to all 5 stores (${superAdmin?.storeAssignments?.length} stores)`);
 
@@ -85,7 +84,6 @@ async function verifyCleanDbState() {
       store: superAdmin!.storeScope,
       allowedStores: ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'],
       avatar: 'SA',
-      shiftStatus: superAdmin!.shiftStatus as any,
       mustChangePassword: true,
     });
 

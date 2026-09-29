@@ -17,7 +17,6 @@ export default function EmployeesPage() {
     addUserAccount,
     updateUserAccount,
     deleteUserAccount,
-    toggleUserShiftStatus,
   } = useApp();
 
   const [addModal, setAddModal] = useState(false);
@@ -121,29 +120,6 @@ export default function EmployeesPage() {
                     {emp.status}
                   </span>
                 </p>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-2xs text-muted-foreground font-semibold">Shift:</span>
-                  <span
-                    className={`text-3xs font-extrabold px-2 py-0.5 rounded-full ${
-                      emp.shiftStatus === 'On Shift'
-                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    {emp.shiftStatus}
-                  </span>
-                </div>
-                <ToggleSwitch
-                  checked={emp.shiftStatus === 'On Shift'}
-                  onChange={() => toggleUserShiftStatus(emp.id)}
-                  size="sm"
-                  onText="ON"
-                  offText="OFF"
-                  title={`Toggle shift status for ${emp.name}`}
-                />
               </div>
             </div>
           ))}

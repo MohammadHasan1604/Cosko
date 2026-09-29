@@ -92,8 +92,7 @@ export async function GET(req: NextRequest) {
         year: 'numeric',
       }),
       assignedTech: r.assignedTech,
-      linkedCoskoSaleNo:
-        (r.customer?.totalOrders || 0) > 0 ? `CS-CUST-${r.customer?.id?.slice(0, 4)}` : null,
+      linkedCoskoSaleNo: null,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
     }));

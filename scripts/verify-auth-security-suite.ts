@@ -77,7 +77,6 @@ async function runAuthSecuritySuite() {
       store: superAdmin!.storeScope,
       allowedStores: ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM'],
       avatar: 'SA',
-      shiftStatus: superAdmin!.shiftStatus as any,
       mustChangePassword: Boolean((superAdmin as any)?.mustChangePassword),
     };
 
@@ -129,11 +128,10 @@ async function runAuthSecuritySuite() {
         name: 'Suspended Auditor',
         email: suspendedEmail,
         passwordHash: suspendedHashed,
-        role: 'Inventory Auditor',
-        securityLevel: 60,
+        role: 'Store Manager',
+        securityLevel: 80,
         storeScope: 'BLR',
         status: 'Suspended', // Suspended account
-        shiftStatus: 'On Leave',
       },
     });
 

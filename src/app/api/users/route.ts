@@ -17,12 +17,10 @@ import {
 } from '@/lib/rbacEngine';
 
 // Whitelist allowed roles and map to security levels — prevent mass assignment
+// Super Admin (100) is a SINGLETON and cannot be created via this API
 const ROLE_LEVEL_MAP: Record<string, number> = {
   'Store Manager': 80,
-  'Inventory Manager': 60,
-  'Sales Executive': 40,
-  'POS Cashier': 20,
-  'Restricted Employee': 10,
+  'Sales Manager': 40,
 };
 
 /**
@@ -64,7 +62,6 @@ export async function GET(req: NextRequest) {
       where: whereClause,
       include: {
         storeAssignments: true,
-        permissionOverrides: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -82,16 +79,10 @@ export async function GET(req: NextRequest) {
         u.storeAssignments?.[0]?.storeCode ||
         (u.role === 'Super Admin' ? 'All Stores' : 'CENTRAL'),
       status: u.status,
-      shiftStatus: u.shiftStatus || 'On Shift',
       assignedStores: u.storeAssignments?.map((a: any) => a.storeCode) || [],
       allowedStores: u.storeAssignments?.map((a: any) => a.storeCode) || [
         u.storeScope || 'CENTRAL',
       ],
-      overrides:
-        u.permissionOverrides?.map((o: any) => ({
-          permissionCode: o.permissionCode,
-          overrideType: o.overrideType,
-        })) || [],
       avatarUrl: u.avatarUrl,
       createdAt: u.createdAt,
       lastLoginAt: u.lastLogin,
@@ -264,30 +255,14 @@ export async function POST(req: NextRequest) {
           securityLevel: targetLevel,
           storeScope: primaryStore,
           status: status || 'Active',
-          shiftStatus: 'On Shift',
           mustChangePassword: true,
-        } as any,
+        },
       });
 
       for (const sCode of targetAssignedStores) {
         await tx.userStoreAssignment.create({
           data: { userId: user.id, storeCode: sCode },
         });
-      }
-
-      // Create permission overrides if provided
-      if (Array.isArray(body.overrides)) {
-        for (const ov of body.overrides) {
-          if (ov.permissionCode && (ov.overrideType === 'ALLOW' || ov.overrideType === 'DENY')) {
-            await tx.userPermissionOverride.create({
-              data: {
-                userId: user.id,
-                permissionCode: ov.permissionCode,
-                overrideType: ov.overrideType,
-              },
-            });
-          }
-        }
       }
 
       return user;
@@ -312,7 +287,6 @@ export async function POST(req: NextRequest) {
       assignedStores: targetAssignedStores,
       allowedStores: targetAssignedStores,
       createdAt: newUser.createdAt,
-      shiftStatus: newUser.shiftStatus,
       mustChangePassword: true,
     };
 
@@ -359,18 +333,8 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const {
-      id,
-      email,
-      name,
-      store,
-      status,
-      password,
-      shiftStatus,
-      allowedStores,
-      assignedStores,
-      overrides,
-    } = body;
+    const { id, email, name, store, status, password, allowedStores, assignedStores, overrides } =
+      body;
 
     if (!id && !email) {
       return NextResponse.json(
@@ -518,7 +482,6 @@ export async function PUT(req: NextRequest) {
       }
     }
     if (status) updateData.status = status;
-    if (shiftStatus) updateData.shiftStatus = shiftStatus;
     if (body.avatarUrl !== undefined || body.avatar !== undefined) {
       const rawAvatar = body.avatarUrl !== undefined ? body.avatarUrl : body.avatar;
       updateData.avatarUrl = await ensureStoredImage(rawAvatar, 'branding', authUser.name);
@@ -579,21 +542,6 @@ export async function PUT(req: NextRequest) {
             create: { userId: user.id, storeCode: sCode },
             update: {},
           });
-        }
-      }
-
-      if (Array.isArray(overrides) && !isSuperAdmin) {
-        await tx.userPermissionOverride.deleteMany({ where: { userId: user.id } });
-        for (const ov of overrides) {
-          if (ov.permissionCode && (ov.overrideType === 'ALLOW' || ov.overrideType === 'DENY')) {
-            await tx.userPermissionOverride.create({
-              data: {
-                userId: user.id,
-                permissionCode: ov.permissionCode,
-                overrideType: ov.overrideType,
-              },
-            });
-          }
         }
       }
 
@@ -757,7 +705,6 @@ export async function DELETE(req: NextRequest) {
 
     // Hard-delete if 0 history
     await prisma.$transaction(async (tx: any) => {
-      await tx.userPermissionOverride.deleteMany({ where: { userId: target.id } });
       await tx.userStoreAssignment.deleteMany({ where: { userId: target.id } });
       await tx.userSession.deleteMany({ where: { userId: target.id } });
       await tx.userAccount.delete({ where: { id: target.id } });

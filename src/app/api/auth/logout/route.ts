@@ -30,22 +30,8 @@ export async function POST(req: NextRequest) {
         });
       } catch {}
     }
-
-    // Close work sessions
-    if (auth.user?.id) {
-      await prisma.userWorkSession.updateMany({
-        where: {
-          userId: auth.user.id,
-          isClosed: false,
-        },
-        data: {
-          isClosed: true,
-          endedAt: new Date(),
-        },
-      });
-    }
   } catch (err) {
-    console.warn('Could not close user work session on logout:', err);
+    console.warn('Error during session revocation:', err);
   }
 
   const response = NextResponse.json({ success: true, message: 'Logged out successfully' });
