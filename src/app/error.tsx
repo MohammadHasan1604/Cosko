@@ -26,8 +26,8 @@ export default function GlobalError({
             <button onClick={() => reset()} className="btn-secondary text-xs font-bold px-4 py-2">
               Try Again
             </button>
-            <Link href="/dashboard" className="btn-primary text-xs font-bold px-4 py-2">
-              Back to Dashboard
+            <Link href="/sales" className="btn-primary text-xs font-bold px-4 py-2">
+              Open Sales & POS
             </Link>
           </div>
         </div>

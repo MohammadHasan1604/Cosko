@@ -48,8 +48,19 @@ export default function PaymentMethodModal({
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editMethodIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetMethodChanging =
+      open && Boolean(paymentMethod?.id) && paymentMethod?.id !== editMethodIdRef.current;
+
+    if (isOpening || isTargetMethodChanging) {
+      prevOpenRef.current = open;
+      editMethodIdRef.current = paymentMethod?.id || null;
+
       if (paymentMethod) {
         setName(paymentMethod.name || '');
         setCode(paymentMethod.code || '');
@@ -73,7 +84,35 @@ export default function PaymentMethodModal({
         setIsActive(true);
       }
     }
-  }, [open, paymentMethod, initialName, paymentMethods.length]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editMethodIdRef.current = null;
+    }
+  }, [open, paymentMethod?.id, initialName]);
+
+  const isDirty = React.useMemo(() => {
+    if (paymentMethod) {
+      return (
+        name !== (paymentMethod.name || '') ||
+        code !== (paymentMethod.code || '') ||
+        description !== (paymentMethod.description || '')
+      );
+    }
+    return Boolean(name || code || description);
+  }, [paymentMethod, name, code, description]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this payment method form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   const handleNameChange = (val: string) => {
     setName(val);
@@ -175,7 +214,7 @@ export default function PaymentMethodModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleSafeClose}
       title={
         isEdit
           ? `Edit Payment Method: ${paymentMethod?.name}`
@@ -287,7 +326,7 @@ export default function PaymentMethodModal({
         <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="btn-secondary text-xs"
             disabled={isSubmitting}
           >

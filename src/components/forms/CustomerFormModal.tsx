@@ -53,8 +53,19 @@ export default function CustomerFormModal({
 
   const isEdit = Boolean(customer);
 
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editCustomerIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetCustomerChanging =
+      open && Boolean(customer?.id) && customer?.id !== editCustomerIdRef.current;
+
+    if (isOpening || isTargetCustomerChanging) {
+      prevOpenRef.current = open;
+      editCustomerIdRef.current = customer?.id || null;
+
       if (customer) {
         setName(customer.name || '');
         setPhone(clean10DigitPhone(customer.phone || ''));
@@ -79,7 +90,36 @@ export default function CustomerFormModal({
         setCreditBalance('');
       }
     }
-  }, [open, customer, initialPhone, initialName]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editCustomerIdRef.current = null;
+    }
+  }, [open, customer?.id, initialPhone, initialName]);
+
+  const isDirty = React.useMemo(() => {
+    if (isEdit) {
+      return (
+        name !== (customer?.name || '') ||
+        clean10DigitPhone(phone) !== clean10DigitPhone(customer?.phone || '') ||
+        email !== (customer?.email || '') ||
+        address !== (customer?.address || '')
+      );
+    }
+    return Boolean(name || phone || email || address || gstin);
+  }, [isEdit, customer, name, phone, email, address, gstin]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this customer form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   if (!open) return null;
 
@@ -200,7 +240,7 @@ export default function CustomerFormModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleSafeClose}
       zIndex={zIndex}
       title={
         isEdit
@@ -348,7 +388,7 @@ export default function CustomerFormModal({
         <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="btn-secondary text-xs"
             disabled={isSubmitting}
           >

@@ -36,8 +36,19 @@ export default function BrandModal({
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editBrandIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetBrandChanging =
+      open && Boolean(brand?.id) && brand?.id !== editBrandIdRef.current;
+
+    if (isOpening || isTargetBrandChanging) {
+      prevOpenRef.current = open;
+      editBrandIdRef.current = brand?.id || null;
+
       if (brand) {
         setName(brand.name || '');
         setCode(brand.code || '');
@@ -57,7 +68,35 @@ export default function BrandModal({
         setIsActive(true);
       }
     }
-  }, [open, brand, initialName]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editBrandIdRef.current = null;
+    }
+  }, [open, brand?.id, initialName]);
+
+  const isDirty = React.useMemo(() => {
+    if (brand) {
+      return (
+        name !== (brand.name || '') ||
+        code !== (brand.code || '') ||
+        description !== (brand.description || '')
+      );
+    }
+    return Boolean(name || code || description);
+  }, [brand, name, code, description]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this brand form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   const handleNameChange = (val: string) => {
     setName(val);
@@ -151,7 +190,7 @@ export default function BrandModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleSafeClose}
       title={
         isEdit
           ? `Edit Brand: ${brand?.name}`
@@ -230,7 +269,7 @@ export default function BrandModal({
         <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="btn-secondary text-xs"
             disabled={isSubmitting}
           >

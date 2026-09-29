@@ -526,7 +526,7 @@ export default function SalesPage() {
       const saleOrder = await addSale({
         customerId: selectedCustomerId !== 'walkin' ? selectedCustomerId : undefined,
         customerName: customerName.trim() || 'Walk-in Customer',
-        customerPhone: customerPhone || '+91 99000 00000',
+        customerPhone: customerPhone ? customerPhone.trim() : '',
         store: effectiveStore,
         items: cart.map((c) => ({
           itemId: c.itemId,

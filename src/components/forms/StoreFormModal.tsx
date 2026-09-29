@@ -34,8 +34,19 @@ export default function StoreFormModal({
 
   const isEdit = Boolean(store);
 
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editStoreIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetStoreChanging =
+      open && Boolean(store?.id) && store?.id !== editStoreIdRef.current;
+
+    if (isOpening || isTargetStoreChanging) {
+      prevOpenRef.current = open;
+      editStoreIdRef.current = store?.id || null;
+
       if (store) {
         setCode(store.code || '');
         setName(store.name || '');
@@ -54,7 +65,38 @@ export default function StoreFormModal({
         setStatus('Active');
       }
     }
-  }, [open, store]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editStoreIdRef.current = null;
+    }
+  }, [open, store?.id]);
+
+  const isDirty = React.useMemo(() => {
+    if (isEdit) {
+      return (
+        code !== (store?.code || '') ||
+        name !== (store?.name || '') ||
+        city !== (store?.city || '') ||
+        address !== (store?.address || '') ||
+        owner !== (store?.owner || store?.manager || '') ||
+        phone !== (store?.phone || '')
+      );
+    }
+    return Boolean(code || name || address || owner || phone);
+  }, [isEdit, store, code, name, city, address, owner, phone]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this store form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   if (!open) return null;
 
@@ -103,10 +145,10 @@ export default function StoreFormModal({
         await updateStoreHub(store.id, {
           name: cleanName,
           city: city.trim() || 'Bengaluru',
-          address: address.trim() || 'Commercial Hub, Main Road',
-          owner: owner.trim() || 'Store Owner',
-          manager: owner.trim() || 'Store Owner',
-          phone: phone.trim() || '+91 99000 99000',
+          address: address.trim() || undefined,
+          owner: owner.trim() || undefined,
+          manager: owner.trim() || undefined,
+          phone: phone.trim() || undefined,
           status,
         });
 
@@ -130,10 +172,10 @@ export default function StoreFormModal({
           code: cleanCode,
           name: cleanName,
           city: city.trim() || 'Bengaluru',
-          address: address.trim() || 'Commercial Hub, Main Road',
-          owner: owner.trim() || 'Store Owner',
-          manager: owner.trim() || 'Store Owner',
-          phone: phone.trim() || '+91 99000 99000',
+          address: address.trim() || '',
+          owner: owner.trim() || '',
+          manager: owner.trim() || '',
+          phone: phone.trim() || '',
           status,
         });
 
@@ -151,7 +193,7 @@ export default function StoreFormModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleSafeClose}
       zIndex={zIndex}
       title={isEdit ? `Edit Store Hub: ${store?.name}` : 'Provision New Store Hub'}
       subtitle={
@@ -243,7 +285,7 @@ export default function StoreFormModal({
             <label className="text-xs font-bold text-foreground block mb-1">Contact Phone</label>
             <input
               type="tel"
-              placeholder="e.g. +91 99000 12345"
+              placeholder="e.g. 9876543210"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="input-field text-xs font-mono"
@@ -275,7 +317,7 @@ export default function StoreFormModal({
         <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="btn-secondary text-xs"
             disabled={isSubmitting}
           >

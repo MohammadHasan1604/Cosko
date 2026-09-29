@@ -102,9 +102,12 @@ export default function StockTransferModal({
     return sourceInventoryItems[0] || null;
   }, [selectedProductId, sourceInventoryItems]);
 
-  // Reset or initialize state when opened
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+
   useEffect(() => {
-    if (open) {
+    if (!prevOpenRef.current && open) {
+      prevOpenRef.current = true;
       const src =
         initialSourceStore || (currentUser.role === 'Super Admin' ? 'CENTRAL' : currentUser.store);
       setSourceStore(src);
@@ -115,7 +118,27 @@ export default function StockTransferModal({
       setTransferQty('');
       setNotes('');
     }
-  }, [open, initialSourceStore, initialDestStore, initialItemId, currentUser, storesList]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+    }
+  }, [open, initialSourceStore, initialDestStore, initialItemId]);
+
+  const isDirty = React.useMemo(() => {
+    return Boolean(transferQty !== '' || notes);
+  }, [transferQty, notes]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this stock transfer. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   // Keep destination valid when source changes
   useEffect(() => {
@@ -233,7 +256,7 @@ export default function StockTransferModal({
     <>
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={handleSafeClose}
         title="Initiate Inter-Store Stock Transfer"
         subtitle="Transfer goods between warehouse hubs and retail branches with automated inventory adjustments"
         size="md"
@@ -405,7 +428,7 @@ export default function StockTransferModal({
           <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleSafeClose}
               className="btn-secondary text-xs"
               disabled={isSubmitting}
             >

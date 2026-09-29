@@ -83,7 +83,7 @@ export default function LoginForm() {
         }
         setLockoutSeconds(0);
 
-        setCurrentUser({ ...result.user, token: result.token });
+        setCurrentUser(result.user);
         addAuditLog(
           'Authentication',
           'User Login',
@@ -259,7 +259,7 @@ export default function LoginForm() {
             </>
           ) : (
             <>
-              <span>Sign In to Dashboard</span>
+              <span>Sign In</span>
               <Icon name="ArrowRightIcon" size={16} />
             </>
           )}

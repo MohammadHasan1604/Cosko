@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         user: authoritativeUser,
         mustChangePassword: authoritativeUser.mustChangePassword,
       },
-      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
     );
   } catch (err: any) {
     console.error('Auth verification error in /api/auth/me:', err);

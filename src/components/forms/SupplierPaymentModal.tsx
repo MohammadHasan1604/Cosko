@@ -47,17 +47,53 @@ export default function SupplierPaymentModal({
     return Math.max(0, Math.round((total - paid - credit) * 100) / 100);
   }, [purchase]);
 
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editPurchaseIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open && purchase) {
-      const initialBal = remaining > 0 ? remaining : '';
-      setPayAmount(initialBal);
-      setPayMethod('Bank Transfer');
-      setPayDate(new Date().toISOString().split('T')[0]);
-      setPayRef('');
-      setPayNotes(`Payment against ${purchase.invoiceNo || purchase.poNo}`);
-      setPayProof(null);
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetPurchaseChanging =
+      open && Boolean(purchase?.id) && purchase?.id !== editPurchaseIdRef.current;
+
+    if (isOpening || isTargetPurchaseChanging) {
+      prevOpenRef.current = open;
+      editPurchaseIdRef.current = purchase?.id || null;
+
+      if (purchase) {
+        const initialBal = remaining > 0 ? remaining : '';
+        setPayAmount(initialBal);
+        setPayMethod('Bank Transfer');
+        setPayDate(new Date().toISOString().split('T')[0]);
+        setPayRef('');
+        setPayNotes(`Payment against ${purchase.invoiceNo || purchase.poNo}`);
+        setPayProof(null);
+      }
     }
-  }, [open, purchase, remaining]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editPurchaseIdRef.current = null;
+    }
+  }, [open, purchase?.id]);
+
+  const isDirty = React.useMemo(() => {
+    return Boolean(
+      payRef || payNotes !== `Payment against ${purchase?.invoiceNo || purchase?.poNo}` || payProof
+    );
+  }, [purchase, payRef, payNotes, payProof]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this payment form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   if (!open || !purchase) return null;
 
@@ -155,7 +191,7 @@ export default function SupplierPaymentModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleSafeClose}
       title="Record Supplier / Bill Payment"
       subtitle={`Bill: ${purchase.invoiceNo || purchase.poNo} · Vendor: ${purchase.vendorName || purchase.vendor}`}
       size="md"
@@ -292,7 +328,7 @@ export default function SupplierPaymentModal({
         <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="btn-secondary text-xs"
             disabled={isSubmitting}
           >

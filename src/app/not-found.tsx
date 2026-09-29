@@ -9,8 +9,8 @@ export default function NotFound() {
       <p className="text-muted-foreground mb-6">
         The requested route does not exist in COSKO System.
       </p>
-      <Link href="/dashboard" className="btn-primary text-xs font-bold px-4 py-2">
-        Return to Dashboard
+      <Link href="/sales" className="btn-primary text-xs font-bold px-4 py-2">
+        Open Sales & POS
       </Link>
     </div>
   );

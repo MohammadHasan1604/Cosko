@@ -113,7 +113,17 @@ export async function POST(req: NextRequest) {
         },
       });
     } else {
-      const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10) || '0000000000';
+      const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
+      if (!cleanPhone) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'A valid 10-digit mobile phone number is required to link external customer records.',
+          },
+          { status: 400 }
+        );
+      }
       link = await prisma.customerExternalLink.create({
         data: {
           externalCustomerId: legacyCustomerId,

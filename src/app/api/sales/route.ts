@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
       },
       async () => {
         // Pre-resolve customerId if missing to keep interactive transaction fast
-        if (!body.customerId && body.customerPhone && body.customerPhone !== '+91 99000 00000') {
+        if (!body.customerId && body.customerPhone && body.customerPhone.trim()) {
           try {
             const existingCust = await prisma.customer.findFirst({
               where: { phone: body.customerPhone },

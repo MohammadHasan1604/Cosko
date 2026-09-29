@@ -80,9 +80,19 @@ export default function CategoryFormModal({
     }));
   }, [categoryTypes]);
 
-  // Sync state when opened or category prop changes
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editCategoryIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetCategoryChanging =
+      open && Boolean(category?.id) && category?.id !== editCategoryIdRef.current;
+
+    if (isOpening || isTargetCategoryChanging) {
+      prevOpenRef.current = open;
+      editCategoryIdRef.current = category?.id || null;
+
       if (category) {
         setName(category.name || '');
         setSlug(category.slug || '');
@@ -111,7 +121,35 @@ export default function CategoryFormModal({
         setIsActive(true);
       }
     }
-  }, [open, category, categoryTypes, categoriesList.length, initialCategoryType, initialName]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editCategoryIdRef.current = null;
+    }
+  }, [open, category?.id, initialCategoryType, initialName]);
+
+  const isDirty = React.useMemo(() => {
+    if (category) {
+      return (
+        name !== (category.name || '') ||
+        slug !== (category.slug || '') ||
+        description !== (category.description || '')
+      );
+    }
+    return Boolean(name || description);
+  }, [category, name, slug, description]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this category form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   // Handle Name change and auto slug generation
   const handleNameChange = (val: string) => {
@@ -219,7 +257,7 @@ export default function CategoryFormModal({
     <>
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={handleSafeClose}
         title={
           isEdit
             ? `Edit ${entityTitle}: ${category?.name}`
@@ -366,7 +404,7 @@ export default function CategoryFormModal({
           <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleSafeClose}
               className="btn-secondary text-xs"
               disabled={isSubmitting}
             >

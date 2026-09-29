@@ -37,8 +37,18 @@ export default function UnitModal({
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editUnitIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetUnitChanging = open && Boolean(unit?.id) && unit?.id !== editUnitIdRef.current;
+
+    if (isOpening || isTargetUnitChanging) {
+      prevOpenRef.current = open;
+      editUnitIdRef.current = unit?.id || null;
+
       if (unit) {
         setName(unit.name || '');
         setCode(unit.code || '');
@@ -60,7 +70,36 @@ export default function UnitModal({
         setIsActive(true);
       }
     }
-  }, [open, unit, initialName]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editUnitIdRef.current = null;
+    }
+  }, [open, unit?.id, initialName]);
+
+  const isDirty = React.useMemo(() => {
+    if (unit) {
+      return (
+        name !== (unit.name || '') ||
+        code !== (unit.code || '') ||
+        symbol !== (unit.symbol || '') ||
+        description !== (unit.description || '')
+      );
+    }
+    return Boolean(name || code || symbol || description);
+  }, [unit, name, code, symbol, description]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this unit form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   const handleNameChange = (val: string) => {
     setName(val);
@@ -159,7 +198,7 @@ export default function UnitModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleSafeClose}
       title={
         isEdit ? `Edit Unit: ${unit?.name}` : quickMode ? '+ Add New Unit' : 'Create Unit Record'
       }
@@ -248,7 +287,7 @@ export default function UnitModal({
         <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="btn-secondary text-xs"
             disabled={isSubmitting}
           >

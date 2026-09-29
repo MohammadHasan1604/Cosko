@@ -137,7 +137,7 @@ export async function middleware(request: NextRequest) {
 
     // For page requests, redirect to login
     const loginUrl = new URL('/sign-up-login', request.url);
-    if (pathname !== '/dashboard') {
+    if (pathname !== '/sales' && pathname !== '/dashboard') {
       loginUrl.searchParams.set('redirect', pathname);
     }
     return addSecurityHeaders(NextResponse.redirect(loginUrl));

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import Icon from '@/components/ui/AppIcon';
 import AppLogo from '@/components/ui/AppLogo';
@@ -32,7 +32,7 @@ export default function UserProfileModal() {
   // Edit Profile Details State
   const fullUser = usersList.find((u) => u.id === currentUser.id);
   const [editName, setEditName] = useState(currentUser.name);
-  const [editPhone, setEditPhone] = useState(fullUser?.phone || '+91 98765 00000');
+  const [editPhone, setEditPhone] = useState(fullUser?.phone || '');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Change Password State
@@ -42,6 +42,23 @@ export default function UserProfileModal() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showCurrentPass, setShowCurrentPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
+
+  const prevOpenRef = React.useRef(false);
+  useEffect(() => {
+    if (!prevOpenRef.current && userProfileOpen) {
+      prevOpenRef.current = true;
+      setEditName(currentUser.name);
+      setEditPhone(fullUser?.phone || '');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowCurrentPass(false);
+      setShowNewPass(false);
+    }
+    if (!userProfileOpen) {
+      prevOpenRef.current = false;
+    }
+  }, [userProfileOpen, currentUser.name, fullUser?.phone]);
 
   if (!userProfileOpen) return null;
 

@@ -98,21 +98,32 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
   let dbSessionId: string;
 
   try {
-    // Primary lookup by token hash
-    let dbSession = await (prisma as any).userSession.findUnique({
-      where: { tokenHash: tokenDigest },
-    });
+    // Lookup DB session by session ID from JWT or token hash
+    let dbSession = jwtResult.sid
+      ? await (prisma as any).userSession.findUnique({
+          where: { id: jwtResult.sid },
+        })
+      : null;
 
-    // Secondary lookup by session ID from JWT (covers re-signed tokens)
-    if (!dbSession && jwtResult.sid) {
+    if (!dbSession) {
       dbSession = await (prisma as any).userSession.findUnique({
-        where: { id: jwtResult.sid },
+        where: { tokenHash: tokenDigest },
       });
     }
 
-    // FAIL CLOSED: No DB session found → reject
+    // FAIL CLOSED: No DB session found -> reject
     if (!dbSession) {
       return { user: null, error: 'Session not found. Please log in again.', status: 401 };
+    }
+
+    // Authoritative check: Token hash must match DB session token_hash
+    if (dbSession.tokenHash !== tokenDigest) {
+      return { user: null, error: 'Session token mismatch. Please log in again.', status: 401 };
+    }
+
+    // Authoritative check: User ID must match
+    if (dbSession.userId !== jwtResult.user.id) {
+      return { user: null, error: 'Session user mismatch. Please log in again.', status: 401 };
     }
 
     // Check revocation

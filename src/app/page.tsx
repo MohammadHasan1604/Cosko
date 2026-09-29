@@ -1,6 +1,5 @@
-import React from 'react';
-import LoginPage from './sign-up-login/page';
+import { redirect } from 'next/navigation';
 
 export default function RootPage() {
-  return <LoginPage />;
+  redirect('/sales');
 }

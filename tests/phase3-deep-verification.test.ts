@@ -469,8 +469,13 @@ export async function runDeepVerification() {
   });
 
   await test('Duplicate start shift on completed day is strictly blocked (409)', async () => {
-    // Check if test user has completed attendance today
-    const dateStr = new Date().toISOString().split('T')[0];
+    // Check if test user has completed attendance today in store timezone (Asia/Kolkata)
+    const dateStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
     const existing = await (prisma as any).attendanceDay.findUnique({
       where: {
         userId_localDate: {

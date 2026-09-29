@@ -1,11 +1,18 @@
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { comparePassword, signSessionToken, isValidAuthOrigin, hashToken } from '@/lib/auth';
+import {
+  comparePassword,
+  signSessionToken,
+  isValidAuthOrigin,
+  hashToken,
+  hashSessionToken,
+} from '@/lib/auth';
 import { checkRateLimit, recordFailedAttempt, clearRateLimit, getClientIp } from '@/lib/rateLimit';
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes temporary lockout
-const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days in seconds
+const SESSION_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
 
 export async function POST(req: NextRequest) {
   // 1. Origin / CSRF validation
@@ -204,44 +211,31 @@ export async function POST(req: NextRequest) {
       mustChangePassword: user.mustChangePassword || false,
     };
 
-    // 9. Create database-backed session record
-    let dbSessionId: string | undefined;
-    const token = signSessionToken(sessionUser);
-    const tokenDigest = hashToken(token);
-    const expiresAt = new Date(Date.now() + SESSION_COOKIE_MAX_AGE * 1000);
+    // 9. Authoritative Session Creation:
+    // Generate session ID -> Sign final JWT containing session ID -> Hash final JWT -> Create DB UserSession in MySQL
+    // ONLY THEN set HttpOnly cookie and return success. NO JWT-only fallback.
+    const sessionId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const finalToken = signSessionToken({ ...sessionUser, sessionId }, sessionId);
+    const finalTokenHash = hashSessionToken(finalToken);
 
     try {
-      const dbSession = await (prisma as any).userSession.create({
+      await (prisma as any).userSession.create({
         data: {
+          id: sessionId,
           userId: user.id,
-          tokenHash: tokenDigest,
+          tokenHash: finalTokenHash,
           expiresAt,
           ipAddress: clientIp,
           userAgent: req.headers.get('user-agent')?.substring(0, 255) || null,
         },
       });
-      dbSessionId = dbSession.id;
-    } catch (sessionErr) {
-      console.warn(
-        'Could not create DB session record (session will still work via JWT):',
-        sessionErr
+    } catch (sessionErr: any) {
+      console.error('[Auth] CRITICAL: Failed to create database UserSession:', sessionErr);
+      return NextResponse.json(
+        { error: 'Authentication service temporarily unavailable. Please try again.' },
+        { status: 503 }
       );
-    }
-
-    // Re-sign with session ID if we got one
-    const finalToken = dbSessionId
-      ? signSessionToken({ ...sessionUser, sessionId: dbSessionId }, dbSessionId)
-      : token;
-    const finalTokenHash = dbSessionId ? hashToken(finalToken) : tokenDigest;
-
-    // Update the token hash if we re-signed
-    if (dbSessionId && finalTokenHash !== tokenDigest) {
-      try {
-        await (prisma as any).userSession.update({
-          where: { id: dbSessionId },
-          data: { tokenHash: finalTokenHash },
-        });
-      } catch {}
     }
 
     // 10. Return response — token is ONLY in the HttpOnly cookie, NOT in the response body

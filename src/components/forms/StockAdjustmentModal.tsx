@@ -72,17 +72,44 @@ export default function StockAdjustmentModal({
   const adjustmentType = watch('adjustmentType');
   const quantity = watch('quantity');
 
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editItemIdRef = React.useRef<string | null>(null);
+
   React.useEffect(() => {
-    if (open && item) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetItemChanging = open && Boolean(item?.id) && item?.id !== editItemIdRef.current;
+
+    if (isOpening || isTargetItemChanging) {
+      prevOpenRef.current = open;
+      editItemIdRef.current = item?.id || null;
       reset({
         adjustmentType: 'add',
         quantity: '',
         reason: '',
         notes: '',
-        store: item.store,
+        store: item?.store || '',
       });
     }
-  }, [open, item, reset]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editItemIdRef.current = null;
+    }
+  }, [open, item?.id, reset]);
+
+  const isDirty = Boolean(quantity !== '' || watch('notes'));
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this stock adjustment form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   if (!open || !item) return null;
 
@@ -139,7 +166,7 @@ export default function StockAdjustmentModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleSafeClose}
       title="Authoritative Stock Adjustment"
       subtitle={`${item.sku} · ${item.name} · Location: ${item.store}`}
       size="md"
@@ -272,7 +299,7 @@ export default function StockAdjustmentModal({
         <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="btn-secondary text-xs"
             disabled={isSubmitting}
           >

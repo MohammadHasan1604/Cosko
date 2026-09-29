@@ -44,6 +44,7 @@ export default function UserFormModal({
   const [storeSearch, setStoreSearch] = useState('');
   const [status, setStatus] = useState<'Active' | 'Inactive' | 'Suspended'>('Active');
 
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEdit = Boolean(user);
@@ -94,9 +95,22 @@ export default function UserFormModal({
     );
   }, [availableStoreHubs, storeSearch]);
 
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  // Initialize ONLY on closed -> open transition or when target user?.id intentionally changes.
+  // Never re-initialize due to background sync, storesList refetch, or parent rerenders.
+  const prevOpenRef = React.useRef(false);
+  const editUserIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetUserChanging = open && Boolean(user?.id) && user?.id !== editUserIdRef.current;
+
+    if (isOpening || isTargetUserChanging) {
+      prevOpenRef.current = open;
+      editUserIdRef.current = user?.id || null;
+      setSubmitError(null);
       setStoreSearch('');
+
       if (user) {
         setName(user.name || '');
         setEmail(user.email || '');
@@ -136,7 +150,38 @@ export default function UserFormModal({
         setStatus('Active');
       }
     }
-  }, [open, user, callerAccessibleStores, isCallerSuperAdmin, currentUser.store, permittedRoles]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editUserIdRef.current = null;
+    }
+  }, [open, user?.id]);
+
+  // Dirty form protection
+  const isDirty = useMemo(() => {
+    if (isEdit) {
+      return (
+        name !== (user?.name || '') ||
+        email !== (user?.email || '') ||
+        phone !== (user?.phone || '') ||
+        password !== ''
+      );
+    }
+    return Boolean(name || email || phone || password);
+  }, [isEdit, user, name, email, phone, password]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    setSubmitError(null);
+    onClose();
+  };
 
   // Rule 11: Sales Manager must not access user creation
   if (!open || currentUser.role === 'Sales Manager') return null;
@@ -221,6 +266,7 @@ export default function UserFormModal({
     if (!confirmed) return;
 
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       const primaryStore = assignedStores[0] || 'BLR';
 
@@ -245,7 +291,7 @@ export default function UserFormModal({
         }
 
         const res = await updateUserAccount(user.id, updatePayload);
-        if (res?.success !== false) {
+        if (res?.success !== false && !res?.error) {
           toast.success(`Team member "${cleanName}" updated successfully!`);
           if (onSuccess) {
             onSuccess({
@@ -260,13 +306,18 @@ export default function UserFormModal({
             });
           }
           onClose();
+        } else {
+          const errMsg =
+            res?.error || res?.message || 'Failed to update team member. Please retry.';
+          setSubmitError(errMsg);
+          toast.error(errMsg);
         }
       } else {
         const res = await addUserAccount({
           name: cleanName,
           email: cleanEmail,
           password,
-          phone: phone.trim() || '+91 99000 12345',
+          phone: phone.trim() || undefined,
           role,
           store: primaryStore,
           assignedStores,
@@ -274,14 +325,23 @@ export default function UserFormModal({
           status,
         } as any);
 
-        if (res?.success !== false) {
+        if (res?.success && !res?.error) {
           toast.success(`Team member "${cleanName}" registered successfully!`);
           if (onSuccess && res) onSuccess((res as any).user || res);
           onClose();
+        } else {
+          const errMsg =
+            res?.error ||
+            res?.message ||
+            'Failed to register team member. Please verify fields and retry.';
+          setSubmitError(errMsg);
+          toast.error(errMsg);
         }
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save team member');
+      const errMsg = err?.message || 'Failed to save team member';
+      setSubmitError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -290,7 +350,7 @@ export default function UserFormModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleSafeClose}
       title={isEdit ? `Edit Team Member: ${user?.name}` : 'Register New Team Member'}
       subtitle={
         isEdit
@@ -301,6 +361,23 @@ export default function UserFormModal({
       zIndex={zIndex}
     >
       <form onSubmit={handleSubmit} className="space-y-4 py-2">
+        {/* Error Alert Banner with Retry Guidance */}
+        {submitError && (
+          <div className="p-3 rounded-xl bg-danger/10 border border-danger/30 text-danger text-xs flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Icon name="ExclamationTriangleIcon" size={16} className="flex-shrink-0" />
+              <span>{submitError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSubmitError(null)}
+              className="text-xs text-danger/80 hover:text-danger font-semibold cursor-pointer underline flex-shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* Protected Super Admin Notice Banner */}
         {isProtectedSuperAdmin && (
           <div className="p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger flex items-center justify-between">
@@ -357,7 +434,7 @@ export default function UserFormModal({
             <label className="text-xs font-bold text-foreground block mb-1">Contact Phone</label>
             <input
               type="tel"
-              placeholder="+91 99000 12345"
+              placeholder="e.g. 9876543210"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="input-field text-xs font-mono"
@@ -567,7 +644,7 @@ export default function UserFormModal({
         <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="btn-secondary text-xs"
             disabled={isSubmitting}
           >

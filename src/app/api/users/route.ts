@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { prisma, executeTransaction } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 import {
   authenticateRequest,
@@ -174,6 +174,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 🔒 Store Manager: can create Sales Manager only.
+    if (authUser.role === 'Store Manager' && requestedRole !== 'Sales Manager') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Forbidden: Store Manager can only create Sales Manager accounts.',
+        },
+        { status: 403 }
+      );
+    }
+
     const cleanEmail = email.toLowerCase().trim();
 
     const existing = await prisma.userAccount.findUnique({
@@ -187,37 +198,56 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Resolve assigned stores
-    const rawStores: string[] =
-      Array.isArray(body.assignedStores) && body.assignedStores.length > 0
-        ? body.assignedStores
-        : Array.isArray(body.allowedStores) && body.allowedStores.length > 0
-          ? body.allowedStores
-          : [store || 'BLR'];
-
-    const validHubs = await prisma.storeHub.findMany({ select: { code: true } });
-    const validCodes = new Set(validHubs.map((s) => s.code));
-    const targetAssignedStores = rawStores.filter((c: string) => validCodes.has(c));
-
-    if (targetAssignedStores.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'User must be assigned to at least one valid store' },
-        { status: 400 }
-      );
-    }
-
-    // 🔒 Non-Super-Admin callers can only assign stores they have access to
+    // 🔒 Store Scope Validation: Non-Super Admin cannot assign stores outside their own scope
     if (authUser.role !== 'Super Admin') {
-      const callerAllowed =
-        authUser.allowedStores.length > 0 ? authUser.allowedStores : [authUser.store];
-      const hasInvalidAssignment = targetAssignedStores.some((s) => !callerAllowed.includes(s));
-      if (hasInvalidAssignment) {
+      const requestedStores: string[] =
+        Array.isArray(body.assignedStores) && body.assignedStores.length > 0
+          ? body.assignedStores
+          : Array.isArray(body.allowedStores) && body.allowedStores.length > 0
+            ? body.allowedStores
+            : body.store
+              ? [body.store]
+              : [];
+
+      const hasUnauthorizedStore = requestedStores.some(
+        (s: string) => !authUser.allowedStores.includes(s) && authUser.store !== s
+      );
+
+      if (hasUnauthorizedStore) {
         return NextResponse.json(
           {
             success: false,
-            error: 'Forbidden: You can only assign users to stores you are authorized for',
+            error: 'Forbidden: You can only assign stores you are authorized for',
           },
           { status: 403 }
+        );
+      }
+    }
+
+    // Resolve assigned stores: Store Manager is automatically forced to their own store
+    let targetAssignedStores: string[];
+    if (authUser.role === 'Store Manager') {
+      const managerStore =
+        authUser.store && authUser.store !== 'All Stores'
+          ? authUser.store
+          : authUser.allowedStores[0] || 'BLR';
+      targetAssignedStores = [managerStore];
+    } else {
+      const rawStores: string[] =
+        Array.isArray(body.assignedStores) && body.assignedStores.length > 0
+          ? body.assignedStores
+          : Array.isArray(body.allowedStores) && body.allowedStores.length > 0
+            ? body.allowedStores
+            : [store || 'BLR'];
+
+      const validHubs = await prisma.storeHub.findMany({ select: { code: true } });
+      const validCodes = new Set(validHubs.map((s) => s.code));
+      targetAssignedStores = rawStores.filter((c: string) => validCodes.has(c));
+
+      if (targetAssignedStores.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'User must be assigned to at least one valid store' },
+          { status: 400 }
         );
       }
     }
@@ -243,14 +273,16 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await hashPassword(password);
     const primaryStore = targetAssignedStores[0];
+    const cleanPhone = phone ? String(phone).trim() : null;
 
-    const newUser = await prisma.$transaction(async (tx) => {
-      const user = await (tx.userAccount as any).create({
+    // Requirement 10: Atomic single database transaction
+    const newUser = await executeTransaction(async (tx: any) => {
+      const user = await tx.userAccount.create({
         data: {
           email: cleanEmail,
           passwordHash: hashedPassword,
           name: name.trim(),
-          phone: phone || null,
+          phone: cleanPhone || null,
           role: requestedRole,
           securityLevel: targetLevel,
           storeScope: primaryStore,
@@ -265,16 +297,20 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      await tx.auditLog.create({
+        data: {
+          module: 'Users',
+          action: 'User Created',
+          details: `Created user "${user.name}" (${user.email}) with role ${requestedRole} at stores [${targetAssignedStores.join(', ')}]`,
+          userId: authUser.id,
+          userEmail: authUser.email,
+          userRole: authUser.role,
+          storeCode: primaryStore,
+        },
+      });
+
       return user;
     });
-
-    // Audit log
-    await createAuditLog(
-      authUser,
-      'Users',
-      'User Created',
-      `Created user "${newUser.name}" (${newUser.email}) with role ${requestedRole} at stores [${targetAssignedStores.join(', ')}]`
-    );
 
     const sanitizedUser = {
       id: newUser.id,

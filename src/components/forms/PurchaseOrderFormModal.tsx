@@ -162,9 +162,19 @@ export default function PurchaseOrderFormModal({
     lineTotal: 0,
   });
 
-  // Initialize or reset form when modal opens
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editPurchaseIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetPurchaseChanging =
+      open && Boolean(purchase?.id) && purchase?.id !== editPurchaseIdRef.current;
+
+    if (isOpening || isTargetPurchaseChanging) {
+      prevOpenRef.current = open;
+      editPurchaseIdRef.current = purchase?.id || null;
+
       if (purchase) {
         setVendorName(purchase.vendorName || '');
         setStore(purchase.store || 'CENTRAL');
@@ -248,7 +258,40 @@ export default function PurchaseOrderFormModal({
         setItems([createEmptyLineItem()]);
       }
     }
-  }, [open, purchase, vendors]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editPurchaseIdRef.current = null;
+    }
+  }, [open, purchase?.id]);
+
+  const isDirty = React.useMemo(() => {
+    if (purchase) {
+      return (
+        vendorName !== (purchase.vendorName || '') ||
+        invoiceNo !== (purchase.invoiceNo || '') ||
+        notes !== (purchase.notes || '')
+      );
+    }
+    return Boolean(
+      invoiceNo ||
+      notes ||
+      items.length > 1 ||
+      Boolean(items[0] && (items[0].productId || items[0].name || items[0].unitCost !== ''))
+    );
+  }, [purchase, vendorName, invoiceNo, notes, items]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this purchase order form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   // Live Financial Summaries
   const financials = useMemo(() => {
@@ -660,7 +703,7 @@ export default function PurchaseOrderFormModal({
     <>
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={handleSafeClose}
         title={isEdit ? `Edit Purchase Order: ${purchase?.poNo}` : 'Create Purchase Order (PO)'}
         subtitle="Procure multi-product stock replenishment with live taxes, discounts, and inventory receiving"
         size="xl"
@@ -1337,7 +1380,7 @@ export default function PurchaseOrderFormModal({
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleSafeClose}
               className="btn-secondary text-xs"
               disabled={isSubmitting}
             >

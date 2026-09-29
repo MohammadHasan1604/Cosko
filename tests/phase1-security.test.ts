@@ -347,6 +347,101 @@ for (const route of criticalRoutes) {
 }
 
 // ═══════════════════════════════════════════════════
+// 11. FAIL-CLOSED DB SESSIONS & FORM DRAFT PROTECTION
+// ═══════════════════════════════════════════════════
+console.log('\n🔒 11. Fail-Closed Sessions, Form Draft Protection & Data Hygiene');
+
+test('Login uses single final token model with sid', () => {
+  const loginContent = readFile('src/app/api/auth/login/route.ts');
+  const authContent = readFile('src/lib/auth.ts');
+  return (
+    loginContent.includes('sessionId') &&
+    loginContent.includes('hashSessionToken(finalToken)') &&
+    authContent.includes('sid: sessionId')
+  );
+});
+
+test('Login fails closed on DB session creation failure (503 and NO cookie)', () => {
+  const content = readFile('src/app/api/auth/login/route.ts');
+  return (
+    content.includes('status: 503') &&
+    !content.includes('session will still work via JWT') &&
+    content.includes('Authentication service temporarily unavailable')
+  );
+});
+
+test('/api/auth/me uses authoritative authPipeline with tokenHash check', () => {
+  const content = readFile('src/app/api/auth/me/route.ts');
+  return content.includes('authenticateRequest') && content.includes('authoritativeUser');
+});
+
+test('Login landing redirects to /sales and uses "Sign In" button', () => {
+  const loginForm = readFile('src/app/sign-up-login/components/LoginForm.tsx');
+  const appPage = readFile('src/app/page.tsx');
+  return (
+    loginForm.includes("router.push('/sales')") &&
+    loginForm.includes('Sign In') &&
+    !loginForm.includes('Sign In to Dashboard') &&
+    appPage.includes("redirect('/sales')")
+  );
+});
+
+test('UserFormModal uses stable initialization and draft protection', () => {
+  const content = readFile('src/components/forms/UserFormModal.tsx');
+  return (
+    content.includes('prevOpenRef') &&
+    content.includes('editUserIdRef') &&
+    content.includes('handleSafeClose') &&
+    !content.includes('+91 99000 12345')
+  );
+});
+
+test('Fake phone numbers completely removed from forms and APIs', () => {
+  const userModal = readFile('src/components/forms/UserFormModal.tsx');
+  const storeModal = readFile('src/components/forms/StoreFormModal.tsx');
+  const vendorModal = readFile('src/components/forms/VendorFormModal.tsx');
+  const userProfile = readFile('src/components/UserProfileModal.tsx');
+  const vendorApi = readFile('src/app/api/vendors/route.ts');
+  const salesPage = readFile('src/app/sales/page.tsx');
+
+  if (userModal.includes('+91 99000 12345')) return 'UserFormModal contains +91 99000 12345';
+  if (storeModal.includes('+91 99000 99000')) return 'StoreFormModal contains +91 99000 99000';
+  if (vendorModal.includes('+91 98000 00000')) return 'VendorFormModal contains +91 98000 00000';
+  if (userProfile.includes('+91 98765 00000')) return 'UserProfileModal contains +91 98765 00000';
+  if (vendorApi.includes('+91 00000 00000')) return 'Vendor API contains +91 00000 00000';
+  if (salesPage.includes('+91 99000 00000')) return 'Sales page contains +91 99000 00000';
+  return true;
+});
+
+test('Store Manager can create Sales Manager only and forced to own store', () => {
+  const content = readFile('src/app/api/users/route.ts');
+  return (
+    content.includes("authUser.role === 'Store Manager'") &&
+    content.includes("requestedRole !== 'Sales Manager'") &&
+    (content.includes('targetAssignedStores = [managerStore]') ||
+      content.includes('targetAssignedStores = authUser.allowedStores'))
+  );
+});
+
+test('User creation uses atomic database transaction', () => {
+  const content = readFile('src/app/api/users/route.ts');
+  return (
+    content.includes('executeTransaction') &&
+    content.includes('tx.userAccount.create') &&
+    content.includes('tx.userStoreAssignment.create') &&
+    content.includes('tx.auditLog.create')
+  );
+});
+
+test('30-day session expiry matches between cookie and DB UserSession', () => {
+  const content = readFile('src/app/api/auth/login/route.ts');
+  return (
+    content.includes('30 * 24 * 60 * 60 * 1000') &&
+    content.includes('maxAge: SESSION_COOKIE_MAX_AGE')
+  );
+});
+
+// ═══════════════════════════════════════════════════
 // SUMMARY
 // ═══════════════════════════════════════════════════
 console.log('\n' + '═'.repeat(50));
@@ -358,3 +453,4 @@ if (failed > 0) {
 console.log('═'.repeat(50) + '\n');
 
 process.exit(failed > 0 ? 1 : 0);
+

@@ -56,8 +56,19 @@ export default function VendorFormModal({
       }));
   }, [categoriesList]);
 
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editVendorIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetVendorChanging =
+      open && Boolean(vendor?.id) && vendor?.id !== editVendorIdRef.current;
+
+    if (isOpening || isTargetVendorChanging) {
+      prevOpenRef.current = open;
+      editVendorIdRef.current = vendor?.id || null;
+
       if (vendor) {
         setName(vendor.name || '');
         setContactPerson(vendor.contactPerson || '');
@@ -78,13 +89,42 @@ export default function VendorFormModal({
         setPhone('');
         setEmail('');
         setGstin('');
-        setCategory(categoryOptions[0]?.value || '');
+        setCategory(categoryOptions[0]?.value || 'General Hardware');
         setAddress('');
         setPaymentTerms('Net 30');
         setLeadTimeDays('');
       }
     }
-  }, [open, vendor, categoryOptions]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editVendorIdRef.current = null;
+    }
+  }, [open, vendor?.id]);
+
+  const isDirty = useMemo(() => {
+    if (isEdit) {
+      return (
+        name !== (vendor?.name || '') ||
+        phone !== (vendor?.phone || '') ||
+        email !== (vendor?.email || '') ||
+        contactPerson !== (vendor?.contactPerson || '')
+      );
+    }
+    return Boolean(name || contactPerson || phone || email || gstin || address);
+  }, [isEdit, vendor, name, phone, email, contactPerson, gstin, address]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this vendor form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   if (!open) return null;
 
@@ -132,9 +172,8 @@ export default function VendorFormModal({
         await updateVendor(vendor.id, {
           name: cleanName,
           contactPerson: contactPerson.trim() || 'Account Manager',
-          email:
-            email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
-          phone: phone.trim() || '+91 98000 00000',
+          email: email.trim() || undefined,
+          phone: phone.trim() || '',
           gstin: cleanGstin || undefined,
           category: category.trim() || 'General Hardware',
           address: address.trim() || undefined,
@@ -152,9 +191,8 @@ export default function VendorFormModal({
         const created = await addVendor({
           name: cleanName,
           contactPerson: contactPerson.trim() || 'Account Manager',
-          email:
-            email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
-          phone: phone.trim() || '+91 98000 00000',
+          email: email.trim() || '',
+          phone: phone.trim() || '',
           gstin: cleanGstin || undefined,
           category: category.trim() || 'General Hardware',
           address: address.trim() || undefined,
@@ -182,7 +220,7 @@ export default function VendorFormModal({
     <>
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={handleSafeClose}
         title={
           isEdit
             ? `Edit Supplier: ${vendor?.name}`
@@ -333,7 +371,7 @@ export default function VendorFormModal({
           <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleSafeClose}
               className="btn-secondary text-xs"
               disabled={isSubmitting}
             >

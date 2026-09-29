@@ -120,8 +120,19 @@ export default function ProductFormModal({
     status: 'active' as const,
   });
 
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editItemIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetItemChanging =
+      open && Boolean(editItem?.id) && editItem?.id !== editItemIdRef.current;
+
+    if (isOpening || isTargetItemChanging) {
+      prevOpenRef.current = open;
+      editItemIdRef.current = editItem?.id || null;
+
       if (editItem) {
         setFormData({
           sku: editItem.sku || '',
@@ -204,7 +215,42 @@ export default function ProductFormModal({
         setPrimaryImage('');
       }
     }
-  }, [editItem, open]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editItemIdRef.current = null;
+    }
+  }, [open, editItem?.id]);
+
+  const isDirty = React.useMemo(() => {
+    if (editItem) {
+      return (
+        formData.name !== (editItem.name || '') ||
+        formData.sku !== (editItem.sku || '') ||
+        formData.costPrice !== (editItem.costPrice || '') ||
+        formData.sellingPrice !== (editItem.sellingPrice || '')
+      );
+    }
+    return Boolean(
+      formData.name ||
+      formData.sku ||
+      formData.barcode ||
+      Boolean(formData.costPrice) ||
+      Boolean(formData.sellingPrice)
+    );
+  }, [editItem, formData]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this product form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   if (!open) return null;
 
@@ -415,7 +461,7 @@ export default function ProductFormModal({
     <>
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={handleSafeClose}
         title={editItem ? `Edit Product: ${editItem.name}` : 'Create New Product Record'}
         subtitle={
           editItem
@@ -804,7 +850,7 @@ export default function ProductFormModal({
           <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleSafeClose}
               className="btn-secondary text-xs"
               disabled={isSubmitting}
             >

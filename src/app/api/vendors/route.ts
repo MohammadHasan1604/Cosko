@@ -186,10 +186,8 @@ export async function POST(req: NextRequest) {
             code,
             name: body.name.trim(),
             contactPerson: body.contactPerson?.trim() || 'Account Manager',
-            email:
-              body.email?.trim() ||
-              `${body.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@vendor.com`,
-            phone: body.phone?.trim() || '+91 00000 00000',
+            email: body.email?.trim() || '',
+            phone: body.phone?.trim() || '',
             city: body.city?.trim() || 'Central',
             address: body.address?.trim() || null,
             categories: body.categories?.trim() || body.category?.trim() || 'General',

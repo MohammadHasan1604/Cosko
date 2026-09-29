@@ -105,9 +105,19 @@ export default function ExpenseFormModal({
     ];
   }, [storesList]);
 
-  // Prefill state
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  const editExpenseIdRef = React.useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const isOpening = !prevOpenRef.current && open;
+    const isTargetExpenseChanging =
+      open && Boolean(expense?.id) && expense?.id !== editExpenseIdRef.current;
+
+    if (isOpening || isTargetExpenseChanging) {
+      prevOpenRef.current = open;
+      editExpenseIdRef.current = expense?.id || null;
+
       if (expense) {
         setCategory(expense.category || 'Store Rent');
         setStore(expense.store || 'CENTRAL');
@@ -129,7 +139,35 @@ export default function ExpenseFormModal({
         setReceiptUrl(null);
       }
     }
-  }, [open, expense, selectedStore, expenseCategoryOptions]);
+
+    if (!open) {
+      prevOpenRef.current = false;
+      editExpenseIdRef.current = null;
+    }
+  }, [open, expense?.id]);
+
+  const isDirty = React.useMemo(() => {
+    if (expense) {
+      return (
+        description !== (expense.description || '') ||
+        amount !== (expense.amount !== undefined ? Number(expense.amount) : '') ||
+        referenceNo !== (expense.referenceNo || '')
+      );
+    }
+    return Boolean(description || amount !== '' || referenceNo || receiptUrl);
+  }, [expense, description, amount, referenceNo, receiptUrl]);
+
+  const handleSafeClose = () => {
+    if (isDirty && !isSubmitting) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm('You have unsaved changes in this expense form. Discard them?')
+      ) {
+        return;
+      }
+    }
+    onClose();
+  };
 
   if (!open) return null;
 
@@ -242,7 +280,7 @@ export default function ExpenseFormModal({
     <>
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={handleSafeClose}
         title={
           isEdit ? `Edit Expense (${expense?.referenceNo || ''})` : 'Record Operational Expense'
         }
@@ -357,7 +395,7 @@ export default function ExpenseFormModal({
           <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleSafeClose}
               className="btn-secondary text-xs"
               disabled={isSubmitting}
             >
