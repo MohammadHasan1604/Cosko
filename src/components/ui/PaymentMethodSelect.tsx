@@ -1,10 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { useApp } from '@/context/AppContext';
+import React, { useMemo } from 'react';
 import CustomSelect, { SelectOption } from '@/components/ui/CustomSelect';
-import PaymentMethodModal from '@/components/forms/PaymentMethodModal';
-import Icon from '@/components/ui/AppIcon';
 
 export interface PaymentMethodSelectProps {
   value: string;
@@ -21,6 +18,13 @@ export interface PaymentMethodSelectProps {
   modalZIndex?: number;
 }
 
+// Requirement 12: Across POS and other applicable payment forms show exactly: Cash, UPI, Other
+const EXACT_PAYMENT_METHODS = [
+  { name: 'Cash', label: 'Cash', sublabel: 'Cash Currency Payment', badge: 'Cash' },
+  { name: 'UPI', label: 'UPI', sublabel: 'UPI QR / Digital Payment', badge: 'Digital' },
+  { name: 'Other', label: 'Other', sublabel: 'Other Payment Method', badge: 'Other' },
+];
+
 export default function PaymentMethodSelect({
   value,
   onChange,
@@ -30,93 +34,53 @@ export default function PaymentMethodSelect({
   placeholder = 'Select Payment Method',
   searchPlaceholder = 'Search payment methods...',
   layout = 'dropdown',
-  allowAddNew = true,
   size = 'md',
   className = '',
-  modalZIndex = 1100,
 }: PaymentMethodSelectProps) {
-  const { paymentMethods } = useApp();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [initialSearchTerm, setInitialSearchTerm] = useState('');
-
-  // Generate dynamic options from master list
-  const { activeMethods, selectOptions } = useMemo(() => {
-    // Sort active methods by sortOrder ascending, then name
-    const active = paymentMethods
-      .filter((pm) => pm.status === 'Active')
-      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
-
-    const options: SelectOption[] = active.map((pm) => ({
+  // Generate options for the exact 3 payment methods
+  const selectOptions: SelectOption[] = useMemo(() => {
+    const list: SelectOption[] = EXACT_PAYMENT_METHODS.map((pm) => ({
       value: pm.name,
-      label: pm.name,
-      sublabel: pm.description || `${pm.type} Instrument`,
-      badge: pm.type,
+      label: pm.label,
+      sublabel: pm.sublabel,
+      badge: pm.badge,
     }));
 
-    // Data Integrity: If current value is set but inactive or not in active methods, preserve it!
-    if (value && !active.some((pm) => pm.name.toLowerCase() === value.toLowerCase())) {
-      const existingInactive = paymentMethods.find(
-        (pm) => pm.name.toLowerCase() === value.toLowerCase()
-      );
-      options.unshift({
+    // Data Integrity: If current value is historical/different (e.g. Card, Net Banking), preserve it!
+    if (value && !list.some((pm) => pm.value.toLowerCase() === value.toLowerCase())) {
+      list.unshift({
         value,
         label: value,
-        sublabel: existingInactive?.description || 'Historical Instrument',
-        badge: 'Inactive',
+        sublabel: 'Historical Instrument',
+        badge: 'Historical',
       });
     }
 
-    return { activeMethods: active, selectOptions: options };
-  }, [paymentMethods, value]);
-
-  const handleOpenAddModal = (term?: string) => {
-    setInitialSearchTerm(term || '');
-    setModalOpen(true);
-  };
-
-  const handleModalSuccess = (newMethodName: string) => {
-    onChange(newMethodName);
-    setModalOpen(false);
-  };
+    return list;
+  }, [value]);
 
   if (layout === 'pills') {
-    // Pill layout for high-speed POS checkout
-    const hasInactiveSelected =
-      value && !activeMethods.some((pm) => pm.name.toLowerCase() === value.toLowerCase());
-
     return (
       <div className={`space-y-1.5 ${className}`}>
         {label && (
-          <div className="flex items-center justify-between">
-            <label className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">
-              {label} {required && <span className="text-danger">*</span>}
-            </label>
-            {allowAddNew && !disabled && (
-              <button
-                type="button"
-                onClick={() => handleOpenAddModal()}
-                className="text-3xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <Icon name="PlusIcon" size={11} />
-                <span>+ Add New</span>
-              </button>
-            )}
-          </div>
+          <label className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block">
+            {label} {required && <span className="text-danger">*</span>}
+          </label>
         )}
 
-        <div className="flex flex-wrap gap-1.5">
-          {activeMethods.map((m) => {
+        <div className="grid grid-cols-3 gap-2">
+          {EXACT_PAYMENT_METHODS.map((m) => {
             const isSelected = value?.toLowerCase() === m.name.toLowerCase();
             return (
               <button
-                key={`pm-pill-${m.id || m.name}`}
+                key={`pm-pill-${m.name}`}
                 type="button"
                 disabled={disabled}
                 onClick={() => onChange(m.name)}
-                className={`h-9 px-3 rounded-xl text-xs font-bold border transition-all duration-150 flex items-center justify-center cursor-pointer ${
+                className={`h-11 px-3 rounded-xl text-xs font-bold border transition-all duration-150 flex items-center justify-center cursor-pointer min-h-[44px] ${
                   isSelected
-                    ? 'bg-primary text-primary-foreground border-primary shadow-xs'
-                    : 'bg-muted/40 text-muted-foreground border-border/80 hover:border-border hover:text-foreground'
+                    ? 'bg-primary text-primary-foreground border-primary shadow-xs ring-2 ring-primary/20'
+                    : 'bg-muted/30 text-foreground border-border/80 hover:border-border hover:bg-muted/60'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {m.name}
@@ -124,74 +88,39 @@ export default function PaymentMethodSelect({
             );
           })}
 
-          {/* Historical Inactive pill if currently selected */}
-          {hasInactiveSelected && (
-            <button
-              type="button"
-              disabled={disabled}
-              className="h-9 px-3 rounded-xl text-xs font-bold border border-warning/50 bg-warning/10 text-warning flex items-center gap-1.5"
-            >
-              <span>{value}</span>
-              <span className="text-4xs px-1.5 py-0.2 rounded bg-warning/20 font-mono">
-                Inactive
-              </span>
-            </button>
-          )}
-
-          {allowAddNew && !label && !disabled && (
-            <button
-              type="button"
-              onClick={() => handleOpenAddModal()}
-              className="h-9 px-2.5 rounded-xl text-xs font-semibold border border-dashed border-border/80 text-muted-foreground hover:text-primary hover:border-primary/50 transition-all flex items-center gap-1 cursor-pointer"
-              title="Add New Payment Method"
-            >
-              <Icon name="PlusIcon" size={12} />
-              <span>Add</span>
-            </button>
-          )}
+          {/* Historical fallback pill if currently selected */}
+          {value &&
+            !EXACT_PAYMENT_METHODS.some((m) => m.name.toLowerCase() === value.toLowerCase()) && (
+              <button
+                type="button"
+                disabled={disabled}
+                className="h-11 px-3 rounded-xl text-xs font-bold border border-warning/50 bg-warning/10 text-warning flex items-center justify-center gap-1.5 col-span-3 min-h-[44px]"
+              >
+                <span>{value}</span>
+                <span className="text-4xs px-1.5 py-0.5 rounded bg-warning/20 font-mono">
+                  Historical
+                </span>
+              </button>
+            )}
         </div>
-
-        {/* Embedded Reusable Modal */}
-        <PaymentMethodModal
-          open={modalOpen}
-          onClose={() => setModalOpen(false)}
-          initialName={initialSearchTerm}
-          onSuccess={handleModalSuccess}
-          zIndex={modalZIndex}
-          quickMode
-        />
       </div>
     );
   }
 
-  // Default: Dropdown layout with Search & Add New
+  // Default: Dropdown layout with responsive BottomSheet on mobile
   return (
-    <>
-      <CustomSelect
-        options={selectOptions}
-        value={value}
-        onChange={onChange}
-        label={label}
-        required={required}
-        disabled={disabled}
-        placeholder={placeholder}
-        searchPlaceholder={searchPlaceholder}
-        searchable={true}
-        size={size}
-        className={className}
-        addNewLabel={allowAddNew ? '+ Add New Payment Method' : undefined}
-        onAddNew={allowAddNew ? (term) => handleOpenAddModal(term) : undefined}
-      />
-
-      {/* Embedded Reusable Modal */}
-      <PaymentMethodModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        initialName={initialSearchTerm}
-        onSuccess={handleModalSuccess}
-        zIndex={modalZIndex}
-        quickMode
-      />
-    </>
+    <CustomSelect
+      options={selectOptions}
+      value={value}
+      onChange={onChange}
+      label={label}
+      required={required}
+      disabled={disabled}
+      placeholder={placeholder}
+      searchPlaceholder={searchPlaceholder}
+      searchable={false}
+      size={size}
+      className={className}
+    />
   );
 }

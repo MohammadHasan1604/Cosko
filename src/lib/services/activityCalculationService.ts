@@ -80,6 +80,49 @@ export function getLocalDateString(date: Date, timezone = 'Asia/Kolkata'): strin
   }
 }
 
+export function calculateServerDelta(start: Date, end: Date, maxInterval: number): number {
+  const delta = Math.round((end.getTime() - start.getTime()) / 1000);
+  return Math.min(Math.max(0, delta), maxInterval);
+}
+
+export function isIdleGap(start: Date, end: Date, thresholdSeconds = 120): boolean {
+  const diffSec = (end.getTime() - start.getTime()) / 1000;
+  return diffSec > thresholdSeconds;
+}
+
+export function splitAcrossMidnight(
+  start: Date,
+  end: Date,
+  totalSeconds: number,
+  timezone = 'Asia/Kolkata'
+): Array<{ date: string; seconds: number }> {
+  const startDateStr = getLocalDateString(start, timezone);
+  const endDateStr = getLocalDateString(end, timezone);
+
+  if (startDateStr === endDateStr) {
+    return [{ date: startDateStr, seconds: totalSeconds }];
+  }
+
+  // Calculate midnight transition
+  let midnightMs: number;
+  if (timezone === 'UTC') {
+    midnightMs = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate(), 0, 0, 0);
+  } else {
+    const nextDay = new Date(startDateStr + 'T00:00:00');
+    nextDay.setDate(nextDay.getDate() + 1);
+    midnightMs = nextDay.getTime();
+  }
+
+  const secBeforeMidnight = Math.max(0, Math.round((midnightMs - start.getTime()) / 1000));
+  const s1 = Math.min(totalSeconds, secBeforeMidnight);
+  const s2 = Math.max(0, totalSeconds - s1);
+
+  return [
+    { date: startDateStr, seconds: s1 },
+    { date: endDateStr, seconds: s2 },
+  ];
+}
+
 /**
  * Calculate activity summary for a single user over a date range.
  */

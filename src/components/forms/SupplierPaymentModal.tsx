@@ -78,10 +78,7 @@ export default function SupplierPaymentModal({
       return;
     }
 
-    if (!payRef.trim()) {
-      toast.error('Payment Reference / UTR number is mandatory.');
-      return;
-    }
+    const effectiveRef = payRef.trim() || `PAY-${Date.now().toString(36).toUpperCase()}`;
 
     if (!payProof) {
       toast.error('Payment proof is mandatory! Please upload receipt/screenshot.');
@@ -91,7 +88,7 @@ export default function SupplierPaymentModal({
     const confirmed = await confirmAction({
       actionType: 'payment',
       title: 'Confirm Supplier Payment',
-      subtitle: 'Please review payment amount, vendor, and reference details before recording.',
+      subtitle: 'Please review payment amount and vendor details before recording.',
       confirmLabel: 'Confirm & Record Payment',
       summaryItems: [
         {
@@ -101,7 +98,6 @@ export default function SupplierPaymentModal({
         { label: 'PO / Invoice Ref', value: purchase.invoiceNo || purchase.poNo },
         { label: 'Payment Method', value: payMethod },
         { label: 'Payment Date', value: payDate },
-        { label: 'Reference / UTR', value: payRef.trim() },
         {
           label: 'Remaining Balance After',
           value: `₹${Math.max(0, remaining - amountNum).toLocaleString('en-IN')}`,
@@ -125,7 +121,7 @@ export default function SupplierPaymentModal({
         amount: amountNum,
         paymentDate: payDate,
         paymentMethod: payMethod,
-        referenceNo: payRef.trim(),
+        referenceNo: effectiveRef,
         receiptUrl: payProof,
         notes: payNotes.trim() || undefined,
       });
@@ -243,34 +239,18 @@ export default function SupplierPaymentModal({
           </div>
         </div>
 
-        {/* Date & Reference */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-bold text-foreground block mb-1">
-              Payment Date <span className="text-danger">*</span>
-            </label>
-            <input
-              type="date"
-              required
-              value={payDate}
-              onChange={(e) => setPayDate(e.target.value)}
-              className="input-field text-xs font-mono h-9"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-foreground block mb-1">
-              Payment Reference / UTR No <span className="text-danger">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. UTR-HDFC-98213894"
-              value={payRef}
-              onChange={(e) => setPayRef(e.target.value)}
-              className="input-field text-xs font-mono font-bold uppercase h-9"
-            />
-          </div>
+        {/* Date */}
+        <div>
+          <label className="text-xs font-bold text-foreground block mb-1">
+            Payment Date <span className="text-danger">*</span>
+          </label>
+          <input
+            type="date"
+            required
+            value={payDate}
+            onChange={(e) => setPayDate(e.target.value)}
+            className="input-field text-xs font-mono h-9"
+          />
         </div>
 
         {/* Mandatory Payment Proof Attachment */}

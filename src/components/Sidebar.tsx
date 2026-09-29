@@ -75,6 +75,7 @@ export default function Sidebar({
       '/work-activity',
       '/audit-logs',
       '/settings',
+      '/attendance',
     ],
     'Store Manager': [
       '/dashboard',
@@ -88,8 +89,9 @@ export default function Sidebar({
       '/accounting',
       '/reports',
       '/employees',
+      '/attendance',
     ],
-    'Sales Manager': ['/sales', '/inventory-management', '/customers'],
+    'Sales Manager': ['/sales', '/inventory-management', '/customers', '/attendance'],
   };
 
   const allowedHrefs = roleAllowedHrefs[currentUser.role] || ['/sales'];
@@ -151,13 +153,14 @@ export default function Sidebar({
       id: 'group-org',
       label: 'Organization',
       items: [
-        { id: 'nav-employees', label: 'Employees', icon: 'UserGroupIcon', href: '/employees' },
+        { id: 'nav-attendance', label: 'Attendance', icon: 'ClockIcon', href: '/attendance' },
+        { id: 'nav-employees', label: 'Staff Roster', icon: 'UserGroupIcon', href: '/employees' },
         { id: 'nav-stores', label: 'Stores', icon: 'MapPinIcon', href: '/stores' },
         { id: 'nav-users', label: 'Users & Roles', icon: 'ShieldCheckIcon', href: '/users' },
         {
           id: 'nav-work-activity',
           label: 'Work Activity',
-          icon: 'ClockIcon',
+          icon: 'ChartBarIcon',
           href: '/work-activity',
         },
       ],

@@ -50,6 +50,7 @@ const routePermissions: Record<string, string[]> = {
   '/settings/data-connections': superAdminOnly,
   '/stock-transfers': superAdminOnly,
   '/delete-requests': superAdminOnly,
+  '/attendance': allRoles,
 };
 
 export default function AppLayout({ children, activeRoute }: AppLayoutProps) {

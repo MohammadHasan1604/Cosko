@@ -315,7 +315,9 @@ export default function CustomersPage() {
             <table className="w-full text-left text-xs min-w-[850px]">
               <thead>
                 <tr>
-                  <th className="table-header">Customer Name</th>
+                  <th className="table-header sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                    Customer Name
+                  </th>
                   <th className="table-header">Mobile Number</th>
                   <th className="table-header">City / Store</th>
                   <th className="table-header">CRM Segment</th>
@@ -337,7 +339,7 @@ export default function CustomersPage() {
                     const tag = getCustomerSegmentTag(cust);
                     return (
                       <tr key={cust.id} className="table-row">
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                           <div className="font-semibold text-foreground">{cust.name}</div>
                           <div className="text-3xs text-muted-foreground">{cust.email}</div>
                         </td>

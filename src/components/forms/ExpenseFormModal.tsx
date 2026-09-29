@@ -146,28 +146,23 @@ export default function ExpenseFormModal({
       return;
     }
 
-    if (!referenceNo.trim()) {
-      toast.error('Payment Reference / UTR Number is required');
-      return;
-    }
+    const parsedAmount = Math.round(Number(amount) * 100) / 100;
+    const effectiveRef = referenceNo.trim() || `EXP-${Date.now().toString(36).toUpperCase()}`;
 
     if (!receiptUrl) {
       toast.error('Payment proof is mandatory! Please upload a receipt or voucher.');
       return;
     }
 
-    const parsedAmount = Math.round(Number(amount) * 100) / 100;
-
     const confirmed = await confirmAction({
       actionType: isEdit ? 'update' : 'create',
       title: isEdit ? 'Confirm Expense Modification' : 'Confirm Expense Voucher',
-      subtitle: 'Please review category, amount, and payment reference before recording.',
+      subtitle: 'Please review category, amount, and store details before recording.',
       confirmLabel: isEdit ? 'Confirm & Update Expense' : 'Confirm & Record Expense',
       summaryItems: [
         { label: 'Category', value: category.trim() },
         { label: 'Store Location', value: store },
         { label: 'Payment Method', value: paymentMethod },
-        { label: 'Reference / UTR', value: referenceNo.trim() },
         { label: 'Description', value: description.trim() || 'N/A' },
         {
           label: 'Expense Amount',
@@ -190,7 +185,7 @@ export default function ExpenseFormModal({
           store,
           description: description.trim(),
           paymentMethod,
-          referenceNo: referenceNo.trim(),
+          referenceNo: effectiveRef,
           receiptUrl,
         });
         toast.success(`Expense ${expense.referenceNo || expense.id} updated successfully!`);
@@ -202,7 +197,7 @@ export default function ExpenseFormModal({
             store,
             description: description.trim(),
             paymentMethod,
-            referenceNoText: referenceNo.trim() || undefined,
+            referenceNoText: effectiveRef,
             receiptUrl,
           });
         }
@@ -213,7 +208,7 @@ export default function ExpenseFormModal({
           store,
           description: description.trim(),
           paymentMethod,
-          referenceNoText: referenceNo.trim() || undefined,
+          referenceNoText: effectiveRef,
           receiptUrl,
           status: 'Approved',
         });
@@ -221,7 +216,7 @@ export default function ExpenseFormModal({
         if (onSuccess) {
           onSuccess({
             id: 'temp-' + Date.now(),
-            referenceNo: 'EXP-TEMP',
+            referenceNo: effectiveRef,
             category: category.trim(),
             amount: parsedAmount,
             store,
@@ -336,21 +331,6 @@ export default function ExpenseFormModal({
                 modalZIndex={zIndex + 20}
               />
             </div>
-          </div>
-
-          {/* Payment Reference / UTR */}
-          <div>
-            <label className="text-xs font-bold text-foreground block mb-1">
-              Payment Reference / UTR / Voucher No <span className="text-danger">*</span>
-            </label>
-            <input
-              required
-              type="text"
-              placeholder="e.g. UTR-EXP-992812"
-              value={referenceNo}
-              onChange={(e) => setReferenceNo(e.target.value)}
-              className="input-field text-xs font-mono font-bold uppercase h-8"
-            />
           </div>
 
           {/* Mandatory Payment Proof Attachment */}

@@ -152,15 +152,6 @@ export default function Topbar({ onToggleSidebar, onMobileMenuOpen }: TopbarProp
       style={{ height: 'var(--topbar-height)' }}
     >
       <div className="flex items-center gap-2 min-w-0">
-        {/* Mobile: hamburger for sidebar (secondary nav) */}
-        <button
-          onClick={onMobileMenuOpen}
-          className="btn-ghost lg:hidden w-8 h-8 p-0 flex items-center justify-center flex-shrink-0 rounded-lg"
-          aria-label="Open navigation menu"
-        >
-          <Icon name="Bars3Icon" size={18} />
-        </button>
-
         {/* Desktop: sidebar toggle */}
         <button
           onClick={onToggleSidebar}

@@ -50,6 +50,17 @@ export default function UserFormModal({
   const isProtectedSuperAdmin = user?.role === 'Super Admin';
   const isCallerSuperAdmin = currentUser.role === 'Super Admin';
 
+  // Rule 11: Role selector must show only roles caller is permitted to create. Hide forbidden roles.
+  const permittedRoles = useMemo(() => {
+    if (isCallerSuperAdmin) {
+      return AVAILABLE_ROLES;
+    }
+    if (currentUser.role === 'Store Manager') {
+      return AVAILABLE_ROLES.filter((r) => r.role === 'Sales Manager');
+    }
+    return [];
+  }, [isCallerSuperAdmin, currentUser.role]);
+
   // Caller's allowed stores to assign
   const callerAccessibleStores = useMemo(() => {
     if (isCallerSuperAdmin) {
@@ -57,7 +68,7 @@ export default function UserFormModal({
     }
     return currentUser.allowedStores && currentUser.allowedStores.length > 0
       ? currentUser.allowedStores
-      : [currentUser.store];
+      : [currentUser.store || 'BLR'];
   }, [isCallerSuperAdmin, storesList, currentUser]);
 
   // Stores available in the selector
@@ -93,14 +104,20 @@ export default function UserFormModal({
         setPassword('');
         setShowPassword(false);
         if (user.role !== 'Super Admin') {
-          setRole((user.role as any) || 'Store Manager');
+          const userRole = (user.role as any) || 'Sales Manager';
+          setRole(
+            permittedRoles.some((r) => r.role === userRole)
+              ? userRole
+              : permittedRoles[0]?.role || 'Sales Manager'
+          );
         }
-        const initialStores =
-          user.allowedStores && user.allowedStores.length > 0
+        const initialStores = isCallerSuperAdmin
+          ? user.allowedStores && user.allowedStores.length > 0
             ? user.allowedStores
             : user.store
               ? [user.store]
-              : [callerAccessibleStores[0] || 'BLR'];
+              : [callerAccessibleStores[0] || 'BLR']
+          : [currentUser.store || 'BLR'];
         setAssignedStores(initialStores);
         setStatus((user.status as any) || 'Active');
       } else {
@@ -109,15 +126,20 @@ export default function UserFormModal({
         setPhone('');
         setPassword('');
         setShowPassword(false);
-        setRole('Store Manager');
-        const defaultStore = callerAccessibleStores[0] || 'BLR';
+        // Default role: Super Admin can choose Store Manager, Store Manager only gets Sales Manager
+        setRole(isCallerSuperAdmin ? 'Store Manager' : 'Sales Manager');
+        // Store Manager always automatically uses manager's own store
+        const defaultStore = isCallerSuperAdmin
+          ? callerAccessibleStores[0] || 'BLR'
+          : currentUser.store || 'BLR';
         setAssignedStores([defaultStore]);
         setStatus('Active');
       }
     }
-  }, [open, user, callerAccessibleStores]);
+  }, [open, user, callerAccessibleStores, isCallerSuperAdmin, currentUser.store, permittedRoles]);
 
-  if (!open) return null;
+  // Rule 11: Sales Manager must not access user creation
+  if (!open || currentUser.role === 'Sales Manager') return null;
 
   // Toggle store assignment ON/OFF
   const toggleStoreAssignment = (code: string) => {
@@ -382,7 +404,7 @@ export default function UserFormModal({
               onChange={(e) => setRole(e.target.value as any)}
               className="input-field text-xs font-medium"
             >
-              {AVAILABLE_ROLES.map((r) => (
+              {permittedRoles.map((r) => (
                 <option key={r.role} value={r.role}>
                   {r.role} (Level {r.level}) — {r.desc}
                 </option>
@@ -395,26 +417,26 @@ export default function UserFormModal({
           </p>
         </div>
 
-        {/* 4. Assigned Store(s) — Single Source of Truth with Search & ON/OFF Toggles */}
-        <div className="space-y-2 p-3.5 rounded-xl border border-border bg-card">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <Icon name="BuildingStorefrontIcon" size={15} className="text-primary" />
-                <label className="text-xs font-bold text-foreground">
-                  Assigned Store(s) <span className="text-danger">*</span>
-                </label>
+        {/* 4. Assigned Store(s) — Rule 11: Super Admin may see Assigned Store. Store Manager creating Sales Manager: control MUST NOT render, optionally read-only */}
+        {isCallerSuperAdmin ? (
+          <div className="space-y-2 p-3.5 rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <Icon name="BuildingStorefrontIcon" size={15} className="text-primary" />
+                  <label className="text-xs font-bold text-foreground">
+                    Assigned Store(s) <span className="text-danger">*</span>
+                  </label>
+                </div>
+                <p className="text-3xs text-muted-foreground mt-0.5">
+                  Single source of truth: User will strictly only access stores assigned here.
+                </p>
               </div>
-              <p className="text-3xs text-muted-foreground mt-0.5">
-                Single source of truth: User will strictly only access stores assigned here.
-              </p>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <span className="badge-primary text-3xs font-bold">
-                {assignedStores.length} Store{assignedStores.length !== 1 ? 's' : ''} Assigned
-              </span>
-              {isCallerSuperAdmin && (
+              <div className="flex items-center gap-2">
+                <span className="badge-primary text-3xs font-bold">
+                  {assignedStores.length} Store{assignedStores.length !== 1 ? 's' : ''} Assigned
+                </span>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
@@ -432,82 +454,96 @@ export default function UserFormModal({
                     Reset
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Search Box for Store Selector */}
+            <div className="relative">
+              <Icon
+                name="MagnifyingGlassIcon"
+                size={13}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                type="text"
+                placeholder="Search store code, branch name, or city..."
+                value={storeSearch}
+                onChange={(e) => setStoreSearch(e.target.value)}
+                className="input-field text-xs pl-8 py-1.5 bg-muted/40"
+              />
+            </div>
+
+            {/* Store List with Clear ON / OFF Access Toggles */}
+            <div className="max-h-48 overflow-y-auto scrollbar-thin divide-y divide-border/60 border border-border/80 rounded-lg bg-muted/10">
+              {filteredStoreHubs.length === 0 ? (
+                <div className="p-3 text-center text-xs text-muted-foreground">
+                  No store branches match "{storeSearch}"
+                </div>
+              ) : (
+                filteredStoreHubs.map((st) => {
+                  const isAssigned = isProtectedSuperAdmin || assignedStores.includes(st.code);
+
+                  return (
+                    <div
+                      key={`assign-store-${st.code}`}
+                      className="p-2.5 flex items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-foreground font-mono">
+                            {st.code}
+                          </span>
+                          <span className="text-xs font-medium text-foreground truncate">
+                            {st.name}
+                          </span>
+                          {st.code === 'CENTRAL' && (
+                            <span className="badge-warning text-3xs px-1.5 py-0">Central Hub</span>
+                          )}
+                        </div>
+                        <p className="text-3xs text-muted-foreground truncate">{st.city}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span
+                          className={`text-3xs font-extrabold px-1.5 py-0.5 rounded ${
+                            isAssigned
+                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {isAssigned ? 'ASSIGNED' : 'OFF'}
+                        </span>
+                        <ToggleSwitch
+                          checked={isAssigned}
+                          disabled={isProtectedSuperAdmin}
+                          onChange={() => toggleStoreAssignment(st.code)}
+                          size="sm"
+                          onText="ON"
+                          offText="OFF"
+                          title={`Toggle access for ${st.name} (${st.code})`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
-
-          {/* Search Box for Store Selector */}
-          <div className="relative">
-            <Icon
-              name="MagnifyingGlassIcon"
-              size={13}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <input
-              type="text"
-              placeholder="Search store code, branch name, or city..."
-              value={storeSearch}
-              onChange={(e) => setStoreSearch(e.target.value)}
-              className="input-field text-xs pl-8 py-1.5 bg-muted/40"
-            />
+        ) : (
+          /* Store Manager creating staff: Control MUST NOT render; store is displayed as read-only contextual info */
+          <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 flex items-center justify-between text-xs">
+            <div className="space-y-0.5">
+              <span className="font-bold text-foreground block">Assigned Store Location</span>
+              <p className="text-3xs text-muted-foreground">
+                Staff member will automatically be assigned to your branch (
+                {currentUser.store || 'BLR'}).
+              </p>
+            </div>
+            <span className="badge-primary text-xs font-mono font-bold px-2.5 py-1 rounded-lg">
+              {currentUser.store || 'BLR'}
+            </span>
           </div>
-
-          {/* Store List with Clear ON / OFF Access Toggles */}
-          <div className="max-h-48 overflow-y-auto scrollbar-thin divide-y divide-border/60 border border-border/80 rounded-lg bg-muted/10">
-            {filteredStoreHubs.length === 0 ? (
-              <div className="p-3 text-center text-xs text-muted-foreground">
-                No store branches match "{storeSearch}"
-              </div>
-            ) : (
-              filteredStoreHubs.map((st) => {
-                const isAssigned = isProtectedSuperAdmin || assignedStores.includes(st.code);
-
-                return (
-                  <div
-                    key={`assign-store-${st.code}`}
-                    className="p-2.5 flex items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-foreground font-mono">
-                          {st.code}
-                        </span>
-                        <span className="text-xs font-medium text-foreground truncate">
-                          {st.name}
-                        </span>
-                        {st.code === 'CENTRAL' && (
-                          <span className="badge-warning text-3xs px-1.5 py-0">Central Hub</span>
-                        )}
-                      </div>
-                      <p className="text-3xs text-muted-foreground truncate">{st.city}</p>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span
-                        className={`text-3xs font-extrabold px-1.5 py-0.5 rounded ${
-                          isAssigned
-                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {isAssigned ? 'ASSIGNED' : 'OFF'}
-                      </span>
-                      <ToggleSwitch
-                        checked={isAssigned}
-                        disabled={isProtectedSuperAdmin}
-                        onChange={() => toggleStoreAssignment(st.code)}
-                        size="sm"
-                        onText="ON"
-                        offText="OFF"
-                        title={`Toggle access for ${st.name} (${st.code})`}
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
+        )}
 
         {/* 5. Account Status */}
         <div className="p-3 rounded-xl border border-border bg-card">

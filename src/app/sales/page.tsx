@@ -5,8 +5,6 @@ import AppLayout from '@/components/AppLayout';
 import Icon from '@/components/ui/AppIcon';
 import Modal from '@/components/ui/Modal';
 import CoskoLogo from '@/components/ui/CoskoLogo';
-import BarcodeScannerModal from '@/components/ui/BarcodeScannerModal';
-import VisualSearchModal from '@/components/ui/VisualSearchModal';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import {
   useApp,
@@ -62,8 +60,8 @@ export default function SalesPage() {
   const [displayLimit, setDisplayLimit] = useState(48);
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [imageSearchOpen, setImageSearchOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [selectedCustomerToEdit, setSelectedCustomerToEdit] = useState<Customer | null>(null);
 
   // Cashier & Store Resolution
   const activeEmployeeName = currentUser.name || 'Sales Executive';
@@ -132,28 +130,6 @@ export default function SalesPage() {
     if (raw.startsWith('0') && raw.length === 11) return raw.slice(1);
     if (raw.length > 10) return raw.slice(-10);
     return raw;
-  };
-
-  // Auto-Lookup when 10 digits are typed
-  const handlePhoneInput = (val: string) => {
-    const cleaned = clean10DigitPhone(val);
-    setCustomerPhoneDigits(cleaned);
-
-    if (cleaned.length < 10) {
-      setLookupDone(false);
-      setCustomerNotFound(false);
-      if (selectedCustomerId !== 'walkin' && cleaned.length === 0) {
-        // Reset to clean walk-in if cleared
-        setSelectedCustomerId('walkin');
-        setCustomerName('Walk-in Customer');
-        setCustomerPhone('');
-        setCustomerHistory({ purchases: [], repairs: [] });
-      }
-      return;
-    }
-
-    // 10 digits reached -> trigger auto lookup
-    performCustomerLookup(cleaned);
   };
 
   const performCustomerLookup = async (phone10: string) => {
@@ -244,36 +220,93 @@ export default function SalesPage() {
     }
   };
 
-  const handleSelectCustomerFromDropdown = (id: string) => {
-    if (id === '__add_new__') {
-      openQuickRegisterModal();
-      return;
+  const attachCustomer = (c: Customer) => {
+    setSelectedCustomerId(c.id);
+    setCustomerName(c.name);
+    setCustomerPhone(c.phone);
+    const digits = clean10DigitPhone(c.phone);
+    setCustomerPhoneDigits(digits);
+    setCustomerSearchQuery('');
+    setLookupDone(true);
+    setCustomerNotFound(false);
+
+    if (c.gstin) {
+      setGstInvoiceEnabled(true);
+      setCustomerGstin(c.gstin.trim().toUpperCase());
     }
-    if (id === 'walkin') {
-      setSelectedCustomerId('walkin');
-      setCustomerName('Walk-in Customer');
-      setCustomerPhone('');
-      setCustomerPhoneDigits('');
-      setCustomerHistory({ purchases: [], repairs: [] });
-      setCustomerNotFound(false);
-      setLookupDone(false);
-      return;
+    if (c.address) {
+      setCustomerBillingAddress(c.address.trim());
     }
 
-    const found = customers.find((c) => c.id === id);
-    if (found) {
-      setSelectedCustomerId(found.id);
-      setCustomerName(found.name);
-      const digits = clean10DigitPhone(found.phone);
-      setCustomerPhoneDigits(digits);
-      setCustomerPhone(found.phone);
-      performCustomerLookup(digits);
-    }
+    const pastSales = sales
+      .filter(
+        (s) =>
+          clean10DigitPhone(s.customerPhone || '') === digits ||
+          s.customerName.toLowerCase() === c.name.toLowerCase()
+      )
+      .slice(0, 3);
+
+    const relevantRepairs: { date: string; status: string; service: string; device: string }[] = [];
+    repairsEnquiries
+      .filter((r) => clean10DigitPhone(r.customerPhone) === digits)
+      .slice(0, 3)
+      .forEach((r) => {
+        relevantRepairs.push({
+          date: r.enquiryDate,
+          status: r.repairStatus,
+          service: r.repairRequested,
+          device: r.deviceName || 'Device',
+        });
+      });
+
+    setCustomerHistory({
+      purchases: pastSales,
+      repairs: relevantRepairs,
+    });
+    toast.success(`Attached Customer: ${c.name}`);
   };
 
-  const openQuickRegisterModal = () => {
+  const resetToWalkIn = () => {
+    setSelectedCustomerId('walkin');
+    setCustomerName('Walk-in Customer');
+    setCustomerPhone('');
+    setCustomerPhoneDigits('');
+    setCustomerSearchQuery('');
+    setCustomerHistory({ purchases: [], repairs: [] });
+    setCustomerNotFound(false);
+    setLookupDone(false);
+    setSelectedCustomerToEdit(null);
+  };
+
+  const openCustomerModal = (cust?: Customer) => {
+    setSelectedCustomerToEdit(cust || null);
     setQuickRegModal(true);
   };
+
+  const handleSearchQueryChange = (val: string) => {
+    setCustomerSearchQuery(val);
+    const digits = clean10DigitPhone(val);
+    if (digits.length === 10) {
+      setCustomerPhoneDigits(digits);
+      performCustomerLookup(digits);
+    } else {
+      setLookupDone(false);
+      setCustomerNotFound(false);
+    }
+  };
+
+  const matchingCustomers = useMemo(() => {
+    const q = customerSearchQuery.trim().toLowerCase();
+    if (!q) return [];
+    const cleanQ = clean10DigitPhone(q);
+    return customers
+      .filter((c) => {
+        const matchName = c.name.toLowerCase().includes(q);
+        const matchPhone = cleanQ.length >= 3 && clean10DigitPhone(c.phone).includes(cleanQ);
+        return matchName || matchPhone;
+      })
+      .slice(0, 5);
+  }, [customers, customerSearchQuery]);
 
   // Inventory Filtering
   const dynamicCategories = useMemo(() => {
@@ -431,17 +464,17 @@ export default function SalesPage() {
       }
     }
 
-    // Strictly validate payment reference and mandatory payment proof
-    if (!posReferenceNo.trim()) {
-      toast.error('Payment Reference / UTR / Voucher No is strictly required.');
-      return;
-    }
+    // Strictly validate mandatory payment proof
     if (!posPaymentProofUrl) {
       toast.error(
         'Payment Proof (Receipt / Screenshot / Voucher) is strictly required to complete checkout.'
       );
       return;
     }
+
+    const effectiveRefNo =
+      posReferenceNo.trim() ||
+      `POS-${paymentMethod.toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
 
     const totalUnits = cart.reduce((sum, c) => sum + c.qty, 0);
 
@@ -462,7 +495,7 @@ export default function SalesPage() {
           ? [{ label: 'Discount Applied', value: `-₹${cartDiscount.toLocaleString('en-IN')}` }]
           : []),
         { label: 'Payment Method', value: paymentMethod },
-        { label: 'Payment Ref / UTR', value: posReferenceNo.trim() },
+        { label: 'Payment Ref (Server-generated)', value: effectiveRefNo },
         {
           label: 'Total Payable Amount',
           value: `₹${cartTotal.toLocaleString('en-IN')}`,
@@ -504,7 +537,7 @@ export default function SalesPage() {
         total: cartTotal,
         taxEnabled: gstInvoiceEnabled,
         paymentMethod,
-        referenceNo: posReferenceNo.trim(),
+        referenceNo: effectiveRefNo,
         paymentProofUrl: posPaymentProofUrl,
         status: 'Completed',
         salePhotos,
@@ -518,7 +551,7 @@ export default function SalesPage() {
       // Attach GST snapshot info for receipt modal
       const receiptSnapshot = {
         ...saleOrder,
-        referenceNo: posReferenceNo.trim(),
+        referenceNo: effectiveRefNo,
         paymentProofUrl: posPaymentProofUrl,
         gstInvoiceEnabled,
         customerGstin: customerGstin.trim() || undefined,
@@ -643,8 +676,229 @@ export default function SalesPage() {
 
         {activeTab === 'pos' ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
-            {/* Left Column: Product Catalog & Search */}
-            <div className="lg:col-span-7 space-y-4">
+            {/* 1. Customer Lookup & CRM Section (Order 1 on Mobile: Very Top. Desktop: Right Column Row 1) */}
+            <div className="order-1 lg:order-none lg:col-start-8 lg:col-end-13 lg:row-start-1 space-y-4">
+              <div className="card p-4 space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Icon name="UserIcon" size={15} className="text-primary" />
+                    Customer Lookup & CRM
+                  </span>
+                  {selectedCustomerId !== 'walkin' && (
+                    <button
+                      type="button"
+                      onClick={resetToWalkIn}
+                      className="text-2xs font-semibold text-muted-foreground hover:text-danger underline transition-colors"
+                    >
+                      Reset to Walk-in
+                    </button>
+                  )}
+                </div>
+
+                {/* Customer Search Field (Phone or Name) */}
+                <div className="space-y-1.5">
+                  <label className="text-2xs font-bold uppercase tracking-wider text-muted-foreground block">
+                    Search Customer (Phone or Name)
+                  </label>
+                  <div className="relative">
+                    <Icon
+                      name="MagnifyingGlassIcon"
+                      size={14}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Type 10-digit mobile or customer name..."
+                      value={customerSearchQuery}
+                      onChange={(e) => handleSearchQueryChange(e.target.value)}
+                      className="input-field pl-9 pr-8 text-xs font-medium"
+                    />
+                    {lookupLoading ? (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    ) : customerSearchQuery ? (
+                      <button
+                        type="button"
+                        onClick={() => setCustomerSearchQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <Icon name="XMarkIcon" size={14} />
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {/* Auto-matching Results Panel */}
+                  {customerSearchQuery.trim().length > 0 && matchingCustomers.length > 0 && (
+                    <div className="p-1.5 rounded-xl border border-border bg-card shadow-lg space-y-1 max-h-48 overflow-y-auto z-20">
+                      <div className="text-3xs font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">
+                        Matching Customers ({matchingCustomers.length})
+                      </div>
+                      {matchingCustomers.map((c) => (
+                        <button
+                          key={`match-cust-${c.id}`}
+                          type="button"
+                          onClick={() => attachCustomer(c)}
+                          className="w-full text-left p-2 rounded-lg hover:bg-primary/10 hover:border-primary/30 border border-transparent transition-all flex items-center justify-between group min-h-[44px]"
+                        >
+                          <div>
+                            <span className="font-bold text-xs text-foreground group-hover:text-primary transition-colors block">
+                              {c.name}
+                            </span>
+                            <span className="text-3xs font-mono text-muted-foreground">
+                              {c.phone} {c.city ? `· ${c.city}` : ''}
+                            </span>
+                          </div>
+                          <span className="text-3xs font-bold px-2 py-1 rounded bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                            Attach
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Not Found -> Prompt to Add Customer */}
+                  {customerSearchQuery.trim().length > 0 &&
+                    matchingCustomers.length === 0 &&
+                    !lookupLoading && (
+                      <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 flex items-center justify-between text-xs fade-in">
+                        <div>
+                          <p className="font-bold text-foreground">No Customer Found</p>
+                          <p className="text-2xs text-muted-foreground">
+                            {clean10DigitPhone(customerSearchQuery).length === 10
+                              ? `+91 ${clean10DigitPhone(customerSearchQuery)}`
+                              : `"${customerSearchQuery}"`}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const digits = clean10DigitPhone(customerSearchQuery);
+                            if (digits.length === 10) {
+                              setCustomerPhoneDigits(digits);
+                            }
+                            openCustomerModal();
+                          }}
+                          className="btn-primary text-xs py-1.5 px-3 font-bold flex items-center gap-1 min-h-[36px]"
+                        >
+                          <Icon name="PlusIcon" size={14} />+ Create Customer
+                        </button>
+                      </div>
+                    )}
+                </div>
+
+                {/* Attached Customer View or Walk-in Default */}
+                {selectedCustomerId !== 'walkin' ? (
+                  <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-2 fade-in">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-foreground truncate block">
+                            {customerName}
+                          </span>
+                          <span className="badge-success text-3xs px-2 py-0.5 rounded-full font-bold shrink-0">
+                            Verified
+                          </span>
+                        </div>
+                        <span className="text-2xs font-mono text-muted-foreground block mt-0.5">
+                          {customerPhone}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentObj = customers.find((c) => c.id === selectedCustomerId);
+                            if (currentObj) openCustomerModal(currentObj);
+                          }}
+                          className="text-3xs font-semibold px-2 py-1 rounded bg-card border border-border text-foreground hover:border-primary/50 transition-colors"
+                          title="Edit Customer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetToWalkIn}
+                          className="text-3xs font-semibold px-2 py-1 rounded bg-card border border-border text-muted-foreground hover:text-danger transition-colors"
+                          title="Change Customer"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Previous Own-Store Purchases */}
+                    {customerHistory.purchases.length > 0 && (
+                      <div className="pt-2 border-t border-emerald-500/20 space-y-1 text-2xs">
+                        <span className="font-bold text-muted-foreground block">
+                          Previous Own-Store Purchases:
+                        </span>
+                        <div className="space-y-1">
+                          {customerHistory.purchases.map((p, idx) => (
+                            <div
+                              key={`past-p-${idx}`}
+                              className="flex justify-between text-foreground"
+                            >
+                              <span className="font-mono">
+                                {p.orderNo} ({p.createdAt})
+                              </span>
+                              <span className="font-bold">₹{p.total.toLocaleString('en-IN')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Read-Only Legacy Repair / Service History */}
+                    {customerHistory.repairs.length > 0 && (
+                      <div className="pt-2 border-t border-emerald-500/20 space-y-1 text-2xs">
+                        <span className="font-bold text-muted-foreground block">
+                          Service & Repair History (Read-Only):
+                        </span>
+                        <div className="space-y-1">
+                          {customerHistory.repairs.map((r, idx) => (
+                            <div
+                              key={`past-r-${idx}`}
+                              className="flex justify-between text-foreground"
+                            >
+                              <span>
+                                {r.device} - {r.service}
+                              </span>
+                              <span className="badge-warning text-3xs">{r.status}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-xl border border-border/80 bg-muted/30 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+                        <Icon name="UserIcon" size={14} />
+                      </div>
+                      <div>
+                        <span className="font-bold text-foreground block text-xs">
+                          Walk-in Customer
+                        </span>
+                        <span className="text-3xs text-muted-foreground">
+                          Default billing profile
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openCustomerModal()}
+                      className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                    >
+                      <Icon name="PlusIcon" size={13} />+ New Customer
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Product Catalog & Search (Order 2 on Mobile: Middle. Desktop: Left Column Spanning Both Rows) */}
+            <div className="order-2 lg:order-none lg:col-start-1 lg:col-end-8 lg:row-start-1 lg:row-span-2 space-y-4">
               <div className="card p-3.5 sm:p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
@@ -661,25 +915,6 @@ export default function SalesPage() {
                       className="input-field pl-9 text-xs font-medium"
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setImageSearchOpen(true)}
-                    className="btn-secondary h-[38px] text-xs px-3.5 gap-1.5 whitespace-nowrap shadow-xs hover:border-primary/50 text-foreground"
-                    title="Search by Image / Camera"
-                  >
-                    <Icon name="CameraIcon" size={15} className="text-primary" />
-                    <span className="hidden sm:inline">Search by Image</span>
-                    <span className="sm:hidden">Image</span>
-                  </button>
-                  <button
-                    onClick={() => setScannerOpen(true)}
-                    className="btn-secondary h-[38px] text-xs px-3.5 gap-1.5 whitespace-nowrap shadow-xs"
-                    title="Barcode Scanner"
-                  >
-                    <Icon name="QrCodeIcon" size={15} />
-                    <span className="hidden sm:inline">Scan Barcode</span>
-                    <span className="sm:hidden">Barcode</span>
-                  </button>
                 </div>
 
                 {/* Category Pill Filters */}
@@ -767,159 +1002,8 @@ export default function SalesPage() {
               </div>
             </div>
 
-            {/* Right Column: Customer Phone Lookup + Cart + Checkout */}
-            <div className="lg:col-span-5 space-y-4">
-              {/* 1. Customer Phone Search & Verification Box */}
-              <div className="card p-4 space-y-3">
-                <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
-                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <Icon name="UserIcon" size={14} className="text-primary" />
-                    Customer Lookup & CRM
-                  </span>
-                  {selectedCustomerId !== 'walkin' && (
-                    <button
-                      onClick={() => handleSelectCustomerFromDropdown('walkin')}
-                      className="text-2xs font-semibold text-muted-foreground hover:text-danger underline transition-colors"
-                    >
-                      Reset to Walk-in
-                    </button>
-                  )}
-                </div>
-
-                {/* +91 Mobile Number Input Field */}
-                <div>
-                  <label className="text-2xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                    Customer Mobile Number
-                  </label>
-                  <div className="flex items-center rounded-xl border border-border/80 bg-card overflow-hidden focus-within:ring-2 focus-within:ring-primary/25 focus-within:border-primary transition-all">
-                    <span className="px-3 h-[38px] flex items-center bg-muted/60 text-xs font-bold text-muted-foreground border-r border-border select-none font-mono">
-                      +91
-                    </span>
-                    <input
-                      type="tel"
-                      maxLength={10}
-                      placeholder="98765 43210"
-                      value={customerPhoneDigits}
-                      onChange={(e) => handlePhoneInput(e.target.value)}
-                      className="flex-1 bg-transparent px-3 h-[38px] text-xs font-mono font-bold text-foreground focus:outline-none"
-                    />
-                    {lookupLoading && (
-                      <span className="pr-3 text-2xs text-muted-foreground animate-pulse">
-                        Searching...
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Dropdown alternative */}
-                <div>
-                  <label className="text-2xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                    Or Select Existing Customer
-                  </label>
-                  <select
-                    value={selectedCustomerId}
-                    onChange={(e) => handleSelectCustomerFromDropdown(e.target.value)}
-                    className="select-field text-xs"
-                  >
-                    <option value="walkin">Walk-in Customer</option>
-                    <option value="__add_new__" className="font-bold text-primary">
-                      + Add New Customer
-                    </option>
-                    {customers.map((c) => (
-                      <option key={`cust-sel-${c.id}`} value={c.id}>
-                        {c.name} ({c.phone})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Case A: Customer Found */}
-                {lookupDone && !customerNotFound && selectedCustomerId !== 'walkin' && (
-                  <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-2 fade-in">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span className="font-bold text-xs text-foreground block">
-                          {customerName}
-                        </span>
-                        <span className="text-2xs font-mono text-muted-foreground">
-                          {customerPhone}
-                        </span>
-                      </div>
-                      <span className="badge-success text-3xs px-2 py-0.5 rounded-full font-bold">
-                        Verified Customer
-                      </span>
-                    </div>
-
-                    {/* Compact Customer History: Last 3 Purchases & Repairs (Requirement 3 & 51) */}
-                    {(customerHistory.purchases.length > 0 ||
-                      customerHistory.repairs.length > 0) && (
-                      <div className="pt-2 border-t border-emerald-500/20 space-y-2 text-2xs">
-                        {customerHistory.purchases.length > 0 && (
-                          <div>
-                            <span className="font-bold text-muted-foreground block mb-1">
-                              Last Purchases:
-                            </span>
-                            <div className="space-y-1">
-                              {customerHistory.purchases.map((p, idx) => (
-                                <div
-                                  key={`past-p-${idx}`}
-                                  className="flex justify-between text-foreground"
-                                >
-                                  <span className="font-mono">
-                                    {p.orderNo} ({p.createdAt})
-                                  </span>
-                                  <span className="font-bold">
-                                    ₹{p.total.toLocaleString('en-IN')}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {customerHistory.repairs.length > 0 && (
-                          <div>
-                            <span className="font-bold text-muted-foreground block mb-1">
-                              Service & Repair History:
-                            </span>
-                            <div className="space-y-1">
-                              {customerHistory.repairs.map((r, idx) => (
-                                <div
-                                  key={`past-r-${idx}`}
-                                  className="flex justify-between text-foreground"
-                                >
-                                  <span>
-                                    {r.device} - {r.service}
-                                  </span>
-                                  <span className="badge-warning text-3xs">{r.status}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Case B: Customer Not Found -> Inline Add Customer Action (Requirement 4) */}
-                {customerNotFound && customerPhoneDigits.length === 10 && (
-                  <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 flex items-center justify-between text-xs fade-in">
-                    <div>
-                      <p className="font-bold text-foreground">No Customer Found</p>
-                      <p className="text-2xs text-muted-foreground">+91 {customerPhoneDigits}</p>
-                    </div>
-                    <button
-                      onClick={openQuickRegisterModal}
-                      className="btn-primary text-xs py-1.5 px-3 font-bold flex items-center gap-1"
-                    >
-                      <Icon name="PlusIcon" size={14} />+ Add New Customer
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* 2. Billing Cart & Price Line Items */}
+            {/* 3. Cart, Pricing, Discounts, Payment, Proof Upload, Checkout (Order 3 on Mobile: Bottom. Desktop: Right Column Row 2) */}
+            <div className="order-3 lg:order-none lg:col-start-8 lg:col-end-13 lg:row-start-2 space-y-4">
               <div className="card p-4 space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-border">
                   <div className="flex items-center gap-2">
@@ -931,7 +1015,7 @@ export default function SalesPage() {
                     )}
                   </div>
 
-                  {/* GST Invoice Toggle (Requirement 10) */}
+                  {/* GST Invoice Toggle */}
                   <div className="flex items-center gap-2">
                     <span className="text-2xs font-bold text-muted-foreground">GST Invoice:</span>
                     <ToggleSwitch
@@ -944,7 +1028,7 @@ export default function SalesPage() {
                   </div>
                 </div>
 
-                {/* Customer GST Fields when GST is ON (Requirement 10 & 11) */}
+                {/* Customer GST Fields when GST is ON */}
                 {gstInvoiceEnabled && (
                   <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 space-y-2 text-xs fade-in">
                     <div className="flex items-center justify-between text-2xs text-muted-foreground">
@@ -1000,7 +1084,7 @@ export default function SalesPage() {
                   </div>
                 )}
 
-                {/* Cart Items List with Reference Selling Price & Actual Selling Price (Requirement 6, 7, 8) */}
+                {/* Cart Items List */}
                 {cart.length === 0 ? (
                   <div className="py-8 text-center space-y-2">
                     <Icon
@@ -1033,14 +1117,14 @@ export default function SalesPage() {
                             <div className="flex items-center gap-1 bg-card rounded-lg border border-border px-1 py-0.5">
                               <button
                                 onClick={() => updateCartQty(c.itemId, -1)}
-                                className="p-0.5 text-muted-foreground hover:text-foreground"
+                                className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center text-muted-foreground hover:text-foreground"
                               >
                                 <Icon name="MinusIcon" size={12} />
                               </button>
                               <span className="text-xs font-bold px-1.5 font-tabular">{c.qty}</span>
                               <button
                                 onClick={() => updateCartQty(c.itemId, 1)}
-                                className="p-0.5 text-muted-foreground hover:text-foreground"
+                                className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center text-muted-foreground hover:text-foreground"
                               >
                                 <Icon name="PlusIcon" size={12} />
                               </button>
@@ -1091,7 +1175,7 @@ export default function SalesPage() {
                             </div>
                           </div>
 
-                          {/* Below Cost Warning (Requirement 7) */}
+                          {/* Below Cost Warning */}
                           {isBelowCost && (
                             <div className="p-1.5 rounded-lg bg-danger/10 border border-danger/30 text-danger text-3xs font-bold flex items-center gap-1">
                               <Icon name="ExclamationTriangleIcon" size={12} />
@@ -1140,7 +1224,7 @@ export default function SalesPage() {
                   </div>
                 </div>
 
-                {/* Payment Method Selector (Single Source of Truth) */}
+                {/* Payment Method Selector (Cash, UPI, Other) */}
                 <PaymentMethodSelect
                   layout="pills"
                   label="Payment Method"
@@ -1149,26 +1233,8 @@ export default function SalesPage() {
                   modalZIndex={1200}
                 />
 
-                {/* Payment Reference & Mandatory Proof Upload */}
+                {/* Mandatory Proof Upload */}
                 <div className="pt-2 border-t border-border space-y-2">
-                  <div>
-                    <label className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                      Payment Reference / UTR / Voucher No <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder={
-                        paymentMethod === 'Cash'
-                          ? 'e.g. CASH-RCPT-001'
-                          : 'e.g. UTR-998210 or UPI Ref ID'
-                      }
-                      value={posReferenceNo}
-                      onChange={(e) => setPosReferenceNo(e.target.value)}
-                      className="input-field text-xs py-1.5 font-mono"
-                    />
-                  </div>
-
                   <PaymentProofUpload
                     value={posPaymentProofUrl}
                     onChange={setPosPaymentProofUrl}
@@ -1177,17 +1243,14 @@ export default function SalesPage() {
                     helperText="Upload UPI screenshot, card slip, or cash voucher (JPG, PNG, WebP, PDF) — Required"
                   />
 
-                  {(!posPaymentProofUrl || !posReferenceNo.trim()) && cart.length > 0 && (
+                  {!posPaymentProofUrl && cart.length > 0 && (
                     <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-3xs font-semibold">
                       <Icon
                         name="ExclamationTriangleIcon"
                         size={14}
                         className="shrink-0 text-amber-600"
                       />
-                      <span>
-                        Payment Reference and Payment Proof file are strictly mandatory to enable
-                        checkout.
-                      </span>
+                      <span>Payment Proof upload is strictly required to enable checkout.</span>
                     </div>
                   )}
                 </div>
@@ -1207,19 +1270,14 @@ export default function SalesPage() {
                         toast.info('Cart put on hold');
                       }
                     }}
-                    className="btn-secondary h-10 text-xs font-semibold shadow-xs"
+                    className="btn-secondary h-11 text-xs font-semibold shadow-xs"
                   >
                     {heldCart ? 'Resume Held Cart' : 'Hold Cart'}
                   </button>
                   <button
                     onClick={handleCheckout}
-                    disabled={
-                      cart.length === 0 ||
-                      isCheckingOut ||
-                      !posPaymentProofUrl ||
-                      !posReferenceNo.trim()
-                    }
-                    className="btn-primary h-10 text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={cart.length === 0 || isCheckingOut || !posPaymentProofUrl}
+                    className="btn-primary h-11 text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isCheckingOut ? (
                       <>
@@ -1281,11 +1339,100 @@ export default function SalesPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto scrollbar-thin">
+            {/* Mobile Record Cards (< sm) */}
+            <div className="space-y-3 sm:hidden">
+              {filteredSalesHistory.map((s) => (
+                <div key={`mob-hist-${s.id}`} className="card p-3.5 space-y-2 border border-border">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="font-mono font-bold text-primary text-xs">{s.orderNo}</span>
+                      <span className="text-3xs text-muted-foreground block">{s.createdAt}</span>
+                    </div>
+                    <span className="badge-info text-3xs font-semibold">{s.store}</span>
+                  </div>
+                  <div className="text-xs">
+                    <span className="font-semibold text-foreground">{s.customerName}</span>
+                    <span className="text-3xs font-mono text-muted-foreground block">
+                      {s.customerPhone}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-border/50 text-xs">
+                    <span className="badge-neutral text-3xs">{s.paymentMethod}</span>
+                    <span className="font-bold text-foreground font-tabular">
+                      ₹{s.total.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-end gap-1.5 pt-1">
+                    {s.paymentProofUrl && (
+                      <button
+                        onClick={() =>
+                          setSelectedProof({
+                            url: s.paymentProofUrl!,
+                            referenceNo: s.referenceNo || s.orderNo,
+                            amount: s.total,
+                            paymentMethod: s.paymentMethod,
+                            paymentDate: s.createdAt,
+                            payeeOrPayer: s.customerName,
+                            recordedBy: s.cashierName || 'POS Terminal',
+                            timestamp: s.createdAt,
+                            notes: `Sales Order ${s.orderNo} (${s.store})`,
+                          })
+                        }
+                        className="px-2 py-1 rounded text-3xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                      >
+                        Proof
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setReceiptModal(s)}
+                      className="btn-secondary text-2xs py-1 px-2.5 h-7"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleSendWhatsAppInvoice(s)}
+                      className="p-1 rounded-md bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                      title="Send WhatsApp Invoice"
+                    >
+                      <Icon name="WhatsApp" size={14} />
+                    </button>
+                    {s.status === 'Cancelled' || s.status === 'Refunded' ? (
+                      <span className="px-1.5 py-0.5 rounded text-3xs font-bold bg-danger/10 text-danger border border-danger/20">
+                        Voided
+                      </span>
+                    ) : (
+                      (currentUser.role === 'Super Admin' ||
+                        currentUser.role === 'Store Manager') && (
+                        <button
+                          onClick={() => {
+                            setRefundModalSale(s);
+                            setRefundMethod(s.paymentMethod || 'Cash');
+                          }}
+                          className="p-1 rounded-md bg-danger/10 text-danger hover:bg-danger hover:text-white"
+                          title="Void / Refund Invoice"
+                        >
+                          <Icon name="TrashIcon" size={14} />
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              ))}
+              {filteredSalesHistory.length === 0 && (
+                <div className="py-8 text-center text-muted-foreground text-xs">
+                  No sales transactions found matching query.
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Wide Table (>= sm) with Sticky Invoice # Column */}
+            <div className="hidden sm:block overflow-x-auto scrollbar-thin">
               <table className="w-full text-left text-xs border-collapse min-w-[850px]">
                 <thead>
                   <tr className="table-header">
-                    <th className="px-4 py-3">Invoice #</th>
+                    <th className="px-4 py-3 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                      Invoice #
+                    </th>
                     <th className="px-4 py-3">Date / Time</th>
                     <th className="px-4 py-3">Store</th>
                     <th className="px-4 py-3">Customer & Mobile</th>
@@ -1301,7 +1448,9 @@ export default function SalesPage() {
                 <tbody className="divide-y divide-border/60">
                   {filteredSalesHistory.map((s) => (
                     <tr key={`hist-row-${s.id}`} className="table-row">
-                      <td className="px-4 py-3 font-mono font-bold text-primary">{s.orderNo}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-primary sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                        {s.orderNo}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                         {s.createdAt}
                       </td>
@@ -1420,26 +1569,16 @@ export default function SalesPage() {
       {/* Reusable Single-Source-of-Truth Customer Form Modal */}
       <CustomerFormModal
         open={quickRegModal}
-        onClose={() => setQuickRegModal(false)}
+        onClose={() => {
+          setQuickRegModal(false);
+          setSelectedCustomerToEdit(null);
+        }}
+        customer={selectedCustomerToEdit || undefined}
         initialPhone={customerPhoneDigits ? `+91 ${customerPhoneDigits}` : undefined}
         onSuccess={(created) => {
-          const cleanDigits = clean10DigitPhone(created.phone);
-          setSelectedCustomerId(created.id);
-          setCustomerName(created.name);
-          setCustomerPhone(created.phone);
-          setCustomerPhoneDigits(cleanDigits);
-          setCustomerNotFound(false);
-          setLookupDone(true);
-
-          if (created.gstin) {
-            setGstInvoiceEnabled(true);
-            setCustomerGstin(created.gstin.trim().toUpperCase());
-          }
-          if (created.address) {
-            setCustomerBillingAddress(created.address.trim());
-          }
-
-          setCustomerHistory({ purchases: [], repairs: [] });
+          attachCustomer(created);
+          setQuickRegModal(false);
+          setSelectedCustomerToEdit(null);
         }}
       />
 
@@ -1679,43 +1818,6 @@ export default function SalesPage() {
             </div>
           </div>
         </Modal>
-      )}
-
-      {/* Barcode Scanner Modal */}
-      {scannerOpen && (
-        <BarcodeScannerModal
-          open={scannerOpen}
-          onClose={() => setScannerOpen(false)}
-          onScan={(scannedCode) => {
-            const match = inventory.find(
-              (i) =>
-                i.store === effectiveStore &&
-                ((i.barcode && i.barcode === scannedCode) || i.sku === scannedCode)
-            );
-            if (match) {
-              addToCart(match);
-              toast.success(`Scanned & added: "${match.name}"`);
-            } else {
-              setCatalogSearch(scannedCode);
-              toast.info(`Scanned code: ${scannedCode}. Filter applied.`);
-            }
-          }}
-          title="POS Barcode Scanner"
-          subtitle="Scan product retail barcode to instantly add items to the billing cart."
-        />
-      )}
-
-      {/* Visual Product Search Modal */}
-      {imageSearchOpen && (
-        <VisualSearchModal
-          open={imageSearchOpen}
-          onClose={() => setImageSearchOpen(false)}
-          onAddToCart={(item) => {
-            addToCart(item);
-          }}
-          effectiveStore={effectiveStore}
-          inventory={inventory}
-        />
       )}
 
       {/* Full-Screen Payment Proof Viewer */}

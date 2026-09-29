@@ -90,7 +90,7 @@ export default function LoginForm() {
           `Signed in as ${result.user.role} (${result.user.email})`
         );
         toast.success(`Welcome back, ${result.user.name}! Signed in as ${result.user.role}`);
-        router.push('/dashboard');
+        router.push('/sales');
         return;
       } else {
         if (res.status === 429 || result?.locked) {

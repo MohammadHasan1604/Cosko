@@ -561,7 +561,9 @@ export default function VendorsPage() {
               <table className="w-full text-left min-w-[850px]">
                 <thead>
                   <tr className="table-header">
-                    <th className="px-4 py-3">Code / Supplier</th>
+                    <th className="px-4 py-3 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                      Code / Supplier
+                    </th>
                     <th className="px-4 py-3">Category</th>
                     <th className="px-4 py-3">Contact & Phone</th>
                     <th className="px-4 py-3">GSTIN</th>
@@ -576,7 +578,7 @@ export default function VendorsPage() {
                     const hasPayable = v.outstandingPayable > 0.005;
                     return (
                       <tr key={`v-row-${v.id}`} className="table-row">
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                           <span className="font-mono text-3xs font-bold text-muted-foreground block">
                             {v.code}
                           </span>

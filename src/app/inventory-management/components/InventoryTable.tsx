@@ -584,7 +584,7 @@ export default function InventoryTable({
             <thead>
               <tr className="bg-muted">
                 {/* Checkbox */}
-                <th className="w-10 px-4 py-3">
+                <th className="w-10 px-4 py-3 sticky left-0 z-20 bg-muted">
                   <input
                     type="checkbox"
                     checked={paginated.length > 0 && selectedIds.size === paginated.length}
@@ -597,7 +597,12 @@ export default function InventoryTable({
                 {visibleColumns.map((col) => (
                   <th
                     key={`th-${col.key}`}
-                    className="table-header"
+                    className={`table-header ${
+                      col.key === 'name' ||
+                      (col.key === 'sku' && !visibleColumns.some((c) => c.key === 'name'))
+                        ? 'sticky left-10 z-20 bg-muted border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]'
+                        : ''
+                    }`}
                     onClick={() => handleSort(col.key as SortKey)}
                   >
                     <span className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -635,7 +640,7 @@ export default function InventoryTable({
                       className={`table-row group ${isSelected ? 'bg-primary/5' : ''}`}
                     >
                       {/* Checkbox */}
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-3.5 sticky left-0 z-10 bg-card">
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -651,7 +656,14 @@ export default function InventoryTable({
 
                         if (col.key === 'sku')
                           return (
-                            <td key={`cell-${item.id}-sku`} className="table-cell">
+                            <td
+                              key={`cell-${item.id}-sku`}
+                              className={`table-cell ${
+                                !visibleColumns.some((c) => c.key === 'name')
+                                  ? 'sticky left-10 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]'
+                                  : ''
+                              }`}
+                            >
                               <div>
                                 <span className="font-mono text-xs font-semibold text-foreground">
                                   {item.sku}
@@ -665,7 +677,10 @@ export default function InventoryTable({
 
                         if (col.key === 'name')
                           return (
-                            <td key={`cell-${item.id}-name`} className="table-cell max-w-[240px]">
+                            <td
+                              key={`cell-${item.id}-name`}
+                              className="table-cell max-w-[240px] sticky left-10 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]"
+                            >
                               <div className="flex items-center gap-2.5">
                                 {item.primaryImage ||
                                 (item.images && item.images[0]) ||

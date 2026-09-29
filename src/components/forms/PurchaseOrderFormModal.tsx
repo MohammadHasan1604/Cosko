@@ -535,18 +535,14 @@ export default function PurchaseOrderFormModal({
         lineTotal: Number(it.lineTotal),
       }));
 
-      // If creating new PO with initial payment, enforce mandatory proof & UTR
+      // If creating new PO with initial payment, enforce mandatory proof
+      const effectivePaymentRef =
+        paymentRef.trim() || `PO-ADV-${Date.now().toString(36).toUpperCase()}`;
+
       if (
         !isEdit &&
         (paymentStatus === 'Partial' || paymentStatus === 'Paid' || financials.paidAmount > 0)
       ) {
-        if (!paymentRef.trim()) {
-          toast.error(
-            'Payment Reference / UTR number is mandatory when recording advance payment.'
-          );
-          setIsSubmitting(false);
-          return;
-        }
         if (!paymentProof) {
           toast.error(
             'Payment proof is mandatory! Please upload receipt/screenshot for upfront payment.'
@@ -574,7 +570,7 @@ export default function PurchaseOrderFormModal({
         paidAmount: financials.paidAmount,
         remainingAmount: financials.remainingAmount,
         paymentMethod: paymentMethod,
-        referenceNo: paymentRef.trim() || undefined,
+        referenceNo: effectivePaymentRef,
         receiptUrl: paymentProof || undefined,
         paymentProofUrl: paymentProof || undefined,
         paymentNotes: paymentNotes.trim() || undefined,
@@ -1253,7 +1249,7 @@ export default function PurchaseOrderFormModal({
                 <div className="font-bold text-muted-foreground text-3xs uppercase tracking-wider">
                   Initial Payment Details
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="text-3xs font-semibold text-muted-foreground block mb-0.5">
                       Method
@@ -1263,19 +1259,6 @@ export default function PurchaseOrderFormModal({
                       onChange={(val) => setPaymentMethod(val)}
                       size="sm"
                       modalZIndex={zIndex + 30}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-3xs font-semibold text-muted-foreground block mb-0.5">
-                      Reference / UTR # *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. UTR123456"
-                      value={paymentRef}
-                      onChange={(e) => setPaymentRef(e.target.value)}
-                      className="input-field text-xs h-8 font-mono"
                     />
                   </div>
                   <div>

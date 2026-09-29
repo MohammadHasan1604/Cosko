@@ -19,7 +19,7 @@ export default function SuperAdminGuard({
 
   useEffect(() => {
     if (currentUser.role !== 'Super Admin') {
-      router.replace('/dashboard');
+      router.replace('/sales');
     }
   }, [currentUser.role, router]);
 

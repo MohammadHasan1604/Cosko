@@ -283,8 +283,10 @@ export default function PurchasesPage() {
             <table className="w-full text-left min-w-[850px]">
               <thead>
                 <tr className="table-header">
-                  <th className="px-3 py-3 w-8 text-center"></th>
-                  <th className="px-4 py-3">PO Number</th>
+                  <th className="px-3 py-3 w-8 text-center sticky left-0 z-20 bg-card"></th>
+                  <th className="px-4 py-3 sticky left-8 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                    PO Number
+                  </th>
                   <th className="px-4 py-3">Vendor</th>
                   <th className="px-4 py-3">Store</th>
                   <th className="px-4 py-3">Products & Items</th>
@@ -305,7 +307,7 @@ export default function PurchasesPage() {
                     <React.Fragment key={`po-frag-${po.id}`}>
                       <tr className="table-row">
                         {/* Expand Toggle */}
-                        <td className="px-3 py-3 text-center">
+                        <td className="px-3 py-3 text-center sticky left-0 z-10 bg-card">
                           {itemCount > 0 ? (
                             <button
                               type="button"
@@ -320,7 +322,7 @@ export default function PurchasesPage() {
                             </button>
                           ) : null}
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs font-bold text-primary">
+                        <td className="px-4 py-3 font-mono text-xs font-bold text-primary sticky left-8 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                           {po.poNo}
                         </td>
                         <td className="px-4 py-3 font-semibold text-foreground">{po.vendorName}</td>

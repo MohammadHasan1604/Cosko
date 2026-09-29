@@ -212,7 +212,9 @@ export default function CategoriesPage() {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-muted-foreground uppercase text-3xs font-bold tracking-wider">
-                  <th className="px-4 py-3">Category Name</th>
+                  <th className="px-4 py-3 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                    Category Name
+                  </th>
                   <th className="px-4 py-3">Hierarchy / Parent</th>
                   <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3">Description</th>
@@ -251,7 +253,7 @@ export default function CategoriesPage() {
 
                     return (
                       <tr key={`cat-row-${cat.id}`} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-foreground">
+                        <td className="px-4 py-3 font-semibold text-foreground sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                           <div className="flex items-center gap-2">
                             <div
                               className={`w-2 h-2 rounded-full ${cat.status === 'Active' ? 'bg-success' : 'bg-muted-foreground'}`}
