@@ -498,8 +498,8 @@
 
   /* Button sizes */
   .btn-sm {
-    @apply text-xs px-2.5 py-1 rounded-md gap-1 font-semibold !important;
-    min-height: 30px !important;
+    @apply text-xs px-2.5 py-1.5 rounded-lg gap-1 font-semibold !important;
+    min-height: 32px !important;
   }
 
   .btn-lg {
@@ -852,27 +852,6 @@
 
   .page-subtitle {
     @apply text-xs text-muted-foreground;
-  }
-
-  /* ─── Small Buttons ─── */
-  .btn-sm {
-    @apply text-xs py-1.5 px-2.5 rounded-lg font-semibold;
-  }
-
-  /* ─── Section Header ─── */
-  .section-header {
-    @apply text-sm font-bold text-foreground;
-  }
-
-  /* ─── Empty States ─── */
-  .empty-state {
-    @apply flex flex-col items-center justify-center py-12 px-4 text-center;
-  }
-  .empty-state-title {
-    @apply text-sm font-semibold text-foreground;
-  }
-  .empty-state-text {
-    @apply text-xs text-muted-foreground mt-1 max-w-[240px];
   }
 
   /* ─── Responsive Typography Scale ─── */

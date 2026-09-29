@@ -10,6 +10,9 @@ import SupplierPaymentModal from '@/components/forms/SupplierPaymentModal';
 import ProofViewerModal, { ProofViewerData } from '@/components/ui/ProofViewerModal';
 import { toast } from 'sonner';
 import { validateAndNormalizeGstin } from '@/lib/gstUtils';
+import { VendorBillsBreakdownModal } from './components/VendorBillsBreakdownModal';
+import { VendorPaymentVoucherModal } from './components/VendorPaymentVoucherModal';
+import { DeleteVendorModal } from './components/DeleteVendorModal';
 
 export default function VendorsPage() {
   const {
@@ -36,8 +39,6 @@ export default function VendorsPage() {
 
   // Drill-Down: Vendor Payables & Bills Drawer/Modal
   const [selectedVendorForBills, setSelectedVendorForBills] = useState<Vendor | null>(null);
-  const [billsFilter, setBillsFilter] = useState<'pending' | 'all' | 'overdue'>('pending');
-  const [expandedPaymentPoId, setExpandedPaymentPoId] = useState<string | null>(null);
 
   // Pay Now Modal State (Master Single Source of Truth SupplierPaymentModal)
   const [payModalPo, setPayModalPo] = useState<any | null>(null);
@@ -215,21 +216,6 @@ export default function VendorsPage() {
     });
     return Array.from(set).sort();
   }, [vendors]);
-
-  // Selected vendor's bills for modal
-  const selectedVendorBills = useMemo(() => {
-    if (!selectedVendorForBills) return [];
-    const vMatch = enrichedVendors.find((v) => v.id === selectedVendorForBills.id);
-    const bills = vMatch?.bills || [];
-
-    if (billsFilter === 'pending') {
-      return bills.filter((b: any) => b.balance > 0.005);
-    }
-    if (billsFilter === 'overdue') {
-      return bills.filter((b: any) => b.balance > 0.005 && b.overdueStatus === 'Overdue');
-    }
-    return bills;
-  }, [selectedVendorForBills, enrichedVendors, billsFilter]);
 
   const openEdit = (v: Vendor) => {
     setEditVendorModal(v);
@@ -520,8 +506,6 @@ export default function VendorsPage() {
                   <div
                     onClick={() => {
                       setSelectedVendorForBills(v);
-                      setBillsFilter('pending');
-                      setExpandedPaymentPoId(null);
                     }}
                     className={`p-3 rounded-xl border transition-all duration-150 cursor-pointer flex items-center justify-between ${
                       hasPayable
@@ -606,7 +590,6 @@ export default function VendorsPage() {
                           <button
                             onClick={() => {
                               setSelectedVendorForBills(v);
-                              setBillsFilter('pending');
                             }}
                             className={`px-2.5 py-1 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 transition-all ${
                               hasPayable
@@ -649,348 +632,13 @@ export default function VendorsPage() {
         {/* VENDOR PAYABLES & BILLS BREAKDOWN MODAL                       */}
         {/* ------------------------------------------------------------- */}
         {selectedVendorForBills && (
-          <Modal
-            open={!!selectedVendorForBills}
+          <VendorBillsBreakdownModal
+            vendor={selectedVendorForBills}
             onClose={() => setSelectedVendorForBills(null)}
-            title={`Outstanding Payables & Bills — ${selectedVendorForBills.name}`}
-            subtitle={`Supplier Code: ${selectedVendorForBills.code} · Terms: ${selectedVendorForBills.paymentTerms || 'Net 30'}`}
-            size="lg"
-          >
-            <div className="space-y-4 py-1 text-xs">
-              {/* Financial Reconciled Banner */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-muted/40 border border-border rounded-xl">
-                <div>
-                  <span className="text-3xs uppercase font-bold text-muted-foreground block">
-                    Total Billed
-                  </span>
-                  <span className="text-base font-bold text-foreground font-tabular">
-                    ₹{(selectedVendorForBills.totalBilledAmount || 0).toLocaleString('en-IN')}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-3xs uppercase font-bold text-muted-foreground block">
-                    Settled Payments
-                  </span>
-                  <span className="text-base font-bold text-emerald-600 font-tabular">
-                    ₹{(selectedVendorForBills.totalPaidAmount || 0).toLocaleString('en-IN')}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-3xs uppercase font-bold text-muted-foreground block">
-                    Vendor Credits
-                  </span>
-                  <span className="text-base font-bold text-info font-tabular">
-                    ₹{(selectedVendorForBills.totalCreditsAmount || 0).toLocaleString('en-IN')}
-                  </span>
-                </div>
-                <div className="border-l border-border pl-3">
-                  <span className="text-3xs uppercase font-bold text-muted-foreground block">
-                    Net Balance Due
-                  </span>
-                  <span
-                    className={`text-lg font-extrabold font-tabular ${
-                      selectedVendorForBills.outstandingPayable > 0
-                        ? 'text-danger'
-                        : 'text-emerald-600'
-                    }`}
-                  >
-                    ₹{(selectedVendorForBills.outstandingPayable || 0).toLocaleString('en-IN')}
-                  </span>
-                </div>
-              </div>
-
-              {/* Bills Filter Tabs */}
-              <div className="flex items-center justify-between border-b border-border pb-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setBillsFilter('pending')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      billsFilter === 'pending'
-                        ? 'bg-primary text-primary-foreground shadow-xs'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Unpaid Bills ({selectedVendorForBills.unpaidBillsCount || 0})
-                  </button>
-                  <button
-                    onClick={() => setBillsFilter('overdue')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      billsFilter === 'overdue'
-                        ? 'bg-danger text-white shadow-xs'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Overdue Bills ({selectedVendorForBills.overdueBillsCount || 0})
-                  </button>
-                  <button
-                    onClick={() => setBillsFilter('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      billsFilter === 'all'
-                        ? 'bg-primary text-primary-foreground shadow-xs'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    All Purchase Bills ({selectedVendorBills.length})
-                  </button>
-                </div>
-
-                <span className="text-3xs text-muted-foreground hidden sm:inline">
-                  Formula: Total − Paid − Credits = Balance
-                </span>
-              </div>
-
-              {/* Bills Listing */}
-              {selectedVendorBills.length === 0 ? (
-                <div className="py-10 text-center text-muted-foreground">
-                  <Icon
-                    name="CheckCircleIcon"
-                    size={36}
-                    className="mx-auto mb-2 text-positive/60"
-                  />
-                  <p className="font-bold text-foreground">No matching purchase bills found</p>
-                  <p className="text-2xs text-muted-foreground mt-0.5">
-                    {billsFilter === 'pending'
-                      ? 'All purchase bills for this vendor are fully paid and settled.'
-                      : 'No purchase records matching this criteria.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1 scrollbar-thin">
-                  {selectedVendorBills.map((bill: any) => {
-                    const isExpanded = expandedPaymentPoId === bill.id;
-                    const isOverdue = bill.overdueStatus === 'Overdue';
-                    const isSettled = bill.balance <= 0.005;
-
-                    return (
-                      <div
-                        key={`bill-${bill.id}`}
-                        className={`rounded-xl border transition-all p-3.5 space-y-2.5 ${
-                          isOverdue
-                            ? 'border-danger/40 bg-danger/5'
-                            : isSettled
-                              ? 'border-emerald-500/30 bg-emerald-500/5'
-                              : 'border-border bg-card'
-                        }`}
-                      >
-                        {/* Bill Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-bold text-xs text-primary">
-                              {bill.invoiceNo || bill.poNo}
-                            </span>
-                            {bill.invoiceNo && bill.invoiceNo !== bill.poNo && (
-                              <span className="text-3xs text-muted-foreground font-mono">
-                                ({bill.poNo})
-                              </span>
-                            )}
-                            <span className="badge-neutral text-3xs">
-                              {bill.store || bill.storeCode}
-                            </span>
-
-                            {/* Overdue Badge */}
-                            {isOverdue ? (
-                              <span className="badge-danger text-3xs font-extrabold flex items-center gap-1">
-                                <Icon name="ClockIcon" size={11} />
-                                Overdue by {bill.overdueDays} day{bill.overdueDays === 1 ? '' : 's'}
-                              </span>
-                            ) : bill.overdueStatus === 'Due Today' ? (
-                              <span className="badge-warning text-3xs font-extrabold">
-                                Due Today
-                              </span>
-                            ) : isSettled ? (
-                              <span className="badge-positive text-3xs font-bold flex items-center gap-1">
-                                <Icon name="CheckIcon" size={11} /> Settled
-                              </span>
-                            ) : (
-                              <span className="badge-neutral text-3xs">Pending</span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {/* Payment History Toggle */}
-                            <button
-                              onClick={() => setExpandedPaymentPoId(isExpanded ? null : bill.id)}
-                              className="btn-secondary text-3xs py-1 px-2.5 gap-1"
-                            >
-                              <Icon name="DocumentTextIcon" size={12} />
-                              {bill.payments?.length || 0} Payment
-                              {bill.payments?.length === 1 ? '' : 's'}
-                              <Icon
-                                name="ChevronDownIcon"
-                                size={12}
-                                className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                              />
-                            </button>
-
-                            {/* Pay Now Button */}
-                            {!isSettled && (
-                              <button
-                                onClick={() => openPayNow(bill)}
-                                className="btn-primary text-3xs py-1 px-3 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                              >
-                                <Icon name="BanknotesIcon" size={12} />
-                                Pay Now
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Bill Financial Breakdown Row */}
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-2xs font-tabular pt-1 border-t border-border/70">
-                          <div>
-                            <span className="text-muted-foreground block">Order Date:</span>
-                            <span className="font-semibold text-foreground">
-                              {bill.orderDate
-                                ? new Date(bill.orderDate).toLocaleDateString('en-IN')
-                                : '—'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block">Due Date:</span>
-                            <span
-                              className={`font-semibold ${isOverdue ? 'text-danger' : 'text-foreground'}`}
-                            >
-                              {bill.effectiveDueDate
-                                ? new Date(bill.effectiveDueDate).toLocaleDateString('en-IN')
-                                : 'Net 30'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block">Original Amount:</span>
-                            <span className="font-bold text-foreground">
-                              ₹{bill.totalCost.toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block">Paid Amount:</span>
-                            <span className="font-semibold text-emerald-600">
-                              ₹{(bill.paidAmount || 0).toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block font-bold">
-                              Outstanding Balance:
-                            </span>
-                            <span
-                              className={`font-extrabold text-xs ${bill.balance > 0 ? 'text-danger' : 'text-emerald-600'}`}
-                            >
-                              ₹{bill.balance.toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Expandable Payment History Table */}
-                        {isExpanded && (
-                          <div className="mt-2 pt-2 border-t border-border/70 fade-in space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">
-                                Verified Payment Transactions
-                              </span>
-                              <span className="text-3xs text-muted-foreground">
-                                Source: Real DB Purchase Payments
-                              </span>
-                            </div>
-
-                            {!bill.payments || bill.payments.length === 0 ? (
-                              <p className="text-3xs text-muted-foreground italic py-1">
-                                No payment transactions recorded yet.
-                              </p>
-                            ) : (
-                              <div className="overflow-x-auto border border-border rounded-lg">
-                                <table className="w-full text-left text-3xs">
-                                  <thead>
-                                    <tr className="bg-muted text-muted-foreground font-bold uppercase">
-                                      <th className="px-2.5 py-1.5">Voucher #</th>
-                                      <th className="px-2.5 py-1.5">Date</th>
-                                      <th className="px-2.5 py-1.5 font-tabular text-right">
-                                        Amount
-                                      </th>
-                                      <th className="px-2.5 py-1.5">Method</th>
-                                      <th className="px-2.5 py-1.5">Reference / UTR</th>
-                                      <th className="px-2.5 py-1.5">Remarks</th>
-                                      <th className="px-2.5 py-1.5">Recorded By</th>
-                                      <th className="px-2.5 py-1.5 text-center">Receipt</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-border font-tabular">
-                                    {bill.payments.map((p: any) => (
-                                      <tr key={`pay-row-${p.id}`} className="hover:bg-muted/20">
-                                        <td className="px-2.5 py-1.5 font-mono text-primary font-bold">
-                                          {p.voucherNo || 'PV-LEGACY'}
-                                        </td>
-                                        <td className="px-2.5 py-1.5 text-muted-foreground">
-                                          {new Date(
-                                            p.paymentDate || p.createdAt
-                                          ).toLocaleDateString('en-IN')}
-                                        </td>
-                                        <td className="px-2.5 py-1.5 text-right font-extrabold text-emerald-600">
-                                          ₹{Number(p.amount).toLocaleString('en-IN')}
-                                        </td>
-                                        <td className="px-2.5 py-1.5">{p.paymentMethod}</td>
-                                        <td className="px-2.5 py-1.5 font-mono text-muted-foreground">
-                                          {p.referenceNo || 'N/A'}
-                                        </td>
-                                        <td
-                                          className="px-2.5 py-1.5 text-muted-foreground max-w-[160px] truncate"
-                                          title={p.notes || ''}
-                                        >
-                                          {p.notes || '—'}
-                                        </td>
-                                        <td className="px-2.5 py-1.5 text-muted-foreground">
-                                          {p.recordedBy}
-                                        </td>
-                                        <td className="px-2.5 py-1.5 text-center">
-                                          {p.receiptUrl ? (
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                setProofViewerData({
-                                                  proofUrl: p.receiptUrl,
-                                                  title: `Payment Proof — Voucher #${p.voucherNo || 'PV'}`,
-                                                  amount: Number(p.amount),
-                                                  paymentMethod: p.paymentMethod,
-                                                  referenceNo: p.referenceNo,
-                                                  paymentDate: p.paymentDate,
-                                                  recordedBy: p.recordedBy,
-                                                  entityName: selectedVendorForBills?.name,
-                                                  billNo: bill.invoiceNo || bill.poNo,
-                                                  notes: p.notes,
-                                                })
-                                              }
-                                              className="text-primary hover:underline font-bold inline-flex items-center gap-0.5"
-                                            >
-                                              <Icon name="DocumentIcon" size={11} /> View Proof
-                                            </button>
-                                          ) : (
-                                            <span className="text-muted-foreground/50">—</span>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="flex justify-end pt-3 border-t border-border">
-                <button
-                  onClick={() => setSelectedVendorForBills(null)}
-                  className="btn-secondary text-xs"
-                >
-                  Close Payables Drawer
-                </button>
-              </div>
-            </div>
-          </Modal>
+            openPayNow={(po) => setPayModalPo(po)}
+            setProofViewerData={(proof) => setProofViewerData(proof)}
+          />
         )}
-
         {/* Master Single Source of Truth Supplier Payment Modal */}
         <SupplierPaymentModal
           open={Boolean(payModalPo)}
@@ -1009,176 +657,12 @@ export default function VendorsPage() {
         {/* PRINTABLE PAYMENT RECEIPT VOUCHER MODAL                       */}
         {/* ------------------------------------------------------------- */}
         {receiptVoucherModal && (
-          <Modal
-            open={!!receiptVoucherModal}
+          <VendorPaymentVoucherModal
+            voucher={receiptVoucherModal}
+            currentUser={currentUser}
             onClose={() => setReceiptVoucherModal(null)}
-            title="Official Payment Receipt Voucher"
-            subtitle={`Voucher #${receiptVoucherModal.voucherNo} · Status: Verified`}
-            size="md"
-          >
-            <div className="space-y-4 py-2 text-xs">
-              {/* Printable Voucher Card */}
-              <div
-                id="payment-voucher-print-area"
-                className="p-5 border border-border rounded-xl bg-card space-y-4"
-              >
-                <div className="flex items-start justify-between border-b border-border pb-3">
-                  <div>
-                    <h2 className="text-base font-extrabold text-foreground tracking-tight">
-                      COSKO ENTERPRISE RETAIL
-                    </h2>
-                    <p className="text-3xs text-muted-foreground">
-                      Procurement & Accounts Payable Department
-                    </p>
-                    <p className="text-3xs text-muted-foreground font-mono mt-0.5">
-                      Voucher: {receiptVoucherModal.voucherNo}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="badge-positive text-2xs font-bold px-2 py-0.5">
-                      PAID / SETTLED
-                    </span>
-                    <p className="text-3xs text-muted-foreground mt-1">
-                      {new Date(receiptVoucherModal.paymentDate).toLocaleDateString('en-IN')}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-2xs">
-                  <div>
-                    <span className="text-muted-foreground uppercase text-3xs font-bold block">
-                      Vendor Beneficiary:
-                    </span>
-                    <strong className="text-foreground text-xs block">
-                      {receiptVoucherModal.vendorName}
-                    </strong>
-                    {receiptVoucherModal.vendorGstin && (
-                      <span className="text-muted-foreground font-mono block">
-                        GSTIN: {receiptVoucherModal.vendorGstin}
-                      </span>
-                    )}
-                    {receiptVoucherModal.vendorPhone && (
-                      <span className="text-muted-foreground block">
-                        Phone: {receiptVoucherModal.vendorPhone}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <span className="text-muted-foreground uppercase text-3xs font-bold block">
-                      Bill Details:
-                    </span>
-                    <strong className="text-primary font-mono text-xs block">
-                      Invoice #{receiptVoucherModal.billNo}
-                    </strong>
-                    <span className="text-muted-foreground font-mono text-3xs block">
-                      PO Ref: {receiptVoucherModal.poNo}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-muted/40 rounded-xl border border-border space-y-1.5 font-tabular text-2xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Bill Value:</span>
-                    <span className="font-bold text-foreground">
-                      ₹{Number(receiptVoucherModal.totalCost).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Payment Method:</span>
-                    <span className="font-bold text-foreground">
-                      {receiptVoucherModal.paymentMethod}
-                    </span>
-                  </div>
-                  {receiptVoucherModal.referenceNo && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Transaction Reference (UTR):</span>
-                      <span className="font-mono font-bold text-foreground">
-                        {receiptVoucherModal.referenceNo}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between pt-1.5 border-t border-border font-extrabold text-sm text-emerald-600">
-                    <span>Disbursed Amount:</span>
-                    <span>₹{Number(receiptVoucherModal.amount).toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between text-muted-foreground pt-1 border-t border-border/60">
-                    <span>Remaining Balance on Bill:</span>
-                    <span className="font-bold text-foreground">
-                      ₹{Number(receiptVoucherModal.remainingBalance).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
-
-                {receiptVoucherModal.receiptUrl && (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300">
-                    <div className="flex items-center gap-2">
-                      <Icon
-                        name="DocumentCheckIcon"
-                        size={16}
-                        className="text-emerald-600 shrink-0"
-                      />
-                      <div>
-                        <span className="font-bold text-2xs block">Payment Proof Attached</span>
-                        <span className="text-4xs text-muted-foreground font-mono">
-                          Permanently stored in database ledger
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setProofViewerData({
-                          proofUrl: receiptVoucherModal.receiptUrl,
-                          title: `Payment Proof — Voucher #${receiptVoucherModal.voucherNo}`,
-                          amount: Number(receiptVoucherModal.amount),
-                          paymentMethod: receiptVoucherModal.paymentMethod,
-                          referenceNo: receiptVoucherModal.referenceNo,
-                          paymentDate: receiptVoucherModal.paymentDate,
-                          recordedBy: receiptVoucherModal.recordedBy,
-                          entityName: receiptVoucherModal.vendorName,
-                          billNo: receiptVoucherModal.billNo,
-                        })
-                      }
-                      className="btn-secondary text-2xs py-1 px-2.5 gap-1 font-bold shadow-2xs"
-                    >
-                      <Icon name="EyeIcon" size={12} />
-                      View Proof
-                    </button>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between text-3xs text-muted-foreground pt-2 border-t border-border">
-                  <span>
-                    Authorized by:{' '}
-                    <strong>{receiptVoucherModal.recordedBy || currentUser?.name}</strong>
-                  </span>
-                  <span>Digitally Recorded via COSKO StoreCommand</span>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-between pt-2 border-t border-border">
-                <span className="text-3xs text-muted-foreground">
-                  Print or export copy for vendor file.
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handlePrintReceipt}
-                    className="btn-secondary text-xs gap-1.5 font-bold"
-                  >
-                    <Icon name="PrinterIcon" size={14} />
-                    Print Receipt Voucher
-                  </button>
-                  <button
-                    onClick={() => setReceiptVoucherModal(null)}
-                    className="btn-primary text-xs font-bold"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            </div>
-          </Modal>
+            setProofViewerData={(proof) => setProofViewerData(proof)}
+          />
         )}
 
         {/* Reusable Single-Source-of-Truth Vendor Form Modal */}
@@ -1195,90 +679,17 @@ export default function VendorsPage() {
         {/* DELETE / ARCHIVE CONFIRMATION MODAL                           */}
         {/* ------------------------------------------------------------- */}
         {deleteVendorModal && (
-          <Modal
-            open={!!deleteVendorModal}
+          <DeleteVendorModal
+            vendor={deleteVendorModal}
+            currentUser={currentUser}
             onClose={() => setDeleteVendorModal(null)}
-            title={`Archive / Delete "${deleteVendorModal.name}"`}
-            subtitle="Relational validation against purchase orders and financial history"
-            size="md"
-          >
-            <div className="space-y-4 py-2 text-xs">
-              {(() => {
-                const poCount =
-                  (deleteVendorModal as any).totalBillsCount ||
-                  (deleteVendorModal.outstandingPayable > 0 ? 1 : 0);
-                return (
-                  <>
-                    <div
-                      className={`p-4 rounded-xl border ${
-                        poCount > 0
-                          ? 'bg-warning/10 border-warning/30 text-foreground'
-                          : 'bg-muted/40 border-border text-foreground'
-                      }`}
-                    >
-                      <div className="flex items-start gap-2.5">
-                        <Icon
-                          name={poCount > 0 ? 'ExclamationTriangleIcon' : 'InformationCircleIcon'}
-                          size={18}
-                          className={
-                            poCount > 0
-                              ? 'text-warning shrink-0 mt-0.5'
-                              : 'text-primary shrink-0 mt-0.5'
-                          }
-                        />
-                        <div>
-                          <p className="font-bold text-sm">
-                            {poCount > 0
-                              ? 'Linked Procurement & Financial Records Found'
-                              : 'Unused Supplier Profile'}
-                          </p>
-                          <p className="text-muted-foreground mt-1">
-                            {poCount > 0
-                              ? `This vendor has purchase bills or an outstanding balance of ₹${deleteVendorModal.outstandingPayable.toLocaleString(
-                                  'en-IN'
-                                )}. To protect warehouse inventory ledgers, tax records, and accounting history, it will be safely Archived.`
-                              : `This vendor has no linked purchase orders. You can safely archive it or permanently delete it.`}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-3 border-t border-border">
-                      <button
-                        onClick={() => setDeleteVendorModal(null)}
-                        className="btn-secondary text-xs"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await deleteVendor(deleteVendorModal.id, false);
-                          setDeleteVendorModal(null);
-                        }}
-                        className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4"
-                      >
-                        Safe Archive
-                      </button>
-                      {poCount === 0 && currentUser?.role === 'Super Admin' && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await deleteVendor(deleteVendorModal.id, true);
-                            setDeleteVendorModal(null);
-                          }}
-                          className="btn-danger text-xs font-bold px-4"
-                        >
-                          Permanent Delete
-                        </button>
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-          </Modal>
+            onDelete={async (vendorId, permanent) => {
+              await deleteVendor(vendorId, permanent);
+              setDeleteVendorModal(null);
+            }}
+          />
         )}
+
         {/* Reusable Proof Viewer Modal */}
         <ProofViewerModal
           open={!!proofViewerData}

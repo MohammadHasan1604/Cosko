@@ -69,7 +69,9 @@ export default function AuditLogsPage() {
               <table className="w-full text-left min-w-[750px]">
                 <thead>
                   <tr className="bg-muted text-2xs font-bold uppercase text-muted-foreground">
-                    <th className="px-4 py-3">Timestamp</th>
+                    <th className="px-4 py-3 sticky left-0 z-20 bg-muted border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                      Timestamp
+                    </th>
                     <th className="px-4 py-3">User & Role</th>
                     <th className="px-4 py-3">Module</th>
                     <th className="px-4 py-3">Action</th>
@@ -80,7 +82,7 @@ export default function AuditLogsPage() {
                 <tbody className="divide-y divide-border text-sm">
                   {filteredLogs.map((log) => (
                     <tr key={`audit-${log.id}`} className="hover:bg-muted/40 transition-colors">
-                      <td className="px-4 py-3.5 text-2xs text-muted-foreground font-mono">
+                      <td className="px-4 py-3.5 text-2xs text-muted-foreground font-mono sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                         {log.timestamp}
                       </td>
                       <td className="px-4 py-3.5">

@@ -138,7 +138,9 @@ export default function StockTransfersPage() {
               <table className="w-full text-left border-collapse text-xs min-w-[780px]">
                 <thead>
                   <tr className="table-header">
-                    <th className="px-4 py-3">Transfer #</th>
+                    <th className="px-4 py-3 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                      Transfer #
+                    </th>
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">Route (From → To)</th>
                     <th className="px-4 py-3 text-right">Units</th>
@@ -158,7 +160,7 @@ export default function StockTransfersPage() {
                   ) : (
                     filteredTransfers.map((t: any) => (
                       <tr key={t.id || t.transferNo} className="table-row">
-                        <td className="px-4 py-3 font-mono font-bold text-primary">
+                        <td className="px-4 py-3 font-mono font-bold text-primary sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                           {t.transferNo}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">

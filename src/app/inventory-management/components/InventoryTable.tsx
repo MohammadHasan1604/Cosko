@@ -640,7 +640,9 @@ export default function InventoryTable({
                       className={`table-row group ${isSelected ? 'bg-primary/5' : ''}`}
                     >
                       {/* Checkbox */}
-                      <td className="px-4 py-3.5 sticky left-0 z-10 bg-card">
+                      <td
+                        className={`px-4 py-3.5 sticky left-0 z-10 ${isSelected ? 'bg-primary/10' : 'bg-card group-hover:bg-muted/40'}`}
+                      >
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -660,7 +662,7 @@ export default function InventoryTable({
                               key={`cell-${item.id}-sku`}
                               className={`table-cell ${
                                 !visibleColumns.some((c) => c.key === 'name')
-                                  ? 'sticky left-10 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]'
+                                  ? `sticky left-10 z-10 ${isSelected ? 'bg-primary/10' : 'bg-card group-hover:bg-muted/40'} border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]`
                                   : ''
                               }`}
                             >
@@ -679,7 +681,7 @@ export default function InventoryTable({
                           return (
                             <td
                               key={`cell-${item.id}-name`}
-                              className="table-cell max-w-[240px] sticky left-10 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]"
+                              className={`table-cell max-w-[240px] sticky left-10 z-10 ${isSelected ? 'bg-primary/10' : 'bg-card group-hover:bg-muted/40'} border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]`}
                             >
                               <div className="flex items-center gap-2.5">
                                 {item.primaryImage ||

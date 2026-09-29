@@ -234,7 +234,9 @@ export default function ExistingCustomersPage() {
             <table className="w-full text-left text-sm">
               <thead className="bg-secondary/40 text-muted-foreground text-xs uppercase font-semibold border-b border-border">
                 <tr>
-                  <th className="px-4 py-3.5">Customer Name</th>
+                  <th className="px-4 py-3.5 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                    Customer Name
+                  </th>
                   <th className="px-4 py-3.5">Mobile Number</th>
                   <th className="px-4 py-3.5">Legacy ID</th>
                   <th className="px-4 py-3.5">COSKO Master Link</th>
@@ -264,7 +266,9 @@ export default function ExistingCustomersPage() {
                 ) : (
                   customers.map((c) => (
                     <tr key={c.id} className="hover:bg-secondary/30 transition-colors">
-                      <td className="px-4 py-3.5 font-medium text-foreground">{c.name}</td>
+                      <td className="px-4 py-3.5 font-medium text-foreground sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                        {c.name}
+                      </td>
                       <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">
                         {c.phone}
                       </td>
