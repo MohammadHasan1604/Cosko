@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const requestedRole = body.role || 'POS Cashier';
+    const requestedRole = body.role || 'Sales Manager';
     const requestedLevel =
       body.securityLevel !== undefined ? Number(body.securityLevel) : undefined;
 

@@ -530,7 +530,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const cashierPosRes = RBACEngine.authorize(cashierUser, cashierPosReq);
   assertTest(
     '9. Functional Features',
-    'POS Cashier Authorized Checkout Action',
+    'Sales Manager Authorized Checkout Action',
     'PASS',
     cashierPosRes.allowed ? 'PASS' : 'DENIED',
     cashierPosRes.reason || 'POS checkout authorized'
@@ -546,7 +546,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const grnRes = RBACEngine.authorize(auditorUser, grnReq);
   assertTest(
     '9. Functional Features',
-    'Inventory Manager Authorized GRN Receiving',
+    'Store Manager Authorized GRN Receiving',
     'PASS',
     grnRes.allowed ? 'PASS' : 'DENIED',
     grnRes.reason || 'GRN receiving authorized'
@@ -660,7 +660,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   );
 
   // =========================================================================
-  // CATEGORY 15: REGRESSION & UX TESTING (Zero-Integrations Check & Sales Executive Scope)
+  // CATEGORY 15: REGRESSION & UX TESTING (Zero-Integrations Check & Sales Manager Scope)
   // =========================================================================
   const intReq: ResourceRequest = {
     resourceName: 'Integrations Page',
@@ -745,10 +745,10 @@ export async function runSecurityAuditTestSuite(): Promise<{
   const seDiscountRes = RBACEngine.authorize(salesExecWithDiscount, seDiscountReq);
   assertTest(
     '15. Regression & UX',
-    'Sales Executive Super Admin Custom Allow Toggle (sales.discount ALLOW)',
+    'Sales Manager Super Admin Custom Allow Toggle (sales.discount ALLOW)',
     'PASS',
     seDiscountRes.allowed ? 'PASS' : 'DENIED',
-    'Granted Sales Executive custom discount permission override'
+    'Granted Sales Manager custom discount permission override'
   );
 
   // =========================================================================
@@ -1025,7 +1025,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
   // CATEGORY 28: PHASE 27 FIELD-LEVEL AUTHORIZATION & TECHNICIAN NOTE REDACTION
   // =========================================================================
   const redactRepairForRole = (repair: typeof sampleLegacyRepair, role: string) => {
-    const isManager = ['Super Admin', 'Store Manager', 'Inventory Manager'].includes(role);
+    const isManager = ['Super Admin', 'Store Manager'].includes(role);
     return {
       ticketNo: repair.ticketNo,
       deviceName: repair.deviceName,
@@ -1034,7 +1034,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
       technicianNotes: isManager ? repair.technicianNotes : null, // REDACTED for Sales roles
     };
   };
-  const salesEmployeeView = redactRepairForRole(sampleLegacyRepair, 'Sales Executive');
+  const salesEmployeeView = redactRepairForRole(sampleLegacyRepair, 'Sales Manager');
   const storeManagerView = redactRepairForRole(sampleLegacyRepair, 'Store Manager');
   const isFieldRedactionEnforced =
     salesEmployeeView.technicianNotes === null && storeManagerView.technicianNotes !== null;
@@ -1043,7 +1043,7 @@ export async function runSecurityAuditTestSuite(): Promise<{
     'Phase 27: Role-Based Field Redaction (Technician Notes Redacted for Sales)',
     'PASS',
     isFieldRedactionEnforced ? 'PASS' : 'DENIED',
-    'Sales Executive receives public repair summary; internal technician diagnosis notes remain hidden'
+    'Sales Manager receives public repair summary; internal technician diagnosis notes remain hidden'
   );
 
   // =========================================================================
@@ -1076,15 +1076,15 @@ export async function runSecurityAuditTestSuite(): Promise<{
     role === 'Super Admin' && level >= 100;
   const isSuperAdminPermitted = canAccessDataConnections('Super Admin', 100);
   const isManagerRejected = !canAccessDataConnections('Store Manager', 80);
-  const isCashierRejected = !canAccessDataConnections('POS Cashier', 20);
+  const isSalesManagerRejected = !canAccessDataConnections('Sales Manager', 40);
   const isDataConnectionRBACSecure =
-    isSuperAdminPermitted && isManagerRejected && isCashierRejected;
+    isSuperAdminPermitted && isManagerRejected && isSalesManagerRejected;
   assertTest(
     '6. Super Admin Security',
     'Settings Data Connections RBAC Guard (Level 100 Exclusive Access)',
     'PASS',
     isDataConnectionRBACSecure ? 'PASS' : 'DENIED',
-    'Level 100 Super Admin authorized; Manager and Cashier strictly blocked (403 Forbidden)'
+    'Level 100 Super Admin authorized; Store Manager and Sales Manager strictly blocked (403 Forbidden)'
   );
 
   // =========================================================================

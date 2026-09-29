@@ -162,35 +162,15 @@ export default function UsersPage() {
       role: 'Store Manager',
       level: 80,
       access:
-        'Level 80 — Assigned store sales, inventory CRUD, purchase orders, customer CRM & daily reporting.',
+        'Level 80 — Assigned store operations, local inventory CRUD, purchase orders, customer CRM & daily reporting.',
       badge: 'badge-warning',
     },
     {
-      role: 'Inventory Manager',
-      level: 60,
-      access:
-        'Level 60 — Inventory stock catalog, purchases, stock adjustments & goods receiving notes (GRN).',
-      badge: 'badge-neutral',
-    },
-    {
-      role: 'Sales Executive',
+      role: 'Sales Manager',
       level: 40,
       access:
-        'Level 40 — Sales & POS terminal billing checkout, walk-in customer creation, receipt printing & sale photo proof.',
+        'Level 40 — POS terminal billing checkout, walk-in customer creation, receipt printing & sale photo proof.',
       badge: 'badge-primary',
-    },
-    {
-      role: 'POS Cashier',
-      level: 20,
-      access:
-        'Level 20 — Sales & POS terminal billing checkout, receipt printing & customer lookup.',
-      badge: 'badge-info',
-    },
-    {
-      role: 'Restricted Employee',
-      level: 10,
-      access: 'Level 10 — Dashboard view only. All other modules denied by default.',
-      badge: 'badge-ghost',
     },
   ];
 
@@ -214,7 +194,7 @@ export default function UsersPage() {
           </div>
 
           {/* Security Level Matrix Cards */}
-          <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 md:grid md:grid-cols-5 md:gap-3 pb-1 md:pb-0">
+          <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 md:grid md:grid-cols-3 md:gap-3 pb-1 md:pb-0">
             {roleDescriptions.map((rd) => (
               <div
                 key={`matrix-${rd.role}`}

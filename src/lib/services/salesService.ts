@@ -88,9 +88,10 @@ export async function executePOSCheckout(input: CreateSaleInput) {
       'Payment proof is mandatory! Please upload a valid receipt or transaction screenshot.'
     );
   }
-  if (!input.referenceNo || !String(input.referenceNo).trim()) {
-    throw new Error('Payment Reference / UTR / Voucher number is strictly mandatory.');
-  }
+  const effectiveRefNo =
+    input.referenceNo && String(input.referenceNo).trim()
+      ? String(input.referenceNo).trim()
+      : `TXN-${store3Digit}-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
   // Execute atomic interactive transaction with configured timeouts
   const result = await prisma.$transaction(
@@ -169,7 +170,7 @@ export async function executePOSCheckout(input: CreateSaleInput) {
           totalCost,
           grossProfit,
           paymentMethod: input.paymentMethod,
-          referenceNo: input.referenceNo || null,
+          referenceNo: effectiveRefNo,
           paymentProofUrl:
             input.paymentProofUrl ||
             (input.photos && input.photos.length > 0 ? input.photos[0] : null),
@@ -247,10 +248,10 @@ export async function executePOSCheckout(input: CreateSaleInput) {
         refId: sale.id,
         refNo: orderNo,
         entityName: input.customerName || 'Customer',
-        description: `Payment Receipt via ${input.paymentMethod} for Order ${orderNo}${input.referenceNo ? ` (Ref: ${input.referenceNo})` : ''}`,
+        description: `Payment Receipt via ${input.paymentMethod} for Order ${orderNo} (Ref: ${effectiveRefNo})`,
         metadataJson: JSON.stringify({
           proofUrl: effectiveProofUrl,
-          referenceNo: input.referenceNo || null,
+          referenceNo: effectiveRefNo,
           paymentMethod: input.paymentMethod,
           orderNo,
           cashierName: input.cashierName,
@@ -318,7 +319,7 @@ export async function executePOSCheckout(input: CreateSaleInput) {
           action: 'POS Checkout',
           details: `Completed order ${orderNo} for ${input.customerName} (Total: ₹${grandTotal.toFixed(2)}) [${input.paymentMethod}]`,
           userEmail: input.cashierName,
-          userRole: 'POS Cashier',
+          userRole: 'Sales Manager',
           storeCode,
         },
       });

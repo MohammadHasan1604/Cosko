@@ -53,7 +53,8 @@
     "test:phase1": "npx tsx tests/phase1-security.test.ts",
     "test:phase2": "npx tsx tests/phase2.test.ts",
     "test:phase3": "npx tsx tests/phase3.test.ts",
-    "test:all": "npx tsx tests/phase1-security.test.ts && npx tsx tests/phase2.test.ts && npx tsx tests/phase3.test.ts"
+    "test:deep": "npx tsx tests/phase3-deep-verification.test.ts",
+    "test:all": "npx tsx tests/phase1-security.test.ts && npx tsx tests/phase2.test.ts && npx tsx tests/phase3.test.ts && npx tsx tests/phase3-deep-verification.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1121.0",

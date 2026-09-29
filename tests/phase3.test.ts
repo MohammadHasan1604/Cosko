@@ -274,13 +274,19 @@ async function runPhase3Tests() {
         phone: phone,
         normalizedPhone: phone,
         email: `cust_${testId}@test.com`,
-        totalSpent: 0,
-        creditBalance: 0,
+        storeProfiles: {
+          create: [{
+            storeCode: storeCode,
+            creditBalance: 0,
+            totalSpent: 0,
+          }],
+        },
       },
+      include: { storeProfiles: true },
     });
     customerId = cust.id;
-    const read = await prisma.customer.findUnique({ where: { id: customerId } });
-    return read?.email === `cust_${testId}@test.com`;
+    const read = await prisma.customer.findUnique({ where: { id: customerId }, include: { storeProfiles: true } });
+    return read?.email === `cust_${testId}@test.com` && read?.storeProfiles?.length > 0;
   });
 
   // 4.7 Vendor CRUD
@@ -428,7 +434,7 @@ async function runPhase3Tests() {
           grandTotal: 240.00,
           totalCost: 100.00,
           grossProfit: 140.00,
-          paymentMethod: 'Card',
+          paymentMethod: 'UPI',
           cashierName: 'QA Cashier',
           items: {
             create: [{
@@ -466,8 +472,8 @@ async function runPhase3Tests() {
       });
 
       // 4. Update customer total spent
-      await tx.customer.update({
-        where: { id: customerId },
+      await (tx as any).customerStoreProfile.updateMany({
+        where: { customerId, storeCode },
         data: { totalSpent: { increment: 240.00 } },
       });
     });
@@ -514,8 +520,8 @@ async function runPhase3Tests() {
       });
 
       // 4. Revert customer spent total
-      await tx.customer.update({
-        where: { id: customerId },
+      await (tx as any).customerStoreProfile.updateMany({
+        where: { customerId, storeCode },
         data: { totalSpent: { decrement: 240.00 } },
       });
     });

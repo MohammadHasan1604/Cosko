@@ -176,6 +176,7 @@ async function verifyAccountingRootReconciliation() {
           },
         ],
         paymentMethod: 'UPI',
+        paymentProofUrl: '/api/files/payment-proofs/2026/09/reconciliation-audit-proof.jpg',
         cashierName: 'Auto Audit Engine',
       });
 

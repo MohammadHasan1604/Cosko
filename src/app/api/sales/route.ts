@@ -155,11 +155,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    // Auto-generate internal transaction audit reference if omitted
     if (!body.referenceNo || !String(body.referenceNo).trim()) {
-      return NextResponse.json(
-        { error: 'Payment Reference / UTR / Voucher number is strictly mandatory.' },
-        { status: 400 }
-      );
+      body.referenceNo = `TXN-${body.storeCode}-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     }
 
     const itemFingerprint = body.items

@@ -551,7 +551,7 @@ export async function POST(req: NextRequest) {
                   grnNo,
                   purchaseId: createdPO.id,
                   storeCode: targetStore,
-                  receivedBy: user.name || 'Inventory Manager',
+                  receivedBy: user.name || 'Store Manager',
                   notes: `Auto-generated GRN upon purchase order creation (${poNo})`,
                 },
               });
@@ -855,7 +855,7 @@ export async function PUT(req: NextRequest) {
                 grnNo,
                 purchaseId: existing.id,
                 storeCode: targetStore,
-                receivedBy: user.name || 'Inventory Manager',
+                receivedBy: user.name || 'Store Manager',
                 notes: body.grnNotes || `Goods received against PO ${existing.poNo}`,
               },
             });

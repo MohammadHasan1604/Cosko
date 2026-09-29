@@ -111,20 +111,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const cleanRef = body.referenceNo
-      ? String(body.referenceNo).trim()
-      : body.payRef
-        ? String(body.payRef).trim()
-        : '';
-    if (!cleanRef) {
-      return NextResponse.json(
-        { error: 'Reference / Voucher / Transaction number is mandatory.' },
-        { status: 400 }
-      );
-    }
+    const cleanRef =
+      (body.referenceNo && String(body.referenceNo).trim()) ||
+      (body.payRef && String(body.payRef).trim()) ||
+      `EXP-REF-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
     const expenseDate = body.date ? new Date(body.date) : new Date();
-    const paymentMethod = body.paymentMethod ? String(body.paymentMethod).trim() : 'Bank Transfer';
+    const paymentMethod = body.paymentMethod ? String(body.paymentMethod).trim() : 'Other';
 
     const pmRecord = await prisma.paymentMethod.findFirst({
       where: { name: paymentMethod },
@@ -206,11 +199,11 @@ export async function POST(req: NextRequest) {
               timestamp: new Date().toISOString(),
             });
 
-            // Record Double-Entry Financial Ledger Entries for Expense atomically in a single batched query
+            const entrySuffix = Date.now().toString().slice(-4);
             await tx.financialLedgerEntry.createMany({
               data: [
                 {
-                  entryNo: `JRN-EXP-${expenseNo}`,
+                  entryNo: `JRN-EXP-${expenseNo}-${entrySuffix}`,
                   entryDate: expenseDate,
                   storeCode: expenseStore,
                   accountCategory: isCentral ? 'CENTRAL_EXPENSE' : 'OPERATING_EXPENSE',
@@ -226,7 +219,7 @@ export async function POST(req: NextRequest) {
                   createdBy: user.name,
                 },
                 {
-                  entryNo: `JRN-EXP-BANK-${expenseNo}`,
+                  entryNo: `JRN-EXP-BANK-${expenseNo}-${entrySuffix}`,
                   entryDate: expenseDate,
                   storeCode: expenseStore,
                   accountCategory: 'ASSET',

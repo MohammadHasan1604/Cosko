@@ -72,9 +72,6 @@ async function apiCall<T = any>(
         ...(customHeaders || {}),
       };
       if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
-      if (activeEmail) headers['x-user-email'] = activeEmail;
-      if (activeRole) headers['x-user-role'] = activeRole;
-      if (activeStore) headers['x-user-store'] = activeStore;
       if (idempotencyKey && !headers['x-idempotency-key']) {
         headers['x-idempotency-key'] = idempotencyKey;
       }
@@ -285,7 +282,7 @@ export const MySQLDataService = {
     return apiCall('/api/users', 'POST', {
       name: user.name,
       email: user.email,
-      password: user.password || 'Cosko2026@',
+      password: user.password,
       role: user.role,
       store: user.store,
       assignedStores: user.assignedStores || user.allowedStores || [user.store],

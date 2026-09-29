@@ -267,16 +267,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const cleanRef = body.referenceNo ? String(body.referenceNo).trim() : '';
-    if (!cleanRef) {
-      return NextResponse.json(
-        { error: 'Payment Reference / UTR / Cheque number is mandatory.' },
-        { status: 400 }
-      );
-    }
+    const cleanRef =
+      (body.referenceNo && String(body.referenceNo).trim()) ||
+      (body.payRef && String(body.payRef).trim()) ||
+      `VND-PAY-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
     const paymentDate = body.paymentDate ? new Date(body.paymentDate) : new Date();
-    const paymentMethod = body.paymentMethod ? String(body.paymentMethod).trim() : 'Bank Transfer';
+    const paymentMethod = body.paymentMethod ? String(body.paymentMethod).trim() : 'Other';
 
     const pmRecord = await prisma.paymentMethod.findFirst({
       where: { name: paymentMethod },

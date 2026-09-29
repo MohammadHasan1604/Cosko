@@ -366,9 +366,7 @@ export default function ExpenseFormModal({
             <button
               type="submit"
               className="btn-primary text-xs font-bold gap-1.5 px-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={
-                isSubmitting || !receiptUrl || !referenceNo.trim() || !amount || Number(amount) <= 0
-              }
+              disabled={isSubmitting || !receiptUrl || !amount || Number(amount) <= 0}
             >
               {isSubmitting ? (
                 <>

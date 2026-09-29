@@ -42,7 +42,7 @@ export interface LegacyRepairRecord {
   estimatedCost: number;
   storeCode: string;
   enquiryDate: string;
-  technicianNotes?: string | null; // Redacted for Sales Executive & Cashier roles
+  technicianNotes?: string | null; // Redacted for Sales Manager role
   assignedTech?: string | null;
   linkedCoskoSaleNo?: string | null;
 }
@@ -208,7 +208,7 @@ const HISTORICAL_LEGACY_REPAIRS: LegacyRepairRecord[] = [
  */
 export async function searchCustomerWithLegacyBridge(
   phone: string,
-  userRole: string = 'POS Cashier',
+  userRole: string = 'Sales Manager',
   userStore: string = 'BLR'
 ): Promise<{
   found: boolean;
@@ -254,10 +254,8 @@ export async function searchCustomerWithLegacyBridge(
       (r) => r.normalizedPhone.includes(normalized) || normalized.includes(r.normalizedPhone)
     );
 
-    // Apply Field-Level Security: Redact internal technician notes for Sales Roles
-    const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Manager'].includes(
-      userRole
-    );
+    // Apply Field-Level Security: Redact internal technician notes for Sales Manager
+    const isManagerOrAdmin = ['Super Admin', 'Store Manager'].includes(userRole);
     const safeRepairs = legacyRepairs.map((r) => {
       // Store isolation: If repair is from another store and user is not Super Admin, check visibility
       const isSameStore = userRole === 'Super Admin' || r.storeCode === userStore;
@@ -273,7 +271,7 @@ export async function searchCustomerWithLegacyBridge(
         storeCode: r.storeCode,
         enquiryDate: r.enquiryDate,
         estimatedCost: isManagerOrAdmin ? r.estimatedCost : undefined,
-        technicianNotes: isManagerOrAdmin ? r.technicianNotes : null, // REDACTED for Sales / POS Cashier
+        technicianNotes: isManagerOrAdmin ? r.technicianNotes : null, // REDACTED for Sales Manager
         assignedTech: isManagerOrAdmin ? r.assignedTech : null,
       };
     });
@@ -412,7 +410,7 @@ export async function getLegacyRepairsList(
   }
 
   // Redact notes if user is not Manager or Super Admin
-  const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Manager'].includes(userRole);
+  const isManagerOrAdmin = ['Super Admin', 'Store Manager'].includes(userRole);
   return list.map((r) => ({
     ...r,
     technicianNotes: isManagerOrAdmin ? r.technicianNotes : null,
@@ -429,7 +427,7 @@ export async function getLegacyRepairById(ticketIdOrNo: string, userRole: string
   );
   if (!repair) return null;
 
-  const isManagerOrAdmin = ['Super Admin', 'Store Manager', 'Inventory Manager'].includes(userRole);
+  const isManagerOrAdmin = ['Super Admin', 'Store Manager'].includes(userRole);
   return {
     ...repair,
     technicianNotes: isManagerOrAdmin ? repair.technicianNotes : null,

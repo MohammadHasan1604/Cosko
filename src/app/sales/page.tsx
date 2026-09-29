@@ -64,7 +64,7 @@ export default function SalesPage() {
   const [selectedCustomerToEdit, setSelectedCustomerToEdit] = useState<Customer | null>(null);
 
   // Cashier & Store Resolution
-  const activeEmployeeName = currentUser.name || 'Sales Executive';
+  const activeEmployeeName = currentUser.name || 'Sales Manager';
   const effectiveStore =
     currentUser.role !== 'Super Admin'
       ? currentUser.store && currentUser.store !== 'All Stores'
