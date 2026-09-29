@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
+import {
+  getDataConnectionConfig,
+  updateDataConnectionConfig,
+} from '@/lib/services/dataConnectionConfigStore';
 
 /**
  * GET /api/settings/data-connections - Retrieve legacy DB connection configuration (Password redacted)
@@ -21,31 +25,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    let config = await (prisma as any).legacyDataSourceConfig.findUnique({
-      where: { id: 'legacy_customer_repair_db' },
-    });
-
-    if (!config) {
-      config = {
-        id: 'legacy_customer_repair_db',
-        name: 'Legacy Customer & Repair Database',
-        dbType: 'MySQL',
-        host: '127.0.0.1',
-        port: 3306,
-        databaseName: 'cosko_legacy_store',
-        username: 'cosko_legacy_reader',
-        encryptedPassword: null,
-        sslMode: 'Preferred',
-        connectionTimeout: 2500,
-        readTimeout: 3000,
-        status: 'Connected',
-        isReadOnly: true,
-        customerTable: 'legacy_customers',
-        repairTable: 'legacy_repair_enquiries',
-        lastCheckedAt: new Date(),
-        lastLatencyMs: 12,
-      };
-    }
+    const config = getDataConnectionConfig();
 
     return NextResponse.json({
       success: true,
@@ -104,48 +84,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const updatedConfig = await (prisma as any).legacyDataSourceConfig.upsert({
-      where: { id: 'legacy_customer_repair_db' },
-      create: {
-        id: 'legacy_customer_repair_db',
-        name: body.name || 'Legacy Customer & Repair Database',
-        dbType: body.dbType || 'MySQL',
-        host: body.host,
-        port: Number(body.port) || 3306,
-        databaseName: body.databaseName,
-        username: body.username,
-        encryptedPassword: body.password
-          ? Buffer.from(body.password).toString('base64')
-          : 'c2VjcmV0',
-        sslMode: body.sslMode || 'Preferred',
-        connectionTimeout: Number(body.connectionTimeout) || 2500,
-        readTimeout: Number(body.readTimeout) || 3000,
-        status: 'Connected',
-        isReadOnly: true,
-        customerTable: body.customerTable || 'legacy_customers',
-        repairTable: body.repairTable || 'legacy_repair_enquiries',
-        lastCheckedAt: new Date(),
-        lastLatencyMs: 14,
-        updatedBy: user.name,
-      },
-      update: {
-        name: body.name,
-        dbType: body.dbType,
-        host: body.host,
-        port: Number(body.port),
-        databaseName: body.databaseName,
-        username: body.username,
-        encryptedPassword: body.password
-          ? Buffer.from(body.password).toString('base64')
-          : undefined,
-        sslMode: body.sslMode,
-        connectionTimeout: Number(body.connectionTimeout),
-        readTimeout: Number(body.readTimeout),
-        customerTable: body.customerTable,
-        repairTable: body.repairTable,
-        updatedBy: user.name,
-        lastCheckedAt: new Date(),
-      },
+    const updatedConfig = updateDataConnectionConfig({
+      name: body.name || 'Legacy Customer & Repair Database',
+      dbType: body.dbType || 'MySQL',
+      host: body.host,
+      port: Number(body.port) || 3306,
+      databaseName: body.databaseName,
+      username: body.username,
+      encryptedPassword: body.password ? Buffer.from(body.password).toString('base64') : undefined,
+      sslMode: body.sslMode || 'Preferred',
+      connectionTimeout: Number(body.connectionTimeout) || 2500,
+      readTimeout: Number(body.readTimeout) || 3000,
+      status: 'Connected',
+      customerTable: body.customerTable || 'legacy_customers',
+      repairTable: body.repairTable || 'legacy_repair_enquiries',
+      updatedBy: user.name,
     });
 
     // Record Audit Log (Password is strictly omitted)

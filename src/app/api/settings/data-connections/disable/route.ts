@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
+import { disableDataConnection } from '@/lib/services/dataConnectionConfigStore';
 
 /**
  * POST /api/settings/data-connections/disable - Disable the legacy data connection
@@ -17,18 +18,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: Super Admin only' }, { status: 403 });
     }
 
-    await (prisma as any).legacyDataSourceConfig.upsert({
-      where: { id: 'legacy_customer_repair_db' },
-      create: {
-        id: 'legacy_customer_repair_db',
-        status: 'Disabled',
-        updatedBy: user.name,
-      },
-      update: {
-        status: 'Disabled',
-        updatedBy: user.name,
-      },
-    });
+    disableDataConnection(user.name);
 
     await (prisma as any).auditLog.create({
       data: {

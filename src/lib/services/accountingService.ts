@@ -869,7 +869,7 @@ export async function runRootFinancialReconciliation() {
       include: { product: true },
     }),
     // Customers Receivables (from store profiles)
-    prisma.customerStoreProfile.aggregate({
+    (prisma as any).customerStoreProfile.aggregate({
       _sum: { creditBalance: true, totalSpent: true },
       _count: { id: true },
     }),
@@ -979,6 +979,12 @@ export async function runRootFinancialReconciliation() {
     expenses: {
       expensesCount: expensesAgg._count.id,
       totalAmount: Math.round(totalExpenses * 100) / 100,
+    },
+    purchases: {
+      purchasesCount: purchasesAgg._count.id,
+      totalBilled: Math.round((Number(purchasesAgg._sum.totalCost) || 0) * 100) / 100,
+      totalPaid: Math.round((Number(purchasesAgg._sum.paidAmount) || 0) * 100) / 100,
+      totalCredits: Math.round((Number(purchasesAgg._sum.creditAmount) || 0) * 100) / 100,
     },
     netProfit: Math.round(consolidatedNetProfit * 100) / 100,
     transfers: {

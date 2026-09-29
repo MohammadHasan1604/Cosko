@@ -273,6 +273,7 @@ export async function searchCustomerWithLegacyBridge(
         estimatedCost: isManagerOrAdmin ? r.estimatedCost : undefined,
         technicianNotes: isManagerOrAdmin ? r.technicianNotes : null, // REDACTED for Sales Manager
         assignedTech: isManagerOrAdmin ? r.assignedTech : null,
+        isSameStore,
       };
     });
 

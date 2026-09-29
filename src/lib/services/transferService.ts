@@ -5,7 +5,6 @@ import {
   calculateTransferTotals,
   validateTransferHeader,
   validateTransferItem,
-  round2,
   formatTransferINR,
 } from '../stockTransferCalculations';
 

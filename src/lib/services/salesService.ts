@@ -301,11 +301,23 @@ export async function executePOSCheckout(input: CreateSaleInput) {
         data: financialEntries,
       });
 
-      // 7. Update Customer Total Spent & Orders count if customer linked
+      // 7. Update Customer Total Spent & Orders count per store profile
       if (input.customerId) {
-        await tx.customer.update({
-          where: { id: input.customerId },
-          data: {
+        await tx.customerStoreProfile.upsert({
+          where: {
+            customerId_storeCode: {
+              customerId: input.customerId,
+              storeCode,
+            },
+          },
+          create: {
+            customerId: input.customerId,
+            storeCode,
+            totalSpent: grandTotal,
+            totalOrders: 1,
+            creditBalance: 0,
+          },
+          update: {
             totalSpent: { increment: grandTotal },
             totalOrders: { increment: 1 },
           },

@@ -26,6 +26,41 @@ export async function GET(req: NextRequest) {
       whereClause.status = { not: 'Archived' };
     }
 
+    const storeFilter =
+      user.securityLevel >= 100 && (!user.store || user.store === 'ALL') ? undefined : user.store;
+
+    const mapCustomerProfiles = (c: any) => {
+      if (!c) return c;
+      const profiles = c.storeProfiles || [];
+      let totalSpent = 0;
+      let creditBalance = 0;
+      let totalOrders = 0;
+
+      if (storeFilter) {
+        const p = profiles.find(
+          (prof: any) => prof.storeCode.toUpperCase() === storeFilter.toUpperCase()
+        );
+        if (p) {
+          totalSpent = Number(p.totalSpent) || 0;
+          creditBalance = Number(p.creditBalance) || 0;
+          totalOrders = Number(p.totalOrders) || 0;
+        }
+      } else {
+        for (const p of profiles) {
+          totalSpent += Number(p.totalSpent) || 0;
+          creditBalance += Number(p.creditBalance) || 0;
+          totalOrders += Number(p.totalOrders) || 0;
+        }
+      }
+
+      return {
+        ...c,
+        totalSpent,
+        creditBalance,
+        totalOrders,
+      };
+    };
+
     if (phone) {
       const normalized = normalizeMobileNumber(phone);
       const customer = await (prisma as any).customer.findFirst({
@@ -35,9 +70,12 @@ export async function GET(req: NextRequest) {
             contains: normalized,
           },
         },
+        include: {
+          storeProfiles: true,
+        },
       });
       return NextResponse.json(
-        { success: true, customer },
+        { success: true, customer: mapCustomerProfiles(customer) },
         { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
       );
     }
@@ -52,6 +90,9 @@ export async function GET(req: NextRequest) {
 
     const customers = await (prisma as any).customer.findMany({
       where: whereClause,
+      include: {
+        storeProfiles: true,
+      },
       orderBy: {
         createdAt: 'desc',
       },
@@ -59,7 +100,7 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json(
-      { success: true, customers },
+      { success: true, customers: customers.map(mapCustomerProfiles) },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
     );
   } catch (error: any) {
@@ -107,8 +148,12 @@ export async function POST(req: NextRequest) {
               where: { normalizedPhone },
             });
 
+            const storeCode = (user.store || 'HQ').toUpperCase();
+            const initialSpent = Number(body.totalSpend || body.totalSpent) || 0;
+            const initialCredit = Number(body.creditBalance) || 0;
+
             if (existingCustomer) {
-              return tx.customer.update({
+              const updated = await tx.customer.update({
                 where: { id: existingCustomer.id },
                 data: {
                   name: body.name,
@@ -118,9 +163,36 @@ export async function POST(req: NextRequest) {
                   status: 'Active',
                 },
               });
+
+              if (initialCredit > 0 || initialSpent > 0) {
+                await tx.customerStoreProfile.upsert({
+                  where: {
+                    customerId_storeCode: {
+                      customerId: existingCustomer.id,
+                      storeCode,
+                    },
+                  },
+                  create: {
+                    customerId: existingCustomer.id,
+                    storeCode,
+                    totalSpent: initialSpent,
+                    creditBalance: initialCredit,
+                    totalOrders: 0,
+                  },
+                  update: {
+                    creditBalance: initialCredit > 0 ? initialCredit : undefined,
+                  },
+                });
+              }
+
+              return {
+                ...updated,
+                totalSpent: initialSpent,
+                creditBalance: initialCredit,
+              };
             }
 
-            return tx.customer.create({
+            const created = await tx.customer.create({
               data: {
                 name: body.name,
                 phone: body.phone,
@@ -128,11 +200,26 @@ export async function POST(req: NextRequest) {
                 email: body.email || null,
                 address: body.address || null,
                 city: body.city || user.store,
-                totalSpent: body.totalSpend || 0,
-                creditBalance: body.creditBalance || 0,
                 status: 'Active',
               },
             });
+
+            await tx.customerStoreProfile.create({
+              data: {
+                customerId: created.id,
+                storeCode,
+                totalSpent: initialSpent,
+                creditBalance: initialCredit,
+                totalOrders: 0,
+              },
+            });
+
+            return {
+              ...created,
+              totalSpent: initialSpent,
+              creditBalance: initialCredit,
+              totalOrders: 0,
+            };
           },
           { maxWait: 15000, timeout: 45000 }
         );
@@ -183,9 +270,30 @@ export async function PUT(req: NextRequest) {
         ...(body.city ? { city: body.city } : {}),
         ...(body.address !== undefined ? { address: body.address || null } : {}),
         ...(body.status ? { status: body.status } : {}),
-        ...(body.creditBalance !== undefined ? { creditBalance: body.creditBalance } : {}),
       },
     });
+
+    if (body.creditBalance !== undefined) {
+      const storeCode = (user.store || 'HQ').toUpperCase();
+      await (prisma as any).customerStoreProfile.upsert({
+        where: {
+          customerId_storeCode: {
+            customerId: body.id,
+            storeCode,
+          },
+        },
+        create: {
+          customerId: body.id,
+          storeCode,
+          creditBalance: Number(body.creditBalance) || 0,
+          totalSpent: 0,
+          totalOrders: 0,
+        },
+        update: {
+          creditBalance: Number(body.creditBalance) || 0,
+        },
+      });
+    }
 
     broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', {
       id: customer.id,

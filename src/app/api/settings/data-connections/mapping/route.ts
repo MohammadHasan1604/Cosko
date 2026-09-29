@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
+import { setFieldMappings } from '@/lib/services/dataConnectionConfigStore';
 
 /**
  * POST /api/settings/data-connections/mapping - Save field mappings and generate read-only preview
@@ -20,19 +21,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { customerMapping, repairMapping } = body;
 
-    // Update field mappings in COSKO database
-    await (prisma as any).legacyDataSourceConfig.upsert({
-      where: { id: 'legacy_customer_repair_db' },
-      create: {
-        id: 'legacy_customer_repair_db',
-        fieldMappings: JSON.stringify({ customerMapping, repairMapping }),
-        updatedBy: user.name,
-      },
-      update: {
-        fieldMappings: JSON.stringify({ customerMapping, repairMapping }),
-        updatedBy: user.name,
-      },
-    });
+    // Update field mappings in store
+    setFieldMappings(JSON.stringify({ customerMapping, repairMapping }), user.name);
 
     // Generate read-only parsed preview
     const sampleRecordPreview = {

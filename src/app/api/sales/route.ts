@@ -323,13 +323,20 @@ export async function PUT(req: NextRequest) {
 
           // Decrement customer total spend if linked
           if (existing.customerId) {
-            const cust = await tx.customer.findUnique({ where: { id: existing.customerId } });
-            if (cust) {
-              await tx.customer.update({
-                where: { id: cust.id },
+            const profile = await tx.customerStoreProfile.findUnique({
+              where: {
+                customerId_storeCode: {
+                  customerId: existing.customerId,
+                  storeCode: existing.storeCode,
+                },
+              },
+            });
+            if (profile) {
+              await tx.customerStoreProfile.update({
+                where: { id: profile.id },
                 data: {
-                  totalSpent: Math.max(0, Number(cust.totalSpent) - Number(existing.grandTotal)),
-                  totalOrders: Math.max(0, (cust.totalOrders || 1) - 1),
+                  totalSpent: Math.max(0, Number(profile.totalSpent) - Number(existing.grandTotal)),
+                  totalOrders: Math.max(0, (profile.totalOrders || 1) - 1),
                 },
               });
             }
@@ -580,13 +587,20 @@ export async function DELETE(req: NextRequest) {
           });
 
           if (existing.customerId) {
-            const cust = await tx.customer.findUnique({ where: { id: existing.customerId } });
-            if (cust) {
-              await tx.customer.update({
-                where: { id: cust.id },
+            const profile = await tx.customerStoreProfile.findUnique({
+              where: {
+                customerId_storeCode: {
+                  customerId: existing.customerId,
+                  storeCode: existing.storeCode,
+                },
+              },
+            });
+            if (profile) {
+              await tx.customerStoreProfile.update({
+                where: { id: profile.id },
                 data: {
-                  totalSpent: Math.max(0, Number(cust.totalSpent) - Number(existing.grandTotal)),
-                  totalOrders: Math.max(0, (cust.totalOrders || 1) - 1),
+                  totalSpent: Math.max(0, Number(profile.totalSpent) - Number(existing.grandTotal)),
+                  totalOrders: Math.max(0, (profile.totalOrders || 1) - 1),
                 },
               });
             }
