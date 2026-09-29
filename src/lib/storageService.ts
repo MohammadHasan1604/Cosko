@@ -67,24 +67,8 @@ export class StorageService {
       formData.append('file', file, filename);
       formData.append('category', bucket);
 
-      let token = '';
-      if (typeof window !== 'undefined') {
-        try {
-          const saved = localStorage.getItem('cosko_active_session');
-          if (saved) {
-            token = JSON.parse(saved).token || '';
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
       const res = await fetch('/api/upload', {
         method: 'POST',
-        headers,
         credentials: 'include',
         body: formData,
       });
@@ -130,24 +114,8 @@ export class StorageService {
       formData.append('file', file);
       formData.append('category', 'payment-proofs');
 
-      let token = '';
-      if (typeof window !== 'undefined') {
-        try {
-          const saved = localStorage.getItem('cosko_active_session');
-          if (saved) {
-            token = JSON.parse(saved).token || '';
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
       const res = await fetch('/api/upload', {
         method: 'POST',
-        headers,
         credentials: 'include',
         body: formData,
       });
@@ -178,24 +146,9 @@ export class StorageService {
   static async deleteFile(bucket: string, keyOrPath: string): Promise<boolean> {
     try {
       const key = keyOrPath.startsWith('/') ? keyOrPath.replace(/^\/uploads\//, '') : keyOrPath;
-      let token = '';
-      if (typeof window !== 'undefined') {
-        try {
-          const saved = localStorage.getItem('cosko_active_session');
-          if (saved) {
-            token = JSON.parse(saved).token || '';
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const res = await fetch(`/api/files/${encodeURIComponent(key)}`, {
         method: 'DELETE',
-        headers,
         credentials: 'include',
       });
 

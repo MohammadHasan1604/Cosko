@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, createAuditLog } from '@/lib/authPipeline';
 import { uploadToStorage, validateFile, StorageBucket } from '@/lib/objectStorage';
+import { prisma } from '@/lib/db';
 
 const CATEGORY_MAP: Record<string, StorageBucket> = {
   'payment-proofs': 'payment-proofs',
@@ -58,6 +59,30 @@ export async function POST(req: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json({ error: result.error || 'Upload failed' }, { status: 500 });
+    }
+
+    // Persist FileAsset record in MySQL
+    try {
+      await (prisma as any).fileAsset.create({
+        data: {
+          objectKey: result.key,
+          storageProvider: process.env.STORAGE_ENDPOINT ? 's3' : 'local',
+          mimeType: result.mimeType,
+          byteSize: result.size,
+          originalFilename: file.name || 'document',
+          createdByUserId: user.id,
+          storeCode: user.store && user.store !== 'All Stores' ? user.store : 'CENTRAL',
+          privacyLevel: result.isPrivate ? 'STORE_PRIVATE' : 'PUBLIC',
+          relatedEntityType:
+            categoryRaw === 'payment-proofs'
+              ? 'Sale'
+              : categoryRaw === 'expense-receipts'
+                ? 'Expense'
+                : 'Asset',
+        },
+      });
+    } catch (assetErr) {
+      console.warn('[Upload API] Could not record FileAsset metadata:', assetErr);
     }
 
     // Audit log

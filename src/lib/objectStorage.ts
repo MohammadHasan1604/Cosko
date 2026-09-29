@@ -209,8 +209,33 @@ export async function uploadToStorage(
       return { success: true, url, key, size: buffer.length, mimeType, isPrivate };
     } catch (err: any) {
       console.error('[Storage] S3 upload failed:', err.message);
-      // Fall through to local fallback
+      // In production/Netlify, S3/R2 failure MUST produce an explicit failure, never write to ephemeral disk
+      if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') {
+        return {
+          success: false,
+          url: '',
+          key,
+          size: 0,
+          mimeType,
+          isPrivate,
+          error: `Production object storage upload failed: ${err.message}`,
+        };
+      }
+      // Fall through to local fallback in development only
     }
+  }
+
+  // In production or Netlify, reject fallback if S3/R2 client is not configured
+  if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') {
+    return {
+      success: false,
+      url: '',
+      key,
+      size: 0,
+      mimeType,
+      isPrivate,
+      error: 'Production object storage (S3/R2) is required but not configured',
+    };
   }
 
   // ─── Local Filesystem Fallback (development only) ──────────────────────────

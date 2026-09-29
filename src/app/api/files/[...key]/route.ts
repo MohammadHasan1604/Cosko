@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/authPipeline';
 import { getSignedDownloadUrl, deleteFromStorage } from '@/lib/objectStorage';
+import { prisma } from '@/lib/db';
 import path from 'path';
 import fs from 'fs/promises';
 
@@ -16,7 +17,7 @@ const MIME_MAP: Record<string, string> = {
 /**
  * GET /api/files/[...key]
  * Secure, authenticated file access endpoint for private storage files (payment proofs, expense receipts).
- * Verifies user authentication and security permissions before serving or redirecting.
+ * Verifies user authentication and database security permissions before serving or redirecting.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ key: string[] }> }) {
   try {
@@ -36,6 +37,116 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
     // Path traversal prevention
     const sanitizedParts = keyParts.map((p) => p.replace(/(\.\.|\/|\\)/g, ''));
     const fullKey = sanitizedParts.join('/');
+
+    // 🔒 Database Authorization Check (Requirement 13)
+    // Super Admin has global enterprise access; all other roles require database authorization.
+    if (auth.user.role !== 'Super Admin') {
+      const fileAsset = await (prisma as any).fileAsset.findUnique({
+        where: { objectKey: fullKey },
+      });
+
+      if (fileAsset) {
+        if (fileAsset.privacyLevel !== 'PUBLIC') {
+          // Check store scope
+          if (
+            fileAsset.storeCode &&
+            fileAsset.storeCode !== auth.user.store &&
+            !auth.user.allowedStores.includes(fileAsset.storeCode)
+          ) {
+            return NextResponse.json(
+              { error: 'Forbidden: Cannot access private files of another store' },
+              { status: 403 }
+            );
+          }
+
+          // Sales Managers cannot access expense receipts
+          if (
+            auth.user.role === 'Sales Manager' &&
+            (fileAsset.relatedEntityType === 'Expense' || fullKey.startsWith('expense-receipts'))
+          ) {
+            return NextResponse.json(
+              {
+                error: 'Forbidden: Sales Managers do not have permission to view expense receipts',
+              },
+              { status: 403 }
+            );
+          }
+        }
+      } else {
+        // If not in fileAsset, check if it's a private evidence category
+        const isPrivateProof =
+          fullKey.startsWith('payment-proofs/') || fullKey.startsWith('expense-receipts/');
+
+        if (isPrivateProof) {
+          if (fullKey.startsWith('expense-receipts/')) {
+            if (auth.user.role === 'Sales Manager') {
+              return NextResponse.json(
+                {
+                  error:
+                    'Forbidden: Sales Managers do not have permission to view expense receipts',
+                },
+                { status: 403 }
+              );
+            }
+            const expense = await prisma.expense.findFirst({
+              where: { receiptUrl: { contains: fullKey } },
+            });
+            if (expense) {
+              if (
+                expense.storeCode !== auth.user.store &&
+                !auth.user.allowedStores.includes(expense.storeCode)
+              ) {
+                return NextResponse.json(
+                  { error: 'Forbidden: Cannot access expense receipts of another store' },
+                  { status: 403 }
+                );
+              }
+            } else {
+              return NextResponse.json(
+                { error: 'Forbidden: File not authorized' },
+                { status: 403 }
+              );
+            }
+          } else if (fullKey.startsWith('payment-proofs/')) {
+            const sale = await prisma.salesOrder.findFirst({
+              where: { paymentProofUrl: { contains: fullKey } },
+            });
+            if (sale) {
+              if (
+                sale.storeCode !== auth.user.store &&
+                !auth.user.allowedStores.includes(sale.storeCode)
+              ) {
+                return NextResponse.json(
+                  { error: 'Forbidden: Cannot access payment proofs of another store' },
+                  { status: 403 }
+                );
+              }
+            } else {
+              const payment = await prisma.purchasePayment.findFirst({
+                where: { receiptUrl: { contains: fullKey } },
+                include: { purchase: true },
+              });
+              if (payment) {
+                if (
+                  payment.purchase.storeCode !== auth.user.store &&
+                  !auth.user.allowedStores.includes(payment.purchase.storeCode)
+                ) {
+                  return NextResponse.json(
+                    { error: 'Forbidden: Cannot access payment proofs of another store' },
+                    { status: 403 }
+                  );
+                }
+              } else {
+                return NextResponse.json(
+                  { error: 'Forbidden: File not authorized' },
+                  { status: 403 }
+                );
+              }
+            }
+          }
+        }
+      }
+    }
 
     // Check if signed S3 URL is available
     const signedUrl = await getSignedDownloadUrl(fullKey, 3600);
@@ -123,6 +234,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
         { status: 404 }
       );
     }
+
+    try {
+      await (prisma as any).fileAsset.deleteMany({
+        where: { objectKey: fullKey },
+      });
+    } catch {}
 
     return NextResponse.json({ success: true, message: `File ${fullKey} deleted successfully` });
   } catch (error: any) {

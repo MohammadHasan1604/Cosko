@@ -46,18 +46,9 @@ export default function DrilldownModal({
         if (startDate) params.set('startDate', startDate);
         if (endDate) params.set('endDate', endDate);
 
-        let token = '';
-        try {
-          const saved = localStorage.getItem('cosko_active_session');
-          if (saved) token = JSON.parse(saved).token || '';
-        } catch {}
-
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
         const res = await fetch(`/api/reports/drilldown?${params.toString()}`, {
           credentials: 'include',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
         });
         if (res.ok) {
           const data = await res.json();

@@ -1068,23 +1068,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
     const initAuth = async () => {
       try {
-        let token = '';
-        if (typeof window !== 'undefined') {
-          try {
-            const saved = localStorage.getItem('cosko_active_session');
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              token = parsed.token || '';
-            }
-          } catch {}
-        }
-
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
         const res = await fetch('/api/auth/me', {
           credentials: 'include',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
         });
 
         if (res.ok) {
@@ -1183,21 +1169,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const domainRefreshInFlightRef = useRef<Record<string, Promise<any> | null>>({});
 
   const getAuthOpts = useCallback((): RequestInit => {
-    let activeToken = '';
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('cosko_active_session');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          activeToken = parsed.token || '';
-        }
-      } catch {}
-    }
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (activeToken) {
-      headers['Authorization'] = `Bearer ${activeToken}`;
-    }
-    return { credentials: 'include', headers };
+    return { credentials: 'include', headers: { 'Content-Type': 'application/json' } };
   }, []);
 
   const safeFetchJson = async (url: string, opts: RequestInit) => {
@@ -2092,28 +2064,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentUserState(user);
     setAuthStatus('AUTHENTICATED');
 
-    try {
-      localStorage.setItem(
-        'cosko_active_session',
-        JSON.stringify({
-          userId: user.id,
-          email: user.email,
-          role: user.role,
-          store: user.store,
-          token: user.token || '',
-          timestamp: Date.now(),
-        })
-      );
-    } catch {}
-
     refreshAllData();
   };
 
   const logoutUser = async () => {
     try {
-      localStorage.removeItem('cosko_active_session');
       if (typeof window !== 'undefined') {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
       }
     } catch {}
     setCurrentUserState(unauthenticatedUser);

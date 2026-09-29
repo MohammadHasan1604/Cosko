@@ -61,15 +61,7 @@ export default function ReportsPage() {
 
   // Fetch auth headers
   const getHeaders = useCallback(() => {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    try {
-      const saved = localStorage.getItem('cosko_active_session');
-      if (saved) {
-        const token = JSON.parse(saved).token;
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-      }
-    } catch {}
-    return headers;
+    return { 'Content-Type': 'application/json' };
   }, []);
 
   // Fetch report data

@@ -299,13 +299,19 @@ export default function SalesPage() {
     const q = customerSearchQuery.trim().toLowerCase();
     if (!q) return [];
     const cleanQ = clean10DigitPhone(q);
-    return customers
-      .filter((c) => {
-        const matchName = c.name.toLowerCase().includes(q);
-        const matchPhone = cleanQ.length >= 3 && clean10DigitPhone(c.phone).includes(cleanQ);
-        return matchName || matchPhone;
-      })
-      .slice(0, 5);
+    const seen = new Set<string>();
+    const result: Customer[] = [];
+    for (const c of customers) {
+      if (!c.id || seen.has(c.id)) continue;
+      const matchName = c.name?.toLowerCase().includes(q);
+      const matchPhone = cleanQ.length >= 3 && clean10DigitPhone(c.phone || '').includes(cleanQ);
+      if (matchName || matchPhone) {
+        seen.add(c.id);
+        result.push(c);
+        if (result.length >= 5) break;
+      }
+    }
+    return result;
   }, [customers, customerSearchQuery]);
 
   // Inventory Filtering

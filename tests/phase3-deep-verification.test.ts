@@ -26,6 +26,12 @@ import { GET as getUsers, POST as postUsers } from '../src/app/api/users/route';
 import { GET as getAttendance } from '../src/app/api/attendance/route';
 import { POST as startAttendance } from '../src/app/api/attendance/start/route';
 import { POST as endAttendance } from '../src/app/api/attendance/end/route';
+import { GET as getInventory, POST as postInventory } from '../src/app/api/inventory/route';
+import { GET as getFiles } from '../src/app/api/files/[...key]/route';
+import { GET as getCategories, POST as postCategories } from '../src/app/api/categories/route';
+import { POST as postBrands } from '../src/app/api/brands/route';
+import { POST as postUnits } from '../src/app/api/units/route';
+import { POST as postVendors } from '../src/app/api/vendors/route';
 
 let passed = 0;
 let failed = 0;
@@ -96,10 +102,11 @@ export async function runDeepVerification() {
   const blrManager = await prisma.userAccount.findFirst({ where: { role: 'Store Manager', storeScope: 'BLR' } });
   const hydManager = await prisma.userAccount.findFirst({ where: { role: 'Store Manager', storeScope: 'HYD' } });
   const delManager = await prisma.userAccount.findFirst({ where: { role: 'Store Manager', storeScope: 'DEL' } });
+  const cheManager = await prisma.userAccount.findFirst({ where: { role: 'Store Manager', storeScope: 'CHE' } });
   const salesManager = await prisma.userAccount.findFirst({ where: { role: 'Sales Manager', storeScope: 'BLR' } });
 
-  if (!superAdmin || !blrManager || !hydManager || !delManager || !salesManager) {
-    throw new Error('Required seeded users for BLR, HYD, DEL, Super Admin, and Sales Manager must exist in DB');
+  if (!superAdmin || !blrManager || !hydManager || !delManager || !cheManager || !salesManager) {
+    throw new Error('Required seeded users for BLR, HYD, DEL, CHE, Super Admin, and Sales Manager must exist in DB');
   }
 
   // Create real DB sessions
@@ -107,6 +114,7 @@ export async function runDeepVerification() {
   const blrToken = await createTestSession(blrManager);
   const hydToken = await createTestSession(hydManager);
   const delToken = await createTestSession(delManager);
+  const cheToken = await createTestSession(cheManager);
   const smToken = await createTestSession(salesManager);
 
   // ─────────────────────────────────────────────────────────────────────
@@ -144,6 +152,16 @@ export async function runDeepVerification() {
     return res.status === 403 && body.error?.includes('Forbidden');
   });
 
+  await test('CHE Manager is FORBIDDEN from querying BLR store inventory (403)', async () => {
+    const req = new NextRequest('http://localhost:3000/api/inventory?store=BLR', {
+      method: 'GET',
+      headers: { cookie: `cosko_session=${cheToken}` },
+    });
+    const res = await getInventory(req);
+    const body = await res.json();
+    return res.status === 403 && body.error?.includes('Forbidden');
+  });
+
   await test('DEL Manager is FORBIDDEN from querying consolidated "All Stores" (403)', async () => {
     const req = new NextRequest('http://localhost:3000/api/sales?store=All+Stores', {
       method: 'GET',
@@ -165,6 +183,61 @@ export async function runDeepVerification() {
         storeCode: 'HYD',
         items: [{ productId: 'non_existent', qty: 1, unitPrice: 100 }],
         paymentMethod: 'UPI',
+      }),
+    });
+    const res = await postSales(req);
+    const body = await res.json();
+    return res.status === 403 && body.error?.includes('Store Scope Lock');
+  });
+
+  await test('BLR Manager attempting to create Purchase Order for CHE store returns 403', async () => {
+    const req = new NextRequest('http://localhost:3000/api/purchases', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: `cosko_session=${blrToken}`,
+      },
+      body: JSON.stringify({
+        storeCode: 'CHE',
+        vendorName: 'Anker Innovations Ltd',
+        items: [{ productId: 'test-item', qtyOrdered: 5, unitCost: 500 }],
+      }),
+    });
+    const res = await postPurchases(req);
+    const body = await res.json();
+    return res.status === 403 && body.error?.includes('Forbidden');
+  });
+
+  await test('HYD Manager attempting to record Expense for DEL store returns 403', async () => {
+    const req = new NextRequest('http://localhost:3000/api/expenses', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: `cosko_session=${hydToken}`,
+      },
+      body: JSON.stringify({
+        store: 'DEL',
+        category: 'Maintenance',
+        amount: 350,
+        paymentMethod: 'Cash',
+      }),
+    });
+    const res = await postExpenses(req);
+    const body = await res.json();
+    return res.status === 403 && body.error?.includes('Forbidden');
+  });
+
+  await test('CHE Manager attempting to execute POS sale under BLR store returns 403', async () => {
+    const req = new NextRequest('http://localhost:3000/api/sales', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: `cosko_session=${cheToken}`,
+      },
+      body: JSON.stringify({
+        storeCode: 'BLR',
+        items: [{ productId: 'test_product', qty: 1, unitPrice: 500 }],
+        paymentMethod: 'Cash',
       }),
     });
     const res = await postSales(req);
@@ -557,6 +630,202 @@ export async function runDeepVerification() {
       }
     }
     return mismatchCount === 0;
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 9. PRIVATE FILE AUTHORIZATION (Section 13)
+  // ─────────────────────────────────────────────────────────────────────
+  console.log('\n📁 9. Private File Authorization & Storage Security');
+
+  // Create a test FileAsset in DB for BLR store
+  const testProofKey = `payment-proofs/test-auth-proof-${Date.now()}.jpg`;
+  const testExpenseKey = `expense-receipts/test-auth-receipt-${Date.now()}.pdf`;
+
+  await (prisma as any).fileAsset.createMany({
+    data: [
+      {
+        objectKey: testProofKey,
+        storageProvider: 'local',
+        mimeType: 'image/jpeg',
+        byteSize: 1024,
+        originalFilename: 'test-proof.jpg',
+        createdByUserId: blrManager.id,
+        storeCode: 'BLR',
+        privacyLevel: 'STORE_PRIVATE',
+        relatedEntityType: 'Sale',
+      },
+      {
+        objectKey: testExpenseKey,
+        storageProvider: 'local',
+        mimeType: 'application/pdf',
+        byteSize: 2048,
+        originalFilename: 'test-receipt.pdf',
+        createdByUserId: blrManager.id,
+        storeCode: 'BLR',
+        privacyLevel: 'STORE_PRIVATE',
+        relatedEntityType: 'Expense',
+      },
+    ],
+  });
+
+  await test('Unauthenticated user is DENIED access to private file (401)', async () => {
+    const req = new NextRequest(`http://localhost:3000/api/files/${testProofKey}`, {
+      method: 'GET',
+    });
+    const res = await getFiles(req, {
+      params: Promise.resolve({ key: testProofKey.split('/') }),
+    });
+    return res.status === 401;
+  });
+
+  await test('Other-Store Manager (HYD) is FORBIDDEN from accessing BLR private proof (403)', async () => {
+    const req = new NextRequest(`http://localhost:3000/api/files/${testProofKey}`, {
+      method: 'GET',
+      headers: { cookie: `cosko_session=${hydToken}` },
+    });
+    const res = await getFiles(req, {
+      params: Promise.resolve({ key: testProofKey.split('/') }),
+    });
+    const body = await res.json();
+    return res.status === 403 && body.error?.includes('Forbidden');
+  });
+
+  await test('Sales Manager is FORBIDDEN from accessing expense receipts (403)', async () => {
+    const req = new NextRequest(`http://localhost:3000/api/files/${testExpenseKey}`, {
+      method: 'GET',
+      headers: { cookie: `cosko_session=${smToken}` },
+    });
+    const res = await getFiles(req, {
+      params: Promise.resolve({ key: testExpenseKey.split('/') }),
+    });
+    const body = await res.json();
+    return res.status === 403 && body.error?.includes('Forbidden');
+  });
+
+  await test('Same-Store Manager (BLR) is GRANTED access to BLR private proof (200 or 307 or 404 local file)', async () => {
+    const req = new NextRequest(`http://localhost:3000/api/files/${testProofKey}`, {
+      method: 'GET',
+      headers: { cookie: `cosko_session=${blrToken}` },
+    });
+    const res = await getFiles(req, {
+      params: Promise.resolve({ key: testProofKey.split('/') }),
+    });
+    // Authorized: status is 200 (if file exists), 307 (if redirected to S3), or 404 (if DB authorized but file not on disk)
+    // The key invariant is that it MUST NOT be 401 or 403!
+    return res.status !== 401 && res.status !== 403;
+  });
+
+  await test('Super Admin is GRANTED access across all stores and private files', async () => {
+    const req = new NextRequest(`http://localhost:3000/api/files/${testProofKey}`, {
+      method: 'GET',
+      headers: { cookie: `cosko_session=${saToken}` },
+    });
+    const res = await getFiles(req, {
+      params: Promise.resolve({ key: testProofKey.split('/') }),
+    });
+    return res.status !== 401 && res.status !== 403;
+  });
+
+  // Clean up test file assets
+  await (prisma as any).fileAsset.deleteMany({
+    where: { objectKey: { in: [testProofKey, testExpenseKey] } },
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 10. CSRF & ORIGIN VALIDATION (Section 11)
+  // ─────────────────────────────────────────────────────────────────────
+  console.log('\n🛡️ 10. CSRF Protection & Origin Validation');
+
+  await test('Cross-origin request with unauthorized Origin header is blocked (403)', async () => {
+    const req = new NextRequest('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://evil-attacker-site.com',
+      },
+      body: JSON.stringify({ email: 'test@cosko.com', password: 'SomePassword!' }),
+    });
+    const { POST: postLogin } = await import('../src/app/api/auth/login/route');
+    const res = await postLogin(req);
+    return res.status === 403;
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 11. ACTUAL API CRUD E2E & NEWEST-FIRST VERIFICATION (Section 3)
+  // ─────────────────────────────────────────────────────────────────────
+  console.log('\n🔄 11. Actual API CRUD E2E & Newest-First Verification');
+
+  const testCategorySlug = `qa-cat-${Date.now()}`;
+  let createdCategoryId: string | null = null;
+
+  await test('Category API CRUD: Create -> Read newest -> Cleanup', async () => {
+    const createReq = new NextRequest('http://localhost:3000/api/categories', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: `cosko_session=${saToken}`,
+      },
+      body: JSON.stringify({
+        name: `QA Test Category ${Date.now()}`,
+        slug: testCategorySlug,
+        description: 'Automated E2E Test Category',
+      }),
+    });
+    const createRes = await postCategories(createReq);
+    const createBody = await createRes.json();
+    if (!createRes.ok || !createBody.success) return false;
+    createdCategoryId = createBody.category.id;
+
+    const readReq = new NextRequest('http://localhost:3000/api/categories', {
+      method: 'GET',
+      headers: { cookie: `cosko_session=${saToken}` },
+    });
+    const readRes = await getCategories(readReq);
+    const readBody = await readRes.json();
+    const found = readBody.categories?.some((c: any) => c.id === createdCategoryId);
+
+    // Clean up
+    if (createdCategoryId) {
+      await prisma.category.delete({ where: { id: createdCategoryId } });
+    }
+    return Boolean(found);
+  });
+
+  const testCustPhone = `98${Math.floor(10000000 + Math.random() * 90000000)}`;
+  let createdCustId: string | null = null;
+
+  await test('Customer API CRUD: Create -> Read newest -> Verify', async () => {
+    const createReq = new NextRequest('http://localhost:3000/api/customers', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: `cosko_session=${blrToken}`,
+      },
+      body: JSON.stringify({
+        name: 'QA E2E Customer',
+        phone: testCustPhone,
+        city: 'Bengaluru',
+      }),
+    });
+    const createRes = await postCustomers(createReq);
+    const createBody = await createRes.json();
+    if (!createRes.ok || !createBody.success) return false;
+    createdCustId = createBody.customer.id;
+
+    const readReq = new NextRequest(`http://localhost:3000/api/customers?search=${testCustPhone}`, {
+      method: 'GET',
+      headers: { cookie: `cosko_session=${blrToken}` },
+    });
+    const readRes = await getCustomers(readReq);
+    const readBody = await readRes.json();
+    const found = readBody.customers?.some((c: any) => c.phone.includes(testCustPhone));
+
+    // Clean up
+    if (createdCustId) {
+      await (prisma as any).customerStoreProfile.deleteMany({ where: { customerId: createdCustId } });
+      await prisma.customer.delete({ where: { id: createdCustId } });
+    }
+    return Boolean(found);
   });
 
   // ─────────────────────────────────────────────────────────────────────

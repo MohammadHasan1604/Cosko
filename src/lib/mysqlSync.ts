@@ -49,29 +49,10 @@ async function apiCall<T = any>(
 
   const executeCall = (async (): Promise<ApiResponse<T>> => {
     try {
-      let activeToken = '';
-      let activeEmail = '';
-      let activeRole = '';
-      let activeStore = '';
-
-      if (typeof window !== 'undefined') {
-        try {
-          const saved = localStorage.getItem('cosko_active_session');
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            activeEmail = parsed.email || '';
-            activeRole = parsed.role || '';
-            activeStore = parsed.store || '';
-            activeToken = parsed.token || '';
-          }
-        } catch {}
-      }
-
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...(customHeaders || {}),
       };
-      if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
       if (idempotencyKey && !headers['x-idempotency-key']) {
         headers['x-idempotency-key'] = idempotencyKey;
       }

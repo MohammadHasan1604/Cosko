@@ -85,6 +85,21 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
+    const targetStore = body.storeCode || body.store || body.storeId;
+    if (
+      user.role !== 'Super Admin' &&
+      targetStore &&
+      targetStore !== user.store &&
+      !user.allowedStores.includes(targetStore)
+    ) {
+      return NextResponse.json(
+        {
+          error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot record expenses for store "${targetStore}".`,
+        },
+        { status: 403 }
+      );
+    }
+
     if (
       !body.category ||
       body.amount === undefined ||
@@ -128,19 +143,6 @@ export async function POST(req: NextRequest) {
           error: `Payment method "${paymentMethod}" is currently deactivated. Please select an active payment method.`,
         },
         { status: 400 }
-      );
-    }
-
-    if (
-      user.role !== 'Super Admin' &&
-      (body.storeCode || body.store) &&
-      (body.storeCode || body.store) !== user.store
-    ) {
-      return NextResponse.json(
-        {
-          error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot record expenses for store "${body.storeCode || body.store}".`,
-        },
-        { status: 403 }
       );
     }
 
