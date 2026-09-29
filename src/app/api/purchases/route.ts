@@ -194,6 +194,29 @@ export async function POST(req: NextRequest) {
     const effectiveStoreCode =
       user.role === 'Super Admin' ? body.storeCode || 'CENTRAL' : user.store;
 
+    // Resolve real registered vendor only
+    let vendor = null;
+    if (body.vendorId) {
+      vendor = await prisma.vendor.findUnique({
+        where: { id: body.vendorId },
+      });
+    }
+    if (!vendor && body.vendorName) {
+      vendor = await prisma.vendor.findFirst({
+        where: { name: body.vendorName.trim() },
+      });
+    }
+
+    if (!vendor) {
+      return NextResponse.json(
+        {
+          error:
+            'Invalid vendor: Purchase orders can only be created for registered vendors in the system.',
+        },
+        { status: 400 }
+      );
+    }
+
     const customKey =
       body.idempotencyKey ||
       req.headers.get('x-idempotency-key') ||
@@ -212,27 +235,6 @@ export async function POST(req: NextRequest) {
         // Generate collision-proof PO and Invoice sequence numbers
         const poNo = await generateSafeSequenceNo('purchaseOrder', 'poNo', 'PO-2026-', 4);
         const invoiceNo = body.invoiceNo?.trim() || `INV-${poNo.replace('PO-', '')}`;
-
-        // Resolve or upsert vendor safely
-        let vendor = await (prisma as any).vendor.findFirst({
-          where: { name: body.vendorName },
-        });
-
-        if (!vendor) {
-          const vCode = await generateSafeSequenceNo('vendor', 'code', 'VEN-', 3);
-          vendor = await (prisma as any).vendor.create({
-            data: {
-              code: vCode,
-              name: body.vendorName,
-              contactPerson: body.vendorContact || 'Account Manager',
-              email: `${body.vendorName.toLowerCase().replace(/[^a-z0-9]/g, '')}@supplier.com`,
-              phone: body.vendorPhone || '+91 98000 00000',
-              city: 'Central',
-              address: 'Vendor Hub',
-              categories: 'General Hardware',
-            },
-          });
-        }
 
         // Auto-compute due date from vendor payment terms if omitted
         let effectiveDueDate = body.dueDate ? new Date(body.dueDate) : null;
@@ -318,8 +320,7 @@ export async function POST(req: NextRequest) {
         totalDiscount = Math.round(totalDiscount * 100) / 100;
         totalTax = Math.round(totalTax * 100) / 100;
         const calculatedGrandTotal = Math.round((subtotal - totalDiscount + totalTax) * 100) / 100;
-        const totalCost =
-          body.totalCost !== undefined ? Number(body.totalCost) : calculatedGrandTotal;
+        const totalCost = calculatedGrandTotal;
         const creditAmount = body.creditAmount ? Number(body.creditAmount) : 0;
 
         let paidAmount = 0;

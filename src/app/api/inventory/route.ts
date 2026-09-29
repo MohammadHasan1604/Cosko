@@ -176,13 +176,29 @@ export async function POST(req: NextRequest) {
         extractEntityId: (d) => d?.product?.id || d?.product?.sku,
       },
       async () => {
+        // Check duplicate SKU (POST = CREATE only)
+        const existingProduct = await prisma.product.findUnique({
+          where: { sku: cleanSku },
+        });
+        if (existingProduct) {
+          return {
+            status: 409,
+            data: {
+              error: `Product with SKU "${cleanSku}" already exists. Use PUT /api/inventory to update.`,
+            },
+          };
+        }
+
         // Check duplicate barcode if provided
         if (cleanBarcode) {
           const duplicateBarcode = await prisma.product.findFirst({
             where: { barcode: cleanBarcode, sku: { not: cleanSku } },
           });
           if (duplicateBarcode) {
-            throw new Error(`Duplicate barcode: Already assigned to "${duplicateBarcode.name}"`);
+            return {
+              status: 409,
+              data: { error: `Duplicate barcode: Already assigned to "${duplicateBarcode.name}"` },
+            };
           }
         }
 
@@ -211,6 +227,14 @@ export async function POST(req: NextRequest) {
             : body.qtyOnHand !== undefined && body.qtyOnHand !== null && body.qtyOnHand !== ''
               ? Number(body.qtyOnHand)
               : 0;
+
+        if (qtyOnHand < 0) {
+          return {
+            status: 400,
+            data: { error: 'Quantity on hand cannot be negative.' },
+          };
+        }
+
         const reorderPt =
           typeof body.reorderPt === 'number'
             ? body.reorderPt
@@ -258,28 +282,11 @@ export async function POST(req: NextRequest) {
         const description = body.description?.trim() || null;
 
         const savedProduct = await prisma.$transaction(async (tx: any) => {
-          const product = await tx.product.upsert({
-            where: { sku: cleanSku },
-            create: {
+          const product = await tx.product.create({
+            data: {
               sku: cleanSku,
               barcode: cleanBarcode,
               name: body.name.trim(),
-              brand: body.brand?.trim() || null,
-              model: body.model?.trim() || null,
-              category: body.category || 'General',
-              subcategory: body.subcategory?.trim() || null,
-              description: description,
-              baseCostPrice: costPrice,
-              baseSellingPrice: sellingPrice,
-              mrp: mrp,
-              gstRate: taxRate,
-              warrantyMonths: warrantyMonths,
-              imageUrl: imageUrl,
-              status: body.status || 'active',
-            },
-            update: {
-              name: body.name.trim(),
-              barcode: cleanBarcode,
               brand: body.brand?.trim() || null,
               model: body.model?.trim() || null,
               category: body.category || 'General',
@@ -463,7 +470,10 @@ export async function PUT(req: NextRequest) {
         productUpdate.imageUrl = await ensureStoredImage(img || null, 'product-images', user.name);
       }
     }
-    if (body.status !== undefined) productUpdate.status = body.status;
+    // Prevent negative quantities
+    if (body.qtyOnHand !== undefined && body.qtyOnHand !== null && Number(body.qtyOnHand) < 0) {
+      return NextResponse.json({ error: 'Quantity on hand cannot be negative.' }, { status: 400 });
+    }
 
     const updatedProduct = await prisma.$transaction(
       async (tx: any) => {
