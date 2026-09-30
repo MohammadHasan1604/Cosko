@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
+import { authenticateRequest, hasPermission, createAuditLog, requireStoreScope } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 
 /**
@@ -20,20 +20,16 @@ export async function GET(req: NextRequest) {
     const user = auth.user;
 
     // RBAC: Require security level >= 80 (Store Manager+) for financial reports
-    if (
-      (user.securityLevel || 0) < 60 &&
-      user.role !== 'Super Admin' &&
-      user.role !== 'Store Manager'
-    ) {
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
       return NextResponse.json(
-        { error: 'Insufficient permissions for financial reports' },
+        { error: 'Forbidden: Insufficient permissions for financial reports' },
         { status: 403 }
       );
     }
 
     const { searchParams } = new URL(req.url);
     const report = searchParams.get('report') || 'overview';
-    const requestedStore = searchParams.get('store') || 'All Stores';
+    const requestedStore = searchParams.get('store');
     const period = searchParams.get('period') || 'This Month';
     const startDateParam = searchParams.get('startDate');
     const endDateParam = searchParams.get('endDate');
@@ -48,31 +44,14 @@ export async function GET(req: NextRequest) {
     const { start, end } = getServerDateRange(period, startDateParam, endDateParam);
 
     // Store isolation
-    let storeFilter: string | undefined;
-    if (user.role !== 'Super Admin') {
-      const allowed =
-        user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
-      if (requestedStore === 'All Stores' || requestedStore === 'ALL') {
-        return NextResponse.json(
-          {
-            error:
-              'Forbidden: Consolidated reporting across all stores is restricted to Super Admin only',
-          },
-          { status: 403 }
-        );
-      }
-      if (requestedStore && !allowed.includes(requestedStore)) {
-        return NextResponse.json(
-          {
-            error: `Forbidden: Cross-store and consolidated reporting is restricted to Super Admin only`,
-          },
-          { status: 403 }
-        );
-      }
-      storeFilter = requestedStore || allowed[0];
-    } else if (requestedStore && requestedStore !== 'All Stores' && requestedStore !== 'ALL') {
-      storeFilter = requestedStore;
+    const storeScope = requireStoreScope(user, requestedStore, {
+      allowAllStoresForSuperAdmin: true,
+    });
+    if (!storeScope.authorized) {
+      return NextResponse.json({ error: storeScope.error }, { status: storeScope.status });
     }
+
+    const storeFilter: string | undefined = storeScope.effectiveStore || undefined;
 
     const meta = {
       report,

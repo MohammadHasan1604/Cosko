@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
+import { authenticateRequest, hasPermission, createAuditLog, requireStoreScope } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 
 /**
@@ -19,18 +19,14 @@ export async function GET(req: NextRequest) {
     }
     const user = auth.user;
 
-    if (
-      (user.securityLevel || 0) < 60 &&
-      user.role !== 'Super Admin' &&
-      user.role !== 'Store Manager'
-    ) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type') || '';
     const id = searchParams.get('id') || '';
-    const requestedStore = searchParams.get('store') || 'All Stores';
+    const requestedStore = searchParams.get('store');
     const period = searchParams.get('period') || 'This Month';
     const startDateParam = searchParams.get('startDate');
     const endDateParam = searchParams.get('endDate');
@@ -45,12 +41,14 @@ export async function GET(req: NextRequest) {
 
     const { start, end } = getServerDateRange(period, startDateParam, endDateParam);
 
-    let storeFilter: string | undefined;
-    if (user.role !== 'Super Admin') {
-      storeFilter = user.store;
-    } else if (requestedStore && requestedStore !== 'All Stores' && requestedStore !== 'ALL') {
-      storeFilter = requestedStore;
+    const storeScope = requireStoreScope(user, requestedStore, {
+      allowAllStoresForSuperAdmin: true,
+    });
+    if (!storeScope.authorized) {
+      return NextResponse.json({ error: storeScope.error }, { status: storeScope.status });
     }
+
+    const storeFilter: string | undefined = storeScope.effectiveStore || undefined;
 
     let data: any = {};
 

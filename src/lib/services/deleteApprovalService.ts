@@ -277,6 +277,95 @@ export async function createDeleteRequest(
     };
   }
 
+  // 🔒 Authoritative Store Ownership Verification (Requirement 17)
+  if (user.securityLevel < 100) {
+    const callerStore = user.store && user.store !== 'All Stores' ? user.store : '';
+    if (!callerStore) {
+      return { success: false, error: 'Forbidden: No operational store assigned to caller.' };
+    }
+
+    if (
+      ['CATEGORY', 'BRAND', 'UNIT', 'CATEGORY_TYPE', 'PAYMENT_METHOD'].includes(input.entityType)
+    ) {
+      return {
+        success: false,
+        error: `Forbidden: Managing global ${input.entityType.toLowerCase()} records is restricted to Super Admin only.`,
+      };
+    }
+
+    if (input.entityType === 'INVENTORY') {
+      const inv = await (prisma as any).inventory.findFirst({
+        where: { productId: input.entityId, storeCode: callerStore },
+      });
+      if (!inv) {
+        return {
+          success: false,
+          error: `Forbidden: Product is not stocked in your store (${callerStore}).`,
+        };
+      }
+    } else if (input.entityType === 'CUSTOMER') {
+      const [profile, sale] = await Promise.all([
+        (prisma as any).customerStoreProfile.findFirst({
+          where: { customerId: input.entityId, storeCode: callerStore },
+        }),
+        (prisma as any).salesOrder.findFirst({
+          where: { customerId: input.entityId, storeCode: callerStore },
+          select: { id: true },
+        }),
+      ]);
+      if (!profile && !sale) {
+        return {
+          success: false,
+          error: `Forbidden: Customer is not associated with your store (${callerStore}).`,
+        };
+      }
+    } else if (input.entityType === 'VENDOR') {
+      const vendor = await (prisma as any).vendor.findUnique({
+        where: { id: input.entityId },
+        select: { storeCode: true },
+      });
+      if (!vendor || vendor.storeCode !== callerStore) {
+        return {
+          success: false,
+          error: `Forbidden: Vendor does not belong to your store (${callerStore}).`,
+        };
+      }
+    } else if (input.entityType === 'PURCHASE') {
+      const po = await (prisma as any).purchaseOrder.findUnique({
+        where: { id: input.entityId },
+        select: { storeCode: true },
+      });
+      if (!po || po.storeCode !== callerStore) {
+        return {
+          success: false,
+          error: `Forbidden: Purchase order does not belong to your store (${callerStore}).`,
+        };
+      }
+    } else if (input.entityType === 'EXPENSE') {
+      const exp = await (prisma as any).expense.findUnique({
+        where: { id: input.entityId },
+        select: { storeCode: true },
+      });
+      if (!exp || exp.storeCode !== callerStore) {
+        return {
+          success: false,
+          error: `Forbidden: Expense does not belong to your store (${callerStore}).`,
+        };
+      }
+    } else if (input.entityType === 'REPAIR') {
+      const rep = await (prisma as any).repairEnquiry.findUnique({
+        where: { id: input.entityId },
+        select: { storeCode: true },
+      });
+      if (!rep || rep.storeCode !== callerStore) {
+        return {
+          success: false,
+          error: `Forbidden: Repair does not belong to your store (${callerStore}).`,
+        };
+      }
+    }
+  }
+
   // Check for existing pending request (prevent duplicates)
   const existingPending = await (prisma as any).deleteRequest.findFirst({
     where: {

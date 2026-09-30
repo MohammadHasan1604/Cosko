@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { executePOSCheckout, CreateSaleInput } from '@/lib/services/salesService';
 import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
-import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
+import {
+  authenticateRequest,
+  hasPermission,
+  createAuditLog,
+  requireStoreScope,
+  validatePhysicalStore,
+} from '@/lib/authPipeline';
 
 /**
- * GET /api/sales - Retrieve sales orders with store isolation
+ * GET /api/sales - Retrieve sales orders with store isolation and financial privacy
  */
 export async function GET(req: NextRequest) {
   try {
@@ -18,35 +24,17 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const requestedStore = searchParams.get('store');
 
-    // Store isolation check
+    // Authoritative Store Scope Enforcement
+    const storeScope = requireStoreScope(user, requestedStore, {
+      allowAllStoresForSuperAdmin: true,
+    });
+    if (!storeScope.authorized) {
+      return NextResponse.json({ error: storeScope.error }, { status: storeScope.status });
+    }
+
     const whereClause: any = {};
-    if (user.role !== 'Super Admin') {
-      const allowed =
-        user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
-      if (requestedStore) {
-        if (requestedStore === 'All Stores' || requestedStore === 'ALL') {
-          return NextResponse.json(
-            {
-              error:
-                'Forbidden: Consolidated view across all stores is restricted to Super Admin only',
-            },
-            { status: 403 }
-          );
-        }
-        if (!allowed.includes(requestedStore)) {
-          return NextResponse.json(
-            {
-              error: `Forbidden: Cross-store sales queries are restricted to Super Admin accounts only`,
-            },
-            { status: 403 }
-          );
-        }
-        whereClause.storeCode = requestedStore;
-      } else {
-        whereClause.storeCode = { in: allowed };
-      }
-    } else if (requestedStore && requestedStore !== 'All Stores' && requestedStore !== 'ALL') {
-      whereClause.storeCode = requestedStore;
+    if (storeScope.effectiveStore) {
+      whereClause.storeCode = storeScope.effectiveStore;
     }
 
     const limit = Math.min(Number(searchParams.get('limit')) || 100, 500);
@@ -62,8 +50,23 @@ export async function GET(req: NextRequest) {
       take: limit,
     });
 
+    // Financial Privacy: Non-Super-Admin and Sales Manager must NOT see cost prices or profit margins
+    const isSalesManager = user.role === 'Sales Manager' || user.securityLevel <= 40;
+    const sanitizedSales = isSalesManager
+      ? sales.map((sale) => ({
+          ...sale,
+          totalCost: 0,
+          grossProfit: 0,
+          items: sale.items?.map((item) => ({
+            ...item,
+            unitCost: 0,
+            lineProfit: 0,
+          })),
+        }))
+      : sales;
+
     return NextResponse.json(
-      { success: true, sales },
+      { success: true, sales: sanitizedSales },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
     );
   } catch (error: any) {
@@ -101,14 +104,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify cashier store authorization
-    const callerAllowed =
-      user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
-    if (user.role !== 'Super Admin' && !callerAllowed.includes(body.storeCode)) {
-      return NextResponse.json(
-        { error: 'Store Scope Lock: Cashier cannot execute sales for unauthorized store' },
-        { status: 403 }
-      );
+    // Authoritative cashier store authorization
+    if (user.role !== 'Super Admin') {
+      if (body.storeCode !== user.store) {
+        return NextResponse.json(
+          {
+            error: `Store Scope Lock: Cashier cannot execute sales for store ${body.storeCode}. Assigned store is ${user.store}.`,
+          },
+          { status: 403 }
+        );
+      }
+    } else {
+      const storeVal = await validatePhysicalStore(body.storeCode);
+      if (!storeVal.valid) {
+        return NextResponse.json({ error: storeVal.error }, { status: 400 });
+      }
     }
 
     if (!body.items || body.items.length === 0) {
@@ -207,24 +217,42 @@ export async function POST(req: NextRequest) {
           cashierName: (sale as any)?.cashierName,
         };
 
-        // Broadcast sale event to global and store-scoped channels
-        await broadcastRealtimeEvent('sales', 'SALE_CREATED', salePayload);
+        // Broadcast sale event to global and store-scoped channels (skipOutbox since committed in tx)
+        await broadcastRealtimeEvent('sales', 'SALE_CREATED', salePayload, { skipOutbox: true });
         if (storeCode) {
-          await broadcastRealtimeEvent(getStoreChannel(storeCode), 'SALE_CREATED', salePayload);
+          await broadcastRealtimeEvent(getStoreChannel(storeCode), 'SALE_CREATED', salePayload, {
+            skipOutbox: true,
+          });
         }
 
-        // Broadcast stock update event so devices invalidate/refetch inventory
+        // Broadcast stock update event so devices invalidate/refetch inventory (skipOutbox since committed in tx)
         const stockPayload = {
           storeCode,
           reason: 'SALE_CHECKOUT',
           orderNo: (sale as any)?.orderNo,
         };
-        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload, { skipOutbox: true });
         if (storeCode) {
-          await broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload);
+          await broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload, {
+            skipOutbox: true,
+          });
         }
 
-        return { status: 201, data: { success: true, sale } };
+        const isSalesManager = user.role === 'Sales Manager' || user.securityLevel <= 40;
+        const sanitizedSale = isSalesManager
+          ? {
+              ...sale,
+              totalCost: 0,
+              grossProfit: 0,
+              items: (sale as any)?.items?.map((it: any) => ({
+                ...it,
+                unitCost: 0,
+                lineProfit: 0,
+              })),
+            }
+          : sale;
+
+        return { status: 201, data: { success: true, sale: sanitizedSale } };
       }
     );
   } catch (error: any) {

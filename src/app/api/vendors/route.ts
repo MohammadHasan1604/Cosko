@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, createAuditLog } from '@/lib/authPipeline';
+import { authenticateRequest, createAuditLog, validatePhysicalStore } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 import { validateAndNormalizeGstin } from '@/lib/gstUtils';
@@ -157,8 +157,8 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST /api/vendors - Create a new vendor
- * Super Admin: can explicitly select authorized store
+ * POST /api/vendors - Create a new vendor (CREATE-only, no upsert)
+ * Super Admin: can explicitly select authorized store (validated against StoreHub)
  * Store Manager: server FORCE own store
  * Sales Manager: 403 Forbidden
  */
@@ -186,8 +186,13 @@ export async function POST(req: NextRequest) {
 
     // Authoritative store assignment
     let targetStoreCode: string;
-    if (user.role === 'Super Admin') {
-      targetStoreCode = body.storeCode?.trim() || body.store?.trim() || 'CENTRAL';
+    if (user.role === 'Super Admin' || user.securityLevel >= 100) {
+      const reqStore = body.storeCode?.trim() || body.store?.trim() || 'CENTRAL';
+      const validated = await validatePhysicalStore(reqStore);
+      if (!validated.valid) {
+        return NextResponse.json({ error: validated.error }, { status: 400 });
+      }
+      targetStoreCode = validated.storeCode!;
     } else {
       // Store Manager: server FORCE own store. Client cannot override.
       targetStoreCode = user.store;
@@ -209,6 +214,19 @@ export async function POST(req: NextRequest) {
       req.headers.get('x-idempotency-key') ||
       `vnd_${body.name.trim()}_${targetStoreCode}_${cleanGstin || 'nogst'}_${Date.now()}`;
 
+    let code = body.code?.trim();
+    if (code) {
+      const existingCode = await (prisma as any).vendor.findUnique({ where: { code } });
+      if (existingCode) {
+        return NextResponse.json(
+          {
+            error: `Conflict: Vendor with code "${code}" already exists. Updates must use PUT /api/vendors.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     return await executeWithIdempotency(
       req,
       {
@@ -218,7 +236,6 @@ export async function POST(req: NextRequest) {
         extractEntityId: (d) => d?.vendor?.id || d?.vendor?.code,
       },
       async () => {
-        let code = body.code?.trim();
         if (!code) {
           const allVendors = await (prisma as any).vendor.findMany({ select: { code: true } });
           let maxNum = 0;
@@ -232,9 +249,9 @@ export async function POST(req: NextRequest) {
           code = `VND-${String(maxNum + 1).padStart(4, '0')}`;
         }
 
-        const vendor = await (prisma as any).vendor.upsert({
-          where: { code },
-          create: {
+        // 🔒 Strict CREATE-only semantics (Requirement 5.1): NEVER upsert across stores
+        const vendor = await (prisma as any).vendor.create({
+          data: {
             code,
             name: body.name.trim(),
             contactPerson: body.contactPerson?.trim() || 'Account Manager',
@@ -254,30 +271,6 @@ export async function POST(req: NextRequest) {
             paymentTerms: body.paymentTerms?.trim() || 'Net 30',
             storeCode: targetStoreCode,
             status: body.status || 'Active',
-          },
-          update: {
-            name: body.name.trim(),
-            ...(body.contactPerson ? { contactPerson: body.contactPerson.trim() } : {}),
-            ...(body.email ? { email: body.email.trim() } : {}),
-            ...(body.phone ? { phone: body.phone.trim() } : {}),
-            ...(body.city ? { city: body.city.trim() } : {}),
-            ...(body.address !== undefined ? { address: body.address?.trim() || null } : {}),
-            ...(body.categories || body.category
-              ? { categories: (body.categories || body.category).trim() }
-              : {}),
-            gstin: cleanGstin,
-            ...(body.leadTimeDays !== undefined
-              ? {
-                  leadTimeDays:
-                    body.leadTimeDays !== null && body.leadTimeDays !== ''
-                      ? Number(body.leadTimeDays)
-                      : null,
-                }
-              : {}),
-            ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
-            ...(body.paymentTerms ? { paymentTerms: body.paymentTerms.trim() } : {}),
-            ...(user.role === 'Super Admin' && body.storeCode ? { storeCode: body.storeCode } : {}),
-            ...(body.status ? { status: body.status } : {}),
           },
         });
 
@@ -388,8 +381,12 @@ export async function PUT(req: NextRequest) {
     };
 
     // Only Super Admin can transfer vendor to another store
-    if (user.role === 'Super Admin' && body.storeCode) {
-      updateData.storeCode = body.storeCode.trim();
+    if ((user.role === 'Super Admin' || user.securityLevel >= 100) && body.storeCode) {
+      const validated = await validatePhysicalStore(body.storeCode.trim());
+      if (!validated.valid) {
+        return NextResponse.json({ error: validated.error }, { status: 400 });
+      }
+      updateData.storeCode = validated.storeCode!;
     }
 
     const vendor = await (prisma as any).vendor.update({
@@ -496,7 +493,10 @@ export async function DELETE(req: NextRequest) {
         reason: reason.trim(),
       });
       if (!result.success) {
-        return NextResponse.json({ error: result.error }, { status: 409 });
+        const isForbidden =
+          result.error?.toLowerCase().includes('forbidden') ||
+          result.error?.toLowerCase().includes('authorized');
+        return NextResponse.json({ error: result.error }, { status: isForbidden ? 403 : 409 });
       }
       return NextResponse.json({
         success: true,

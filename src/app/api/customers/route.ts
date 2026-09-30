@@ -21,44 +21,63 @@ export async function GET(req: NextRequest) {
     const query = searchParams.get('query');
     const includeArchived = searchParams.get('includeArchived') === 'true';
 
+    const isSuperAdmin = user.role === 'Super Admin' || user.securityLevel >= 100;
+    const callerStore = (user.store && user.store !== 'All Stores' ? user.store : 'BLR').toUpperCase();
+
     const whereClause: any = {};
     if (!includeArchived) {
       whereClause.status = { not: 'Archived' };
     }
 
-    const storeFilter =
-      user.securityLevel >= 100 && (!user.store || user.store === 'ALL') ? undefined : user.store;
-
     const mapCustomerProfiles = (c: any) => {
       if (!c) return c;
-      const profiles = c.storeProfiles || [];
+      const allProfiles = c.storeProfiles || [];
       let totalSpent = 0;
       let creditBalance = 0;
       let totalOrders = 0;
 
-      if (storeFilter) {
-        const p = profiles.find(
-          (prof: any) => prof.storeCode.toUpperCase() === storeFilter.toUpperCase()
+      if (!isSuperAdmin) {
+        const p = allProfiles.find(
+          (prof: any) => prof.storeCode.toUpperCase() === callerStore
         );
         if (p) {
           totalSpent = Number(p.totalSpent) || 0;
           creditBalance = Number(p.creditBalance) || 0;
           totalOrders = Number(p.totalOrders) || 0;
         }
+        return {
+          ...c,
+          totalSpent,
+          creditBalance,
+          totalOrders,
+          storeProfiles: p ? [p] : [],
+        };
       } else {
-        for (const p of profiles) {
-          totalSpent += Number(p.totalSpent) || 0;
-          creditBalance += Number(p.creditBalance) || 0;
-          totalOrders += Number(p.totalOrders) || 0;
+        const filterStore = searchParams.get('storeCode') || searchParams.get('store');
+        if (filterStore && filterStore !== 'All Stores' && filterStore !== 'ALL') {
+          const p = allProfiles.find(
+            (prof: any) => prof.storeCode.toUpperCase() === filterStore.toUpperCase()
+          );
+          if (p) {
+            totalSpent = Number(p.totalSpent) || 0;
+            creditBalance = Number(p.creditBalance) || 0;
+            totalOrders = Number(p.totalOrders) || 0;
+          }
+        } else {
+          for (const p of allProfiles) {
+            totalSpent += Number(p.totalSpent) || 0;
+            creditBalance += Number(p.creditBalance) || 0;
+            totalOrders += Number(p.totalOrders) || 0;
+          }
         }
+        return {
+          ...c,
+          totalSpent,
+          creditBalance,
+          totalOrders,
+          storeProfiles: allProfiles,
+        };
       }
-
-      return {
-        ...c,
-        totalSpent,
-        creditBalance,
-        totalOrders,
-      };
     };
 
     if (phone) {
@@ -80,12 +99,26 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const storeScopeCondition = {
+      OR: [
+        { storeProfiles: { some: { storeCode: callerStore } } },
+        { sales: { some: { storeCode: callerStore } } },
+      ],
+    };
+
     if (query) {
-      whereClause.OR = [
+      const searchConditions = [
         { name: { contains: query } },
         { phone: { contains: query } },
         { email: { contains: query } },
       ];
+      if (!isSuperAdmin) {
+        whereClause.AND = [storeScopeCondition, { OR: searchConditions }];
+      } else {
+        whereClause.OR = searchConditions;
+      }
+    } else if (!isSuperAdmin) {
+      whereClause.AND = [storeScopeCondition];
     }
 
     const customers = await (prisma as any).customer.findMany({
@@ -268,6 +301,28 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
     }
 
+    if (user.securityLevel < 100) {
+      const callerStore = (user.store && user.store !== 'All Stores' ? user.store : 'BLR').toUpperCase();
+      const association = await (prisma as any).customer.findFirst({
+        where: {
+          id: body.id,
+          OR: [
+            { storeProfiles: { some: { storeCode: callerStore } } },
+            { sales: { some: { storeCode: callerStore } } },
+          ],
+        },
+        select: { id: true },
+      });
+      if (!association) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: Customer is not associated with your assigned store "${user.store}". Modification denied.`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const customer = await (prisma as any).customer.update({
       where: { id: body.id },
       data: {
@@ -283,7 +338,7 @@ export async function PUT(req: NextRequest) {
     });
 
     if (body.creditBalance !== undefined) {
-      const storeCode = (user.store || 'HQ').toUpperCase();
+      const storeCode = (user.store && user.store !== 'All Stores' ? user.store : 'BLR').toUpperCase();
       await (prisma as any).customerStoreProfile.upsert({
         where: {
           customerId_storeCode: {
@@ -304,7 +359,7 @@ export async function PUT(req: NextRequest) {
       });
     }
 
-    const customerStore = user.store || 'BLR';
+    const customerStore = (user.store && user.store !== 'All Stores' ? user.store : 'BLR').toUpperCase();
     const customerPayload = {
       entityId: customer.id,
       storeCode: customerStore,
@@ -381,7 +436,10 @@ export async function DELETE(req: NextRequest) {
         reason: reason.trim(),
       });
       if (!result.success) {
-        return NextResponse.json({ error: result.error }, { status: 409 });
+        const isForbidden =
+          result.error?.toLowerCase().includes('forbidden') ||
+          result.error?.toLowerCase().includes('authorized');
+        return NextResponse.json({ error: result.error }, { status: isForbidden ? 403 : 409 });
       }
       return NextResponse.json({
         success: true,

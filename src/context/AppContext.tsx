@@ -459,6 +459,7 @@ export interface AuditLog {
   action: string;
   details: string;
   ipAddress: string;
+  storeCode?: string;
 }
 
 export interface NotificationItem {

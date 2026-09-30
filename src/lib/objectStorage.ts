@@ -26,12 +26,25 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
 
-// ─── S3 Configuration (server-only) ──────────────────────────────────────────
-const S3_ENDPOINT = process.env.STORAGE_ENDPOINT || '';
-const S3_REGION = process.env.STORAGE_REGION || 'auto';
-const S3_BUCKET = process.env.STORAGE_BUCKET || 'cosko-assets';
-const S3_ACCESS_KEY = process.env.STORAGE_ACCESS_KEY || '';
-const S3_SECRET_KEY = process.env.STORAGE_SECRET_KEY || '';
+// ─── S3 / Cloudflare R2 Configuration (server-only) ──────────────────────────
+const S3_ENDPOINT =
+  process.env.STORAGE_ENDPOINT ||
+  process.env.R2_ENDPOINT ||
+  (process.env.R2_ACCOUNT_ID
+    ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+    : '');
+const S3_REGION = process.env.STORAGE_REGION || process.env.R2_REGION || 'auto';
+const S3_BUCKET = process.env.STORAGE_BUCKET || process.env.R2_BUCKET_NAME || 'cosko-assets';
+const S3_ACCESS_KEY =
+  process.env.STORAGE_ACCESS_KEY ||
+  process.env.R2_ACCESS_KEY_ID ||
+  process.env.AWS_ACCESS_KEY_ID ||
+  '';
+const S3_SECRET_KEY =
+  process.env.STORAGE_SECRET_KEY ||
+  process.env.R2_SECRET_ACCESS_KEY ||
+  process.env.AWS_SECRET_ACCESS_KEY ||
+  '';
 
 const isS3Configured = !!(S3_ENDPOINT && S3_ACCESS_KEY && S3_SECRET_KEY);
 
@@ -202,9 +215,16 @@ export async function uploadToStorage(
         })
       );
 
+      const publicBaseUrl =
+        process.env.R2_PUBLIC_URL ||
+        process.env.NEXT_PUBLIC_R2_URL ||
+        process.env.STORAGE_PUBLIC_URL;
+
       const url = isPrivate
         ? `/api/files/${encodeURIComponent(key)}`
-        : `${S3_ENDPOINT}/${S3_BUCKET}/${key}`;
+        : publicBaseUrl
+          ? `${publicBaseUrl.replace(/\/$/, '')}/${key}`
+          : `${S3_ENDPOINT}/${S3_BUCKET}/${key}`;
 
       return { success: true, url, key, size: buffer.length, mimeType, isPrivate };
     } catch (err: any) {

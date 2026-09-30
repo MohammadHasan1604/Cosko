@@ -1,5 +1,5 @@
 import { prisma } from '../db';
-import { broadcastRealtimeEvent } from '../realtime';
+import { broadcastRealtimeEvent, getStoreChannel } from '../realtime';
 import { generateSafeSequenceNo } from '../sequenceUtils';
 
 export interface CreateSaleInput {
@@ -336,6 +336,35 @@ export async function executePOSCheckout(input: CreateSaleInput) {
         },
       });
 
+      // 9. Atomically write durable outbox events inside transaction
+      await tx.realtimeOutbox.create({
+        data: {
+          channel: getStoreChannel(storeCode),
+          event: 'SALE_COMPLETED',
+          payload: JSON.stringify({
+            orderNo: sale.orderNo,
+            orderId: sale.id,
+            storeCode,
+            grandTotal,
+            cashierName: input.cashierName,
+          }),
+          storeCode,
+        },
+      });
+
+      await tx.realtimeOutbox.create({
+        data: {
+          channel: getStoreChannel(storeCode),
+          event: 'STOCK_UPDATED',
+          payload: JSON.stringify({
+            storeCode,
+            reason: 'SALE_CHECKOUT',
+            orderNo: sale.orderNo,
+          }),
+          storeCode,
+        },
+      });
+
       return sale;
     },
     {
@@ -344,13 +373,38 @@ export async function executePOSCheckout(input: CreateSaleInput) {
     }
   );
 
-  // Broadcast Realtime Events outside interactive transaction
+  // Broadcast Realtime Events outside interactive transaction (skipOutbox since already committed in tx)
   try {
-    await broadcastRealtimeEvent('sales', 'SALE_COMPLETED', {
-      orderNo: result.orderNo,
-      storeCode: result.storeCode,
-    });
-    await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: result.storeCode });
+    await broadcastRealtimeEvent(
+      'sales',
+      'SALE_COMPLETED',
+      {
+        orderNo: result.orderNo,
+        storeCode: result.storeCode,
+      },
+      { skipOutbox: true }
+    );
+    await broadcastRealtimeEvent(
+      getStoreChannel(result.storeCode),
+      'SALE_COMPLETED',
+      {
+        orderNo: result.orderNo,
+        storeCode: result.storeCode,
+      },
+      { skipOutbox: true }
+    );
+    await broadcastRealtimeEvent(
+      'inventory',
+      'STOCK_UPDATED',
+      { storeCode: result.storeCode },
+      { skipOutbox: true }
+    );
+    await broadcastRealtimeEvent(
+      getStoreChannel(result.storeCode),
+      'STOCK_UPDATED',
+      { storeCode: result.storeCode },
+      { skipOutbox: true }
+    );
   } catch (broadcastErr) {
     console.warn('[salesService] Realtime broadcast error (non-fatal):', broadcastErr);
   }

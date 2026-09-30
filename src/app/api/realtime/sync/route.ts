@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
+import { canUserAccessChannel } from '@/lib/realtime';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,8 @@ export const dynamic = 'force-dynamic';
  *
  * Strict Store Isolation:
  * - Super Admin: Receives all events or filtered store events
- * - Store Manager / Sales Manager: Strictly receives events for own store or global broadcasts
+ * - Store Manager / Sales Manager: Strictly receives events for own store or permitted domain broadcasts.
+ *   NEVER receives private-enterprise, private-work-activity, or other-store events.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -54,13 +56,7 @@ export async function GET(req: NextRequest) {
                 { storeCode: null },
                 {
                   channel: {
-                    in: [
-                      'private-enterprise',
-                      'store-global',
-                      'settings',
-                      'units',
-                      'payment-methods',
-                    ],
+                    in: ['settings', 'units', 'payment-methods'],
                   },
                 },
               ],
@@ -87,22 +83,24 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const parsedEvents = events.map((e: any) => {
-      let parsedPayload: any = {};
-      try {
-        parsedPayload = JSON.parse(e.payload);
-      } catch {
-        parsedPayload = { raw: e.payload };
-      }
-      return {
-        id: e.id,
-        channel: e.channel,
-        event: e.event,
-        payload: parsedPayload,
-        storeCode: e.storeCode,
-        createdAt: e.createdAt.toISOString(),
-      };
-    });
+    const parsedEvents = events
+      .filter((e: any) => canUserAccessChannel(user, e.channel))
+      .map((e: any) => {
+        let parsedPayload: any = {};
+        try {
+          parsedPayload = JSON.parse(e.payload);
+        } catch {
+          parsedPayload = { raw: e.payload };
+        }
+        return {
+          id: e.id,
+          channel: e.channel,
+          event: e.event,
+          payload: parsedPayload,
+          storeCode: e.storeCode,
+          createdAt: e.createdAt.toISOString(),
+        };
+      });
 
     const latestCursor =
       events.length > 0 ? events[events.length - 1].createdAt.toISOString() : cursor;

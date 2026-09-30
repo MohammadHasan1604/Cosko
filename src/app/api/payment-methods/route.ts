@@ -98,6 +98,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: _ar.error }, { status: _ar.status });
     }
     const authUser = _ar.user;
+
+    if (authUser.role !== 'Super Admin' || authUser.securityLevel < 100) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Managing payment methods is restricted to Super Admin only.' },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
 
     const name = body?.name?.trim();
@@ -172,6 +180,14 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: _ar.error }, { status: _ar.status });
     }
     const authUser = _ar.user;
+
+    if (authUser.role !== 'Super Admin' || authUser.securityLevel < 100) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Managing payment methods is restricted to Super Admin only.' },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
 
     const id = body?.id?.trim();
@@ -226,13 +242,10 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: _ar.error }, { status: _ar.status });
     }
     const authUser = _ar.user;
-    if (!authUser) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
 
-    if (authUser.securityLevel < 80) {
+    if (authUser.role !== 'Super Admin' || authUser.securityLevel < 100) {
       return NextResponse.json(
-        { success: false, error: 'Forbidden: Insufficient permissions' },
+        { success: false, error: 'Forbidden: Managing payment methods is restricted to Super Admin only.' },
         { status: 403 }
       );
     }

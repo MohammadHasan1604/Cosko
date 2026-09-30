@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
+import {
+  authenticateRequest,
+  hasPermission,
+  createAuditLog,
+  validatePhysicalStore,
+} from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
-import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
+import { broadcastRealtimeEvent, getStoreChannel, persistOutboxEvent } from '@/lib/realtime';
 
 import { executeWithIdempotency } from '@/lib/idempotency';
 
@@ -16,28 +21,17 @@ export async function POST(req: NextRequest) {
     }
     const user = auth.user;
 
-    if (user.securityLevel < 60) {
+    if (!hasPermission(user, 'inventory.adjust')) {
       return NextResponse.json(
-        { error: 'Forbidden: Insufficient security level for stock adjustment' },
+        { error: 'Forbidden: Insufficient permissions for stock adjustment' },
         { status: 403 }
       );
     }
 
     const body = await req.json();
+    const targetStore = body.storeCode || body.store || user.store;
 
-    if (
-      !body.productId ||
-      !body.storeCode ||
-      body.qtyChange === undefined ||
-      body.qtyChange === 0
-    ) {
-      return NextResponse.json(
-        { error: 'productId, storeCode, and non-zero qtyChange are required' },
-        { status: 400 }
-      );
-    }
-
-    if (body.storeCode === 'All Stores' || body.storeCode === 'ALL') {
+    if (targetStore === 'All Stores' || targetStore === 'ALL') {
       return NextResponse.json(
         {
           error:
@@ -47,10 +41,66 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ─── Authoritative Store-Scope Enforcement ────────────────────────────
+    if (user.securityLevel < 100) {
+      if (
+        targetStore &&
+        targetStore.trim().toUpperCase() !== (user.store || '').trim().toUpperCase()
+      ) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cross-store adjustment on "${targetStore}" is denied.`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (!body.productId) {
+      return NextResponse.json(
+        { error: 'productId is required' },
+        { status: 400 }
+      );
+    }
+
+    // Support either qtyChange or explicit newQty
+    let resolvedQtyChange = body.qtyChange;
+    if (resolvedQtyChange === undefined && body.newQty !== undefined) {
+      const existingInv = await prisma.inventory.findUnique({
+        where: {
+          productId_storeCode: {
+            productId: body.productId,
+            storeCode: user.securityLevel >= 100 ? targetStore : user.store,
+          },
+        },
+      });
+      resolvedQtyChange = Number(body.newQty) - (existingInv?.qtyOnHand || 0);
+    }
+
+    if (resolvedQtyChange === undefined || resolvedQtyChange === 0) {
+      return NextResponse.json(
+        { error: 'A non-zero qtyChange or changing newQty is required' },
+        { status: 400 }
+      );
+    }
+    body.qtyChange = resolvedQtyChange;
+    body.storeCode = targetStore;
+
+    let effectiveStoreCode: string;
+    if (user.securityLevel >= 100) {
+      const validated = await validatePhysicalStore(body.storeCode);
+      if (!validated.valid) {
+        return NextResponse.json({ error: validated.error }, { status: 400 });
+      }
+      effectiveStoreCode = validated.storeCode!;
+    } else {
+      effectiveStoreCode = user.store;
+    }
+
     const customKey =
       body.idempotencyKey ||
       req.headers.get('x-idempotency-key') ||
-      `adj_${body.productId}_${body.storeCode}_${body.qtyChange}_${Date.now()}`;
+      `adj_${body.productId}_${effectiveStoreCode}_${body.qtyChange}_${Date.now()}`;
 
     return await executeWithIdempotency(
       req,
@@ -58,14 +108,17 @@ export async function POST(req: NextRequest) {
         action: 'INVENTORY_ADJUSTMENT',
         key: customKey,
         userId: user.id,
-        storeCode: body.storeCode,
+        storeCode: effectiveStoreCode,
       },
       async () => {
         const result = await prisma.$transaction(
           async (tx: any) => {
             const inv = await tx.inventory.findUnique({
               where: {
-                productId_storeCode: { productId: body.productId, storeCode: body.storeCode },
+                productId_storeCode: {
+                  productId: body.productId,
+                  storeCode: effectiveStoreCode,
+                },
               },
             });
 
@@ -74,9 +127,16 @@ export async function POST(req: NextRequest) {
 
             await tx.inventory.upsert({
               where: {
-                productId_storeCode: { productId: body.productId, storeCode: body.storeCode },
+                productId_storeCode: {
+                  productId: body.productId,
+                  storeCode: effectiveStoreCode,
+                },
               },
-              create: { productId: body.productId, storeCode: body.storeCode, qtyOnHand: newQty },
+              create: {
+                productId: body.productId,
+                storeCode: effectiveStoreCode,
+                qtyOnHand: newQty,
+              },
               update: { qtyOnHand: newQty },
             });
 
@@ -90,7 +150,7 @@ export async function POST(req: NextRequest) {
             await tx.inventoryLedger.create({
               data: {
                 productId: body.productId,
-                storeCode: body.storeCode,
+                storeCode: effectiveStoreCode,
                 refNo,
                 type: 'Stock Adjustment',
                 qtyChange: body.qtyChange,
@@ -113,7 +173,7 @@ export async function POST(req: NextRequest) {
                     {
                       entryNo: `JRN-ADJ-LOSS-${refNo}`,
                       entryDate: new Date(),
-                      storeCode: body.storeCode,
+                      storeCode: effectiveStoreCode,
                       accountCategory: 'OPERATING_EXPENSE',
                       accountName: 'Inventory Shrinkage & Spoilage Expense',
                       debit: financialImpact,
@@ -128,7 +188,7 @@ export async function POST(req: NextRequest) {
                     {
                       entryNo: `JRN-ADJ-INVA-${refNo}`,
                       entryDate: new Date(),
-                      storeCode: body.storeCode,
+                      storeCode: effectiveStoreCode,
                       accountCategory: 'ASSET',
                       accountName: 'Inventory Asset (Shrinkage Write-Down)',
                       debit: 0,
@@ -148,7 +208,7 @@ export async function POST(req: NextRequest) {
                     {
                       entryNo: `JRN-ADJ-GAIN-${refNo}`,
                       entryDate: new Date(),
-                      storeCode: body.storeCode,
+                      storeCode: effectiveStoreCode,
                       accountCategory: 'REVENUE',
                       accountName: 'Inventory Count Surplus & Gain',
                       debit: 0,
@@ -163,7 +223,7 @@ export async function POST(req: NextRequest) {
                     {
                       entryNo: `JRN-ADJ-INVA-${refNo}`,
                       entryDate: new Date(),
-                      storeCode: body.storeCode,
+                      storeCode: effectiveStoreCode,
                       accountCategory: 'ASSET',
                       accountName: 'Inventory Asset (Surplus Stock In)',
                       debit: financialImpact,
@@ -184,12 +244,23 @@ export async function POST(req: NextRequest) {
               data: {
                 module: 'Inventory',
                 action: 'Stock Adjustment',
-                details: `Adjusted ${product?.name || body.productId} (${product?.sku || 'N/A'}) by ${body.qtyChange > 0 ? '+' : ''}${body.qtyChange} at ${body.storeCode}. New balance: ${newQty}. Reason: ${body.reason || 'Manual adjustment'}`,
+                details: `Adjusted ${product?.name || body.productId} (${product?.sku || 'N/A'}) by ${body.qtyChange > 0 ? '+' : ''}${body.qtyChange} at ${effectiveStoreCode}. New balance: ${newQty}. Reason: ${body.reason || 'Manual adjustment'}`,
                 userEmail: user.email || user.name,
                 userRole: user.role,
-                storeCode: body.storeCode,
+                storeCode: effectiveStoreCode,
               },
             });
+
+            // Atomically persist durable outbox event inside same transaction
+            await persistOutboxEvent(
+              getStoreChannel(effectiveStoreCode),
+              'STOCK_UPDATED',
+              {
+                storeCode: effectiveStoreCode,
+                productId: body.productId,
+              },
+              tx
+            );
 
             return { newQty, refNo };
           },
@@ -197,15 +268,18 @@ export async function POST(req: NextRequest) {
         );
 
         const stockPayload = {
-          storeCode: body.storeCode,
+          storeCode: effectiveStoreCode,
           productId: body.productId,
         };
-        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
-        if (body.storeCode) {
+        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload, {
+          skipOutbox: true,
+        });
+        if (effectiveStoreCode) {
           await broadcastRealtimeEvent(
-            getStoreChannel(body.storeCode),
+            getStoreChannel(effectiveStoreCode),
             'STOCK_UPDATED',
-            stockPayload
+            stockPayload,
+            { skipOutbox: true }
           );
         }
 

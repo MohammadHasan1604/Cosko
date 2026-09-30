@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
+import {
+  authenticateRequest,
+  hasPermission,
+  createAuditLog,
+  requireStoreScope,
+  validatePhysicalStore,
+} from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 import { generateSafeSequenceNo } from '@/lib/sequenceUtils';
@@ -27,34 +33,16 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const store = searchParams.get('store');
 
+    const storeScope = requireStoreScope(user, store, {
+      allowAllStoresForSuperAdmin: true,
+    });
+    if (!storeScope.authorized) {
+      return NextResponse.json({ error: storeScope.error }, { status: storeScope.status });
+    }
+
     const whereClause: any = {};
-    if (user.role !== 'Super Admin') {
-      const allowed =
-        user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
-      if (store) {
-        if (store === 'All Stores' || store === 'ALL') {
-          return NextResponse.json(
-            {
-              error:
-                'Forbidden: Consolidated view across all stores is restricted to Super Admin only',
-            },
-            { status: 403 }
-          );
-        }
-        if (!allowed.includes(store)) {
-          return NextResponse.json(
-            {
-              error: `Forbidden: Cross-store expense queries are restricted to Super Admin accounts only`,
-            },
-            { status: 403 }
-          );
-        }
-        whereClause.storeCode = store;
-      } else {
-        whereClause.storeCode = { in: allowed };
-      }
-    } else if (store && store !== 'All Stores' && store !== 'ALL') {
-      whereClause.storeCode = store;
+    if (storeScope.effectiveStore) {
+      whereClause.storeCode = storeScope.effectiveStore;
     }
 
     const expenses = await (prisma as any).expense.findMany({
@@ -93,19 +81,21 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    const targetStore = body.storeCode || body.store || body.storeId;
-    if (
-      user.role !== 'Super Admin' &&
-      targetStore &&
-      targetStore !== user.store &&
-      !user.allowedStores.includes(targetStore)
-    ) {
-      return NextResponse.json(
-        {
-          error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot record expenses for store "${targetStore}".`,
-        },
-        { status: 403 }
-      );
+    const targetStore = body.storeCode || body.store || body.storeId || user.store;
+    if (user.role !== 'Super Admin') {
+      if (targetStore && targetStore !== user.store) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot record expenses for store "${targetStore}".`,
+          },
+          { status: 403 }
+        );
+      }
+    } else {
+      const storeVal = await validatePhysicalStore(targetStore);
+      if (!storeVal.valid) {
+        return NextResponse.json({ error: storeVal.error }, { status: 400 });
+      }
     }
 
     if (
@@ -258,6 +248,20 @@ export async function POST(req: NextRequest) {
               },
             });
 
+            await tx.realtimeOutbox.create({
+              data: {
+                channel: getStoreChannel(expenseStore),
+                event: 'EXPENSE_CREATED',
+                payload: JSON.stringify({
+                  expenseNo,
+                  category: body.category,
+                  storeCode: expenseStore,
+                  amount: expenseAmt,
+                }),
+                storeCode: expenseStore,
+              },
+            });
+
             return { expense, expenseNo };
           },
           { maxWait: 15000, timeout: 45000 }
@@ -268,12 +272,13 @@ export async function POST(req: NextRequest) {
           category: body.category,
           storeCode: expenseStore,
         };
-        await broadcastRealtimeEvent('expenses', 'EXPENSE_CREATED', expPayload);
+        await broadcastRealtimeEvent('expenses', 'EXPENSE_CREATED', expPayload, { skipOutbox: true });
         if (expenseStore) {
           await broadcastRealtimeEvent(
             getStoreChannel(expenseStore),
             'EXPENSE_CREATED',
-            expPayload
+            expPayload,
+            { skipOutbox: true }
           );
         }
 

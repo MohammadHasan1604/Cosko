@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
-import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { broadcastRealtimeEvent, getStoreChannel, persistOutboxEvent } from '@/lib/realtime';
 import { generateDateSequenceNo } from '@/lib/sequenceUtils';
+import { executeWithIdempotency } from '@/lib/idempotency';
 
 /**
  * Helper to compute overdue days and status
@@ -48,6 +49,14 @@ export async function GET(req: NextRequest) {
     }
     const user = auth.user;
 
+    // Strict RBAC: Sales Manager has no vendor payment access
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
+      return NextResponse.json(
+        { error: 'Forbidden: Sales Managers do not have vendor payment access.' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const purchaseId = searchParams.get('purchaseId');
     const vendorId = searchParams.get('vendorId');
@@ -60,6 +69,7 @@ export async function GET(req: NextRequest) {
           purchases: {
             where: {
               status: { notIn: ['Cancelled', 'Archived'] },
+              ...(user.role !== 'Super Admin' ? { storeCode: user.store } : {}),
             },
             include: {
               payments: {
@@ -73,6 +83,15 @@ export async function GET(req: NextRequest) {
 
       if (!vendor) {
         return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
+      }
+
+      if (user.role !== 'Super Admin' && vendor.storeCode !== user.store) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: Vendor belongs to store "${vendor.storeCode}", not your assigned store "${user.store}".`,
+          },
+          { status: 403 }
+        );
       }
 
       let totalBilled = 0;
@@ -178,6 +197,15 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 });
       }
 
+      if (user.role !== 'Super Admin' && purchase.storeCode !== user.store) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: Purchase order belongs to store "${purchase.storeCode}", not your assigned store "${user.store}".`,
+          },
+          { status: 403 }
+        );
+      }
+
       const totalCost = Number(purchase.totalCost) || 0;
       const creditAmount = Number(purchase.creditAmount) || 0;
       const realPaid =
@@ -221,8 +249,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-import { executeWithIdempotency } from '@/lib/idempotency';
-
 /**
  * POST /api/purchases/payments - Record a payment against a purchase order atomically with idempotency
  */
@@ -234,9 +260,10 @@ export async function POST(req: NextRequest) {
     }
     const user = auth.user;
 
-    if (user.securityLevel < 60) {
+    // Strict RBAC: Sales Manager cannot record vendor payments
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
       return NextResponse.json(
-        { error: 'Forbidden: Insufficient security level to record vendor payment' },
+        { error: 'Forbidden: Sales Managers cannot record vendor payments' },
         { status: 403 }
       );
     }
@@ -245,6 +272,34 @@ export async function POST(req: NextRequest) {
 
     if (!body.purchaseId) {
       return NextResponse.json({ error: 'Purchase Order ID is required' }, { status: 400 });
+    }
+
+    // 🔒 Pre-flight check: Load PO and verify caller store and vendor store ownership
+    const poCheck = await (prisma as any).purchaseOrder.findUnique({
+      where: { id: body.purchaseId },
+      include: { vendor: true, payments: true },
+    });
+    if (!poCheck) {
+      return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 });
+    }
+
+    if (user.role !== 'Super Admin' && user.securityLevel < 100) {
+      if (poCheck.storeCode !== user.store) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: Purchase order belongs to store "${poCheck.storeCode}", not your assigned store "${user.store}".`,
+          },
+          { status: 403 }
+        );
+      }
+      if (poCheck.vendor && poCheck.vendor.storeCode !== user.store) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: Vendor belongs to store "${poCheck.vendor.storeCode}", not your assigned store "${user.store}".`,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const paymentAmount = Math.round(Number(body.amount) * 100) / 100;
@@ -273,7 +328,18 @@ export async function POST(req: NextRequest) {
       `VND-PAY-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
     const paymentDate = body.paymentDate ? new Date(body.paymentDate) : new Date();
+
+    // 🔒 Canonical Payment Method Check (Requirement 16)
+    const allowedMethods = ['Cash', 'UPI', 'Other'];
     const paymentMethod = body.paymentMethod ? String(body.paymentMethod).trim() : 'Other';
+    if (!allowedMethods.includes(paymentMethod)) {
+      return NextResponse.json(
+        {
+          error: `Invalid payment method "${paymentMethod}". Allowed payment methods are: Cash, UPI, Other.`,
+        },
+        { status: 400 }
+      );
+    }
 
     const pmRecord = await prisma.paymentMethod.findFirst({
       where: { name: paymentMethod },
@@ -471,6 +537,19 @@ export async function POST(req: NextRequest) {
               },
             });
 
+            // Atomically persist durable outbox event inside same transaction
+            await persistOutboxEvent(
+              getStoreChannel(po.storeCode),
+              'PAYMENT_RECORDED',
+              {
+                purchaseId: body.purchaseId,
+                paymentStatus: newPaymentStatus,
+                vendorId: po.vendorId,
+                storeCode: po.storeCode,
+              },
+              tx
+            );
+
             return {
               payment,
               updatedPO,
@@ -486,16 +565,37 @@ export async function POST(req: NextRequest) {
           { maxWait: 15000, timeout: 45000 }
         );
 
+        const poStore = result.updatedPO.storeCode || 'CENTRAL';
         // Broadcast realtime event for multi-tab sync
-        await broadcastRealtimeEvent('purchases', 'PAYMENT_RECORDED', {
-          purchaseId: body.purchaseId,
-          paymentStatus: result.newPaymentStatus,
-          vendorId: result.vendor?.id,
-        });
+        await broadcastRealtimeEvent(
+          'purchases',
+          'PAYMENT_RECORDED',
+          {
+            purchaseId: body.purchaseId,
+            paymentStatus: result.newPaymentStatus,
+            vendorId: result.vendor?.id,
+            storeCode: poStore,
+          },
+          { skipOutbox: true }
+        );
+        if (poStore) {
+          await broadcastRealtimeEvent(
+            getStoreChannel(poStore),
+            'PAYMENT_RECORDED',
+            {
+              purchaseId: body.purchaseId,
+              paymentStatus: result.newPaymentStatus,
+              vendorId: result.vendor?.id,
+              storeCode: poStore,
+            },
+            { skipOutbox: true }
+          );
+        }
         await broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
           id: result.vendor?.id,
           code: result.vendor?.code,
           action: 'payment_recorded',
+          storeCode: poStore,
         });
 
         return {

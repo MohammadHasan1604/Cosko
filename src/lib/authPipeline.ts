@@ -26,7 +26,6 @@ import { prisma } from './db';
 import {
   RBACEngine,
   ROLE_SECURITY_LEVELS,
-  SUPER_ADMIN_PROTECTED_PERMISSIONS,
   DEFAULT_ROLE_PERMISSIONS,
   type UserRole,
   type SecurityLevel,
@@ -247,6 +246,167 @@ export function hasPermission(
   );
 
   return result.allowed;
+}
+
+/**
+ * Validate physical StoreHub code against active database records.
+ * Rejects 'All Stores', 'ALL', empty values, and non-existent codes.
+ */
+let storeCache: { codes: Set<string>; lastFetch: number } = { codes: new Set(), lastFetch: 0 };
+const STORE_CACHE_TTL = 30_000;
+
+export async function validatePhysicalStore(
+  storeCode: string | null | undefined
+): Promise<{ valid: boolean; storeCode?: string; error?: string }> {
+  if (!storeCode || typeof storeCode !== 'string' || !storeCode.trim()) {
+    return { valid: false, error: 'Physical store code is required.' };
+  }
+  const upper = storeCode.trim().toUpperCase();
+  if (upper === 'ALL' || upper === 'ALL STORES') {
+    return {
+      valid: false,
+      error:
+        '"All Stores" is a reporting/aggregation scope only. Physical store operations must target a valid store hub.',
+    };
+  }
+
+  const now = Date.now();
+  if (now - storeCache.lastFetch > STORE_CACHE_TTL || !storeCache.codes.has(upper)) {
+    try {
+      const activeStores = await prisma.storeHub.findMany({
+        where: { status: 'Active' },
+        select: { code: true },
+      });
+      storeCache = {
+        codes: new Set(activeStores.map((s) => s.code.toUpperCase())),
+        lastFetch: now,
+      };
+    } catch (_err) {
+      // In case of transient DB error, fall back to direct single query
+      const single = await prisma.storeHub.findUnique({ where: { code: upper } }).catch(() => null);
+      if (single && single.status === 'Active') {
+        return { valid: true, storeCode: upper };
+      }
+      return { valid: false, error: `Failed to validate store code "${upper}".` };
+    }
+  }
+
+  if (!storeCache.codes.has(upper)) {
+    return {
+      valid: false,
+      error: `Store code "${upper}" is not a recognized active store location.`,
+    };
+  }
+
+  return { valid: true, storeCode: upper };
+}
+
+export interface StoreScopeResult {
+  authorized: boolean;
+  authorizedStore: string;
+  effectiveStore: string;
+  isAllStores: boolean;
+  status: number;
+  error: string | null;
+}
+
+/**
+ * Authoritative Server-Side Store Scope Guard
+ * Single source of truth for scoping API routes.
+ *
+ * Rules:
+ * Super Admin:
+ *   - May access any valid StoreHub store and enterprise reporting scopes ('All Stores') where allowed.
+ * Store Manager / Sales Manager:
+ *   - The only valid operational store is user.store.
+ *   - Client-provided store values must NEVER expand this scope.
+ *   - If a lower role supplies a different store: returns 403 Forbidden.
+ *   - Never silently substitutes another store for mutation requests.
+ */
+export function requireStoreScope(
+  user: AuthenticatedUser,
+  requestedStore?: string | null,
+  options?: { allowAllStoresForSuperAdmin?: boolean }
+): StoreScopeResult {
+  const isSuperAdmin = user.role === 'Super Admin' || user.securityLevel >= 100;
+  const allowAllStores = options?.allowAllStoresForSuperAdmin ?? false;
+
+  if (isSuperAdmin) {
+    if (!requestedStore || requestedStore === 'All Stores' || requestedStore === 'ALL') {
+      if (allowAllStores) {
+        return {
+          authorized: true,
+          authorizedStore: 'All Stores',
+          effectiveStore: 'All Stores',
+          isAllStores: true,
+          status: 200,
+          error: null,
+        };
+      }
+      // Mutation requiring physical store defaults to CENTRAL or user's assigned store
+      const defaultPhysical =
+        user.store && user.store !== 'All Stores' && user.store !== 'ALL' ? user.store : 'CENTRAL';
+      return {
+        authorized: true,
+        authorizedStore: defaultPhysical,
+        effectiveStore: defaultPhysical,
+        isAllStores: false,
+        status: 200,
+        error: null,
+      };
+    }
+
+    const cleanReq = requestedStore.trim().toUpperCase();
+    return {
+      authorized: true,
+      authorizedStore: cleanReq,
+      effectiveStore: cleanReq,
+      isAllStores: false,
+      status: 200,
+      error: null,
+    };
+  }
+
+  // Non-Super-Admin (Store Manager & Sales Manager)
+  const canonicalStore = (
+    user.store && user.store !== 'All Stores' && user.store !== 'ALL'
+      ? user.store
+      : user.allowedStores[0] || 'BLR'
+  ).toUpperCase();
+
+  if (requestedStore) {
+    const cleanReq = requestedStore.trim().toUpperCase();
+    if (cleanReq === 'ALL STORES' || cleanReq === 'ALL') {
+      return {
+        authorized: false,
+        authorizedStore: canonicalStore,
+        effectiveStore: canonicalStore,
+        isAllStores: false,
+        status: 403,
+        error: 'Forbidden: Consolidated view across all stores is restricted to Super Admin only',
+      };
+    }
+
+    if (cleanReq !== canonicalStore) {
+      return {
+        authorized: false,
+        authorizedStore: canonicalStore,
+        effectiveStore: canonicalStore,
+        isAllStores: false,
+        status: 403,
+        error: `Forbidden: As ${user.role}, you are restricted to store "${canonicalStore}". Access to "${cleanReq}" is denied.`,
+      };
+    }
+  }
+
+  return {
+    authorized: true,
+    authorizedStore: canonicalStore,
+    effectiveStore: canonicalStore,
+    isAllStores: false,
+    status: 200,
+    error: null,
+  };
 }
 
 /**

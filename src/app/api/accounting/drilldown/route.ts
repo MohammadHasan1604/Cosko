@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
+import { authenticateRequest, hasPermission, createAuditLog, requireStoreScope } from '@/lib/authPipeline';
 import { getDrillDownRecords } from '@/lib/services/accountingService';
 import { getDateRange, parseDate } from '@/lib/dateUtils';
 
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const metric = searchParams.get('metric');
-    const requestedStore = searchParams.get('store') || 'All Stores';
+    const requestedStore = searchParams.get('store');
     const period = searchParams.get('period') || 'This Month';
     const startDateParam = searchParams.get('startDate');
     const endDateParam = searchParams.get('endDate');
@@ -35,10 +35,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Metric key is required' }, { status: 400 });
     }
 
-    let effectiveStore = requestedStore;
-    if (user.role !== 'Super Admin') {
-      effectiveStore = user.store;
+    const storeScope = requireStoreScope(user, requestedStore, {
+      allowAllStoresForSuperAdmin: true,
+    });
+    if (!storeScope.authorized) {
+      return NextResponse.json({ error: storeScope.error }, { status: storeScope.status });
     }
+
+    const effectiveStore = storeScope.effectiveStore || 'All Stores';
 
     let startDate: Date | undefined = undefined;
     let endDate: Date | undefined = undefined;

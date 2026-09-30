@@ -78,6 +78,64 @@ export const getPrivateUserChannel = getUserChannel;
 export const getPrivateWorkActivityChannel = getWorkActivityChannel;
 export const getPrivateAttendanceChannel = getAttendanceChannel;
 
+/**
+ * Authoritative Channel Authorization Guard
+ * Reused across Pusher WebSocket auth, outbox sync fallback, and reconnect recovery.
+ */
+export function canUserAccessChannel(
+  user: { id: string; role: string; store?: string | null; securityLevel?: number },
+  channelName: string
+): boolean {
+  const isSuperAdmin =
+    user.role === 'Super Admin' || (user.securityLevel !== undefined && user.securityLevel >= 100);
+  const userStore = (
+    user.store && user.store !== 'All Stores' && user.store !== 'ALL' ? user.store : ''
+  ).toUpperCase();
+
+  // Enterprise & Management Channels: Super Admin ONLY
+  if (
+    channelName === 'private-enterprise' ||
+    channelName === 'private-global' ||
+    channelName === 'store-global'
+  ) {
+    return isSuperAdmin;
+  }
+
+  if (
+    channelName === 'private-work-activity' ||
+    channelName === 'presence-work-activity' ||
+    channelName === 'work-activity'
+  ) {
+    return isSuperAdmin;
+  }
+
+  if (channelName === 'private-attendance' || channelName === 'attendance') {
+    return isSuperAdmin;
+  }
+
+  // Store Channels: Super Admin gets all stores; Store/Sales Manager strictly get their own store
+  if (channelName.startsWith('private-store-') || channelName.startsWith('store-')) {
+    const requestedStore = channelName
+      .replace(/^private-store-/, '')
+      .replace(/^store-/, '')
+      .toUpperCase();
+    return isSuperAdmin || (Boolean(userStore) && requestedStore === userStore);
+  }
+
+  // User Channels: Super Admin or targeted user only
+  if (channelName.startsWith('private-user-') || channelName.startsWith('user-')) {
+    const requestedUserId = channelName.replace(/^private-user-/, '').replace(/^user-/, '');
+    return isSuperAdmin || requestedUserId === user.id;
+  }
+
+  // Domain entity channels (e.g. notifications for units, settings)
+  if (['settings', 'units', 'payment-methods'].includes(channelName)) {
+    return true;
+  }
+
+  return false;
+}
+
 // ─── Distributed Pusher Provider ─────────────────────────────────────────────
 
 export class PusherRealtimeProvider implements IRealtimeProvider {
@@ -101,7 +159,7 @@ export class PusherRealtimeProvider implements IRealtimeProvider {
           useTLS: true,
         });
         this.isConfigured = true;
-        console.log(`[COSKO Realtime] Pusher provider initialized (Cluster: ${cluster})`);
+        console.info(`[COSKO Realtime] Pusher provider initialized (Cluster: ${cluster})`);
       } catch (err) {
         console.warn('[COSKO Realtime] Failed to initialize Pusher provider:', err);
         this.isConfigured = false;
@@ -171,7 +229,7 @@ export function getRealtimeStatus() {
 export async function persistOutboxEvent(
   channel: string,
   event: string,
-  payload: RealtimePayload,
+  payload: Partial<RealtimePayload> | Record<string, any>,
   tx?: any
 ): Promise<string | null> {
   try {
@@ -184,11 +242,29 @@ export async function persistOutboxEvent(
           ? channel.replace('store-', '')
           : null);
 
+    const safePayload = {
+      eventType: payload.eventType || event,
+      entityId: payload.entityId || payload.id,
+      storeCode: storeCode || undefined,
+      timestamp: payload.timestamp || new Date().toISOString(),
+      version: payload.version || Date.now(),
+      ...payload,
+    };
+    delete (safePayload as any).password;
+    delete (safePayload as any).passwordHash;
+    delete (safePayload as any).tokenHash;
+    delete (safePayload as any).token;
+    delete (safePayload as any).secret;
+    delete (safePayload as any).costPrice;
+    delete (safePayload as any).grossProfit;
+    delete (safePayload as any).netProfit;
+    delete (safePayload as any).margin;
+
     const record = await db.realtimeOutbox.create({
       data: {
         channel,
         event,
-        payload: JSON.stringify(payload),
+        payload: JSON.stringify(safePayload),
         storeCode,
       },
     });

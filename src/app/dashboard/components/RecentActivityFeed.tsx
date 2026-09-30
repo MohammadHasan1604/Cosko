@@ -77,16 +77,18 @@ export default function RecentActivityFeed() {
     : [];
 
   const auditActivities = isSuperAdmin
-    ? auditLogs.map((a) => ({
-        id: `audit-${a.id}`,
-        icon: 'ShieldCheckIcon' as const,
-        color: 'text-muted-foreground',
-        bg: 'bg-muted',
-        title: `${a.action}: ${a.module}`,
-        meta: `${a.details} · by ${a.userName}`,
-        time: a.timestamp || 'Recent',
-        badge: { variant: 'neutral' as const, label: a.module },
-      }))
+    ? auditLogs
+        .filter((a) => activeScope === 'All Stores' || a.storeCode === activeScope)
+        .map((a) => ({
+          id: `audit-${a.id}`,
+          icon: 'ShieldCheckIcon' as const,
+          color: 'text-muted-foreground',
+          bg: 'bg-muted',
+          title: `${a.action}: ${a.module}`,
+          meta: `${a.details} · by ${a.userName}`,
+          time: a.timestamp || 'Recent',
+          badge: { variant: 'neutral' as const, label: a.module },
+        }))
     : [];
 
   const activities = [

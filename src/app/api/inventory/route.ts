@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
+import { broadcastRealtimeEvent, getStoreChannel, persistOutboxEvent } from '@/lib/realtime';
 import { executeWithIdempotency } from '@/lib/idempotency';
-import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
+import {
+  authenticateRequest,
+  hasPermission,
+  createAuditLog,
+  requireStoreScope,
+  validatePhysicalStore,
+} from '@/lib/authPipeline';
 import { ensureStoredImage } from '@/lib/objectStorage';
 
 /**
@@ -23,6 +29,9 @@ export async function GET(req: NextRequest) {
 
     // ─── SINGLE PRODUCT FETCH (For Edit Product Form & Details) ─────────────
     if (id || sku) {
+      const isSalesManager = user.role === 'Sales Manager' || (user.securityLevel !== undefined && user.securityLevel <= 40);
+      const isSuperAdmin = user.role === 'Super Admin' || (user.securityLevel !== undefined && user.securityLevel >= 100);
+
       const product = await prisma.product.findFirst({
         where: id ? { OR: [{ id }, { sku: id }] } : { sku: sku! },
         include: {
@@ -34,13 +43,11 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Product not found' }, { status: 404 });
       }
 
-      // Fetch active stores dynamically to provide complete store stock breakdown (Super Admin gets all stores, others get only their assigned stores)
-      const allowedStoresList =
-        user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
-      const storesWhere =
-        user.role === 'Super Admin'
-          ? { status: 'Active' }
-          : { status: 'Active', code: { in: allowedStoresList } };
+      // Authoritative Store Isolation: Super Admin gets all active stores; lower roles strictly get own assigned store
+      const storesWhere = isSuperAdmin
+        ? { status: 'Active' }
+        : { status: 'Active', code: user.store };
+
       const activeStores = await prisma.storeHub.findMany({
         where: storesWhere,
       });
@@ -62,8 +69,22 @@ export async function GET(req: NextRequest) {
         };
       });
 
+      // 🔒 Single-product information leakage fix (Requirement 3.3 & 13)
+      // Non-Super-Admin must NEVER receive inventoryItems of other stores
+      const filteredInventoryItems = isSuperAdmin
+        ? product.inventoryItems
+        : product.inventoryItems.filter(
+            (it) => it.storeCode.toUpperCase() === user.store.toUpperCase()
+          );
+
+      const sanitizedProduct = {
+        ...product,
+        baseCostPrice: isSalesManager ? 0 : Number(product.baseCostPrice),
+        inventoryItems: filteredInventoryItems,
+      };
+
       return NextResponse.json(
-        { success: true, product, storeStock },
+        { success: true, product: sanitizedProduct, storeStock },
         { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
       );
     }
@@ -72,42 +93,20 @@ export async function GET(req: NextRequest) {
     const store = searchParams.get('store');
     const includeArchived = searchParams.get('includeArchived') === 'true';
 
+    const storeScope = await requireStoreScope(user, store, { allowAllStoresForSuperAdmin: true });
+    if (!storeScope.authorized) {
+      return NextResponse.json({ error: storeScope.error }, { status: storeScope.status });
+    }
+
     const productWhere: any = {};
     if (!includeArchived) {
       productWhere.status = { notIn: ['deleted', 'archived'] };
     }
 
     const storeWhereClause: any = {};
-    if (user.role !== 'Super Admin') {
-      const allowed =
-        user.allowedStores && user.allowedStores.length > 0 ? user.allowedStores : [user.store];
-      if (store) {
-        if (store === 'All Stores' || store === 'ALL') {
-          return NextResponse.json(
-            {
-              error:
-                'Forbidden: Consolidated view across all stores is restricted to Super Admin only',
-            },
-            { status: 403 }
-          );
-        }
-        if (!allowed.includes(store)) {
-          return NextResponse.json(
-            {
-              error: `Forbidden: Cross-store inventory queries are restricted to Super Admin accounts only`,
-            },
-            { status: 403 }
-          );
-        }
-        storeWhereClause.storeCode = store;
-        productWhere.inventoryItems = { some: { storeCode: store } };
-      } else {
-        storeWhereClause.storeCode = { in: allowed };
-        productWhere.inventoryItems = { some: { storeCode: { in: allowed } } };
-      }
-    } else if (store && store !== 'All Stores' && store !== 'ALL') {
-      storeWhereClause.storeCode = store;
-      productWhere.inventoryItems = { some: { storeCode: store } };
+    if (storeScope.effectiveStore && storeScope.effectiveStore !== 'All Stores') {
+      storeWhereClause.storeCode = storeScope.effectiveStore;
+      productWhere.inventoryItems = { some: { storeCode: storeScope.effectiveStore } };
     }
 
     const products = await prisma.product.findMany({
@@ -122,8 +121,14 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    const isSalesManager = user.role === 'Sales Manager' || (user.securityLevel !== undefined && user.securityLevel <= 40);
+    const sanitizedProducts = products.map((p) => ({
+      ...p,
+      baseCostPrice: isSalesManager ? 0 : Number(p.baseCostPrice),
+    }));
+
     return NextResponse.json(
-      { success: true, products },
+      { success: true, products: sanitizedProducts },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
     );
   } catch (error: any) {
@@ -202,7 +207,13 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        if (body.store === 'All Stores' || body.store === 'ALL') {
+        const requestedStore = body.storeCode || body.store;
+        if (
+          requestedStore === 'All Stores' ||
+          requestedStore === 'ALL' ||
+          body.store === 'All Stores' ||
+          body.store === 'ALL'
+        ) {
           return {
             status: 400,
             data: {
@@ -212,15 +223,30 @@ export async function POST(req: NextRequest) {
           };
         }
 
-        if (user.role !== 'Super Admin' && body.store && body.store !== user.store) {
+        if (user.role !== 'Super Admin' && requestedStore && requestedStore.trim().toUpperCase() !== (user.store || '').trim().toUpperCase()) {
           return {
             status: 403,
             data: {
-              error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot modify inventory for store "${body.store}".`,
+              error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot modify inventory for store "${requestedStore}".`,
             },
           };
         }
-        const storeCode = user.role === 'Super Admin' ? body.store || 'CENTRAL' : user.store;
+
+        let storeCode: string;
+        if (user.role === 'Super Admin') {
+          if (requestedStore) {
+            const val = await validatePhysicalStore(requestedStore);
+            if (!val.valid) {
+              return { status: 400, data: { error: val.error } };
+            }
+            storeCode = val.storeCode!;
+          } else {
+            storeCode = 'CENTRAL';
+          }
+        } else {
+          storeCode = user.store;
+        }
+
         const qtyOnHand =
           typeof body.qtyOnHand === 'number'
             ? body.qtyOnHand
@@ -338,6 +364,18 @@ export async function POST(req: NextRequest) {
                 },
               });
             }
+
+            // Atomically persist durable outbox event inside same transaction
+            await persistOutboxEvent(
+              getStoreChannel(storeCode),
+              'STOCK_UPDATED',
+              {
+                storeCode,
+                productId: product.id,
+                sku: product.sku,
+              },
+              tx
+            );
           }
 
           return tx.product.findUnique({
@@ -353,14 +391,25 @@ export async function POST(req: NextRequest) {
           productId: savedProduct?.id,
           sku: savedProduct?.sku,
         };
-        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload, { skipOutbox: true });
         if (storeCode) {
-          await broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload);
+          await broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload, { skipOutbox: true });
+        }
+
+        let responseProduct: any = savedProduct;
+        if (responseProduct && user.securityLevel < 100) {
+          responseProduct = {
+            ...responseProduct,
+            baseCostPrice: user.role === 'Sales Manager' ? 0 : responseProduct.baseCostPrice,
+            inventoryItems: (responseProduct.inventoryItems || []).filter(
+              (inv: any) => inv.storeCode.toUpperCase() === (user.store || '').toUpperCase()
+            ),
+          };
         }
 
         return {
           status: 201,
-          data: { success: true, product: savedProduct },
+          data: { success: true, product: responseProduct },
         };
       }
     );
@@ -399,6 +448,7 @@ export async function PUT(req: NextRequest) {
 
     // Resolve product reliably (whether body.id is product.id or inventory.id or sku)
     let product: any = null;
+    let targetInventoryStoreCode: string | null = null;
     if (targetId) {
       product = await prisma.product.findUnique({ where: { id: targetId } }).catch(() => null);
       if (!product) {
@@ -407,6 +457,18 @@ export async function PUT(req: NextRequest) {
           .findUnique({ where: { id: targetId } })
           .catch(() => null);
         if (inv) {
+          targetInventoryStoreCode = inv.storeCode;
+          if (
+            user.securityLevel < 100 &&
+            inv.storeCode.trim().toUpperCase() !== (user.store || '').trim().toUpperCase()
+          ) {
+            return NextResponse.json(
+              {
+                error: `Forbidden: As ${user.role}, you cannot modify an inventory record belonging to store "${inv.storeCode}". Your assigned store is "${user.store}".`,
+              },
+              { status: 403 }
+            );
+          }
           product = await prisma.product
             .findUnique({ where: { id: inv.productId } })
             .catch(() => null);
@@ -420,6 +482,44 @@ export async function PUT(req: NextRequest) {
 
     if (!product) {
       return NextResponse.json({ error: 'Product record not found in database' }, { status: 404 });
+    }
+
+    // ─── STORE SCOPE ENFORCEMENT ON PUT ─────────────────────────────────────
+    const requestedStore = body.storeCode || body.store;
+    if (requestedStore === 'All Stores' || requestedStore === 'ALL') {
+      return NextResponse.json(
+        { error: '"All Stores" is a reporting scope only. Updates must target a specific store.' },
+        { status: 400 }
+      );
+    }
+
+    if (user.securityLevel < 100) {
+      if (
+        requestedStore &&
+        requestedStore.trim().toUpperCase() !== (user.store || '').trim().toUpperCase()
+      ) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot modify inventory for store "${requestedStore}".`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    let storeCode: string | null = null;
+    if (user.securityLevel >= 100) {
+      if (requestedStore) {
+        const val = await validatePhysicalStore(requestedStore);
+        if (!val.valid) {
+          return NextResponse.json({ error: val.error }, { status: 400 });
+        }
+        storeCode = val.storeCode!;
+      } else if (targetInventoryStoreCode) {
+        storeCode = targetInventoryStoreCode;
+      }
+    } else {
+      storeCode = user.store;
     }
 
     // Check duplicate barcode if barcode is being updated
@@ -489,8 +589,7 @@ export async function PUT(req: NextRequest) {
         }
 
         // Update store inventory if store, quantity, or reorder point was provided
-        const storeCode = body.store || body.storeCode;
-        if (storeCode && storeCode !== 'All Stores' && storeCode !== 'ALL') {
+        if (storeCode && (body.qtyOnHand !== undefined || body.reorderPt !== undefined)) {
           const invWhere = {
             productId_storeCode: {
               productId: product.id,
@@ -539,6 +638,18 @@ export async function PUT(req: NextRequest) {
               },
             });
           }
+
+          // Atomically persist durable outbox event inside same transaction
+          await persistOutboxEvent(
+            getStoreChannel(storeCode),
+            'STOCK_UPDATED',
+            {
+              storeCode,
+              productId: product.id,
+              sku: product.sku,
+            },
+            tx
+          );
         }
 
         return tx.product.findUnique({
@@ -551,18 +662,31 @@ export async function PUT(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    const invStore = body.storeCode || user.store;
+    const invStore = storeCode || user.store;
     const stockPayload = {
       productId: product.id,
       sku: product.sku,
       storeCode: invStore,
     };
-    await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+    await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload, { skipOutbox: true });
     if (invStore) {
-      await broadcastRealtimeEvent(getStoreChannel(invStore), 'STOCK_UPDATED', stockPayload);
+      await broadcastRealtimeEvent(getStoreChannel(invStore), 'STOCK_UPDATED', stockPayload, {
+        skipOutbox: true,
+      });
     }
 
-    return NextResponse.json({ success: true, product: updatedProduct });
+    let responseProduct: any = updatedProduct;
+    if (responseProduct && user.securityLevel < 100) {
+      responseProduct = {
+        ...responseProduct,
+        baseCostPrice: user.role === 'Sales Manager' ? 0 : responseProduct.baseCostPrice,
+        inventoryItems: (responseProduct.inventoryItems || []).filter(
+          (inv: any) => inv.storeCode.toUpperCase() === (user.store || '').toUpperCase()
+        ),
+      };
+    }
+
+    return NextResponse.json({ success: true, product: responseProduct });
   } catch (error: any) {
     console.error('API /api/inventory PUT error:', error);
     return NextResponse.json(
@@ -646,7 +770,10 @@ export async function DELETE(req: NextRequest) {
         reason: reason.trim(),
       });
       if (!result.success) {
-        return NextResponse.json({ error: result.error }, { status: 409 });
+        const isForbidden =
+          result.error?.toLowerCase().includes('forbidden') ||
+          result.error?.toLowerCase().includes('authorized');
+        return NextResponse.json({ error: result.error }, { status: isForbidden ? 403 : 409 });
       }
       return NextResponse.json({
         success: true,

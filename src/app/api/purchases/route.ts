@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
+import {
+  authenticateRequest,
+  hasPermission,
+  createAuditLog,
+  validatePhysicalStore,
+} from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 import { generateSafeSequenceNo, generateDateSequenceNo } from '@/lib/sequenceUtils';
@@ -167,7 +172,7 @@ export async function POST(req: NextRequest) {
     }
     const user = auth.user;
 
-    if (user.securityLevel < 60) {
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
       return NextResponse.json(
         { error: 'Forbidden: Insufficient security level for purchases' },
         { status: 403 }
@@ -176,34 +181,53 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    if (!body.vendorName || !body.items || body.items.length === 0) {
+    if ((!body.vendorName && !body.vendorId) || !body.items || body.items.length === 0) {
       return NextResponse.json(
-        { error: 'Vendor name and line items are required' },
+        { error: 'Vendor (vendorId or vendorName) and line items are required' },
         { status: 400 }
       );
     }
 
-    if (user.role !== 'Super Admin' && body.storeCode && body.storeCode !== user.store) {
-      return NextResponse.json(
-        {
-          error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot create purchase orders for store "${body.storeCode}".`,
-        },
-        { status: 403 }
-      );
+    let effectiveStoreCode: string;
+    if (user.role === 'Super Admin' || user.securityLevel >= 100) {
+      if (body.storeCode && body.storeCode !== 'All Stores' && body.storeCode !== 'ALL') {
+        const validated = await validatePhysicalStore(body.storeCode);
+        if (!validated.valid) {
+          return NextResponse.json({ error: validated.error }, { status: 400 });
+        }
+        effectiveStoreCode = validated.storeCode!;
+      } else {
+        effectiveStoreCode = 'CENTRAL';
+      }
+    } else {
+      if (
+        body.storeCode &&
+        body.storeCode.trim().toUpperCase() !== (user.store || '').trim().toUpperCase()
+      ) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: As ${user.role}, you are restricted to store "${user.store}". Cannot create purchase orders for store "${body.storeCode}".`,
+          },
+          { status: 403 }
+        );
+      }
+      effectiveStoreCode = user.store;
     }
-    const effectiveStoreCode =
-      user.role === 'Super Admin' ? body.storeCode || 'CENTRAL' : user.store;
 
     // Resolve real registered vendor only
-    let vendor = null;
+    let vendor: any = null;
     if (body.vendorId) {
-      vendor = await prisma.vendor.findUnique({
+      vendor = await (prisma as any).vendor.findUnique({
         where: { id: body.vendorId },
       });
     }
     if (!vendor && body.vendorName) {
-      vendor = await prisma.vendor.findFirst({
-        where: { name: body.vendorName.trim() },
+      const vendorNameWhere: any = { name: body.vendorName.trim() };
+      if (user.role !== 'Super Admin' && user.securityLevel < 100) {
+        vendorNameWhere.storeCode = user.store;
+      }
+      vendor = await (prisma as any).vendor.findFirst({
+        where: vendorNameWhere,
       });
     }
 
@@ -215,6 +239,30 @@ export async function POST(req: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    // 🔒 Enforce Purchase ↔ Vendor Store Ownership (Requirement 6)
+    if (user.securityLevel < 100) {
+      if (vendor.storeCode.toUpperCase() !== effectiveStoreCode.toUpperCase()) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: Vendor "${vendor.name}" belongs to store "${vendor.storeCode}". Cannot create purchase order for store "${effectiveStoreCode}".`,
+          },
+          { status: 403 }
+        );
+      }
+    } else {
+      if (
+        vendor.storeCode.toUpperCase() !== effectiveStoreCode.toUpperCase() &&
+        vendor.storeCode.toUpperCase() !== 'CENTRAL'
+      ) {
+        return NextResponse.json(
+          {
+            error: `Invalid store scope: Vendor "${vendor.name}" belongs to store "${vendor.storeCode}", but purchase order targets "${effectiveStoreCode}".`,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const customKey =
@@ -682,8 +730,29 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 });
     }
 
+    if (user.role !== 'Super Admin' && user.securityLevel < 100) {
+      if (existing.storeCode !== user.store) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: You do not have permission to modify a purchase order belonging to store "${existing.storeCode}".`,
+          },
+          { status: 403 }
+        );
+      }
+      if (body.storeCode && body.storeCode !== user.store) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: As ${user.role}, you cannot reassign purchase order to store "${body.storeCode}".`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const isTransitioningToReceived = body.status === 'Received' && existing.status !== 'Received';
-    const targetStore = body.storeCode || existing.storeCode || 'CENTRAL';
+    const targetStore = user.role !== 'Super Admin' && user.securityLevel < 100
+      ? user.store
+      : (body.storeCode || existing.storeCode || 'CENTRAL');
 
     // Pre-resolve any missing products outside transaction if items are updated
     let preparedUpdateItems: any[] | null = null;
@@ -1053,6 +1122,14 @@ export async function DELETE(req: NextRequest) {
 
     // NON-SUPER-ADMIN: delete approval workflow
     if (user.securityLevel < 100) {
+      if (existing.storeCode !== user.store) {
+        return NextResponse.json(
+          {
+            error: `Forbidden: You do not have permission to delete a purchase order belonging to store "${existing.storeCode}".`,
+          },
+          { status: 403 }
+        );
+      }
       if (!reason || reason.trim().length < 3) {
         return NextResponse.json(
           { error: 'A reason for deletion is required (minimum 3 characters)' },
@@ -1065,7 +1142,12 @@ export async function DELETE(req: NextRequest) {
         entityId: id,
         reason: reason.trim(),
       });
-      if (!result.success) return NextResponse.json({ error: result.error }, { status: 409 });
+      if (!result.success) {
+        const isForbidden =
+          result.error?.toLowerCase().includes('forbidden') ||
+          result.error?.toLowerCase().includes('authorized');
+        return NextResponse.json({ error: result.error }, { status: isForbidden ? 403 : 409 });
+      }
       return NextResponse.json({
         success: true,
         mode: 'pending_approval',
