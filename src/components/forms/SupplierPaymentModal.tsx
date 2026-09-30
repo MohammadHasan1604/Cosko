@@ -28,7 +28,7 @@ export default function SupplierPaymentModal({
   const { recordPurchasePayment, refreshAllData, confirmAction, paymentMethods } = useApp();
 
   const [payAmount, setPayAmount] = useState<number | ''>('');
-  const [payMethod, setPayMethod] = useState('Bank Transfer');
+  const [payMethod, setPayMethod] = useState('UPI');
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [payRef, setPayRef] = useState('');
   const [payNotes, setPayNotes] = useState('');
@@ -63,7 +63,7 @@ export default function SupplierPaymentModal({
       if (purchase) {
         const initialBal = remaining > 0 ? remaining : '';
         setPayAmount(initialBal);
-        setPayMethod('Bank Transfer');
+        setPayMethod('UPI');
         setPayDate(new Date().toISOString().split('T')[0]);
         setPayRef('');
         setPayNotes(`Payment against ${purchase.invoiceNo || purchase.poNo}`);

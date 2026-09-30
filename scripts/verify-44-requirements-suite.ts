@@ -191,15 +191,15 @@ async function run44RequirementTestSuite() {
       'None'
     );
 
-    // 12. Product Search (Text & Picture)
+    // 12. Product Search (Text Search)
     recordAudit(
       12,
-      'Product Search (Text & Picture)',
+      'Product Search (Text Search)',
       'COMPLETE',
-      'sales/page.tsx (BarcodeScannerModal, ImageSearchModal)',
-      'Text search (name, SKU, brand) & Picture/Camera search with visual confidence matching',
-      'Instant catalog filtering & visual matching engine',
-      'PASS — Both text and camera image search active',
+      'sales/page.tsx, inventory-management/components/InventoryTable.tsx',
+      'Text search (name, SKU, brand, category) with instant catalog filtering. Scanner and visual image selling decommissioned.',
+      'Instant catalog filtering and search index',
+      'PASS — Pure text search active; camera visual selling and barcode scanner decommissioned',
       'None'
     );
 

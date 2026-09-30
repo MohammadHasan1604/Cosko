@@ -961,4 +961,3 @@ model UserPresence {
   @@index([lastHeartbeat])
   @@map("user_presence")
 }
-

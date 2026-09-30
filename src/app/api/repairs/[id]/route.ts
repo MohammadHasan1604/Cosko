@@ -53,3 +53,44 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Failed to retrieve repair details' }, { status: 500 });
   }
 }
+
+/**
+ * POST /api/repairs/[id] - DECOMMISSIONED (Read-only historical view)
+ */
+export async function POST() {
+  return NextResponse.json(
+    {
+      error: 'Standalone repairs module has been decommissioned. Historical records are read-only.',
+      code: 'REPAIRS_DECOMMISSIONED',
+    },
+    { status: 410 }
+  );
+}
+
+/**
+ * PUT /api/repairs/[id] - DECOMMISSIONED (Read-only historical view)
+ */
+export async function PUT() {
+  return NextResponse.json(
+    {
+      error:
+        'Standalone repairs module has been decommissioned. Historical records cannot be modified.',
+      code: 'REPAIRS_DECOMMISSIONED',
+    },
+    { status: 410 }
+  );
+}
+
+/**
+ * DELETE /api/repairs/[id] - DECOMMISSIONED (Read-only historical view)
+ */
+export async function DELETE() {
+  return NextResponse.json(
+    {
+      error:
+        'Standalone repairs module has been decommissioned. Historical records cannot be deleted.',
+      code: 'REPAIRS_DECOMMISSIONED',
+    },
+    { status: 410 }
+  );
+}

@@ -18,13 +18,11 @@ export interface PaymentMethodModalProps {
   zIndex?: number;
 }
 
+// Operational payment instruments strictly: Cash, UPI, Other
 const PAYMENT_TYPES = [
-  { value: 'Bank', label: 'Bank Transfer (NEFT/RTGS/IMPS/Wire)' },
-  { value: 'Digital', label: 'Digital Wallet / UPI / QR' },
-  { value: 'Card', label: 'Payment Card (Credit / Debit / Corporate)' },
-  { value: 'Cash', label: 'Cash / Currency Disbursement' },
-  { value: 'Credit', label: 'Ledger / Store Credit' },
-  { value: 'Other', label: 'Other Instrument' },
+  { value: 'Cash', label: 'Cash' },
+  { value: 'UPI', label: 'UPI / QR' },
+  { value: 'Other', label: 'Other' },
 ];
 
 export default function PaymentMethodModal({
@@ -42,7 +40,7 @@ export default function PaymentMethodModal({
 
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [type, setType] = useState('Bank');
+  const [type, setType] = useState('Cash');
   const [description, setDescription] = useState('');
   const [sortOrder, setSortOrder] = useState<number>(0);
   const [isActive, setIsActive] = useState(true);
@@ -64,7 +62,7 @@ export default function PaymentMethodModal({
       if (paymentMethod) {
         setName(paymentMethod.name || '');
         setCode(paymentMethod.code || '');
-        setType(paymentMethod.type || 'Bank');
+        setType(paymentMethod.type || 'Cash');
         setDescription(paymentMethod.description || '');
         setSortOrder(paymentMethod.sortOrder || 0);
         setIsActive(paymentMethod.status === 'Active');
@@ -78,7 +76,7 @@ export default function PaymentMethodModal({
                 .slice(0, 32)
             : ''
         );
-        setType('Bank');
+        setType('Cash');
         setDescription('');
         setSortOrder(paymentMethods.length + 1);
         setIsActive(true);
@@ -278,6 +276,9 @@ export default function PaymentMethodModal({
                   {t.label}
                 </option>
               ))}
+              {type && !PAYMENT_TYPES.some((t) => t.value === type) && (
+                <option value={type}>{type} (Historical)</option>
+              )}
             </select>
           </div>
         </div>

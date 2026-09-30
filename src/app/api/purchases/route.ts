@@ -350,9 +350,7 @@ export async function POST(req: NextRequest) {
               'Payment Reference / UTR number is mandatory when recording advance payment for a Purchase Order.'
             );
           }
-          const paymentMethodName = body.paymentMethod
-            ? String(body.paymentMethod).trim()
-            : 'Bank Transfer';
+          const paymentMethodName = body.paymentMethod ? String(body.paymentMethod).trim() : 'UPI';
           const pmRecord = await prisma.paymentMethod.findFirst({
             where: { name: paymentMethodName },
           });
@@ -408,7 +406,7 @@ export async function POST(req: NextRequest) {
                 4,
                 tx
               );
-              const paymentMethod = body.paymentMethod || 'Bank Transfer';
+              const paymentMethod = body.paymentMethod || 'UPI';
 
               const payment = await tx.purchasePayment.create({
                 data: {

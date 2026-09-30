@@ -784,9 +784,6 @@ interface AppContextType {
   stockTransfers: StockTransferRecord[];
   inventoryLedger: InventoryLedgerEntry[];
   repairsEnquiries: RepairEnquiry[];
-  addRepairEnquiry: (enquiry: any) => Promise<any>;
-  updateRepairEnquiry: (id: string, updated: any) => Promise<any>;
-  deleteRepairEnquiry: (id: string) => Promise<any>;
   sales: SalesOrder[];
   addSale: (
     sale: Omit<SalesOrder, 'id' | 'orderNo' | 'createdAt' | 'period'>

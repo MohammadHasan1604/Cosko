@@ -62,7 +62,7 @@ export default function PurchaseOrderFormModal({
   const [status, setStatus] = useState<'Ordered' | 'Received' | 'Pending'>('Ordered');
   const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Partial' | 'Unpaid'>('Unpaid');
   const [paidAmount, setPaidAmount] = useState<string | number>('');
-  const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
+  const [paymentMethod, setPaymentMethod] = useState('UPI');
   const [paymentRef, setPaymentRef] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentProof, setPaymentProof] = useState<string | null>(null);

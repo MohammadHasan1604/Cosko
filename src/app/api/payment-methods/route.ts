@@ -10,7 +10,7 @@ const DEFAULT_PAYMENT_METHODS = [
     name: 'Cash',
     code: 'CASH',
     type: 'Cash',
-    description: 'Cash on counter / cash disbursement',
+    description: 'Cash payment / cash on counter',
     isSystem: true,
     sortOrder: 1,
     status: 'Active',
@@ -18,64 +18,19 @@ const DEFAULT_PAYMENT_METHODS = [
   {
     name: 'UPI',
     code: 'UPI',
-    type: 'Digital',
-    description: 'Instant UPI / QR Code transfer (GPay, PhonePe, Paytm)',
+    type: 'UPI',
+    description: 'Instant UPI / QR Code payment',
     isSystem: true,
     sortOrder: 2,
     status: 'Active',
   },
   {
-    name: 'Card',
-    code: 'CARD',
-    type: 'Card',
-    description: 'Credit or Debit Card swipe / POS terminal',
+    name: 'Other',
+    code: 'OTHER',
+    type: 'Other',
+    description: 'Other verified payment instrument',
     isSystem: true,
     sortOrder: 3,
-    status: 'Active',
-  },
-  {
-    name: 'Bank Transfer',
-    code: 'BANK_TRANSFER',
-    type: 'Bank',
-    description: 'Direct Bank NEFT / RTGS / IMPS wire',
-    isSystem: true,
-    sortOrder: 4,
-    status: 'Active',
-  },
-  {
-    name: 'Corporate Card',
-    code: 'CORP_CARD',
-    type: 'Card',
-    description: 'Company / Corporate Card payment',
-    isSystem: true,
-    sortOrder: 5,
-    status: 'Active',
-  },
-  {
-    name: 'Direct Debit',
-    code: 'DIRECT_DEBIT',
-    type: 'Bank',
-    description: 'Automated bank ECS / ACH direct debit',
-    isSystem: true,
-    sortOrder: 6,
-    status: 'Active',
-  },
-  {
-    name: 'Cheque',
-    code: 'CHEQUE',
-    type: 'Bank',
-    description: 'Physical bank cheque clearing',
-    isSystem: true,
-    sortOrder: 7,
-    status: 'Active',
-  },
-  {
-    name: 'Credit',
-    code: 'CREDIT',
-    type: 'Credit',
-    description: 'Store credit / customer ledger credit balance',
-    isSystem: true,
-    sortOrder: 8,
     status: 'Active',
   },
 ];
@@ -163,7 +118,7 @@ export async function POST(req: NextRequest) {
         .replace(/[^A-Z0-9_]+/g, '_')
         .slice(0, 32);
 
-    const type = body?.type?.trim() || 'Bank';
+    const type = body?.type?.trim() || 'Other';
     const description = body?.description?.trim() || null;
     const status = body?.status === 'Inactive' ? 'Inactive' : 'Active';
     const sortOrder = Number(body?.sortOrder) || 10;

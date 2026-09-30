@@ -43,7 +43,7 @@ export default function ExpenseFormModal({
   const [store, setStore] = useState('CENTRAL');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState<number | ''>('');
-  const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [referenceNo, setReferenceNo] = useState('');
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -125,7 +125,7 @@ export default function ExpenseFormModal({
         setAmount(
           expense.amount !== undefined && expense.amount !== null ? Number(expense.amount) : ''
         );
-        setPaymentMethod(expense.paymentMethod || 'Bank Transfer');
+        setPaymentMethod(expense.paymentMethod || 'Cash');
         setReferenceNo(expense.referenceNo || '');
         setReceiptUrl(expense.receiptUrl || null);
       } else {
@@ -134,7 +134,7 @@ export default function ExpenseFormModal({
         setStore(defaultStore);
         setDescription('');
         setAmount('');
-        setPaymentMethod('Bank Transfer');
+        setPaymentMethod('Cash');
         setReferenceNo('');
         setReceiptUrl(null);
       }

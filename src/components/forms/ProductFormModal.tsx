@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useApp, InventoryItem } from '@/context/AppContext';
 import Modal from '@/components/ui/Modal';
 import Icon from '@/components/ui/AppIcon';
-import BarcodeScannerModal from '@/components/ui/BarcodeScannerModal';
 import CategoryFormModal from './CategoryFormModal';
 import StoreFormModal from './StoreFormModal';
 import VendorFormModal from './VendorFormModal';
@@ -42,7 +41,6 @@ export default function ProductFormModal({
 
   const [images, setImages] = useState<string[]>([]);
   const [primaryImage, setPrimaryImage] = useState<string>('');
-  const [scannerOpen, setScannerOpen] = useState(false);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [storeModalOpen, setStoreModalOpen] = useState(false);
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
@@ -548,17 +546,9 @@ export default function ProductFormModal({
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-foreground block">Barcode</label>
-                  <button
-                    type="button"
-                    onClick={() => setScannerOpen(true)}
-                    className="text-3xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <Icon name="QrCodeIcon" size={11} />
-                    Scan Barcode
-                  </button>
-                </div>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  Barcode (Optional)
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. 8901234567890"
@@ -872,16 +862,6 @@ export default function ProductFormModal({
           </div>
         </form>
       </Modal>
-
-      {/* Barcode Scanner Modal */}
-      <BarcodeScannerModal
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onScan={(code) => {
-          setFormData((prev) => ({ ...prev, barcode: code }));
-          toast.success(`Scanned Barcode: ${code}`);
-        }}
-      />
 
       {/* Dynamic Category Modal */}
       <CategoryFormModal

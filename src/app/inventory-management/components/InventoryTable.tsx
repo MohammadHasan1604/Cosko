@@ -8,7 +8,6 @@ import EmptyState from '@/components/ui/EmptyState';
 import StockAdjustmentModal from '@/components/forms/StockAdjustmentModal';
 import AddItemModal from './AddItemModal';
 import ProductDetailModal from './ProductDetailModal';
-import BarcodeScannerModal from '@/components/ui/BarcodeScannerModal';
 import StoreStockModal from './StoreStockModal';
 import BottomSheet from '@/components/ui/BottomSheet';
 import { useApp, InventoryItem } from '@/context/AppContext';
@@ -84,7 +83,6 @@ export default function InventoryTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnConfig, setColumnConfig] = useState(ALL_COLUMNS);
   const [colVisOpen, setColVisOpen] = useState(false);
-  const [scannerOpen, setScannerOpen] = useState(false);
 
   const [adjustItem, setAdjustItem] = useState<InventoryItem | null>(null);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
@@ -314,7 +312,7 @@ export default function InventoryTable({
       <div className="card overflow-hidden">
         {/* Toolbar */}
         <div className="px-4 py-3.5 border-b border-border flex items-center gap-3 flex-wrap">
-          {/* Search with Barcode Scanner button */}
+          {/* Search */}
           <div className="flex items-center gap-1.5 flex-1 min-w-[240px] max-w-md">
             <div className="relative flex-1">
               <Icon
@@ -333,15 +331,6 @@ export default function InventoryTable({
                 className="input-field pl-9 py-2 text-sm"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => setScannerOpen(true)}
-              className="btn-secondary py-2 px-3 text-xs gap-1.5 font-bold text-foreground"
-              title="Scan Barcode with Camera or USB Scanner"
-            >
-              <Icon name="QrCodeIcon" size={16} />
-              Scan
-            </button>
           </div>
 
           {/* Location filter */}
@@ -1171,28 +1160,6 @@ export default function InventoryTable({
             })()}
           </div>
         </Modal>
-      )}
-
-      {/* Barcode Scanner Modal */}
-      {scannerOpen && (
-        <BarcodeScannerModal
-          open={scannerOpen}
-          onClose={() => setScannerOpen(false)}
-          onScan={(code) => {
-            setSearch(code);
-            setPage(1);
-            const found = inventory.find(
-              (i) => (i.barcode && i.barcode === code) || i.sku === code
-            );
-            if (found) {
-              toast.success(`Found matching product: "${found.name}" (${found.sku})`);
-            } else {
-              toast.info(`Scanned code: ${code}. No direct match found.`);
-            }
-          }}
-          title="Scan Product Barcode"
-          subtitle="Scan retail packaging barcode to instantly filter product inventory."
-        />
       )}
 
       {/* Mobile Product Card Actions BottomSheet */}
