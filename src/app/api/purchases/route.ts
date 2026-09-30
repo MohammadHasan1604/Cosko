@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 import { generateSafeSequenceNo, generateDateSequenceNo } from '@/lib/sequenceUtils';
 import { executeWithIdempotency } from '@/lib/idempotency';
+import { validatePaymentMethod } from '@/lib/paymentValidator';
 
 /**
  * GET /api/purchases - Retrieve purchase orders with authoritative payment reconciliation
@@ -398,15 +399,11 @@ export async function POST(req: NextRequest) {
               'Payment Reference / UTR number is mandatory when recording advance payment for a Purchase Order.'
             );
           }
-          const paymentMethodName = body.paymentMethod ? String(body.paymentMethod).trim() : 'UPI';
-          const pmRecord = await prisma.paymentMethod.findFirst({
-            where: { name: paymentMethodName },
-          });
-          if (pmRecord && pmRecord.status === 'Inactive') {
-            throw new Error(
-              `Payment method "${paymentMethodName}" is currently deactivated. Please select an active payment method.`
-            );
+          const paymentValidation = validatePaymentMethod(body.paymentMethod || 'UPI');
+          if (!paymentValidation.valid) {
+            throw new Error(paymentValidation.error);
           }
+          body.paymentMethod = paymentValidation.normalized!;
         }
 
         let actualPaymentStatus = 'Unpaid';

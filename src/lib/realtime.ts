@@ -128,9 +128,9 @@ export function canUserAccessChannel(
     return isSuperAdmin || requestedUserId === user.id;
   }
 
-  // Domain entity channels (e.g. notifications for units, settings)
-  if (['settings', 'units', 'payment-methods'].includes(channelName)) {
-    return true;
+  // Public business channels are strictly forbidden — all channels must be private or presence
+  if (!channelName.startsWith('private-') && !channelName.startsWith('presence-')) {
+    return false;
   }
 
   return false;
@@ -248,17 +248,7 @@ export async function persistOutboxEvent(
       storeCode: storeCode || undefined,
       timestamp: payload.timestamp || new Date().toISOString(),
       version: payload.version || Date.now(),
-      ...payload,
     };
-    delete (safePayload as any).password;
-    delete (safePayload as any).passwordHash;
-    delete (safePayload as any).tokenHash;
-    delete (safePayload as any).token;
-    delete (safePayload as any).secret;
-    delete (safePayload as any).costPrice;
-    delete (safePayload as any).grossProfit;
-    delete (safePayload as any).netProfit;
-    delete (safePayload as any).margin;
 
     const record = await db.realtimeOutbox.create({
       data: {
@@ -271,6 +261,10 @@ export async function persistOutboxEvent(
     return record.id;
   } catch (err: any) {
     console.warn('[COSKO Realtime] Outbox persistence error:', err?.message || err);
+    // 🔒 Section 16: If inside a transaction, DO NOT swallow durable outbox insertion failure!
+    if (tx) {
+      throw err;
+    }
     return null;
   }
 }
@@ -297,9 +291,19 @@ export async function broadcastRealtimeEvent(
 ): Promise<{ outboxId: string | null; broadcastSuccess: boolean }> {
   const now = new Date().toISOString();
 
-  // Normalize channel: map legacy channels to private authenticated channels
+  // Determine storeCode first
+  const storeCode =
+    payload?.storeCode ||
+    options?.storeCode ||
+    (channel.startsWith('private-store-')
+      ? channel.replace('private-store-', '')
+      : channel.startsWith('store-') && channel !== 'store-global'
+        ? channel.replace('store-', '')
+        : undefined);
+
+  // Normalize channel: Map all business-domain channels to private authenticated channels (Requirement 15)
   let targetChannel = channel;
-  if (channel === 'store-global' || channel === 'global') {
+  if (channel === 'store-global' || channel === 'global' || channel === 'enterprise') {
     targetChannel = 'private-enterprise';
   } else if (channel === 'work-activity') {
     targetChannel = 'private-work-activity';
@@ -309,38 +313,42 @@ export async function broadcastRealtimeEvent(
     targetChannel = `private-${channel}`;
   } else if (channel.startsWith('user-') && !channel.startsWith('private-user-')) {
     targetChannel = `private-${channel}`;
+  } else if (
+    [
+      'sales',
+      'inventory',
+      'expenses',
+      'customers',
+      'vendors',
+      'purchases',
+      'transfers',
+      'notifications',
+      'settings',
+      'units',
+      'payment-methods',
+      'categories',
+      'users',
+    ].includes(channel)
+  ) {
+    // Business-domain mutation: Route to private-store if store-scoped, otherwise private-enterprise
+    if (storeCode && storeCode !== 'All Stores' && storeCode !== 'CENTRAL' && storeCode !== 'all') {
+      targetChannel = getStoreChannel(storeCode);
+    } else {
+      targetChannel = 'private-enterprise';
+    }
+  } else if (!targetChannel.startsWith('private-') && !targetChannel.startsWith('presence-')) {
+    targetChannel = `private-${targetChannel}`;
   }
 
-  // Determine storeCode
-  const storeCode =
-    payload?.storeCode ||
-    options?.storeCode ||
-    (targetChannel.startsWith('private-store-')
-      ? targetChannel.replace('private-store-', '')
-      : targetChannel.startsWith('store-') && targetChannel !== 'store-global'
-        ? targetChannel.replace('store-', '')
-        : undefined);
-
-  // Normalize minimal payload — DO NOT broadcast sensitive credentials, tokens, or private accounting (Requirement O)
+  // Minimal Invalidation Payload (Requirement 15):
+  // Client receives minimal invalidation event and refetches authoritative protected API.
   const normalizedPayload: RealtimePayload = {
     eventType: payload?.eventType || event,
     entityId: payload?.entityId || payload?.id,
     storeCode,
     timestamp: payload?.timestamp || now,
     version: payload?.version || Date.now(),
-    ...(typeof payload === 'object' ? payload : {}),
   };
-
-  // Strip sensitive and restricted keys
-  delete (normalizedPayload as any).password;
-  delete (normalizedPayload as any).passwordHash;
-  delete (normalizedPayload as any).tokenHash;
-  delete (normalizedPayload as any).token;
-  delete (normalizedPayload as any).secret;
-  delete (normalizedPayload as any).costPrice;
-  delete (normalizedPayload as any).grossProfit;
-  delete (normalizedPayload as any).netProfit;
-  delete (normalizedPayload as any).margin;
 
   let outboxId: string | null = null;
   if (!options?.skipOutbox) {
@@ -350,12 +358,6 @@ export async function broadcastRealtimeEvent(
   let broadcastSuccess = false;
   if (realtimeProvider.isConfigured) {
     broadcastSuccess = await realtimeProvider.publish(targetChannel, event, normalizedPayload);
-    // Also broadcast to enterprise channel if this is a store-specific event so Super Admin can observe
-    if (targetChannel.startsWith('private-store-') && targetChannel !== 'private-enterprise') {
-      await realtimeProvider
-        .publish('private-enterprise', event, normalizedPayload)
-        .catch(() => {});
-    }
   }
 
   return { outboxId, broadcastSuccess };

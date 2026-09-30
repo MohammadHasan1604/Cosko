@@ -46,15 +46,19 @@ export default function PurchaseOrderFormModal({
     inventory,
     storesList,
     paymentMethods,
+    currentUser,
     addPurchase,
     updatePurchase,
     refreshAllData,
     confirmAction,
   } = useApp();
 
+  const defaultStore =
+    currentUser.role === 'Super Admin' ? 'CENTRAL' : currentUser.store || 'BLR';
+
   // PO Header Details
   const [vendorName, setVendorName] = useState('');
-  const [store, setStore] = useState('CENTRAL');
+  const [store, setStore] = useState(defaultStore);
   const [invoiceNo, setInvoiceNo] = useState('');
   const [orderDate, setOrderDate] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
@@ -96,6 +100,18 @@ export default function PurchaseOrderFormModal({
 
   // Store options for CustomSelect
   const storeOptions: SelectOption[] = useMemo(() => {
+    if (currentUser.role !== 'Super Admin') {
+      const userStore = currentUser.store || 'BLR';
+      const found = storesList.find((s) => s.code === userStore);
+      return [
+        {
+          value: userStore,
+          label: `${userStore} · ${found?.name || userStore}`,
+          sublabel: found?.city || userStore,
+          badge: 'Assigned Store',
+        },
+      ];
+    }
     return [
       { value: 'CENTRAL', label: 'CENTRAL Warehouse (Central Hub)', sublabel: 'Central Warehouse' },
       ...storesList
@@ -107,7 +123,7 @@ export default function PurchaseOrderFormModal({
           badge: s.status,
         })),
     ];
-  }, [storesList]);
+  }, [storesList, currentUser.role, currentUser.store]);
 
   // Deduplicated unique catalog products for item selection
   const catalogProductOptions: SelectOption[] = useMemo(() => {
@@ -177,7 +193,7 @@ export default function PurchaseOrderFormModal({
 
       if (purchase) {
         setVendorName(purchase.vendorName || '');
-        setStore(purchase.store || 'CENTRAL');
+        setStore(purchase.store || defaultStore);
         setInvoiceNo(purchase.invoiceNo || '');
         setOrderDate(
           purchase.createdAt
@@ -246,7 +262,7 @@ export default function PurchaseOrderFormModal({
         const nextWeekStr = nextWeek.toISOString().split('T')[0];
 
         setVendorName(vendors[0]?.name || '');
-        setStore('CENTRAL');
+        setStore(defaultStore);
         setInvoiceNo('');
         setOrderDate(todayStr);
         setExpectedDate(nextWeekStr);
@@ -728,18 +744,30 @@ export default function PurchaseOrderFormModal({
             </div>
 
             <div>
-              <CustomSelect
-                label="Receiving Store / Hub Location"
-                required
-                placeholder="Select destination warehouse/store..."
-                value={store}
-                onChange={setStore}
-                options={storeOptions}
-                searchable={true}
-                addNewLabel="+ Add New Store"
-                onAddNew={() => setStoreModalOpen(true)}
-                size="sm"
-              />
+              {currentUser.role === 'Super Admin' ? (
+                <CustomSelect
+                  label="Receiving Store / Hub Location"
+                  required
+                  placeholder="Select destination warehouse/store..."
+                  value={store}
+                  onChange={setStore}
+                  options={storeOptions}
+                  searchable={true}
+                  addNewLabel="+ Add New Store"
+                  onAddNew={() => setStoreModalOpen(true)}
+                  size="sm"
+                />
+              ) : (
+                <div>
+                  <label className="text-2xs font-bold text-foreground block mb-1">
+                    Receiving Store / Hub Location <span className="text-danger">*</span>
+                  </label>
+                  <div className="input-field text-xs h-8 flex items-center bg-muted/50 text-muted-foreground font-semibold cursor-not-allowed">
+                    <span className="font-mono text-primary font-bold mr-1.5">{store}</span>
+                    <span className="text-muted-foreground">· Assigned Store (Locked)</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">

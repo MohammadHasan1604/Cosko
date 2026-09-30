@@ -158,6 +158,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (user.role === 'Sales Manager') {
+      return NextResponse.json(
+        { error: 'Forbidden: Sales Manager cannot create enterprise product catalog entries.' },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
 
     if (!body.name || !body.sku) {
@@ -532,6 +539,30 @@ export async function PUT(req: NextRequest) {
         return NextResponse.json(
           { error: `Duplicate barcode: Already assigned to "${duplicateBarcode.name}"` },
           { status: 409 }
+        );
+      }
+    }
+
+    // 🔒 Product Master Security: Sales Manager cannot modify cost, price, tax, or financial config
+    if (user.role === 'Sales Manager') {
+      const hasCostEdit =
+        (body.costPrice !== undefined && body.costPrice !== null && body.costPrice !== '') ||
+        (body.baseCostPrice !== undefined && body.baseCostPrice !== null && body.baseCostPrice !== '');
+      const hasTaxEdit =
+        (body.taxRate !== undefined && body.taxRate !== null && body.taxRate !== '') ||
+        (body.gstRate !== undefined && body.gstRate !== null && body.gstRate !== '');
+      const hasPriceEdit =
+        (body.sellingPrice !== undefined && body.sellingPrice !== null && body.sellingPrice !== '') ||
+        (body.baseSellingPrice !== undefined && body.baseSellingPrice !== null && body.baseSellingPrice !== '') ||
+        (body.mrp !== undefined && body.mrp !== null && body.mrp !== '');
+
+      if (hasCostEdit || hasTaxEdit || hasPriceEdit) {
+        return NextResponse.json(
+          {
+            error:
+              'Forbidden: As Sales Manager, you are not authorized to modify product cost, price, or financial configuration.',
+          },
+          { status: 403 }
         );
       }
     }

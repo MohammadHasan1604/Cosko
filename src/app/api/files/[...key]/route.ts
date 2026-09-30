@@ -220,11 +220,100 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
     const fullKey = sanitizedParts.join('/');
 
     // Retention enforcement: NEVER delete financial proof
-    if (fullKey.startsWith('payment-proofs') || fullKey.startsWith('expense-receipts')) {
+    if (
+      fullKey.startsWith('payment-proofs') ||
+      fullKey.startsWith('expense-receipts') ||
+      fullKey.includes('payment-proof') ||
+      fullKey.includes('expense-receipt')
+    ) {
       return NextResponse.json(
         { error: 'Retention Policy: Payment proofs and expense receipts cannot be deleted.' },
         { status: 403 }
       );
+    }
+
+    // 🔒 File Delete Ownership Enforcement (Requirement 14)
+    if (auth.user.role !== 'Super Admin' && auth.user.securityLevel < 100) {
+      // Branding and enterprise assets can only be deleted by Super Admin
+      if (fullKey.startsWith('branding') || fullKey.includes('/branding/')) {
+        return NextResponse.json(
+          { error: 'Forbidden: Only Super Admin can delete enterprise branding assets' },
+          { status: 403 }
+        );
+      }
+
+      // Check FileAsset ownership in database
+      const fileAsset = await (prisma as any).fileAsset.findUnique({
+        where: { objectKey: fullKey },
+      });
+
+      if (fileAsset) {
+        if (
+          fileAsset.storeCode &&
+          fileAsset.storeCode !== auth.user.store &&
+          !auth.user.allowedStores.includes(fileAsset.storeCode)
+        ) {
+          return NextResponse.json(
+            { error: 'Forbidden: Cannot delete files belonging to another store' },
+            { status: 403 }
+          );
+        }
+
+        if (
+          fileAsset.privacyLevel === 'ENTERPRISE' ||
+          fileAsset.relatedEntityType === 'Enterprise' ||
+          fileAsset.relatedEntityType === 'Store'
+        ) {
+          return NextResponse.json(
+            { error: 'Forbidden: Cannot delete enterprise assets' },
+            { status: 403 }
+          );
+        }
+      } else {
+        // Fallback entity ownership resolution:
+        // 1. Check if it's a catalog product image
+        const productWithImg = await prisma.product.findFirst({
+          where: { imageUrl: { contains: fullKey } },
+          select: { id: true, name: true },
+        });
+        if (productWithImg) {
+          return NextResponse.json(
+            { error: 'Forbidden: Master catalog product images can only be deleted by Super Admin' },
+            { status: 403 }
+          );
+        }
+
+        // 2. Check if associated with another store's sale
+        const saleWithFile = await prisma.salesOrder.findFirst({
+          where: { paymentProofUrl: { contains: fullKey } },
+          select: { storeCode: true },
+        });
+        if (saleWithFile) {
+          if (
+            saleWithFile.storeCode !== auth.user.store &&
+            !auth.user.allowedStores.includes(saleWithFile.storeCode)
+          ) {
+            return NextResponse.json(
+              { error: 'Forbidden: Cannot delete files belonging to another store' },
+              { status: 403 }
+            );
+          }
+        }
+
+        // 3. For any unindexed object, non-super-admin cannot delete simply by knowing objectKey
+        const userStore = auth.user.store || '';
+        const keyMatchesStore =
+          userStore &&
+          (fullKey.toLowerCase().includes(userStore.toLowerCase()) ||
+            fullKey.toUpperCase().includes(userStore.toUpperCase()));
+
+        if (!keyMatchesStore) {
+          return NextResponse.json(
+            { error: 'Forbidden: Cannot verify file ownership for deletion. Store Manager may only delete verified own-store assets.' },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     const success = await deleteFromStorage(fullKey);

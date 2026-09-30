@@ -94,7 +94,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
   }
 
   // Route Permission Check — Canonical RBAC Engine is authoritative
-  const isAuthorized = activeRoute ? isRouteAllowed(activeRoute, currentUser.role) : true;
+  const isAuthorized = activeRoute ? isRouteAllowed(activeRoute, currentUser) : true;
 
   return (
     <div className="flex h-[100dvh] bg-background overflow-hidden">

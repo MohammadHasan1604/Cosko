@@ -37,7 +37,10 @@ export default function ProductFormModal({
     vendors,
     brands,
     confirmAction,
+    currentUser,
   } = useApp();
+
+  const isSalesManager = currentUser?.role === 'Sales Manager';
 
   const [images, setImages] = useState<string[]>([]);
   const [primaryImage, setPrimaryImage] = useState<string>('');
@@ -326,27 +329,34 @@ export default function ProductFormModal({
       return;
     }
 
-    if (
-      formData.costPrice === ('' as unknown as number) ||
-      formData.costPrice === undefined ||
-      formData.costPrice === null ||
-      isNaN(Number(formData.costPrice))
-    ) {
-      toast.error('Cost Price is required. Please enter a valid number.');
+    if (!editItem && isSalesManager) {
+      toast.error('Product master creation is restricted to Super Admin and Store Manager.');
       return;
     }
 
-    if (
-      formData.sellingPrice === ('' as unknown as number) ||
-      formData.sellingPrice === undefined ||
-      formData.sellingPrice === null ||
-      isNaN(Number(formData.sellingPrice))
-    ) {
-      toast.error('Selling Price is required. Please enter a valid number.');
-      return;
+    if (!isSalesManager) {
+      if (
+        formData.costPrice === ('' as unknown as number) ||
+        formData.costPrice === undefined ||
+        formData.costPrice === null ||
+        isNaN(Number(formData.costPrice))
+      ) {
+        toast.error('Cost Price is required. Please enter a valid number.');
+        return;
+      }
+
+      if (
+        formData.sellingPrice === ('' as unknown as number) ||
+        formData.sellingPrice === undefined ||
+        formData.sellingPrice === null ||
+        isNaN(Number(formData.sellingPrice))
+      ) {
+        toast.error('Selling Price is required. Please enter a valid number.');
+        return;
+      }
     }
 
-    const payload = {
+    const payload: any = {
       ...formData,
       name: formData.name.trim(),
       sku: formData.sku.trim().toUpperCase(),
@@ -356,15 +366,6 @@ export default function ProductFormModal({
       category: formData.category.trim(),
       subcategory: formData.subcategory.trim() || 'General',
       description: formData.description.trim() || undefined,
-      costPrice: Number(formData.costPrice),
-      transferPrice: Number(formData.costPrice),
-      sellingPrice: Number(formData.sellingPrice),
-      mrp:
-        formData.mrp !== ('' as unknown as number) &&
-        formData.mrp !== undefined &&
-        formData.mrp !== null
-          ? Number(formData.mrp)
-          : undefined,
       qtyOnHand:
         formData.qtyOnHand !== ('' as unknown as number) &&
         formData.qtyOnHand !== undefined &&
@@ -383,12 +384,6 @@ export default function ProductFormModal({
         formData.minStock !== null
           ? Number(formData.minStock)
           : 10,
-      taxRate:
-        formData.taxRate !== ('' as unknown as number) &&
-        formData.taxRate !== undefined &&
-        formData.taxRate !== null
-          ? Number(formData.taxRate)
-          : 0,
       warrantyMonths:
         formData.warrantyMonths !== ('' as unknown as number) &&
         formData.warrantyMonths !== undefined &&
@@ -402,20 +397,51 @@ export default function ProductFormModal({
       imageUrl: primaryImage || images[0] || undefined,
     };
 
+    if (isSalesManager) {
+      payload.store = currentUser?.store || formData.store;
+      delete payload.costPrice;
+      delete payload.transferPrice;
+      delete payload.sellingPrice;
+      delete payload.mrp;
+      delete payload.taxRate;
+    } else {
+      payload.costPrice = Number(formData.costPrice);
+      payload.transferPrice = Number(formData.costPrice);
+      payload.sellingPrice = Number(formData.sellingPrice);
+      payload.mrp =
+        formData.mrp !== ('' as unknown as number) &&
+        formData.mrp !== undefined &&
+        formData.mrp !== null
+          ? Number(formData.mrp)
+          : undefined;
+      payload.taxRate =
+        formData.taxRate !== ('' as unknown as number) &&
+        formData.taxRate !== undefined &&
+        formData.taxRate !== null
+          ? Number(formData.taxRate)
+          : 0;
+    }
+
+    const summaryItems = [
+      { label: 'Product Name', value: payload.name, highlighted: true },
+      { label: 'SKU Code', value: payload.sku },
+      { label: 'Category', value: `${payload.category} / ${payload.subcategory}` },
+      { label: 'Assigned Store', value: payload.store },
+      ...(isSalesManager
+        ? [{ label: 'Operational Scope', value: 'Catalog info & local store stock' }]
+        : [
+            { label: 'Cost Price', value: `₹${(payload.costPrice || 0).toLocaleString('en-IN')}` },
+            { label: 'Selling Price', value: `₹${(payload.sellingPrice || 0).toLocaleString('en-IN')}` },
+          ]),
+      { label: 'Stock On Hand', value: `${payload.qtyOnHand} units` },
+    ];
+
     const confirmed = await confirmAction({
       actionType: editItem ? 'update' : 'create',
       title: editItem ? `Confirm Product Update: ${payload.name}` : 'Confirm New Product Creation',
       subtitle: 'Please review catalog specifications, pricing, and initial stock.',
       confirmLabel: editItem ? 'Confirm & Update Product' : 'Confirm & Create Product',
-      summaryItems: [
-        { label: 'Product Name', value: payload.name, highlighted: true },
-        { label: 'SKU Code', value: payload.sku },
-        { label: 'Category', value: `${payload.category} / ${payload.subcategory}` },
-        { label: 'Assigned Store', value: payload.store },
-        { label: 'Cost Price', value: `₹${payload.costPrice.toLocaleString('en-IN')}` },
-        { label: 'Selling Price', value: `₹${payload.sellingPrice.toLocaleString('en-IN')}` },
-        { label: 'Stock On Hand', value: `${payload.qtyOnHand} units` },
-      ],
+      summaryItems,
       warningMessage: editItem
         ? 'Updating this product will modify pricing and catalog attributes across all active POS and inventory views.'
         : 'Once confirmed, this SKU will be permanently added to the central catalog and database ledger.',
@@ -611,56 +637,73 @@ export default function ProductFormModal({
             </h4>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">
-                  Cost Price (₹) <span className="text-danger">*</span>
-                </label>
-                <NumericInput
-                  required
-                  min={0}
-                  step="0.01"
-                  allowDecimals={true}
-                  placeholder="e.g. 500.00"
-                  value={formData.costPrice}
-                  onChange={(val) => setFormData({ ...formData, costPrice: val as any })}
-                  className="text-xs font-tabular font-semibold"
-                />
-              </div>
+              {isSalesManager ? (
+                <div>
+                  <label className="text-xs font-bold text-foreground block mb-1">
+                    Cost Price (₹) <span className="text-muted-foreground text-2xs">(Protected)</span>
+                  </label>
+                  <div className="input-field text-xs bg-muted/30 text-muted-foreground flex items-center justify-between cursor-not-allowed py-2">
+                    <span>••••••</span>
+                    <span className="text-2xs font-semibold uppercase text-warning">Restricted</span>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-bold text-foreground block mb-1">
+                    Cost Price (₹) <span className="text-danger">*</span>
+                  </label>
+                  <NumericInput
+                    required
+                    min={0}
+                    step="0.01"
+                    allowDecimals={true}
+                    placeholder="e.g. 500.00"
+                    value={formData.costPrice}
+                    onChange={(val) => setFormData({ ...formData, costPrice: val as any })}
+                    className="text-xs font-tabular font-semibold"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">
-                  Selling Price (₹) <span className="text-danger">*</span>
+                  Selling Price (₹) {isSalesManager ? <span className="text-2xs text-muted-foreground">(Locked)</span> : <span className="text-danger">*</span>}
                 </label>
                 <NumericInput
-                  required
+                  required={!isSalesManager}
+                  disabled={isSalesManager}
                   min={0}
                   step="0.01"
                   allowDecimals={true}
                   placeholder="e.g. 750.00"
                   value={formData.sellingPrice}
                   onChange={(val) => setFormData({ ...formData, sellingPrice: val as any })}
-                  className="text-xs font-tabular font-bold text-success"
+                  className={`text-xs font-tabular font-bold ${isSalesManager ? 'text-muted-foreground bg-muted/30 cursor-not-allowed' : 'text-success'}`}
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">MRP (₹)</label>
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  MRP (₹) {isSalesManager && <span className="text-2xs text-muted-foreground">(Locked)</span>}
+                </label>
                 <NumericInput
+                  disabled={isSalesManager}
                   min={0}
                   step="0.01"
                   allowDecimals={true}
                   placeholder="e.g. 999.00"
                   value={formData.mrp}
                   onChange={(val) => setFormData({ ...formData, mrp: val as any })}
-                  className="text-xs font-tabular text-muted-foreground"
+                  className={`text-xs font-tabular ${isSalesManager ? 'text-muted-foreground bg-muted/30 cursor-not-allowed' : 'text-muted-foreground'}`}
                 />
               </div>
 
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">
-                  GST Tax Rate (%)
+                  GST Tax Rate (%) {isSalesManager && <span className="text-2xs text-muted-foreground">(Locked)</span>}
                 </label>
                 <select
+                  disabled={isSalesManager}
                   value={
                     formData.taxRate !== undefined && formData.taxRate !== ('' as unknown as number)
                       ? formData.taxRate
@@ -673,7 +716,7 @@ export default function ProductFormModal({
                         e.target.value === '' ? ('' as unknown as number) : Number(e.target.value),
                     })
                   }
-                  className="input-field text-xs font-medium"
+                  className={`input-field text-xs font-medium ${isSalesManager ? 'bg-muted/30 text-muted-foreground cursor-not-allowed' : ''}`}
                 >
                   <option value="">Select GST Rate...</option>
                   <option value={0}>0% (Exempt)</option>
@@ -725,9 +768,9 @@ export default function ProductFormModal({
               <div>
                 <CustomSelect
                   label="Stock Location"
-                  disabled={!!editItem}
+                  disabled={!!editItem || isSalesManager}
                   placeholder="Select store location..."
-                  value={formData.store}
+                  value={isSalesManager ? (currentUser?.store || formData.store) : formData.store}
                   onChange={(val) => setFormData((prev) => ({ ...prev, store: val }))}
                   options={storeOptions}
                   searchable={true}

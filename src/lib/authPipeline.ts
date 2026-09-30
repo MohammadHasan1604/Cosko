@@ -27,6 +27,8 @@ import {
   RBACEngine,
   ROLE_SECURITY_LEVELS,
   DEFAULT_ROLE_PERMISSIONS,
+  getEffectivePermissions,
+  hasEffectivePermission,
   type UserRole,
   type SecurityLevel,
 } from './rbacEngine';
@@ -149,6 +151,7 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
       where: { id: jwtResult.user.id },
       include: {
         storeAssignments: true,
+        permissionOverrides: true,
       },
     });
   } catch (dbErr) {
@@ -185,6 +188,17 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
   const dbSecurityLevel = (ROLE_SECURITY_LEVELS[dbRole] ?? dbUser.securityLevel) as SecurityLevel;
 
   const rolePerms = DEFAULT_ROLE_PERMISSIONS[dbRole] || [];
+  const dbOverrides = ((dbUser as any).permissionOverrides || []).map((ov: any) => ({
+    permissionCode: ov.permissionCode,
+    overrideType: ov.overrideType as 'ALLOW' | 'DENY',
+  }));
+
+  const effectivePerms = getEffectivePermissions({
+    role: dbRole,
+    securityLevel: dbSecurityLevel,
+    permissions: rolePerms,
+    overrides: dbOverrides,
+  });
 
   const authenticatedUser: AuthenticatedUser = {
     id: dbUser.id,
@@ -203,8 +217,8 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
     avatarUrl: dbUser.avatarUrl || undefined,
     mustChangePassword: dbUser.mustChangePassword || false,
     sessionId: dbSessionId,
-    permissions: rolePerms,
-    overrides: [],
+    permissions: effectivePerms,
+    overrides: dbOverrides,
   };
 
   return { user: authenticatedUser, error: null, status: 200 };
@@ -220,6 +234,11 @@ export function hasPermission(
 ): boolean {
   if (user.role === 'Super Admin' || user.securityLevel === 100) {
     return true;
+  }
+
+  // First verify effective permission (role default + per-user override + protected boundaries)
+  if (!hasEffectivePermission(user, permissionCode)) {
+    return false;
   }
 
   const result = RBACEngine.authorize(
@@ -306,6 +325,8 @@ export interface StoreScopeResult {
   authorizedStore: string;
   effectiveStore: string;
   isAllStores: boolean;
+  enterpriseScope: boolean;
+  physicalStoreCode: string | null;
   status: number;
   error: string | null;
 }
@@ -317,6 +338,7 @@ export interface StoreScopeResult {
  * Rules:
  * Super Admin:
  *   - May access any valid StoreHub store and enterprise reporting scopes ('All Stores') where allowed.
+ *   - When isAllStores is true: enterpriseScope is true, physicalStoreCode is null (omit store filter!).
  * Store Manager / Sales Manager:
  *   - The only valid operational store is user.store.
  *   - Client-provided store values must NEVER expand this scope.
@@ -339,6 +361,8 @@ export function requireStoreScope(
           authorizedStore: 'All Stores',
           effectiveStore: 'All Stores',
           isAllStores: true,
+          enterpriseScope: true,
+          physicalStoreCode: null,
           status: 200,
           error: null,
         };
@@ -351,6 +375,8 @@ export function requireStoreScope(
         authorizedStore: defaultPhysical,
         effectiveStore: defaultPhysical,
         isAllStores: false,
+        enterpriseScope: false,
+        physicalStoreCode: defaultPhysical,
         status: 200,
         error: null,
       };
@@ -362,6 +388,8 @@ export function requireStoreScope(
       authorizedStore: cleanReq,
       effectiveStore: cleanReq,
       isAllStores: false,
+      enterpriseScope: false,
+      physicalStoreCode: cleanReq,
       status: 200,
       error: null,
     };
@@ -382,6 +410,8 @@ export function requireStoreScope(
         authorizedStore: canonicalStore,
         effectiveStore: canonicalStore,
         isAllStores: false,
+        enterpriseScope: false,
+        physicalStoreCode: canonicalStore,
         status: 403,
         error: 'Forbidden: Consolidated view across all stores is restricted to Super Admin only',
       };
@@ -393,6 +423,8 @@ export function requireStoreScope(
         authorizedStore: canonicalStore,
         effectiveStore: canonicalStore,
         isAllStores: false,
+        enterpriseScope: false,
+        physicalStoreCode: canonicalStore,
         status: 403,
         error: `Forbidden: As ${user.role}, you are restricted to store "${canonicalStore}". Access to "${cleanReq}" is denied.`,
       };
@@ -404,6 +436,8 @@ export function requireStoreScope(
     authorizedStore: canonicalStore,
     effectiveStore: canonicalStore,
     isAllStores: false,
+    enterpriseScope: false,
+    physicalStoreCode: canonicalStore,
     status: 200,
     error: null,
   };

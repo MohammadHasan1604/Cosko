@@ -9,6 +9,7 @@ import {
   requireStoreScope,
   validatePhysicalStore,
 } from '@/lib/authPipeline';
+import { validatePaymentMethod } from '@/lib/paymentValidator';
 
 /**
  * GET /api/sales - Retrieve sales orders with store isolation and financial privacy
@@ -33,8 +34,8 @@ export async function GET(req: NextRequest) {
     }
 
     const whereClause: any = {};
-    if (storeScope.effectiveStore) {
-      whereClause.storeCode = storeScope.effectiveStore;
+    if (!storeScope.isAllStores && storeScope.physicalStoreCode) {
+      whereClause.storeCode = storeScope.physicalStoreCode;
     }
 
     const limit = Math.min(Number(searchParams.get('limit')) || 100, 500);
@@ -135,23 +136,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Validate payment method dynamically against centralized master
-    const paymentMethodName = body.paymentMethod ? String(body.paymentMethod).trim() : '';
-    if (!paymentMethodName) {
-      return NextResponse.json({ error: 'Payment method is required.' }, { status: 400 });
+    // Strict Canonical Payment Method Enforcement (Cash, UPI, Other)
+    const paymentValidation = validatePaymentMethod(body.paymentMethod);
+    if (!paymentValidation.valid) {
+      return NextResponse.json({ error: paymentValidation.error }, { status: 400 });
     }
-    const pmRecord = await prisma.paymentMethod.findFirst({
-      where: { name: paymentMethodName },
-    });
-    if (pmRecord && pmRecord.status === 'Inactive') {
-      return NextResponse.json(
-        {
-          error: `Payment method "${paymentMethodName}" is currently deactivated. Please select an active payment method.`,
-        },
-        { status: 400 }
-      );
-    }
-    body.paymentMethod = paymentMethodName;
+    body.paymentMethod = paymentValidation.normalized!;
 
     // MANDATORY PROOF & REFERENCE VALIDATION (ROOT FIX - ZERO BYPASS)
     const effectiveProofUrl =
@@ -257,9 +247,13 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     console.error('API /api/sales POST error:', error);
+    const status =
+      error.statusCode ||
+      error.status ||
+      (error.message?.includes('Insufficient stock') ? 409 : 500);
     return NextResponse.json(
       { error: error.message || 'Failed to process checkout transaction' },
-      { status: 500 }
+      { status }
     );
   }
 }

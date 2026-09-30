@@ -169,7 +169,7 @@ export default function VendorFormModal({
     setIsSubmitting(true);
     try {
       if (isEdit && vendor) {
-        await updateVendor(vendor.id, {
+        const updateRes = await updateVendor(vendor.id, {
           name: cleanName,
           contactPerson: contactPerson.trim() || 'Account Manager',
           email: email.trim() || undefined,
@@ -183,6 +183,11 @@ export default function VendorFormModal({
               ? Number(leadTimeDays)
               : undefined,
         });
+
+        if (!updateRes?.success) {
+          // Failure: keep modal open with typed values intact
+          return;
+        }
 
         toast.success(`Vendor "${cleanName}" updated successfully`);
         if (onSuccess) onSuccess(cleanName, { ...vendor, name: cleanName });
@@ -205,8 +210,13 @@ export default function VendorFormModal({
           rating: 4.8,
         });
 
+        if (!created) {
+          // Failure: keep modal open with typed values intact
+          return;
+        }
+
         toast.success(`Vendor "${cleanName}" registered successfully!`);
-        if (onSuccess) onSuccess(cleanName, created || undefined);
+        if (onSuccess) onSuccess(cleanName, created);
         onClose();
       }
     } catch (err: any) {

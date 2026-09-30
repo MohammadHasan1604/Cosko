@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const phone = searchParams.get('phone');
-    const query = searchParams.get('query');
+    const query = searchParams.get('query') || searchParams.get('search');
     const includeArchived = searchParams.get('includeArchived') === 'true';
 
     const isSuperAdmin = user.role === 'Super Admin' || user.securityLevel >= 100;
@@ -91,8 +91,37 @@ export async function GET(req: NextRequest) {
         },
         include: {
           storeProfiles: true,
+          sales: {
+            select: { storeCode: true },
+            take: 5,
+          },
         },
       });
+
+      if (!customer) {
+        return NextResponse.json(
+          { success: true, customer: null },
+          { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+        );
+      }
+
+      // Non-Super-Admin: Customer MUST have an active profile or past sales in callerStore
+      if (!isSuperAdmin) {
+        const hasStoreProfile = customer.storeProfiles?.some(
+          (p: any) => p.storeCode.toUpperCase() === callerStore
+        );
+        const hasSalesInStore = customer.sales?.some(
+          (s: any) => s.storeCode.toUpperCase() === callerStore
+        );
+        if (!hasStoreProfile && !hasSalesInStore) {
+          // Exists exclusively in another store — block enumeration
+          return NextResponse.json(
+            { success: true, customer: null },
+            { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+          );
+        }
+      }
+
       return NextResponse.json(
         { success: true, customer: mapCustomerProfiles(customer) },
         { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
@@ -186,42 +215,57 @@ export async function POST(req: NextRequest) {
             const initialCredit = Number(body.creditBalance) || 0;
 
             if (existingCustomer) {
+              // Ownership check: Only modify master profile fields if Super Admin or caller owns the customer exclusively
+              const existingProfiles = await tx.customerStoreProfile.findMany({
+                where: { customerId: existingCustomer.id },
+              });
+              const callerProfile = existingProfiles.find(
+                (p: any) => p.storeCode.toUpperCase() === storeCode
+              );
+              const canModifyMaster =
+                user.role === 'Super Admin' ||
+                existingProfiles.length === 0 ||
+                (existingProfiles.length === 1 && Boolean(callerProfile));
+
+              const updateData: any = { status: 'Active' };
+              if (canModifyMaster) {
+                if (body.name) updateData.name = body.name.trim();
+                if (body.email !== undefined) updateData.email = body.email ? body.email.trim() : null;
+                if (body.address !== undefined) updateData.address = body.address ? body.address.trim() : null;
+                if (body.city !== undefined) updateData.city = body.city ? body.city.trim() : null;
+              }
+
               const updated = await tx.customer.update({
                 where: { id: existingCustomer.id },
-                data: {
-                  name: body.name,
-                  email: body.email || undefined,
-                  address: body.address || undefined,
-                  city: body.city || undefined,
-                  status: 'Active',
+                data: updateData,
+              });
+
+              // Always ensure caller's store profile is linked
+              const profile = await tx.customerStoreProfile.upsert({
+                where: {
+                  customerId_storeCode: {
+                    customerId: existingCustomer.id,
+                    storeCode,
+                  },
+                },
+                create: {
+                  customerId: existingCustomer.id,
+                  storeCode,
+                  totalSpent: initialSpent,
+                  creditBalance: initialCredit,
+                  totalOrders: 0,
+                },
+                update: {
+                  creditBalance: initialCredit > 0 ? initialCredit : undefined,
                 },
               });
 
-              if (initialCredit > 0 || initialSpent > 0) {
-                await tx.customerStoreProfile.upsert({
-                  where: {
-                    customerId_storeCode: {
-                      customerId: existingCustomer.id,
-                      storeCode,
-                    },
-                  },
-                  create: {
-                    customerId: existingCustomer.id,
-                    storeCode,
-                    totalSpent: initialSpent,
-                    creditBalance: initialCredit,
-                    totalOrders: 0,
-                  },
-                  update: {
-                    creditBalance: initialCredit > 0 ? initialCredit : undefined,
-                  },
-                });
-              }
-
               return {
                 ...updated,
-                totalSpent: initialSpent,
-                creditBalance: initialCredit,
+                totalSpent: Number(profile.totalSpent) || initialSpent,
+                creditBalance: Number(profile.creditBalance) || initialCredit,
+                totalOrders: Number(profile.totalOrders) || 0,
+                storeProfiles: [profile],
               };
             }
 

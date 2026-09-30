@@ -55,7 +55,7 @@ export default function Sidebar({
     (p) => p.status === 'Sent' || p.status === 'Draft'
   ).length;
 
-  const navGroups = getAuthoritativeNavGroups(currentUser.role, {
+  const navGroups = getAuthoritativeNavGroups(currentUser, {
     lowStock: lowStockCount,
     pendingPO: pendingPOCount,
   });

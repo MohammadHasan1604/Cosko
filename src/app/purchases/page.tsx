@@ -19,6 +19,7 @@ export default function PurchasesPage() {
     deletePurchase,
     selectedStore,
     storesList,
+    currentUser,
     refreshAllData,
     recordPurchasePayment,
   } = useApp();
@@ -36,9 +37,19 @@ export default function PurchasesPage() {
   };
 
   const filteredPurchases =
-    selectedStore === 'All Stores' ? purchases : purchases.filter((p) => p.store === selectedStore);
+    currentUser.role !== 'Super Admin'
+      ? purchases.filter((p) => p.store === currentUser.store)
+      : selectedStore === 'All Stores'
+        ? purchases
+        : purchases.filter((p) => p.store === selectedStore);
 
   const openEdit = (po: PurchaseOrder) => {
+    if (currentUser.role !== 'Super Admin' && po.store !== currentUser.store) {
+      toast.error(
+        `Forbidden: You can only view and edit purchase orders belonging to your assigned store (${currentUser.store}).`
+      );
+      return;
+    }
     setEditPoModal(po);
   };
 

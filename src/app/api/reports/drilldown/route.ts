@@ -48,7 +48,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: storeScope.error }, { status: storeScope.status });
     }
 
-    const storeFilter: string | undefined = storeScope.effectiveStore || undefined;
+    const storeFilter: string | undefined =
+      !storeScope.isAllStores && storeScope.physicalStoreCode
+        ? storeScope.physicalStoreCode
+        : undefined;
 
     let data: any = {};
 

@@ -50,19 +50,39 @@ model UserAccount {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  storeAssignments UserStoreAssignment[]
-  sessions         UserSession[]
-  attendanceDays   AttendanceDay[]
-  deleteRequests   DeleteRequest[]
-  notifications    Notification[]
-  auditLogs        AuditLog[]            @relation("AuditLogUser")
-  fileAssets       FileAsset[]
-  presence         UserPresence?
+  storeAssignments    UserStoreAssignment[]
+  sessions            UserSession[]
+  attendanceDays      AttendanceDay[]
+  deleteRequests      DeleteRequest[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]               @relation("AuditLogUser")
+  fileAssets          FileAsset[]
+  presence            UserPresence?
+  permissionOverrides UserPermissionOverride[]
 
   @@index([role])
   @@index([status])
   @@index([createdAt])
   @@map("users")
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 2C. USER PERMISSION OVERRIDES (ALLOW / DENY per user)
+// ──────────────────────────────────────────────────────────────────────────────
+model UserPermissionOverride {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  permissionCode String   @map("permission_code") @db.VarChar(64)
+  overrideType   String   @map("override_type") @db.VarChar(16) // "ALLOW" | "DENY"
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionCode])
+  @@index([userId])
+  @@index([permissionCode])
+  @@map("user_permission_overrides")
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

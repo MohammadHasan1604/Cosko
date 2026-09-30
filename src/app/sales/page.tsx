@@ -52,6 +52,7 @@ export default function SalesPage() {
     systemSettings,
     currentUser,
     paymentMethods,
+    storesList,
     addAuditLog,
     confirmAction,
   } = useApp();
@@ -1335,11 +1336,11 @@ export default function SalesPage() {
                     className="select-field text-xs py-1.5 w-36"
                   >
                     <option value="All">All Stores</option>
-                    <option value="CENTRAL">CENTRAL</option>
-                    <option value="BLR">BLR</option>
-                    <option value="HYD">HYD</option>
-                    <option value="DEL">DEL</option>
-                    <option value="MUM">MUM</option>
+                    {storesList.map((st) => (
+                      <option key={st.id || st.code} value={st.code}>
+                        {st.code} - {st.name}
+                      </option>
+                    ))}
                   </select>
                 )}
               </div>

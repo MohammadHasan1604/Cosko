@@ -285,6 +285,8 @@ export const MySQLDataService = {
       securityLevel: user.securityLevel,
       assignedStores: user.assignedStores || user.allowedStores,
       allowedStores: user.assignedStores || user.allowedStores,
+      permissionOverride: user.permissionOverride,
+      overrides: user.overrides,
     });
   },
 
@@ -358,11 +360,11 @@ export const MySQLDataService = {
     });
   },
 
-  async deleteVendor(id: string, permanent = false) {
-    return apiCall(
-      `/api/vendors?id=${encodeURIComponent(id)}${permanent ? '&permanent=true' : ''}`,
-      'DELETE'
-    );
+  async deleteVendor(id: string, permanent = false, reason = '') {
+    let url = `/api/vendors?id=${encodeURIComponent(id)}`;
+    if (permanent) url += '&permanent=true';
+    if (reason) url += `&reason=${encodeURIComponent(reason)}`;
+    return apiCall(url, 'DELETE');
   },
 
   // ─── EXPENSES ────────────────────────────────────────

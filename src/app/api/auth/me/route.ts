@@ -20,6 +20,8 @@ export async function GET(request: NextRequest) {
       securityLevel: u.securityLevel,
       store: u.store,
       allowedStores: u.allowedStores,
+      permissions: u.permissions,
+      overrides: u.overrides,
       avatar: u.name.substring(0, 2).toUpperCase(),
       avatarUrl: u.avatarUrl || undefined,
       mustChangePassword: u.mustChangePassword || false,

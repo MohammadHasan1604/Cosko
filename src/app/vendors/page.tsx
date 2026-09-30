@@ -683,9 +683,13 @@ export default function VendorsPage() {
             vendor={deleteVendorModal}
             currentUser={currentUser}
             onClose={() => setDeleteVendorModal(null)}
-            onDelete={async (vendorId, permanent) => {
-              await deleteVendor(vendorId, permanent);
-              setDeleteVendorModal(null);
+            onDelete={async (vendorId, permanent, reason) => {
+              const res = await deleteVendor(vendorId, permanent, reason);
+              if (res?.success) {
+                setDeleteVendorModal(null);
+                return true;
+              }
+              return false;
             }}
           />
         )}

@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 
+import { validatePaymentMethod } from '@/lib/paymentValidator';
+
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_PAYMENT_METHODS = [
@@ -108,13 +110,18 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    const name = body?.name?.trim();
-    if (!name) {
+    const rawName = body?.name?.trim();
+    const validation = validatePaymentMethod(rawName);
+    if (!validation.valid) {
       return NextResponse.json(
-        { success: false, error: 'Payment method name is required' },
+        {
+          success: false,
+          error: validation.error,
+        },
         { status: 400 }
       );
     }
+    const name = validation.normalized!;
 
     const code =
       body?.code

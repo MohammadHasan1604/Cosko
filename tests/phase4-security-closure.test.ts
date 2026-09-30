@@ -525,7 +525,7 @@ async function runPhase4Matrix() {
 
     // 6.1 BLR Manager search/enumeration: cannot find customer exclusively belonging to CHE
     {
-      const req = makeRequest(`/api/customers?search=${cheCustomer.phone}`, 'GET', blrMgrSess.token);
+      const req = makeRequest(`/api/customers?query=${cheCustomer.phone}`, 'GET', blrMgrSess.token);
       const res = await customersGET(req);
       const json = await res.json();
       const customers = json?.customers || [];
@@ -535,7 +535,7 @@ async function runPhase4Matrix() {
 
     // 6.2 BLR Sales Manager cannot enumerate CHE customer
     {
-      const req = makeRequest(`/api/customers?search=${cheCustomer.name}`, 'GET', blrSaleSess.token);
+      const req = makeRequest(`/api/customers?query=${cheCustomer.name}`, 'GET', blrSaleSess.token);
       const res = await customersGET(req);
       const json = await res.json();
       const customers = json?.customers || [];

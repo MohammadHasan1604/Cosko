@@ -1,6 +1,7 @@
 import { prisma } from '../db';
 import { broadcastRealtimeEvent, getStoreChannel } from '../realtime';
 import { generateSafeSequenceNo } from '../sequenceUtils';
+import { validatePaymentMethod } from '../paymentValidator';
 
 export interface CreateSaleInput {
   storeCode: string;
@@ -13,7 +14,7 @@ export interface CreateSaleInput {
     sku: string;
     qty: number;
     unitPrice: number;
-    unitCost: number;
+    unitCost?: number;
     discountPercent?: number;
   }[];
   taxAmount?: number;
@@ -30,23 +31,40 @@ export interface CreateSaleInput {
  * Executes a POS Sale Checkout using atomic MySQL transaction, generating sequential invoice number
  * and reducing store inventory with concurrency protection.
  *
- * Optimized to prevent "Transaction already closed / 5000ms timeout" errors by:
- * 1. Pre-calculating all line items, subtotals, tax, and costs in memory outside $transaction.
- * 2. Batch-fetching all inventory records in a single query (eliminating N+1 findUnique calls).
- * 3. Concurrently executing inventory upserts within the transaction.
- * 4. Batch-inserting all inventory ledger entries via createMany.
- * 5. Batch-inserting all financial double-entry ledger records via createMany.
- * 6. Setting explicit interactive transaction timeout (15000ms) and maxWait (5000ms).
+ * Security & Integrity Guarantees:
+ * 1. Authoritative DB Cost: Ignores client unitCost and retrieves real product baseCostPrice from database.
+ * 2. Concurrency-Safe Stock Validation: Strictly enforces stock availability; throws 409 on insufficient stock (no clamping).
+ * 3. Atomic Stock Decrement: Uses atomic decrement on database inventory records.
+ * 4. Double-entry financial and inventory ledger tracking.
  */
 export async function executePOSCheckout(input: CreateSaleInput) {
-  // Pre-calculate all financial figures and items synchronously outside the transaction
+  // Validate payment method strictly
+  const paymentValidation = validatePaymentMethod(input.paymentMethod);
+  if (!paymentValidation.valid) {
+    const err: any = new Error(paymentValidation.error);
+    err.statusCode = 400;
+    throw err;
+  }
+  const paymentMethod = paymentValidation.normalized!;
+
   const storeCode = input.storeCode.toUpperCase();
+  const productIds = Array.from(new Set(input.items.map((it) => it.productId)));
+
+  // Authoritative Cost Resolution from Database (Ignore malicious client unitCost)
+  const dbProducts = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, baseCostPrice: true, sku: true, name: true },
+  });
+  const productMap = new Map<string, any>(dbProducts.map((p) => [p.id, p]));
+
   let subtotal = 0;
   let totalCost = 0;
 
   const preparedItems = input.items.map((item) => {
+    const dbProduct = productMap.get(item.productId);
+    const authoritativeUnitCost = dbProduct ? Number(dbProduct.baseCostPrice) || 0 : 0;
     const lineSubtotal = item.qty * item.unitPrice * (1 - (item.discountPercent || 0) / 100);
-    const lineCost = item.qty * item.unitCost;
+    const lineCost = item.qty * authoritativeUnitCost;
     const lineProfit = lineSubtotal - lineCost;
 
     subtotal += lineSubtotal;
@@ -54,11 +72,11 @@ export async function executePOSCheckout(input: CreateSaleInput) {
 
     return {
       productId: item.productId,
-      productName: item.productName,
-      sku: item.sku,
+      productName: item.productName || dbProduct?.name || 'Product',
+      sku: item.sku || dbProduct?.sku || item.productId,
       qty: item.qty,
       unitPrice: item.unitPrice,
-      unitCost: item.unitCost,
+      unitCost: authoritativeUnitCost,
       discountPercent: item.discountPercent || 0,
       lineTotal: lineSubtotal,
       lineProfit,
@@ -70,7 +88,6 @@ export async function executePOSCheckout(input: CreateSaleInput) {
   const grandTotal = Math.max(0, subtotal + taxAmount - discountAmount);
   const grossProfit = grandTotal - totalCost;
   const netRevenue = subtotal - discountAmount;
-  const productIds = Array.from(new Set(input.items.map((it) => it.productId)));
 
   const storeNumericMap: Record<string, string> = {
     BLR: '001',
@@ -84,9 +101,11 @@ export async function executePOSCheckout(input: CreateSaleInput) {
   const effectiveProofUrl =
     input.paymentProofUrl || (input.photos && input.photos.length > 0 ? input.photos[0] : null);
   if (!effectiveProofUrl || !String(effectiveProofUrl).trim()) {
-    throw new Error(
+    const err: any = new Error(
       'Payment proof is mandatory! Please upload a valid receipt or transaction screenshot.'
     );
+    err.statusCode = 400;
+    throw err;
   }
   const effectiveRefNo =
     input.referenceNo && String(input.referenceNo).trim()
@@ -108,24 +127,27 @@ export async function executePOSCheckout(input: CreateSaleInput) {
       });
       const invMap = new Map<string, any>(invRecords.map((r: any) => [r.productId, r]));
 
-      // 3. Concurrently upsert inventory balances
+      // PREVENT OVERSELLING: Strict concurrency-safe availability check
+      for (const item of input.items) {
+        const existing = invMap.get(item.productId);
+        const availableQty = existing ? existing.qtyOnHand : 0;
+        if (!existing || availableQty < item.qty) {
+          const err: any = new Error(
+            `Insufficient stock for "${item.productName || item.sku}": available ${availableQty}, requested ${item.qty}`
+          );
+          err.statusCode = 409;
+          throw err;
+        }
+      }
+
+      // 3. Atomically decrement inventory balances (no clamping)
       await Promise.all(
         input.items.map((item) => {
           const existing = invMap.get(item.productId);
-          const currentQty = existing ? existing.qtyOnHand : 0;
-          const newQty = Math.max(0, currentQty - item.qty);
-
-          return tx.inventory.upsert({
-            where: { productId_storeCode: { productId: item.productId, storeCode } },
-            create: {
-              productId: item.productId,
-              storeCode,
-              qtyOnHand: newQty,
-              reorderPt: existing?.reorderPt ?? 5,
-              maxStock: existing?.maxStock ?? 50,
-            },
-            update: {
-              qtyOnHand: newQty,
+          return tx.inventory.update({
+            where: { id: existing.id },
+            data: {
+              qtyOnHand: { decrement: item.qty },
             },
           });
         })
@@ -135,7 +157,9 @@ export async function executePOSCheckout(input: CreateSaleInput) {
       const inventoryLedgerEntries = input.items.map((item) => {
         const existing = invMap.get(item.productId);
         const currentQty = existing ? existing.qtyOnHand : 0;
-        const newQty = Math.max(0, currentQty - item.qty);
+        const newQty = currentQty - item.qty;
+        const dbProduct = productMap.get(item.productId);
+        const authoritativeUnitCost = dbProduct ? Number(dbProduct.baseCostPrice) || 0 : 0;
 
         return {
           productId: item.productId,
@@ -143,7 +167,7 @@ export async function executePOSCheckout(input: CreateSaleInput) {
           refNo: orderNo,
           type: 'POS Sale Out',
           qtyChange: -item.qty,
-          costPerUnit: item.unitCost,
+          costPerUnit: authoritativeUnitCost,
           sellingPricePerUnit: item.unitPrice,
           balanceAfter: newQty,
           notes: `POS Checkout (${orderNo})`,

@@ -1,14 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Icon from '@/components/ui/AppIcon';
 import { Vendor } from '@/context/AppContext';
+import { toast } from 'sonner';
 
 interface DeleteVendorModalProps {
   vendor: Vendor | null;
   onClose: () => void;
-  onDelete: (id: string, hard: boolean) => Promise<void>;
+  onDelete: (id: string, hard: boolean, reason?: string) => Promise<any>;
   currentUser: any;
 }
 
@@ -18,15 +19,51 @@ export const DeleteVendorModal: React.FC<DeleteVendorModalProps> = ({
   onDelete,
   currentUser,
 }) => {
+  const [reason, setReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   if (!vendor) return null;
 
   const poCount = (vendor as any).totalBillsCount || (vendor.outstandingPayable > 0 ? 1 : 0);
+  const isSuperAdmin = currentUser?.role === 'Super Admin';
+
+  const handleArchive = async () => {
+    if (!isSuperAdmin && reason.trim().length < 3) {
+      toast.error('Please enter a deletion reason (at least 3 characters) to submit approval request');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await onDelete(vendor.id, false, reason.trim());
+      if (res === true || res?.success) {
+        onClose();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to process request');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePermanentDelete = async () => {
+    setIsSubmitting(true);
+    try {
+      const res = await onDelete(vendor.id, true, reason.trim());
+      if (res === true || res?.success) {
+        onClose();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to permanently delete vendor');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <Modal
       open={!!vendor}
-      onClose={onClose}
-      title={`Archive / Delete "${vendor.name}"`}
+      onClose={isSubmitting ? () => {} : onClose}
+      title={isSuperAdmin ? `Archive / Delete "${vendor.name}"` : `Request Deletion for "${vendor.name}"`}
       subtitle="Relational validation against purchase orders and financial history"
       size="md"
     >
@@ -57,36 +94,60 @@ export const DeleteVendorModal: React.FC<DeleteVendorModalProps> = ({
                   ? `This vendor has purchase bills or an outstanding balance of ₹${vendor.outstandingPayable.toLocaleString(
                       'en-IN'
                     )}. To protect warehouse inventory ledgers, tax records, and accounting history, it will be safely Archived.`
-                  : `This vendor has no linked purchase orders. You can safely archive it or permanently delete it.`}
+                  : `This vendor has no linked purchase orders. ${
+                      isSuperAdmin
+                        ? 'You can safely archive it or permanently delete it.'
+                        : 'Store Managers submit a deletion request for Super Admin review.'
+                    }`}
               </p>
             </div>
           </div>
         </div>
 
+        {!isSuperAdmin && (
+          <div className="space-y-1.5">
+            <label className="text-2xs font-bold text-foreground block">
+              Reason for Deletion Request <span className="text-danger">*</span>
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Explain why this vendor profile should be removed (required for Super Admin approval)..."
+              className="input-field text-xs py-2 w-full min-h-[60px]"
+              rows={2}
+              disabled={isSubmitting}
+            />
+          </div>
+        )}
+
         <div className="flex justify-end gap-2 pt-3 border-t border-border">
-          <button onClick={onClose} className="btn-secondary text-xs cursor-pointer">
+          <button
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="btn-secondary text-xs cursor-pointer"
+          >
             Cancel
           </button>
           <button
             type="button"
-            onClick={async () => {
-              await onDelete(vendor.id, false);
-              onClose();
-            }}
-            className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 cursor-pointer"
+            disabled={isSubmitting || (!isSuperAdmin && reason.trim().length < 3)}
+            onClick={handleArchive}
+            className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 cursor-pointer disabled:opacity-50"
           >
-            Safe Archive
+            {isSubmitting
+              ? 'Processing...'
+              : isSuperAdmin
+                ? 'Safe Archive'
+                : 'Submit Deletion Request'}
           </button>
-          {poCount === 0 && currentUser?.role === 'Super Admin' && (
+          {poCount === 0 && isSuperAdmin && (
             <button
               type="button"
-              onClick={async () => {
-                await onDelete(vendor.id, true);
-                onClose();
-              }}
-              className="btn-danger text-xs font-bold px-4 cursor-pointer"
+              disabled={isSubmitting}
+              onClick={handlePermanentDelete}
+              className="btn-danger text-xs font-bold px-4 cursor-pointer disabled:opacity-50"
             >
-              Permanent Delete
+              {isSubmitting ? 'Deleting...' : 'Permanent Delete'}
             </button>
           )}
         </div>

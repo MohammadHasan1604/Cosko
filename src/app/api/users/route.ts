@@ -13,6 +13,7 @@ import { ensureStoredImage } from '@/lib/objectStorage';
 import {
   ROLE_SECURITY_LEVELS,
   SUPER_ADMIN_PROTECTED_PERMISSIONS,
+  getEffectivePermissions,
   type UserRole,
 } from '@/lib/rbacEngine';
 
@@ -67,6 +68,7 @@ export async function GET(req: NextRequest) {
       where: whereClause,
       include: {
         storeAssignments: true,
+        permissionOverrides: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -75,6 +77,16 @@ export async function GET(req: NextRequest) {
 
     const safeUsers = users.map((u: any) => {
       const singleStore = u.storeScope || u.storeAssignments?.[0]?.storeCode || 'BLR';
+      const overrides = (u.permissionOverrides || []).map((ov: any) => ({
+        permissionCode: ov.permissionCode,
+        overrideType: ov.overrideType,
+      }));
+      const effectivePermissions = getEffectivePermissions({
+        role: u.role,
+        securityLevel: u.securityLevel,
+        overrides,
+      });
+
       return {
         id: u.id,
         name: u.name,
@@ -84,6 +96,8 @@ export async function GET(req: NextRequest) {
         store: u.role === 'Super Admin' ? 'All Stores' : singleStore,
         storeScope: u.role === 'Super Admin' ? 'All Stores' : singleStore,
         status: u.status,
+        permissions: effectivePermissions,
+        overrides,
         assignedStores:
           u.role === 'Super Admin'
             ? u.storeAssignments?.map((a: any) => a.storeCode) || []
@@ -308,6 +322,20 @@ export async function POST(req: NextRequest) {
         await tx.userStoreAssignment.create({
           data: { userId: user.id, storeCode: sCode },
         });
+      }
+
+      if (Array.isArray(body.overrides) && requestedRole !== 'Super Admin') {
+        for (const ov of body.overrides) {
+          if (ov.permissionCode && (ov.overrideType === 'ALLOW' || ov.overrideType === 'DENY')) {
+            await tx.userPermissionOverride.create({
+              data: {
+                userId: user.id,
+                permissionCode: ov.permissionCode,
+                overrideType: ov.overrideType,
+              },
+            });
+          }
+        }
       }
 
       await tx.auditLog.create({
@@ -535,9 +563,27 @@ export async function PUT(req: NextRequest) {
     }
 
     // 🔒 Check protected permission overrides
+    const effectiveTargetLevel =
+      (requestedRole && ROLE_LEVEL_MAP[requestedRole]) || targetUser.securityLevel;
+
+    if (body.permissionOverride && targetUser.role !== 'Super Admin') {
+      const ov = body.permissionOverride;
+      if (
+        ov.overrideType === 'ALLOW' &&
+        SUPER_ADMIN_PROTECTED_PERMISSIONS.includes(ov.permissionCode) &&
+        effectiveTargetLevel < 100
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Cannot grant protected permission "${ov.permissionCode}" to roles below Level 100`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     if (Array.isArray(overrides)) {
-      const effectiveTargetLevel =
-        (requestedRole && ROLE_LEVEL_MAP[requestedRole]) || targetUser.securityLevel;
       for (const ov of overrides) {
         if (
           ov.overrideType === 'ALLOW' &&
@@ -631,6 +677,53 @@ export async function PUT(req: NextRequest) {
         }
       }
 
+      // 🔒 Persist permission overrides
+      if (!isSuperAdmin) {
+        if (body.permissionOverride) {
+          const ov = body.permissionOverride;
+          if (ov.overrideType === 'RESET') {
+            await tx.userPermissionOverride.deleteMany({
+              where: {
+                userId: user.id,
+                permissionCode: ov.permissionCode,
+              },
+            });
+          } else if (ov.overrideType === 'ALLOW' || ov.overrideType === 'DENY') {
+            await tx.userPermissionOverride.upsert({
+              where: {
+                userId_permissionCode: {
+                  userId: user.id,
+                  permissionCode: ov.permissionCode,
+                },
+              },
+              create: {
+                userId: user.id,
+                permissionCode: ov.permissionCode,
+                overrideType: ov.overrideType,
+              },
+              update: {
+                overrideType: ov.overrideType,
+              },
+            });
+          }
+        } else if (Array.isArray(overrides)) {
+          await tx.userPermissionOverride.deleteMany({
+            where: { userId: user.id },
+          });
+          for (const ov of overrides) {
+            if (ov.permissionCode && (ov.overrideType === 'ALLOW' || ov.overrideType === 'DENY')) {
+              await tx.userPermissionOverride.create({
+                data: {
+                  userId: user.id,
+                  permissionCode: ov.permissionCode,
+                  overrideType: ov.overrideType,
+                },
+              });
+            }
+          }
+        }
+      }
+
       return user;
     });
 
@@ -646,6 +739,9 @@ export async function PUT(req: NextRequest) {
     if (status) changes.push(`status=${status}`);
     if (password) changes.push('password=reset');
     if (targetStores) changes.push(`stores=[${targetStores.join(',')}]`);
+    if (body.permissionOverride) {
+      changes.push(`permissionOverride=${body.permissionOverride.permissionCode}:${body.permissionOverride.overrideType}`);
+    }
     await createAuditLog(
       authUser,
       'Users',
@@ -658,6 +754,14 @@ export async function PUT(req: NextRequest) {
       email: updatedUser.email,
       action: 'updated',
     });
+
+    if (body.permissionOverride || Array.isArray(overrides)) {
+      await broadcastRealtimeEvent(
+        `private-user-${updatedUser.id}`,
+        'USER_PERMISSIONS_UPDATED',
+        { userId: updatedUser.id }
+      );
+    }
 
     return NextResponse.json({
       success: true,

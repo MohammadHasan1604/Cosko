@@ -304,6 +304,7 @@ export const NAVIGATION_REGISTRY: NavigationItem[] = [
  * Derived directly from NAVIGATION_REGISTRY plus sub-route exceptions.
  */
 export const CANONICAL_ROUTE_ACCESS: Record<string, UserRole[]> = {
+  '/': ['Super Admin', 'Store Manager', 'Sales Manager'],
   ...NAVIGATION_REGISTRY.reduce(
     (acc, item) => {
       acc[item.href] = item.allowedRoles;
@@ -316,40 +317,209 @@ export const CANONICAL_ROUTE_ACCESS: Record<string, UserRole[]> = {
 };
 
 /**
- * Check whether a given route is authorized for a specific role under the canonical access matrix.
+ * Route-to-Permission mapping for per-user override resolution.
  */
-export function isRouteAllowed(route: string, role: UserRole | string): boolean {
-  if (role === 'Super Admin') return true;
-  const allowedRoles = CANONICAL_ROUTE_ACCESS[route];
-  if (!allowedRoles) {
-    const matchedPrefix = Object.keys(CANONICAL_ROUTE_ACCESS).find(
-      (r) => route.startsWith(r) && r !== '/'
-    );
-    if (matchedPrefix) {
-      return (CANONICAL_ROUTE_ACCESS[matchedPrefix] as string[]).includes(role);
-    }
-    return false;
-  }
-  return (allowedRoles as string[]).includes(role);
+export const ROUTE_PERMISSION_MAP: Record<string, string> = {
+  '/': 'dashboard.view',
+  '/dashboard': 'dashboard.view',
+  '/sales': 'sales.view',
+  '/inventory-management': 'inventory.view',
+  '/stock-transfers': 'transfers.view',
+  '/categories': 'inventory.view',
+  '/purchases': 'purchases.view',
+  '/customers': 'customers.view',
+  '/customers/existing': 'customers.view',
+  '/customers/360': 'customers.view',
+  '/vendors': 'vendors.view',
+  '/expenses': 'expenses.view',
+  '/accounting': 'accounting.view',
+  '/reports': 'reports.view',
+  '/employees': 'employees.view',
+  '/users': 'users.view',
+};
+
+/**
+ * Mandatory security boundaries: Super Admin-only routes that can NEVER be bypassed by user overrides.
+ */
+export const PROTECTED_SUPER_ADMIN_ROUTES = new Set([
+  '/stock-transfers',
+  '/central-profit',
+  '/audit-logs',
+  '/stores',
+  '/settings',
+  '/settings/data-connections',
+  '/work-activity',
+  '/attendance',
+  '/delete-requests',
+]);
+
+export interface UserPermissionContext {
+  role: UserRole | string;
+  securityLevel?: number;
+  permissions?: string[];
+  overrides?: UserPermissionOverride[];
 }
 
 /**
- * Get all routes authorized for a given role under the canonical access matrix.
+ * Authoritative Effective Permission Resolver:
+ * effective access = mandatory security boundaries + base role permissions + persisted per-user overrides
  */
-export function getAllowedRoutes(role: UserRole | string): string[] {
+export function getEffectivePermissions(user: UserPermissionContext): string[] {
+  if (
+    user.role === 'Super Admin' ||
+    (user.securityLevel !== undefined && user.securityLevel >= 100)
+  ) {
+    return ['ALL_PERMISSIONS', ...PERMISSION_CATALOGUE.map((p) => p.code)];
+  }
+
+  const role = user.role as UserRole;
+  const basePermissions = new Set<string>(DEFAULT_ROLE_PERMISSIONS[role] || []);
+  const userSecurityLevel = user.securityLevel ?? ROLE_SECURITY_LEVELS[role] ?? 40;
+
+  if (Array.isArray(user.overrides)) {
+    for (const ov of user.overrides) {
+      if (ov.overrideType === 'DENY') {
+        basePermissions.delete(ov.permissionCode);
+      } else if (ov.overrideType === 'ALLOW') {
+        const permDef = PERMISSION_CATALOGUE.find((p) => p.code === ov.permissionCode);
+        const isProtected =
+          permDef?.isProtected ||
+          SUPER_ADMIN_PROTECTED_PERMISSIONS.includes(ov.permissionCode) ||
+          (permDef?.minSecurityLevel && permDef.minSecurityLevel > userSecurityLevel);
+
+        if (!isProtected) {
+          basePermissions.add(ov.permissionCode);
+        }
+      }
+    }
+  }
+
+  return Array.from(basePermissions);
+}
+
+/**
+ * Check whether a user has an effective permission considering mandatory security boundaries,
+ * base role permissions, and persisted per-user overrides.
+ */
+export function hasEffectivePermission(
+  user: UserPermissionContext | UserRole | string,
+  permissionCode: string
+): boolean {
+  if (typeof user === 'string') {
+    if (user === 'Super Admin') return true;
+    return (DEFAULT_ROLE_PERMISSIONS[user as UserRole] || []).includes(permissionCode);
+  }
+
+  if (
+    user.role === 'Super Admin' ||
+    (user.securityLevel !== undefined && user.securityLevel >= 100)
+  ) {
+    return true;
+  }
+
+  if (SUPER_ADMIN_PROTECTED_PERMISSIONS.includes(permissionCode)) {
+    return false;
+  }
+
+  if (Array.isArray(user.overrides)) {
+    const override = user.overrides.find((o) => o.permissionCode === permissionCode);
+    if (override) {
+      if (override.overrideType === 'DENY') return false;
+      if (override.overrideType === 'ALLOW') {
+        const permDef = PERMISSION_CATALOGUE.find((p) => p.code === permissionCode);
+        const userLevel = user.securityLevel ?? ROLE_SECURITY_LEVELS[user.role as UserRole] ?? 40;
+        if (
+          permDef?.isProtected ||
+          (permDef?.minSecurityLevel && permDef.minSecurityLevel > userLevel)
+        ) {
+          return false;
+        }
+        return true;
+      }
+    }
+  }
+
+  const rolePerms = DEFAULT_ROLE_PERMISSIONS[user.role as UserRole] || [];
+  return (
+    rolePerms.includes(permissionCode) || (user.permissions?.includes(permissionCode) ?? false)
+  );
+}
+
+/**
+ * Check whether a given route is authorized for a user or role under the canonical access matrix.
+ * Enforces protected module boundaries and dynamic per-user overrides.
+ */
+export function isRouteAllowed(
+  route: string,
+  userOrRole: UserPermissionContext | UserRole | string
+): boolean {
+  const role: string = typeof userOrRole === 'string' ? userOrRole : userOrRole.role;
+  const isSuperAdmin =
+    role === 'Super Admin' ||
+    (typeof userOrRole !== 'string' && (userOrRole.securityLevel ?? 0) >= 100);
+
+  if (isSuperAdmin) return true;
+
+  const normalizedRoute = route === '' ? '/' : route;
+
+  // 🔒 Protected Boundaries: Super Admin ONLY modules can NEVER be bypassed
+  for (const protectedRoute of PROTECTED_SUPER_ADMIN_ROUTES) {
+    if (normalizedRoute === protectedRoute || normalizedRoute.startsWith(`${protectedRoute}/`)) {
+      return false;
+    }
+  }
+
+  // Base role route access check
+  let allowedRoles = CANONICAL_ROUTE_ACCESS[normalizedRoute];
+  if (!allowedRoles) {
+    const matchedPrefix = Object.keys(CANONICAL_ROUTE_ACCESS).find(
+      (r) => normalizedRoute.startsWith(r) && r !== '/'
+    );
+    if (matchedPrefix) {
+      allowedRoles = CANONICAL_ROUTE_ACCESS[matchedPrefix];
+    }
+  }
+
+  if (!allowedRoles || !(allowedRoles as string[]).includes(role)) {
+    return false;
+  }
+
+  // If user context object is provided, evaluate effective per-user permission overrides
+  if (typeof userOrRole === 'object') {
+    let requiredPermission = ROUTE_PERMISSION_MAP[normalizedRoute];
+    if (!requiredPermission) {
+      const matchedPrefix = Object.keys(ROUTE_PERMISSION_MAP).find(
+        (r) => normalizedRoute.startsWith(r) && r !== '/'
+      );
+      if (matchedPrefix) {
+        requiredPermission = ROUTE_PERMISSION_MAP[matchedPrefix];
+      }
+    }
+
+    if (requiredPermission) {
+      return hasEffectivePermission(userOrRole, requiredPermission);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Get all routes authorized for a given role or user under the canonical access matrix.
+ */
+export function getAllowedRoutes(userOrRole: UserPermissionContext | UserRole | string): string[] {
+  const role: string = typeof userOrRole === 'string' ? userOrRole : userOrRole.role;
   if (role === 'Super Admin') {
     return Object.keys(CANONICAL_ROUTE_ACCESS);
   }
-  return Object.entries(CANONICAL_ROUTE_ACCESS)
-    .filter(([_, roles]) => (roles as string[]).includes(role))
-    .map(([route]) => route);
+  return Object.keys(CANONICAL_ROUTE_ACCESS).filter((route) => isRouteAllowed(route, userOrRole));
 }
 
 /**
- * Get unified navigation groups for Sidebar (Desktop & Mobile) filtered by role.
+ * Get unified navigation groups for Sidebar (Desktop & Mobile) filtered by role and effective permissions.
  */
 export function getAuthoritativeNavGroups(
-  role: UserRole | string,
+  userOrRole: UserPermissionContext | UserRole | string,
   badges?: { lowStock?: number; pendingPO?: number }
 ) {
   const categories: Array<'Overview' | 'Commerce' | 'Finance' | 'Organization' | 'System'> = [
@@ -366,7 +536,7 @@ export function getAuthoritativeNavGroups(
         (nav) =>
           nav.category === cat &&
           nav.href !== '/settings/data-connections' && // sub-page of settings
-          (role === 'Super Admin' || (nav.allowedRoles as string[]).includes(role))
+          isRouteAllowed(nav.href, userOrRole)
       ).map((nav) => {
         let badge: number | undefined = undefined;
         if (nav.badgeKey === 'lowStock' && badges?.lowStock !== undefined) {
@@ -397,13 +567,13 @@ export function getAuthoritativeNavGroups(
  * Get secondary navigation items for the Mobile BottomNav "More" bottom sheet.
  * Excludes primary navigation bar slots (/dashboard, /inventory-management, /sales, /customers).
  */
-export function getMobileMoreNav(role: UserRole | string) {
+export function getMobileMoreNav(userOrRole: UserPermissionContext | UserRole | string) {
   const primarySlots = new Set(['/dashboard', '/inventory-management', '/sales', '/customers']);
   return NAVIGATION_REGISTRY.filter(
     (nav) =>
       !primarySlots.has(nav.href) &&
       nav.href !== '/settings/data-connections' &&
-      (role === 'Super Admin' || (nav.allowedRoles as string[]).includes(role))
+      isRouteAllowed(nav.href, userOrRole)
   ).map((nav) => ({
     id: `more-${nav.id.replace('nav-', '')}`,
     label: nav.label,

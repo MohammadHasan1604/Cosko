@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent, getStoreChannel, persistOutboxEvent } from '@/lib/realtime';
 import { generateDateSequenceNo } from '@/lib/sequenceUtils';
 import { executeWithIdempotency } from '@/lib/idempotency';
+import { validatePaymentMethod } from '@/lib/paymentValidator';
 
 /**
  * Helper to compute overdue days and status
@@ -329,29 +330,12 @@ export async function POST(req: NextRequest) {
 
     const paymentDate = body.paymentDate ? new Date(body.paymentDate) : new Date();
 
-    // 🔒 Canonical Payment Method Check (Requirement 16)
-    const allowedMethods = ['Cash', 'UPI', 'Other'];
-    const paymentMethod = body.paymentMethod ? String(body.paymentMethod).trim() : 'Other';
-    if (!allowedMethods.includes(paymentMethod)) {
-      return NextResponse.json(
-        {
-          error: `Invalid payment method "${paymentMethod}". Allowed payment methods are: Cash, UPI, Other.`,
-        },
-        { status: 400 }
-      );
+    // Strict Canonical Payment Method Enforcement (Cash, UPI, Other)
+    const paymentValidation = validatePaymentMethod(body.paymentMethod || 'Other');
+    if (!paymentValidation.valid) {
+      return NextResponse.json({ error: paymentValidation.error }, { status: 400 });
     }
-
-    const pmRecord = await prisma.paymentMethod.findFirst({
-      where: { name: paymentMethod },
-    });
-    if (pmRecord && pmRecord.status === 'Inactive') {
-      return NextResponse.json(
-        {
-          error: `Payment method "${paymentMethod}" is currently deactivated. Please select an active payment method.`,
-        },
-        { status: 400 }
-      );
-    }
+    const paymentMethod = paymentValidation.normalized!;
 
     const customKey =
       body.idempotencyKey ||

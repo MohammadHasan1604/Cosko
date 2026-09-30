@@ -19,6 +19,7 @@ import {
 } from '@/lib/stockTransferCalculations';
 import { ActionConfirmationConfig } from '@/components/ui/GlobalConfirmationModal';
 export type { ActionConfirmationConfig };
+import { getEffectivePermissions } from '@/lib/rbacEngine';
 
 import { normalizeMobileNumber } from '@/lib/phoneUtils';
 export { normalizeMobileNumber };
@@ -706,6 +707,8 @@ interface AppContextType {
     avatar: string;
     avatarUrl?: string;
     mustChangePassword?: boolean;
+    permissions?: string[];
+    overrides?: UserPermissionOverride[];
   };
   setCurrentUser: (user: any) => void;
   logoutUser: () => void;
@@ -824,7 +827,8 @@ interface AppContextType {
   updateVendor: (id: string, updated: Partial<Vendor>) => Promise<any>;
   deleteVendor: (
     id: string,
-    permanent?: boolean
+    permanent?: boolean,
+    reason?: string
   ) => Promise<{ success: boolean; mode?: string; message?: string }>;
   expenses: Expense[];
   addExpense: (expense: Omit<Expense, 'id' | 'referenceNo' | 'date'>) => Promise<any>;
@@ -1046,6 +1050,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     role: 'Sales Manager' as const,
     store: '',
     avatar: 'UN',
+    permissions: [] as string[],
+    overrides: [] as UserPermissionOverride[],
   };
 
   const [authStatus, setAuthStatus] = useState<
@@ -1060,6 +1066,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     allowedStores?: string[];
     avatar: string;
     avatarUrl?: string;
+    mustChangePassword?: boolean;
+    permissions?: string[];
+    overrides?: UserPermissionOverride[];
   }>(unauthenticatedUser);
 
   // Restore active user session from server-authoritative /api/auth/me
@@ -2027,8 +2036,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else if (event.includes('transfer')) {
         refreshDomainData('transfers');
         refreshDomainData('inventory');
-      } else if (event.includes('user')) {
+      } else if (event.includes('user') || event.includes('permission')) {
         refreshDomainData('users');
+        fetch('/api/auth/me', { credentials: 'include' })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (data?.authenticated && data?.user) {
+              setCurrentUserState(data.user);
+            }
+          })
+          .catch(() => {});
       } else if (event.includes('customer')) {
         refreshDomainData('customers');
       } else if (event.includes('vendor')) {
@@ -2464,6 +2481,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUsersList((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, overrides: updatedOverrides } : u))
     );
+    if (userId === currentUser.id) {
+      setCurrentUserState((prev) => ({
+        ...prev,
+        overrides: updatedOverrides,
+        permissions: getEffectivePermissions({ role: prev.role, overrides: updatedOverrides }),
+      }));
+    }
     toast.success(`Permission ${permissionCode} override updated`);
 
     // 2. Persist to MySQL database
@@ -2479,12 +2503,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setUsersList((prev) =>
           prev.map((u) => (u.id === userId ? { ...u, overrides: currentOverrides } : u))
         );
+        if (userId === currentUser.id) {
+          setCurrentUserState((prev) => ({
+            ...prev,
+            overrides: currentOverrides,
+            permissions: getEffectivePermissions({ role: prev.role, overrides: currentOverrides }),
+          }));
+        }
       }
     } catch (err: any) {
       toast.error('Network error saving permission override');
       setUsersList((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, overrides: currentOverrides } : u))
       );
+      if (userId === currentUser.id) {
+        setCurrentUserState((prev) => ({
+          ...prev,
+          overrides: currentOverrides,
+          permissions: getEffectivePermissions({ role: prev.role, overrides: currentOverrides }),
+        }));
+      }
     }
   };
 
@@ -3621,6 +3659,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...saleData,
         id: dbSale.id,
         orderNo: dbSale.orderNo,
+        store: dbSale.storeCode || saleData.store || storeCode,
         items: saleItemsWithWarranty,
         referenceNo: dbSale.referenceNo || saleData.referenceNo,
         paymentProofUrl: dbSale.paymentProofUrl || saleData.paymentProofUrl,
@@ -4052,16 +4091,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const deleteVendor = async (id: string, permanent = false) => {
+  const deleteVendor = async (id: string, permanent = false, reason = '') => {
     const v = vendors.find((vend) => vend.id === id || vend.code === id);
     try {
-      const res = await MySQLDataService.deleteVendor(id, permanent);
+      const res = await MySQLDataService.deleteVendor(id, permanent, reason);
       if (res?.success) {
-        setVendors((prev) => prev.filter((vend) => vend.id !== id && vend.code !== id));
+        if (res?.mode !== 'pending_approval') {
+          setVendors((prev) => prev.filter((vend) => vend.id !== id && vend.code !== id));
+        }
         if (v) {
           addAuditLog(
             'Vendors',
-            res?.mode === 'archived' ? 'Archive Vendor' : 'Delete Vendor',
+            res?.mode === 'archived'
+              ? 'Archive Vendor'
+              : res?.mode === 'pending_approval'
+                ? 'Request Vendor Deletion'
+                : 'Delete Vendor',
             res?.message || `Removed supplier "${v.name}"`
           );
         }

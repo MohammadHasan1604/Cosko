@@ -10,6 +10,7 @@ import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 import { generateSafeSequenceNo } from '@/lib/sequenceUtils';
 import { executeWithIdempotency } from '@/lib/idempotency';
+import { validatePaymentMethod } from '@/lib/paymentValidator';
 
 /**
  * GET /api/expenses - Retrieve store/central expenses
@@ -41,8 +42,8 @@ export async function GET(req: NextRequest) {
     }
 
     const whereClause: any = {};
-    if (storeScope.effectiveStore) {
-      whereClause.storeCode = storeScope.effectiveStore;
+    if (!storeScope.isAllStores && storeScope.physicalStoreCode) {
+      whereClause.storeCode = storeScope.physicalStoreCode;
     }
 
     const expenses = await (prisma as any).expense.findMany({
@@ -130,19 +131,11 @@ export async function POST(req: NextRequest) {
       `EXP-REF-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
     const expenseDate = body.date ? new Date(body.date) : new Date();
-    const paymentMethod = body.paymentMethod ? String(body.paymentMethod).trim() : 'Other';
-
-    const pmRecord = await prisma.paymentMethod.findFirst({
-      where: { name: paymentMethod },
-    });
-    if (pmRecord && pmRecord.status === 'Inactive') {
-      return NextResponse.json(
-        {
-          error: `Payment method "${paymentMethod}" is currently deactivated. Please select an active payment method.`,
-        },
-        { status: 400 }
-      );
+    const paymentValidation = validatePaymentMethod(body.paymentMethod || 'Other');
+    if (!paymentValidation.valid) {
+      return NextResponse.json({ error: paymentValidation.error }, { status: 400 });
     }
+    const paymentMethod = paymentValidation.normalized!;
 
     const expenseStore =
       user.role === 'Super Admin' ? body.storeCode || body.store || 'CENTRAL' : user.store;
@@ -362,19 +355,11 @@ export async function PUT(req: NextRequest) {
     }
     if (body.description !== undefined) updateData.description = body.description;
     if (body.paymentMethod) {
-      const pmName = String(body.paymentMethod).trim();
-      const pmRecord = await prisma.paymentMethod.findFirst({
-        where: { name: pmName },
-      });
-      if (pmRecord && pmRecord.status === 'Inactive') {
-        return NextResponse.json(
-          {
-            error: `Payment method "${pmName}" is currently deactivated. Please select an active payment method.`,
-          },
-          { status: 400 }
-        );
+      const paymentValidation = validatePaymentMethod(body.paymentMethod);
+      if (!paymentValidation.valid) {
+        return NextResponse.json({ error: paymentValidation.error }, { status: 400 });
       }
-      updateData.paymentMethod = pmName;
+      updateData.paymentMethod = paymentValidation.normalized!;
     }
     if (body.receiptUrl !== undefined || body.proofUrl !== undefined) {
       const newProof = body.receiptUrl || body.proofUrl;
