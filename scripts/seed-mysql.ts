@@ -30,16 +30,17 @@ async function main() {
     { code: 'HYD', name: 'Hyderabad Tech Hub Store', city: 'Hyderabad', address: 'HITEC City Cyber Towers', timezone: 'Asia/Kolkata' },
     { code: 'DEL', name: 'Delhi NCR Experience Store', city: 'Delhi', address: 'Connaught Place Block A', timezone: 'Asia/Kolkata' },
     { code: 'MUM', name: 'Mumbai Retail Store', city: 'Mumbai', address: 'Linking Road, Bandra West', timezone: 'Asia/Kolkata' },
+    { code: 'CHE', name: 'Chennai Experience Store', city: 'Chennai', address: 'Anna Salai, T. Nagar', timezone: 'Asia/Kolkata' },
   ];
 
   for (const s of storesData) {
     await prisma.storeHub.upsert({
       where: { code: s.code },
-      update: { name: s.name, city: s.city, address: s.address, timezone: s.timezone },
-      create: s,
+      update: { name: s.name, city: s.city, address: s.address, timezone: s.timezone } as any,
+      create: s as any,
     });
   }
-  console.log('✅ 5 Store Hubs created');
+  console.log('✅ 6 Store Hubs created');
 
   // ──────────────────────────────────────────────────────────────────
   // 2. SUPER ADMIN ACCOUNT (ONE protected account)
@@ -86,6 +87,77 @@ async function main() {
   } else {
     console.log('ℹ️  Super Admin already exists, skipping creation');
   }
+
+  // ──────────────────────────────────────────────────────────────────
+  // 2.1 PROVISION STORE MANAGERS & SALES MANAGERS (Multi-store staff)
+  // ──────────────────────────────────────────────────────────────────
+  const storeManagers = [
+    { email: 'ananya.blr@cosko.com', name: 'Ananya Sharma', store: 'BLR' },
+    { email: 'vikram.del@cosko.com', name: 'Vikram Malhotra', store: 'DEL' },
+    { email: 'priya.hyd@cosko.com', name: 'Priya Reddy', store: 'HYD' },
+    { email: 'kumar.che@cosko.com', name: 'Kumar Swamy', store: 'CHE' },
+  ];
+
+  const defaultStaffPasswordHash = await bcrypt.hash('Cosko2026@', 12);
+
+  for (const sm of storeManagers) {
+    const user = await prisma.userAccount.upsert({
+      where: { email: sm.email },
+      update: {
+        name: sm.name,
+        role: 'Store Manager',
+        securityLevel: 80,
+        storeScope: sm.store,
+        status: 'Active',
+      },
+      create: {
+        email: sm.email,
+        name: sm.name,
+        role: 'Store Manager',
+        securityLevel: 80,
+        storeScope: sm.store,
+        status: 'Active',
+        passwordHash: defaultStaffPasswordHash,
+        mustChangePassword: false,
+      },
+    });
+
+    await prisma.userStoreAssignment.upsert({
+      where: { userId_storeCode: { userId: user.id, storeCode: sm.store } },
+      update: {},
+      create: { userId: user.id, storeCode: sm.store },
+    });
+  }
+
+  // Provision Sales Manager (Level 40)
+  const salesManager = await prisma.userAccount.upsert({
+    where: { email: 'rahul.cashier@cosko.com' },
+    update: {
+      name: 'Rahul Verma',
+      role: 'Sales Manager',
+      securityLevel: 40,
+      storeScope: 'BLR',
+      status: 'Active',
+    },
+    create: {
+      email: 'rahul.cashier@cosko.com',
+      name: 'Rahul Verma',
+      role: 'Sales Manager',
+      securityLevel: 40,
+      storeScope: 'BLR',
+      status: 'Active',
+      passwordHash: defaultStaffPasswordHash,
+      mustChangePassword: false,
+    },
+  });
+
+  await prisma.userStoreAssignment.upsert({
+    where: { userId_storeCode: { userId: salesManager.id, storeCode: 'BLR' } },
+    update: {},
+    create: { userId: salesManager.id, storeCode: 'BLR' },
+  });
+
+  console.log('✅ Store Managers (BLR, DEL, HYD, CHE) and Sales Manager seeded');
 
   // ──────────────────────────────────────────────────────────────────
   // 3. CATEGORIES & TAXONOMY (system master data)

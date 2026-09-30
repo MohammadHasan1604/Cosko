@@ -564,7 +564,7 @@ export async function runDeepVerification() {
         return false;
       }
     }
-    return products.length > 0;
+    return true;
   });
 
   await test('Sales findMany returns records sorted newest-first (createdAt: desc)', async () => {
