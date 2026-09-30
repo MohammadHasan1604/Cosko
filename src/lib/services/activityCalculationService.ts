@@ -31,6 +31,13 @@ export interface UserActivitySummary {
   avatarUrl: string | null;
   accountStatus: string;
   liveStatus: 'ONLINE' | 'IDLE' | 'OFFLINE';
+  shiftStatus: 'ACTIVE' | 'COMPLETED' | 'NOT_STARTED';
+  shiftStart: Date | null;
+  liveElapsedSeconds: number;
+  formattedLiveElapsed: string;
+  lastSeen: Date | null;
+  todayDurationSeconds: number;
+  formattedTodayDuration: string;
   totalAuthenticatedSeconds: number;
   totalActiveSeconds: number;
   totalIdleSeconds: number;
@@ -143,7 +150,7 @@ export async function calculateUserActivitySummary(
   sessionCount: number;
   anomalies: string[];
 }> {
-  const attendanceDays = await prisma.attendanceDay.findMany({
+  const attendanceDays = await (prisma as any).attendanceDay.findMany({
     where: {
       userId,
       localDate: {
@@ -215,27 +222,71 @@ export async function buildUserActivitySummary(
 ): Promise<UserActivitySummary[]> {
   const userIds = users.map((u) => u.id);
 
-  // Batch fetch attendance records in date range
-  const allAttendanceDays = await prisma.attendanceDay.findMany({
-    where: {
-      userId: { in: userIds },
-      localDate: { gte: startDate, lte: endDate },
-    },
-    orderBy: { shiftStartUtc: 'desc' },
-  });
+  // Batch fetch attendance records and live user presences in date range
+  const [allAttendanceDays, allPresences] = await Promise.all([
+    (prisma as any).attendanceDay.findMany({
+      where: {
+        userId: { in: userIds },
+        localDate: { gte: startDate, lte: endDate },
+      },
+      orderBy: { shiftStartUtc: 'desc' },
+    }),
+    (prisma as any).userPresence.findMany({
+      where: {
+        userId: { in: userIds },
+      },
+    }),
+  ]);
 
   const now = new Date();
+  const todayStr = getLocalDateString(now, _timezone);
 
   return users.map((u) => {
-    const userDays = allAttendanceDays.filter((d) => d.userId === u.id);
-    const hasActiveShift = userDays.some((d) => d.status === 'ACTIVE');
+    const userDays = allAttendanceDays.filter((d: any) => d.userId === u.id);
+    const todayShift = userDays.find((d: any) => d.localDate === todayStr);
+
+    let shiftStatus: 'ACTIVE' | 'COMPLETED' | 'NOT_STARTED' = 'NOT_STARTED';
+    let shiftStart: Date | null = null;
+    let liveElapsedSeconds = 0;
+    let todayDurationSeconds = 0;
+
+    if (todayShift) {
+      shiftStart = todayShift.shiftStartUtc;
+      if (todayShift.status === 'ACTIVE') {
+        shiftStatus = 'ACTIVE';
+        liveElapsedSeconds = Math.max(
+          0,
+          Math.floor((now.getTime() - new Date(todayShift.shiftStartUtc).getTime()) / 1000)
+        );
+        todayDurationSeconds = liveElapsedSeconds;
+      } else {
+        shiftStatus = 'COMPLETED';
+        todayDurationSeconds = todayShift.totalSeconds || 0;
+      }
+    }
+
+    // Live Operational Presence (Online / Idle / Offline)
+    const presence = allPresences.find((p: any) => p.userId === u.id);
+    let liveStatus: 'ONLINE' | 'IDLE' | 'OFFLINE' = 'OFFLINE';
+    let lastSeen: Date | null = u.lastLogin;
+
+    if (presence) {
+      lastSeen = presence.lastSeen || presence.lastHeartbeat || u.lastLogin;
+      const secondsSinceHeartbeat =
+        (now.getTime() - new Date(presence.lastHeartbeat).getTime()) / 1000;
+      if (secondsSinceHeartbeat < 45) {
+        liveStatus = presence.status === 'IDLE' ? 'IDLE' : 'ONLINE';
+      } else {
+        liveStatus = 'OFFLINE';
+      }
+    }
 
     let totalActiveSeconds = 0;
     let firstLogin: Date | null = null;
     let lastLogout: Date | null = null;
     const anomalies: string[] = [];
 
-    const dailyBreakdown: DailyBreakdown[] = userDays.map((d) => {
+    const dailyBreakdown: DailyBreakdown[] = userDays.map((d: any) => {
       let dur = d.totalSeconds;
       if (d.status === 'ACTIVE') {
         dur = Math.max(0, Math.floor((now.getTime() - new Date(d.shiftStartUtc).getTime()) / 1000));
@@ -273,7 +324,14 @@ export async function buildUserActivitySummary(
       storeScope: u.storeScope,
       avatarUrl: u.avatarUrl,
       accountStatus: u.status,
-      liveStatus: hasActiveShift ? 'ONLINE' : 'OFFLINE',
+      liveStatus,
+      shiftStatus,
+      shiftStart,
+      liveElapsedSeconds,
+      formattedLiveElapsed: formatHHMMSS(liveElapsedSeconds),
+      lastSeen,
+      todayDurationSeconds,
+      formattedTodayDuration: formatHHMMSS(todayDurationSeconds),
       totalAuthenticatedSeconds: totalActiveSeconds,
       totalActiveSeconds,
       totalIdleSeconds: 0,

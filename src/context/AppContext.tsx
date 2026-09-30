@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import { toast } from 'sonner';
 import { MySQLDataService } from '@/lib/mysqlSync';
+import { realtimeClient } from '@/lib/realtimeClient';
 import {
   round2,
   calculateTransferTotals,
@@ -1989,7 +1990,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authStatus, refreshAllData]);
 
-  // Multi-Device Synchronization: Window Focus, Visibility Change, Periodic Polling, and SSE
+  // Multi-Device Synchronization: Window Focus, Visibility Change, and Distributed Realtime
   useEffect(() => {
     if (typeof window === 'undefined' || authStatus !== 'AUTHENTICATED') return;
 
@@ -2013,38 +2014,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // 3. Periodic background sync (60s interval - SSE provides instantaneous mutation propagation)
-    const interval = setInterval(() => {
-      refreshAllData();
-    }, 60000);
+    // 3. Initialize Distributed Realtime Client Manager (Pusher or DB Outbox Fallback)
+    realtimeClient.initialize();
 
-    // 4. SSE Realtime Event Broadcaster - targeted domain dispatch
-    let eventSource: EventSource | null = null;
-    try {
-      eventSource = new EventSource('/api/realtime');
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.channel) {
-            // Re-fetch only affected domain data rather than flooding all 15 endpoints
-            refreshDomainData(data.channel);
-            if (data.channel === 'sales' && data.payload?.grandTotal) {
-              toast.info(
-                `⚡ Live POS Sale Recorded on ${data.payload?.storeCode || 'Store'}: ₹${data.payload?.grandTotal}`
-              );
-            }
-          }
-        } catch {}
-      };
-    } catch (err) {
-      console.warn('Realtime SSE setup error:', err);
-    }
+    const unsubscribe = realtimeClient.subscribe((msg) => {
+      const channel = msg.channel || '';
+      const event = (msg.event || '').toLowerCase();
+      const payload = msg.payload || {};
+
+      // Map event or channel to targeted domain
+      let domain = channel.replace(/^store-/, '');
+      if (event.includes('user')) domain = 'users';
+      else if (event.includes('stock') || event.includes('inventory')) domain = 'inventory';
+      else if (event.includes('sale')) domain = 'sales';
+      else if (event.includes('customer')) domain = 'customers';
+      else if (event.includes('purchase')) domain = 'purchases';
+      else if (event.includes('vendor')) domain = 'vendors';
+      else if (event.includes('expense')) domain = 'expenses';
+      else if (event.includes('transfer')) domain = 'transfers';
+      else if (event.includes('category')) domain = 'categories';
+      else if (event.includes('brand')) domain = 'brands';
+      else if (event.includes('unit')) domain = 'units';
+      else if (event.includes('store')) domain = 'stores';
+      else if (event.includes('attendance') || event.includes('shift')) domain = 'attendance';
+      else if (event.includes('work') || event.includes('activity')) domain = 'work-activity';
+
+      // Targeted domain invalidation — avoids reloading all 15 endpoints
+      refreshDomainData(domain);
+
+      if (event.includes('sale') && payload?.grandTotal) {
+        toast.info(
+          `⚡ Live POS Sale Recorded on ${payload?.storeCode || 'Store'}: ₹${payload?.grandTotal}`
+        );
+      }
+    });
 
     return () => {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(interval);
-      if (eventSource) eventSource.close();
+      unsubscribe();
+      realtimeClient.destroy();
     };
   }, [authStatus, refreshAllData, refreshDomainData]);
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
-import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 import { generateSafeSequenceNo, generateDateSequenceNo } from '@/lib/sequenceUtils';
 import { executeWithIdempotency } from '@/lib/idempotency';
 
@@ -623,15 +623,21 @@ export async function POST(req: NextRequest) {
           { maxWait: 15000, timeout: 45000 }
         );
 
-        broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', {
+        const poPayload = {
           id: po.id,
           poNo: po.poNo,
           status: po.status,
-        });
+          storeCode: body.storeCode || 'CENTRAL',
+        };
+        broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', poPayload);
+        if (body.storeCode) {
+          broadcastRealtimeEvent(getStoreChannel(body.storeCode), 'PURCHASE_COMPLETED', poPayload);
+        }
         if (body.status === 'Received') {
-          broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
-            storeCode: body.storeCode || 'CENTRAL',
-          });
+          const sc = body.storeCode || 'CENTRAL';
+          const stockPayload = { storeCode: sc };
+          broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+          broadcastRealtimeEvent(getStoreChannel(sc), 'STOCK_UPDATED', stockPayload);
         }
 
         return {
@@ -973,13 +979,22 @@ export async function PUT(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', {
+    const updatePoPayload = {
       id: updatedPo.id,
       poNo: updatedPo.poNo,
       status: updatedPo.status,
-    });
+      storeCode: targetStore,
+    };
+    broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', updatePoPayload);
+    if (targetStore) {
+      broadcastRealtimeEvent(getStoreChannel(targetStore), 'PURCHASE_COMPLETED', updatePoPayload);
+    }
     if (isTransitioningToReceived) {
-      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: targetStore });
+      const stockPayload = { storeCode: targetStore };
+      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+      if (targetStore) {
+        broadcastRealtimeEvent(getStoreChannel(targetStore), 'STOCK_UPDATED', stockPayload);
+      }
     }
 
     return NextResponse.json({ success: true, purchaseOrder: updatedPo });
@@ -1114,11 +1129,20 @@ export async function DELETE(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', {
+    const poDelPayload = {
       id: existing.id,
       poNo: existing.poNo,
       action: 'deleted',
-    });
+      storeCode: existing.storeCode,
+    };
+    broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', poDelPayload);
+    if (existing.storeCode) {
+      broadcastRealtimeEvent(
+        getStoreChannel(existing.storeCode),
+        'PURCHASE_COMPLETED',
+        poDelPayload
+      );
+    }
 
     return NextResponse.json({
       success: true,

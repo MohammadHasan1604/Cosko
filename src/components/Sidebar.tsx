@@ -89,6 +89,7 @@ export default function Sidebar({
       '/accounting',
       '/reports',
       '/employees',
+      '/work-activity',
       '/attendance',
     ],
     'Sales Manager': ['/sales', '/inventory-management', '/customers', '/attendance'],

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 import { executeWithIdempotency } from '@/lib/idempotency';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { ensureStoredImage } from '@/lib/objectStorage';
@@ -348,11 +348,15 @@ export async function POST(req: NextRequest) {
           });
         });
 
-        broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+        const stockPayload = {
           storeCode,
           productId: savedProduct?.id,
           sku: savedProduct?.sku,
-        });
+        };
+        broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+        if (storeCode) {
+          broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload);
+        }
 
         return {
           status: 201,
@@ -547,10 +551,16 @@ export async function PUT(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+    const invStore = body.storeCode || user.store;
+    const stockPayload = {
       productId: product.id,
       sku: product.sku,
-    });
+      storeCode: invStore,
+    };
+    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+    if (invStore) {
+      broadcastRealtimeEvent(getStoreChannel(invStore), 'STOCK_UPDATED', stockPayload);
+    }
 
     return NextResponse.json({ success: true, product: updatedProduct });
   } catch (error: any) {
@@ -679,11 +689,16 @@ export async function DELETE(req: NextRequest) {
         },
       });
 
-      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+      const archiveStockPayload = {
         productId: target.id,
         sku: target.sku,
         action: 'archived',
-      });
+        storeCode: user.store || 'CENTRAL',
+      };
+      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', archiveStockPayload);
+      if (user.store && user.store !== 'All Stores') {
+        broadcastRealtimeEvent(getStoreChannel(user.store), 'STOCK_UPDATED', archiveStockPayload);
+      }
 
       return NextResponse.json({
         success: true,
@@ -715,11 +730,16 @@ export async function DELETE(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+    const deleteStockPayload = {
       productId: target.id,
       sku: target.sku,
       action: 'deleted',
-    });
+      storeCode: user.store || 'CENTRAL',
+    };
+    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', deleteStockPayload);
+    if (user.store && user.store !== 'All Stores') {
+      broadcastRealtimeEvent(getStoreChannel(user.store), 'STOCK_UPDATED', deleteStockPayload);
+    }
 
     return NextResponse.json({
       success: true,

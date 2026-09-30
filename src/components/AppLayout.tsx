@@ -44,7 +44,7 @@ const routePermissions: Record<string, string[]> = {
   '/employees': managerRoles,
   '/stores': superAdminOnly,
   '/users': superAdminOnly,
-  '/work-activity': superAdminOnly,
+  '/work-activity': managerRoles,
   '/audit-logs': superAdminOnly,
   '/settings': superAdminOnly,
   '/settings/data-connections': superAdminOnly,

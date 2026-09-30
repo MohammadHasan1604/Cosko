@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 function getLocalDateString(date: Date, timezone: string = 'Asia/Kolkata'): string {
   try {
@@ -81,11 +85,65 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Update live presence to ONLINE
+    await (prisma as any).userPresence.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        status: 'ONLINE',
+        lastHeartbeat: now,
+        lastSeen: now,
+        currentStore: storeCode,
+      },
+      update: {
+        status: 'ONLINE',
+        lastHeartbeat: now,
+        lastSeen: now,
+        currentStore: storeCode,
+      },
+    });
+
     await createAuditLog(
       auth.user,
       'Attendance',
       'Start Shift',
       `User ${user.name} started shift at store ${storeCode} (Date: ${todayStr}, UTC: ${now.toISOString()})`
+    );
+
+    // Broadcast realtime notifications across devices
+    await broadcastRealtimeEvent(
+      `store-${storeCode}`,
+      'ATTENDANCE_STARTED',
+      {
+        eventType: 'ATTENDANCE_STARTED',
+        shiftId: shift.id,
+        userId: user.id,
+        employeeName: user.name,
+        storeCode,
+        shiftStartUtc: now.toISOString(),
+        date: todayStr,
+        timestamp: now.toISOString(),
+      },
+      { storeCode }
+    );
+
+    await broadcastRealtimeEvent(
+      'work-activity',
+      'WORK_ACTIVITY_UPDATED',
+      {
+        eventType: 'WORK_ACTIVITY_UPDATED',
+        userId: user.id,
+        name: user.name,
+        role: user.role,
+        storeCode,
+        status: 'ONLINE',
+        hasActiveShift: true,
+        shiftStartUtc: now.toISOString(),
+        elapsedSeconds: 0,
+        lastSeen: now.toISOString(),
+        timestamp: now.toISOString(),
+      },
+      { storeCode }
     );
 
     return NextResponse.json({

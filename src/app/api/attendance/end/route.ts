@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 function formatHHMMSS(totalSecs: number): string {
   const h = Math.floor(totalSecs / 3600);
@@ -52,12 +56,69 @@ export async function POST(req: NextRequest) {
     });
 
     const formattedDuration = formatHHMMSS(durationSeconds);
+    const storeCode = activeShift.storeCode;
+
+    // Update presence
+    await (prisma as any).userPresence.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        status: 'ONLINE',
+        lastHeartbeat: now,
+        lastSeen: now,
+        currentStore: storeCode,
+      },
+      update: {
+        lastSeen: now,
+      },
+    });
 
     await createAuditLog(
       auth.user,
       'Attendance',
       'End Shift',
       `User ${user.name} completed shift (Date: ${activeShift.localDate}, Duration: ${formattedDuration}, Total Seconds: ${durationSeconds})`
+    );
+
+    // Broadcast realtime notifications across devices
+    await broadcastRealtimeEvent(
+      `store-${storeCode}`,
+      'ATTENDANCE_ENDED',
+      {
+        eventType: 'ATTENDANCE_ENDED',
+        shiftId: completedShift.id,
+        userId: user.id,
+        employeeName: user.name,
+        storeCode,
+        shiftStartUtc: activeShift.shiftStartUtc.toISOString(),
+        shiftEndUtc: now.toISOString(),
+        totalSeconds: durationSeconds,
+        formattedDuration,
+        date: activeShift.localDate,
+        timestamp: now.toISOString(),
+      },
+      { storeCode }
+    );
+
+    await broadcastRealtimeEvent(
+      'work-activity',
+      'WORK_ACTIVITY_UPDATED',
+      {
+        eventType: 'WORK_ACTIVITY_UPDATED',
+        userId: user.id,
+        name: user.name,
+        role: user.role,
+        storeCode,
+        status: 'ONLINE',
+        hasActiveShift: false,
+        shiftStartUtc: null,
+        elapsedSeconds: 0,
+        todayDurationSeconds: durationSeconds,
+        formattedTodayDuration: formattedDuration,
+        lastSeen: now.toISOString(),
+        timestamp: now.toISOString(),
+      },
+      { storeCode }
     );
 
     return NextResponse.json({

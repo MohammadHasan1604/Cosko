@@ -29,6 +29,7 @@ const MODELS_WITH_CREATED_AT = new Set([
   'notification',
   'attendanceDay',
   'fileAsset',
+  'realtimeOutbox',
 ]);
 
 function createPrismaClient() {

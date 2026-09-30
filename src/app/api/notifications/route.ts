@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
+import { broadcastRealtimeEvent } from '@/lib/realtime';
 
 /**
  * GET /api/notifications — Fetch user's notifications
@@ -76,6 +77,10 @@ export async function PUT(req: NextRequest) {
         where: { userId: user.id, isRead: false },
         data: { isRead: true },
       });
+      broadcastRealtimeEvent(`user-${user.id}`, 'NOTIFICATION_UPDATED', {
+        userId: user.id,
+        action: 'all_read',
+      });
       return NextResponse.json({ success: true, message: 'All notifications marked as read' });
     }
 
@@ -83,6 +88,11 @@ export async function PUT(req: NextRequest) {
       await (prisma as any).notification.updateMany({
         where: { id: body.notificationId, userId: user.id },
         data: { isRead: true },
+      });
+      broadcastRealtimeEvent(`user-${user.id}`, 'NOTIFICATION_UPDATED', {
+        userId: user.id,
+        notificationId: body.notificationId,
+        action: 'read',
       });
       return NextResponse.json({ success: true, message: 'Notification marked as read' });
     }

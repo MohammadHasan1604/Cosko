@@ -57,6 +57,7 @@ model UserAccount {
   notifications    Notification[]
   auditLogs        AuditLog[]            @relation("AuditLogUser")
   fileAssets       FileAsset[]
+  presence         UserPresence?
 
   @@index([role])
   @@index([status])
@@ -922,3 +923,42 @@ model FileAsset {
   @@index([createdAt])
   @@map("file_assets")
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 23. REALTIME OUTBOX — Durable event persistence for distributed pub-sub
+// ──────────────────────────────────────────────────────────────────────────────
+model RealtimeOutbox {
+  id          String    @id @default(uuid())
+  channel     String    @db.VarChar(64)
+  event       String    @db.VarChar(64)
+  payload     String    @db.Text
+  storeCode   String?   @map("store_code") @db.VarChar(16)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@index([channel])
+  @@index([storeCode])
+  @@index([createdAt])
+  @@map("realtime_outbox")
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 24. USER PRESENCE & LIVE WORK ACTIVITY
+// ──────────────────────────────────────────────────────────────────────────────
+model UserPresence {
+  id            String   @id @default(uuid())
+  userId        String   @unique @map("user_id")
+  status        String   @default("OFFLINE") @db.VarChar(16) // ONLINE, IDLE, OFFLINE
+  lastHeartbeat DateTime @default(now()) @map("last_heartbeat")
+  lastSeen      DateTime @default(now()) @map("last_seen")
+  currentStore  String?  @map("current_store") @db.VarChar(16)
+  deviceInfo    String?  @map("device_info") @db.VarChar(255)
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([lastHeartbeat])
+  @@map("user_presence")
+}
+

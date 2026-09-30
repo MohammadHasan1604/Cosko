@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { executeStockTransfer, CreateTransferInput } from '@/lib/services/transferService';
-import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 import { validateTransferHeader, validateTransferItem } from '@/lib/stockTransferCalculations';
 import { executeWithIdempotency } from '@/lib/idempotency';
 
@@ -163,6 +163,37 @@ export async function POST(req: NextRequest) {
           ...body,
           requestedBy: user.name,
         });
+
+        const transferPayload = {
+          transferNo: (transfer as any)?.transferNo,
+          sourceStore: body.sourceStore,
+          destStore: body.destStore,
+          action: 'created',
+        };
+
+        broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', transferPayload);
+        if (body.sourceStore) {
+          broadcastRealtimeEvent(
+            getStoreChannel(body.sourceStore),
+            'TRANSFER_COMPLETED',
+            transferPayload
+          );
+          broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: body.sourceStore });
+          broadcastRealtimeEvent(getStoreChannel(body.sourceStore), 'STOCK_UPDATED', {
+            storeCode: body.sourceStore,
+          });
+        }
+        if (body.destStore) {
+          broadcastRealtimeEvent(
+            getStoreChannel(body.destStore),
+            'TRANSFER_COMPLETED',
+            transferPayload
+          );
+          broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: body.destStore });
+          broadcastRealtimeEvent(getStoreChannel(body.destStore), 'STOCK_UPDATED', {
+            storeCode: body.destStore,
+          });
+        }
 
         return { status: 201, data: { success: true, transfer } };
       }
@@ -337,13 +368,36 @@ export async function PUT(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', {
+    const transferPayload = {
       transferNo: existing.transferNo,
       action: 'status_updated',
-    });
+      sourceStore: existing.sourceStore,
+      destStore: existing.destStore,
+    };
+    broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', transferPayload);
+    if (existing.sourceStore) {
+      broadcastRealtimeEvent(
+        getStoreChannel(existing.sourceStore),
+        'TRANSFER_COMPLETED',
+        transferPayload
+      );
+    }
+    if (existing.destStore) {
+      broadcastRealtimeEvent(
+        getStoreChannel(existing.destStore),
+        'TRANSFER_COMPLETED',
+        transferPayload
+      );
+    }
     if (isCancelling) {
       broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.sourceStore });
+      broadcastRealtimeEvent(getStoreChannel(existing.sourceStore), 'STOCK_UPDATED', {
+        storeCode: existing.sourceStore,
+      });
       broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.destStore });
+      broadcastRealtimeEvent(getStoreChannel(existing.destStore), 'STOCK_UPDATED', {
+        storeCode: existing.destStore,
+      });
     }
 
     return NextResponse.json({
@@ -513,12 +567,35 @@ export async function DELETE(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', {
+    const delTransferPayload = {
       transferNo: existing.transferNo,
       action: 'cancelled',
-    });
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.sourceStore });
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.destStore });
+      sourceStore: existing.sourceStore,
+      destStore: existing.destStore,
+    };
+    broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', delTransferPayload);
+    if (existing.sourceStore) {
+      broadcastRealtimeEvent(
+        getStoreChannel(existing.sourceStore),
+        'TRANSFER_COMPLETED',
+        delTransferPayload
+      );
+      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.sourceStore });
+      broadcastRealtimeEvent(getStoreChannel(existing.sourceStore), 'STOCK_UPDATED', {
+        storeCode: existing.sourceStore,
+      });
+    }
+    if (existing.destStore) {
+      broadcastRealtimeEvent(
+        getStoreChannel(existing.destStore),
+        'TRANSFER_COMPLETED',
+        delTransferPayload
+      );
+      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.destStore });
+      broadcastRealtimeEvent(getStoreChannel(existing.destStore), 'STOCK_UPDATED', {
+        storeCode: existing.destStore,
+      });
+    }
 
     return NextResponse.json({
       success: true,

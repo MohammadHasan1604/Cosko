@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { normalizeMobileNumber } from '@/lib/phoneUtils';
-import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 import { executeWithIdempotency } from '@/lib/idempotency';
 
 /**
@@ -224,12 +224,23 @@ export async function POST(req: NextRequest) {
           { maxWait: 15000, timeout: 45000 }
         );
 
-        broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', {
+        const customerStore = (user.store || 'HQ').toUpperCase();
+        const customerPayload = {
           id: customer.id,
           name: customer.name,
           phone: customer.phone,
+          storeCode: customerStore,
           action: 'saved',
-        });
+        };
+
+        broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
+        if (customerStore) {
+          broadcastRealtimeEvent(
+            getStoreChannel(customerStore),
+            'CUSTOMER_UPDATED',
+            customerPayload
+          );
+        }
 
         return { status: 201, data: { success: true, customer } };
       }
@@ -295,12 +306,19 @@ export async function PUT(req: NextRequest) {
       });
     }
 
-    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', {
+    const customerStore = user.store || 'BLR';
+    const customerPayload = {
       id: customer.id,
       name: customer.name,
       phone: customer.phone,
+      storeCode: customerStore,
       action: 'updated',
-    });
+    };
+
+    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
+    if (customerStore) {
+      broadcastRealtimeEvent(getStoreChannel(customerStore), 'CUSTOMER_UPDATED', customerPayload);
+    }
 
     return NextResponse.json({ success: true, customer });
   } catch (error: any) {
@@ -443,11 +461,18 @@ export async function DELETE(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', {
+    const customerStore = user.store || 'BLR';
+    const customerPayload = {
       id: target.id,
       name: target.name,
+      storeCode: customerStore,
       action: 'deleted',
-    });
+    };
+
+    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
+    if (customerStore) {
+      broadcastRealtimeEvent(getStoreChannel(customerStore), 'CUSTOMER_UPDATED', customerPayload);
+    }
 
     return NextResponse.json({
       success: true,

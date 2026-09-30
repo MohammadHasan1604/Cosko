@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword } from '@/lib/auth';
 import { prisma, executeTransaction } from '@/lib/db';
-import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 import {
   authenticateRequest,
   createAuditLog,
@@ -329,8 +329,19 @@ export async function POST(req: NextRequest) {
     broadcastRealtimeEvent('users', 'USER_CREATED', {
       userId: newUser.id,
       email: newUser.email,
+      storeCode: newUser.storeScope,
       stores: targetAssignedStores,
     });
+
+    for (const st of targetAssignedStores) {
+      if (st && st !== 'All Stores') {
+        broadcastRealtimeEvent(getStoreChannel(st), 'USER_CREATED', {
+          userId: newUser.id,
+          email: newUser.email,
+          storeCode: st,
+        });
+      }
+    }
 
     return NextResponse.json(
       {

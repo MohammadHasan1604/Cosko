@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { executePOSCheckout, CreateSaleInput } from '@/lib/services/salesService';
-import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 
 /**
@@ -197,6 +197,32 @@ export async function POST(req: NextRequest) {
           ...body,
           cashierName: user.name,
         });
+
+        const storeCode = (sale as any)?.storeCode || body.storeCode;
+        const salePayload = {
+          orderId: (sale as any)?.id,
+          orderNo: (sale as any)?.orderNo,
+          storeCode,
+          grandTotal: (sale as any)?.total,
+          cashierName: (sale as any)?.cashierName,
+        };
+
+        // Broadcast sale event to global and store-scoped channels
+        broadcastRealtimeEvent('sales', 'SALE_CREATED', salePayload);
+        if (storeCode) {
+          broadcastRealtimeEvent(getStoreChannel(storeCode), 'SALE_CREATED', salePayload);
+        }
+
+        // Broadcast stock update event so devices invalidate/refetch inventory
+        const stockPayload = {
+          storeCode,
+          reason: 'SALE_CHECKOUT',
+          orderNo: (sale as any)?.orderNo,
+        };
+        broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+        if (storeCode) {
+          broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload);
+        }
 
         return { status: 201, data: { success: true, sale } };
       }
@@ -468,13 +494,22 @@ export async function PUT(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    broadcastRealtimeEvent('sales', 'SALE_UPDATED', {
+    const salePayload = {
       id: updatedSale.id,
       orderNo: updatedSale.orderNo,
       status: updatedSale.status,
-    });
+      storeCode: existing.storeCode,
+    };
+    broadcastRealtimeEvent('sales', 'SALE_UPDATED', salePayload);
+    if (existing.storeCode) {
+      broadcastRealtimeEvent(getStoreChannel(existing.storeCode), 'SALE_UPDATED', salePayload);
+    }
     if (isVoidingOrRefunding) {
-      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.storeCode });
+      const stockPayload = { storeCode: existing.storeCode, reason: 'SALE_REFUND' };
+      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+      if (existing.storeCode) {
+        broadcastRealtimeEvent(getStoreChannel(existing.storeCode), 'STOCK_UPDATED', stockPayload);
+      }
     }
 
     return NextResponse.json({
@@ -628,12 +663,29 @@ export async function DELETE(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    broadcastRealtimeEvent('sales', 'SALE_UPDATED', {
+    const cancelSalePayload = {
       id: existing.id,
       orderNo: existing.orderNo,
       status: 'Cancelled',
-    });
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.storeCode });
+      storeCode: existing.storeCode,
+    };
+    broadcastRealtimeEvent('sales', 'SALE_UPDATED', cancelSalePayload);
+    if (existing.storeCode) {
+      broadcastRealtimeEvent(
+        getStoreChannel(existing.storeCode),
+        'SALE_UPDATED',
+        cancelSalePayload
+      );
+    }
+    const cancelStockPayload = { storeCode: existing.storeCode, reason: 'SALE_VOID' };
+    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', cancelStockPayload);
+    if (existing.storeCode) {
+      broadcastRealtimeEvent(
+        getStoreChannel(existing.storeCode),
+        'STOCK_UPDATED',
+        cancelStockPayload
+      );
+    }
 
     return NextResponse.json({
       success: true,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
-import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 import { generateSafeSequenceNo } from '@/lib/sequenceUtils';
 import { executeWithIdempotency } from '@/lib/idempotency';
 
@@ -255,12 +255,16 @@ export async function POST(req: NextRequest) {
           { maxWait: 15000, timeout: 45000 }
         );
 
-        broadcastRealtimeEvent('expenses', 'EXPENSE_CREATED', {
+        const expPayload = {
           expenseNo: result.expenseNo,
           category: body.category,
           amount: expenseAmt,
           storeCode: expenseStore,
-        });
+        };
+        broadcastRealtimeEvent('expenses', 'EXPENSE_CREATED', expPayload);
+        if (expenseStore) {
+          broadcastRealtimeEvent(getStoreChannel(expenseStore), 'EXPENSE_CREATED', expPayload);
+        }
 
         return {
           status: 201,
@@ -387,12 +391,20 @@ export async function PUT(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', {
+    const updateExpPayload = {
       id: updated.id,
       expenseNo: updated.expenseNo,
       storeCode: updated.storeCode,
       action: 'updated',
-    });
+    };
+    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', updateExpPayload);
+    if (updated.storeCode) {
+      broadcastRealtimeEvent(
+        getStoreChannel(updated.storeCode),
+        'EXPENSE_UPDATED',
+        updateExpPayload
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -494,7 +506,16 @@ export async function DELETE(req: NextRequest) {
       { maxWait: 15000, timeout: 45000 }
     );
 
-    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', { id: target.id, action: 'deleted' });
+    const delExpPayload = {
+      id: target.id,
+      expenseNo: target.expenseNo,
+      storeCode: target.storeCode,
+      action: 'deleted',
+    };
+    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', delExpPayload);
+    if (target.storeCode) {
+      broadcastRealtimeEvent(getStoreChannel(target.storeCode), 'EXPENSE_UPDATED', delExpPayload);
+    }
 
     return NextResponse.json({ success: true, message: 'Expense record deleted' });
   } catch (error: any) {

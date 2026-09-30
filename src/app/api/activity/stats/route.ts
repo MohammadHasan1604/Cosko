@@ -82,24 +82,12 @@ export async function GET(req: NextRequest) {
     const timezone = searchParams.get('timezone') || 'Asia/Kolkata';
 
     const isSuperAdmin = caller.role === 'Super Admin' || caller.securityLevel >= 100;
+    const isStoreManager = caller.role === 'Store Manager';
+    const isSalesManager = !isSuperAdmin && !isStoreManager;
+    const callerStore = caller.store && caller.store !== 'All Stores' ? caller.store : 'BLR';
 
-    // RBAC: Non-admin users are strictly forced to their own userId and store
+    // RBAC: Store Isolation & Scope enforcement
     if (!isSuperAdmin) {
-      if (reqUserId && reqUserId !== caller.id) {
-        return NextResponse.json(
-          { error: 'Forbidden: You do not have permission to view other staff activity records' },
-          { status: 403 }
-        );
-      }
-      if (reqStore && reqStore !== 'All Stores' && reqStore !== caller.store) {
-        return NextResponse.json(
-          {
-            error:
-              'Forbidden: You do not have permission to view activity records for another store',
-          },
-          { status: 403 }
-        );
-      }
       if (reqStore === 'All Stores') {
         return NextResponse.json(
           {
@@ -109,18 +97,56 @@ export async function GET(req: NextRequest) {
           { status: 403 }
         );
       }
+      if (reqStore && reqStore !== callerStore) {
+        return NextResponse.json(
+          {
+            error:
+              'Forbidden: You do not have permission to view activity records for another store',
+          },
+          { status: 403 }
+        );
+      }
+      if (isSalesManager && reqUserId && reqUserId !== caller.id) {
+        return NextResponse.json(
+          { error: 'Forbidden: You do not have permission to view other staff activity records' },
+          { status: 403 }
+        );
+      }
+      if (isStoreManager && reqUserId && reqUserId !== caller.id) {
+        const targetUser = await prisma.userAccount.findUnique({
+          where: { id: reqUserId },
+          select: { storeScope: true },
+        });
+        if (!targetUser || targetUser.storeScope !== callerStore) {
+          return NextResponse.json(
+            {
+              error:
+                'Forbidden: You do not have permission to view activity records for staff outside your store',
+            },
+            { status: 403 }
+          );
+        }
+      }
     }
-
-    const targetUserId = isSuperAdmin ? reqUserId : caller.id;
 
     const { startDate, endDate } = computeDateRange(range, customStart, customEnd, timezone);
 
-    // Fetch relevant users
+    // Fetch relevant users based on caller role
     const userWhere: any = {};
-    if (targetUserId) {
-      userWhere.id = targetUserId;
-    } else if (reqStore && reqStore !== 'All Stores') {
-      userWhere.storeScope = reqStore;
+    if (isSuperAdmin) {
+      if (reqUserId && reqUserId !== 'all') {
+        userWhere.id = reqUserId;
+      } else if (reqStore && reqStore !== 'All Stores' && reqStore !== 'all') {
+        userWhere.storeScope = reqStore;
+      }
+    } else if (isStoreManager) {
+      userWhere.storeScope = callerStore;
+      if (reqUserId && reqUserId !== 'all') {
+        userWhere.id = reqUserId;
+      }
+    } else {
+      // Sales Manager — strictly own activity
+      userWhere.id = caller.id;
     }
 
     const users = await prisma.userAccount.findMany({

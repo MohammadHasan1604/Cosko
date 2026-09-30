@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
-import { broadcastRealtimeEvent } from '@/lib/realtime';
+import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
 
 import { executeWithIdempotency } from '@/lib/idempotency';
 
@@ -196,10 +196,14 @@ export async function POST(req: NextRequest) {
           { maxWait: 15000, timeout: 45000 }
         );
 
-        broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+        const stockPayload = {
           storeCode: body.storeCode,
           productId: body.productId,
-        });
+        };
+        broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+        if (body.storeCode) {
+          broadcastRealtimeEvent(getStoreChannel(body.storeCode), 'STOCK_UPDATED', stockPayload);
+        }
 
         return {
           status: 200,

@@ -169,6 +169,34 @@ export default function AttendancePage() {
     };
   }, [shiftStatus, shiftStartUtc]);
 
+  // Realtime Attendance Invalidation Listener
+  useEffect(() => {
+    const handleRealtime = (e: any) => {
+      const detail = e?.detail;
+      if (!detail) return;
+
+      if (
+        detail.event === 'ATTENDANCE_STARTED' ||
+        detail.event === 'ATTENDANCE_ENDED' ||
+        detail.event === 'ATTENDANCE_UPDATED' ||
+        detail.event === 'WORK_ACTIVITY_UPDATED'
+      ) {
+        // Refetch records for current store/filters
+        fetchAttendanceRecords();
+
+        // If the event affects current user, also re-sync shift status
+        if (detail.payload?.userId === currentUser.id) {
+          fetchCurrentShift();
+        }
+      }
+    };
+
+    window.addEventListener('cosko:realtime', handleRealtime);
+    return () => {
+      window.removeEventListener('cosko:realtime', handleRealtime);
+    };
+  }, [fetchAttendanceRecords, fetchCurrentShift, currentUser.id]);
+
   // Start Shift Action
   const handleStartShift = async () => {
     setActionLoading(true);
