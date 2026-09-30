@@ -157,7 +157,7 @@ async function main() {
   // ──────────────────────────────────────────────────────────────────
   const paymentMethods = [
     { name: 'Cash', code: 'CASH', type: 'Cash', description: 'Cash payment', isSystem: true, sortOrder: 1, status: 'Active' },
-    { name: 'UPI', code: 'UPI', type: 'Digital', description: 'UPI QR / online transfer', isSystem: true, sortOrder: 2, status: 'Active' },
+    { name: 'UPI', code: 'UPI', type: 'UPI', description: 'Instant UPI / QR Code payment', isSystem: true, sortOrder: 2, status: 'Active' },
     { name: 'Other', code: 'OTHER', type: 'Other', description: 'Other payment method', isSystem: true, sortOrder: 3, status: 'Active' },
   ];
 
