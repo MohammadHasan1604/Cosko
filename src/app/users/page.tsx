@@ -15,7 +15,6 @@ import {
   ROLE_SECURITY_LEVELS,
 } from '@/lib/rbacEngine';
 import { toast } from 'sonner';
-import SuperAdminGuard from '@/components/SuperAdminGuard';
 
 export default function UsersPage() {
   const {
@@ -42,6 +41,10 @@ export default function UsersPage() {
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<UserAccount | null>(null);
 
   const handleOpenPermissions = (u: UserAccount) => {
+    if (currentUser.role !== 'Super Admin') {
+      toast.error('Access Matrix configuration is restricted to Super Admin accounts.');
+      return;
+    }
     if (u.role === 'Super Admin') {
       toast.info(
         'Super Admin accounts possess unconditional root-level enterprise access. Access Matrix configuration is not applicable.'
@@ -86,10 +89,21 @@ export default function UsersPage() {
   }));
 
   // Server-Side Visibility Protection: Filter protected accounts based on caller security level
-  const visibleUsers = RBACEngine.filterVisibleUsers(rbacCurrentUser, rbacUsers).filter((u) => {
-    if (statusFilter === 'All') return true;
-    return u.status === statusFilter;
-  });
+  const visibleUsers = useMemo(() => {
+    let users = RBACEngine.filterVisibleUsers(rbacCurrentUser, rbacUsers);
+    if (currentUser.role === 'Store Manager') {
+      users = users.filter(
+        (u) =>
+          u.role === 'Sales Manager' &&
+          (u.storeScope === currentUser.store ||
+            (u.allowedStores && u.allowedStores.includes(currentUser.store)))
+      );
+    }
+    if (statusFilter !== 'All') {
+      users = users.filter((u) => u.status === statusFilter);
+    }
+    return users;
+  }, [rbacCurrentUser, rbacUsers, currentUser.role, currentUser.store, statusFilter]);
 
   const toggleCategoryCollapse = (cat: string) => {
     setCollapsedCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -102,6 +116,13 @@ export default function UsersPage() {
       );
       return;
     }
+    if (
+      currentUser.role === 'Store Manager' &&
+      (u.role !== 'Sales Manager' || u.store !== currentUser.store)
+    ) {
+      toast.error('Store Managers can only delete Sales Manager accounts for their own store.');
+      return;
+    }
     setDeleteConfirmModal(u);
   };
 
@@ -110,6 +131,13 @@ export default function UsersPage() {
       toast.error(
         'Deny Access: Protected Boundary. Lower-level roles cannot edit Super Admin accounts.'
       );
+      return;
+    }
+    if (
+      currentUser.role === 'Store Manager' &&
+      (u.role !== 'Sales Manager' || u.store !== currentUser.store)
+    ) {
+      toast.error('Store Managers can only edit Sales Manager accounts for their own store.');
       return;
     }
     setEditUserModal(u);
@@ -174,763 +202,744 @@ export default function UsersPage() {
     },
   ];
 
-  return (
-    <SuperAdminGuard moduleName="Users & Roles">
+  if (currentUser.role === 'Sales Manager') {
+    return (
       <AppLayout activeRoute="/users">
-        <div className="space-y-4 md:space-y-6 fade-in">
-          <div className="flex items-start justify-between gap-3">
-            <div className="page-header">
-              <h1 className="page-title">Users & Roles</h1>
-              <p className="page-subtitle">Accounts, permissions & security hierarchy</p>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center space-y-3">
+            <div className="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center mx-auto">
+              <span className="text-danger text-xl">🔒</span>
             </div>
-            <button
-              onClick={() => setInviteModal(true)}
-              className="btn-primary gap-1.5 text-xs flex-shrink-0"
+            <h2 className="text-lg font-bold text-foreground">Access Restricted</h2>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              Sales Managers do not have permissions to manage user accounts.
+            </p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  return (
+    <AppLayout activeRoute="/users">
+      <div className="space-y-4 md:space-y-6 fade-in">
+        <div className="flex items-start justify-between gap-3">
+          <div className="page-header">
+            <h1 className="page-title">Users & Roles</h1>
+            <p className="page-subtitle">Accounts, permissions & security hierarchy</p>
+          </div>
+          <button
+            onClick={() => setInviteModal(true)}
+            className="btn-primary gap-1.5 text-xs flex-shrink-0"
+          >
+            <Icon name="UserPlusIcon" size={14} />
+            <span className="hidden sm:inline">Add User</span>
+            <span className="sm:hidden">Add</span>
+          </button>
+        </div>
+
+        {/* Security Level Matrix Cards */}
+        <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 md:grid md:grid-cols-3 md:gap-3 pb-1 md:pb-0">
+          {roleDescriptions.map((rd) => (
+            <div
+              key={`matrix-${rd.role}`}
+              className="card p-3 md:p-4 space-y-1.5 border-l-4 min-w-[160px] md:min-w-0 flex-shrink-0 md:flex-shrink"
+              style={{
+                borderColor:
+                  rd.level === 100
+                    ? 'var(--danger)'
+                    : rd.level === 80
+                      ? 'var(--warning)'
+                      : 'var(--primary)',
+              }}
             >
-              <Icon name="UserPlusIcon" size={14} />
-              <span className="hidden sm:inline">Add User</span>
-              <span className="sm:hidden">Add</span>
-            </button>
+              <div className="flex items-center justify-between">
+                <span className={`${rd.badge} text-2xs`}>Lvl {rd.level}</span>
+                <span className="text-3xs font-bold uppercase text-muted-foreground">
+                  {rd.role}
+                </span>
+              </div>
+              <p className="text-2xs md:text-xs text-muted-foreground leading-relaxed">
+                {rd.access}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Filter Bar & User Roster */}
+        <div className="card overflow-hidden">
+          <div className="px-3 md:px-4 py-3 border-b border-border/60 flex flex-col md:flex-row md:items-center justify-between gap-2">
+            <div>
+              <h3 className="section-header">Accounts</h3>
+            </div>
+
+            {/* Status Filter Tabs */}
+            <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+              {(['All', 'Active', 'Inactive', 'Suspended'] as const).map((st) => (
+                <button
+                  key={`filter-${st}`}
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                    statusFilter === st
+                      ? 'bg-card text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Security Level Matrix Cards */}
-          <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-[var(--page-gutter)] px-[var(--page-gutter)] md:mx-0 md:px-0 md:grid md:grid-cols-3 md:gap-3 pb-1 md:pb-0">
-            {roleDescriptions.map((rd) => (
-              <div
-                key={`matrix-${rd.role}`}
-                className="card p-3 md:p-4 space-y-1.5 border-l-4 min-w-[160px] md:min-w-0 flex-shrink-0 md:flex-shrink"
-                style={{
-                  borderColor:
-                    rd.level === 100
-                      ? 'var(--danger)'
-                      : rd.level === 80
-                        ? 'var(--warning)'
-                        : 'var(--primary)',
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`${rd.badge} text-2xs`}>Lvl {rd.level}</span>
-                  <span className="text-3xs font-bold uppercase text-muted-foreground">
-                    {rd.role}
-                  </span>
+          {/* Mobile User Cards (<md) */}
+          <div className="block md:hidden divide-y divide-border">
+            {visibleUsers.map((u) => {
+              const level =
+                u.securityLevel ||
+                (u.role === 'Super Admin' ? 100 : u.role === 'Store Manager' ? 80 : 40);
+              const isProtectedSuperAdmin = u.role === 'Super Admin';
+              const fullUserRecord = usersList.find((usr) => usr.id === u.id);
+              const allowedStores = u.allowedStores || [u.storeScope];
+
+              return (
+                <div
+                  key={`m-usr-${u.id}`}
+                  className="p-4 space-y-3 bg-card hover:bg-muted/10 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {u.avatarUrl ? (
+                        <img
+                          src={u.avatarUrl}
+                          alt={u.name}
+                          className="w-10 h-10 rounded-full object-cover border border-border flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0">
+                          {u.name.substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-bold text-sm text-foreground truncate">{u.name}</p>
+                          {isProtectedSuperAdmin && (
+                            <span className="text-3xs bg-danger/10 text-danger border border-danger/20 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5">
+                              <Icon name="LockClosedIcon" size={10} /> Level 100
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-2xs text-muted-foreground truncate">{u.email}</p>
+                      </div>
+                    </div>
+
+                    <select
+                      value={u.status}
+                      disabled={isProtectedSuperAdmin && currentUser.role !== 'Super Admin'}
+                      onChange={(e) => toggleUserStatus(u.id, e.target.value as any)}
+                      className={`text-3xs font-bold px-2 py-1 rounded-md border flex-shrink-0 ${
+                        u.status === 'Active'
+                          ? 'bg-positive/10 text-positive border-positive/30'
+                          : u.status === 'Suspended'
+                            ? 'bg-danger/10 text-danger border-danger/30'
+                            : 'bg-muted text-muted-foreground border-border'
+                      }`}
+                    >
+                      <option value="Active">ACTIVE</option>
+                      <option value="Inactive">INACTIVE</option>
+                      <option value="Suspended">SUSPENDED</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 flex-wrap text-2xs pt-1 border-t border-border/50">
+                    <span
+                      className={`badge ${level === 100 ? 'badge-danger' : level === 80 ? 'badge-warning' : 'badge-info'} text-3xs`}
+                    >
+                      Level {level} · {u.role}
+                    </span>
+
+                    <div className="flex items-center gap-1">
+                      <span className="text-3xs text-muted-foreground font-semibold">Stores:</span>
+                      {allowedStores.map((st) => (
+                        <span
+                          key={`st-m-${st}`}
+                          className="badge-secondary text-3xs font-mono font-bold px-1.5 py-0.5"
+                        >
+                          {st}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <div className="flex items-center gap-1.5">
+                      {fullUserRecord && (
+                        <button
+                          onClick={() => setPerformanceModalUser(fullUserRecord)}
+                          className="btn-secondary text-3xs py-1 px-2 gap-1"
+                        >
+                          <Icon name="ChartBarIcon" size={13} />
+                          Metrics
+                        </button>
+                      )}
+
+                      {currentUser.role === 'Super Admin' &&
+                        fullUserRecord &&
+                        (isProtectedSuperAdmin ? (
+                          <span className="badge-danger text-3xs py-1 px-2 gap-1 font-bold flex items-center">
+                            <Icon name="ShieldCheckIcon" size={12} />
+                            Full Root Access
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleOpenPermissions(fullUserRecord)}
+                            className="btn-primary text-3xs py-1 px-2 gap-1"
+                          >
+                            <Icon name="KeyIcon" size={13} />
+                            Access Matrix
+                          </button>
+                        ))}
+                    </div>
+                  </div>
                 </div>
-                <p className="text-2xs md:text-xs text-muted-foreground leading-relaxed">
-                  {rd.access}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Filter Bar & User Roster */}
-          <div className="card overflow-hidden">
-            <div className="px-3 md:px-4 py-3 border-b border-border/60 flex flex-col md:flex-row md:items-center justify-between gap-2">
-              <div>
-                <h3 className="section-header">Accounts</h3>
+          {/* Desktop User Table (>=md) */}
+          <div className="hidden md:block overflow-x-auto scrollbar-thin">
+            <table className="w-full text-left border-collapse min-w-[750px]">
+              <thead>
+                <tr className="table-header">
+                  <th className="py-3 px-4 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                    User Identity
+                  </th>
+                  <th className="py-3 px-4">Role & Security Level</th>
+                  <th className="py-3 px-4">Store Scope & Access</th>
+                  <th className="py-3 px-4">Account Status</th>
+                  <th className="py-3 px-4 text-right">Security Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60 text-xs">
+                {visibleUsers.map((u) => {
+                  const level =
+                    u.securityLevel ||
+                    (u.role === 'Super Admin' ? 100 : u.role === 'Store Manager' ? 80 : 40);
+                  const isProtectedSuperAdmin = u.role === 'Super Admin';
+                  const fullUserRecord = usersList.find((usr) => usr.id === u.id);
+                  const allowedStores = u.allowedStores || [u.storeScope];
+
+                  return (
+                    <tr key={`usr-row-${u.id}`} className="table-row">
+                      <td className="py-3 px-4 font-medium text-foreground sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                        <div className="flex items-center gap-2.5">
+                          {u.avatarUrl ? (
+                            <img
+                              src={u.avatarUrl}
+                              alt={u.name}
+                              className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">
+                              {u.name.substring(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-semibold text-foreground">{u.name}</p>
+                              {isProtectedSuperAdmin && (
+                                <span className="text-3xs bg-danger/10 text-danger border border-danger/20 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5">
+                                  <Icon name="LockClosedIcon" size={10} /> Level 100
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-3xs text-muted-foreground">{u.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`badge ${level === 100 ? 'badge-danger' : level === 80 ? 'badge-warning' : 'badge-info'} text-3xs`}
+                        >
+                          Level {level} · {u.role}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {allowedStores.map((st) => (
+                            <span
+                              key={`st-badge-${st}`}
+                              className="badge-secondary text-3xs font-mono font-bold"
+                            >
+                              {st}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <select
+                          value={u.status}
+                          disabled={isProtectedSuperAdmin && currentUser.role !== 'Super Admin'}
+                          onChange={(e) => toggleUserStatus(u.id, e.target.value as any)}
+                          className={`text-3xs font-bold px-2 py-1 rounded-lg border ${
+                            u.status === 'Active'
+                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                              : u.status === 'Suspended'
+                                ? 'bg-rose-500/10 text-rose-600 border-rose-500/30'
+                                : 'bg-muted text-muted-foreground border-border'
+                          }`}
+                        >
+                          <option value="Active">ACTIVE</option>
+                          <option value="Inactive">INACTIVE</option>
+                          <option value="Suspended">SUSPENDED</option>
+                        </select>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {fullUserRecord && (
+                            <button
+                              onClick={() => setPerformanceModalUser(fullUserRecord)}
+                              className="btn-secondary h-7 text-3xs py-1 px-2.5 gap-1"
+                              title="Employee Performance Metrics"
+                            >
+                              <Icon name="ChartBarIcon" size={12} />
+                              Metrics
+                            </button>
+                          )}
+
+                          {currentUser.role === 'Super Admin' &&
+                            fullUserRecord &&
+                            (isProtectedSuperAdmin ? (
+                              <span
+                                className="inline-flex items-center gap-1 text-3xs font-extrabold px-2 py-1 rounded-lg bg-danger/10 text-danger border border-danger/20"
+                                title="Super Admin holds unrestricted root-level access to all modules, pages, stores, and actions."
+                              >
+                                <Icon name="ShieldCheckIcon" size={12} />
+                                Full Root Access
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenPermissions(fullUserRecord)}
+                                className="btn-primary h-7 text-3xs py-1 px-2.5 gap-1"
+                                title="Config Granular Permissions"
+                              >
+                                <Icon name="KeyIcon" size={12} />
+                                Access Matrix
+                              </button>
+                            ))}
+
+                          {(!isProtectedSuperAdmin || currentUser.role === 'Super Admin') &&
+                            fullUserRecord && (
+                              <>
+                                <button
+                                  onClick={() => openEdit(fullUserRecord)}
+                                  className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                                  title="Edit User"
+                                >
+                                  <Icon name="PencilSquareIcon" size={14} />
+                                </button>
+                                {u.id !== currentUser.id && (
+                                  <button
+                                    onClick={() => handleDeleteClick(fullUserRecord)}
+                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors"
+                                    title="Delete User"
+                                  >
+                                    <Icon name="TrashIcon" size={14} />
+                                  </button>
+                                )}
+                              </>
+                            )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Reusable Single-Source-of-Truth User Form Modal */}
+      <UserFormModal
+        open={inviteModal || !!editUserModal}
+        onClose={() => {
+          setInviteModal(false);
+          setEditUserModal(null);
+        }}
+        user={editUserModal}
+      />
+
+      {/* Non-Super-Admin User Access & Permissions Matrix Modal */}
+      {permissionsModalUser && permissionsModalUser.role !== 'Super Admin' && (
+        <Modal
+          open={!!permissionsModalUser}
+          onClose={() => setPermissionsModalUser(null)}
+          title={`User Access & Permissions — ${permissionsModalUser.name}`}
+          subtitle={`${permissionsModalUser.email} · Role: ${permissionsModalUser.role} (Level ${permissionsModalUser.securityLevel || 80})`}
+          size="lg"
+        >
+          <div className="space-y-5 py-2">
+            {/* Authorized Store Scope */}
+            <div className="card p-4 bg-muted/30 border border-border space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+                  AUTHORIZED OPERATIONAL STORE
+                </span>
+                <span className="text-2xs text-muted-foreground">
+                  Permanently scoped operational store
+                </span>
               </div>
 
-              {/* Status Filter Tabs */}
-              <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
-                {(['All', 'Active', 'Inactive', 'Suspended'] as const).map((st) => (
-                  <button
-                    key={`filter-${st}`}
-                    onClick={() => setStatusFilter(st)}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                      statusFilter === st
-                        ? 'bg-card text-foreground shadow-xs'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {st}
-                  </button>
-                ))}
+              <div className="flex items-center gap-3 pt-1">
+                <span className="badge-primary font-mono text-xs font-bold px-3 py-1">
+                  {permissionsModalUser.store || 'BLR'}
+                </span>
+                <span className="text-2xs text-muted-foreground">
+                  Store Manager and Sales Manager roles are strictly locked to exactly one
+                  operational store.
+                </span>
               </div>
             </div>
 
-            {/* Mobile User Cards (<md) */}
-            <div className="block md:hidden divide-y divide-border">
-              {visibleUsers.map((u) => {
-                const level =
-                  u.securityLevel ||
-                  (u.role === 'Super Admin' ? 100 : u.role === 'Store Manager' ? 80 : 40);
-                const isProtectedSuperAdmin = u.role === 'Super Admin';
-                const fullUserRecord = usersList.find((usr) => usr.id === u.id);
-                const allowedStores = u.allowedStores || [u.storeScope];
+            {/* Quick Bulk Action Buttons */}
+            <div className="flex items-center justify-between gap-2 flex-wrap bg-primary/5 p-3 rounded-xl border border-primary/20">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Icon name="AdjustmentsHorizontalIcon" size={16} className="text-primary" />
+                <span>Quick Permission Toggles (Safe Actions Only)</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    PERMISSION_CATALOGUE.forEach((perm) => {
+                      if (!perm.isProtected) {
+                        setUserPermissionOverride(permissionsModalUser.id, perm.code, 'ALLOW');
+                      }
+                    });
+                    toast.success(
+                      `Enabled all non-protected permissions for ${permissionsModalUser.name}`
+                    );
+                  }}
+                  className="btn-secondary text-3xs font-bold text-success border-success/30 hover:bg-success/10 py-1"
+                >
+                  Enable All Allowed Permissions
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    PERMISSION_CATALOGUE.forEach((perm) => {
+                      if (!perm.isProtected) {
+                        setUserPermissionOverride(permissionsModalUser.id, perm.code, 'RESET');
+                      }
+                    });
+                    toast.info(
+                      `Reset custom permission overrides for ${permissionsModalUser.name}`
+                    );
+                  }}
+                  className="btn-secondary text-3xs font-bold text-muted-foreground py-1"
+                >
+                  Disable All Optional Overrides
+                </button>
+              </div>
+            </div>
+
+            {/* Expandable Module Permission Groups */}
+            <div className="max-h-96 overflow-y-auto scrollbar-thin space-y-3">
+              {Object.entries(categoriesList).map(([category, perms]) => {
+                const isCollapsed = collapsedCategories[category];
+
+                // Page View Permission Code
+                const pageViewPerm = perms.find((p) => p.code.endsWith('.view'));
+                const pageViewState = pageViewPerm
+                  ? RBACEngine.getPermissionState(
+                      {
+                        id: permissionsModalUser.id,
+                        name: permissionsModalUser.name,
+                        email: permissionsModalUser.email,
+                        role: permissionsModalUser.role,
+                        securityLevel:
+                          (permissionsModalUser.securityLevel as any) ||
+                          (permissionsModalUser.role === 'Super Admin' ? 100 : 80),
+                        storeScope: permissionsModalUser.store,
+                        status: permissionsModalUser.status,
+                        permissions: permissionsModalUser.permissions || [],
+                        overrides: permissionsModalUser.overrides || [],
+                      },
+                      pageViewPerm.code
+                    )
+                  : 'Denied';
+
+                const isPageOn = pageViewState === 'Allowed' || pageViewState === 'Custom Allow';
 
                 return (
                   <div
-                    key={`m-usr-${u.id}`}
-                    className="p-4 space-y-3 bg-card hover:bg-muted/10 transition-colors"
+                    key={`cat-sec-${category}`}
+                    className="border border-border rounded-xl overflow-hidden bg-card"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {u.avatarUrl ? (
-                          <img
-                            src={u.avatarUrl}
-                            alt={u.name}
-                            className="w-10 h-10 rounded-full object-cover border border-border flex-shrink-0"
+                    {/* Module Header with Page ON/OFF Switch */}
+                    <div
+                      className="p-3 bg-muted/40 flex items-center justify-between gap-3 cursor-pointer select-none"
+                      onClick={() => toggleCategoryCollapse(category)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <Icon
+                            name={isCollapsed ? 'ChevronRightIcon' : 'ChevronDownIcon'}
+                            size={16}
+                          />
+                        </button>
+                        <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                          {category} MODULE
+                        </h4>
+                        <span className="text-3xs text-muted-foreground">
+                          ({perms.length} actions)
+                        </span>
+                      </div>
+
+                      <div
+                        className="flex items-center gap-2.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="text-2xs font-semibold text-muted-foreground hidden sm:inline">
+                          {category} Access:
+                        </span>
+                        {pageViewPerm && !pageViewPerm.isProtected ? (
+                          <ToggleSwitch
+                            checked={isPageOn}
+                            onChange={() =>
+                              setUserPermissionOverride(
+                                permissionsModalUser.id,
+                                pageViewPerm.code,
+                                isPageOn ? 'DENY' : 'ALLOW'
+                              )
+                            }
+                            size="sm"
+                            onText="ON"
+                            offText="OFF"
+                            title={`Toggle entire ${category} module access`}
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0">
-                            {u.name.substring(0, 2).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="font-bold text-sm text-foreground truncate">{u.name}</p>
-                            {isProtectedSuperAdmin && (
-                              <span className="text-3xs bg-danger/10 text-danger border border-danger/20 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5">
-                                <Icon name="LockClosedIcon" size={10} /> Level 100
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-2xs text-muted-foreground truncate">{u.email}</p>
-                        </div>
-                      </div>
-
-                      <select
-                        value={u.status}
-                        disabled={isProtectedSuperAdmin && currentUser.role !== 'Super Admin'}
-                        onChange={(e) => toggleUserStatus(u.id, e.target.value as any)}
-                        className={`text-3xs font-bold px-2 py-1 rounded-md border flex-shrink-0 ${
-                          u.status === 'Active'
-                            ? 'bg-positive/10 text-positive border-positive/30'
-                            : u.status === 'Suspended'
-                              ? 'bg-danger/10 text-danger border-danger/30'
-                              : 'bg-muted text-muted-foreground border-border'
-                        }`}
-                      >
-                        <option value="Active">ACTIVE</option>
-                        <option value="Inactive">INACTIVE</option>
-                        <option value="Suspended">SUSPENDED</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 flex-wrap text-2xs pt-1 border-t border-border/50">
-                      <span
-                        className={`badge ${level === 100 ? 'badge-danger' : level === 80 ? 'badge-warning' : 'badge-info'} text-3xs`}
-                      >
-                        Level {level} · {u.role}
-                      </span>
-
-                      <div className="flex items-center gap-1">
-                        <span className="text-3xs text-muted-foreground font-semibold">
-                          Stores:
-                        </span>
-                        {allowedStores.map((st) => (
                           <span
-                            key={`st-m-${st}`}
-                            className="badge-secondary text-3xs font-mono font-bold px-1.5 py-0.5"
+                            className={`text-3xs font-bold px-2 py-0.5 rounded-full ${isPageOn ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}
                           >
-                            {st}
+                            {isPageOn ? 'ON' : 'OFF'}
                           </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 pt-2">
-                      <div className="flex items-center gap-1.5">
-                        {fullUserRecord && (
-                          <button
-                            onClick={() => setPerformanceModalUser(fullUserRecord)}
-                            className="btn-secondary text-3xs py-1 px-2 gap-1"
-                          >
-                            <Icon name="ChartBarIcon" size={13} />
-                            Metrics
-                          </button>
                         )}
-
-                        {fullUserRecord &&
-                          (isProtectedSuperAdmin ? (
-                            <span className="badge-danger text-3xs py-1 px-2 gap-1 font-bold flex items-center">
-                              <Icon name="ShieldCheckIcon" size={12} />
-                              Full Root Access
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleOpenPermissions(fullUserRecord)}
-                              className="btn-primary text-3xs py-1 px-2 gap-1"
-                            >
-                              <Icon name="KeyIcon" size={13} />
-                              Access Matrix
-                            </button>
-                          ))}
                       </div>
                     </div>
+
+                    {/* Action Toggles Inside Category */}
+                    {!isCollapsed && (
+                      <div className="p-3 divide-y divide-border space-y-2">
+                        {perms.map((perm) => {
+                          const permState = RBACEngine.getPermissionState(
+                            {
+                              id: permissionsModalUser.id,
+                              name: permissionsModalUser.name,
+                              email: permissionsModalUser.email,
+                              role: permissionsModalUser.role,
+                              securityLevel:
+                                (permissionsModalUser.securityLevel as any) ||
+                                (permissionsModalUser.role === 'Super Admin' ? 100 : 80),
+                              storeScope: permissionsModalUser.store,
+                              status: permissionsModalUser.status,
+                              permissions: permissionsModalUser.permissions || [],
+                              overrides: permissionsModalUser.overrides || [],
+                            },
+                            perm.code
+                          );
+
+                          const isActionOn =
+                            permState === 'Allowed' || permState === 'Custom Allow';
+
+                          return (
+                            <div
+                              key={`perm-item-${perm.code}`}
+                              className="pt-2 flex items-center justify-between gap-4"
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold text-foreground">
+                                    {perm.name}
+                                  </span>
+                                  <span className="text-3xs font-mono text-muted-foreground">
+                                    ({perm.code})
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {perm.isProtected &&
+                                (permissionsModalUser.securityLevel || 80) < 100 ? (
+                                  <span className="badge-danger text-3xs flex items-center gap-1 font-bold">
+                                    <Icon name="LockClosedIcon" size={11} /> 🔒 Super Admin Only
+                                  </span>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`text-3xs font-bold px-1.5 py-0.5 rounded ${
+                                        permState === 'Custom Allow'
+                                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                          : permState === 'Custom Deny'
+                                            ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                                            : 'text-muted-foreground'
+                                      }`}
+                                    >
+                                      {permState}
+                                    </span>
+                                    {/* Prominent ON / OFF Clickable Toggle Switch */}
+                                    <ToggleSwitch
+                                      checked={isActionOn}
+                                      onChange={() =>
+                                        setUserPermissionOverride(
+                                          permissionsModalUser.id,
+                                          perm.code,
+                                          isActionOn ? 'DENY' : 'ALLOW'
+                                        )
+                                      }
+                                      size="sm"
+                                      onText="ON"
+                                      offText="OFF"
+                                      title={`Toggle ${perm.name} (${perm.code})`}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
 
-            {/* Desktop User Table (>=md) */}
-            <div className="hidden md:block overflow-x-auto scrollbar-thin">
-              <table className="w-full text-left border-collapse min-w-[750px]">
-                <thead>
-                  <tr className="table-header">
-                    <th className="py-3 px-4 sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
-                      User Identity
-                    </th>
-                    <th className="py-3 px-4">Role & Security Level</th>
-                    <th className="py-3 px-4">Store Scope & Access</th>
-                    <th className="py-3 px-4">Account Status</th>
-                    <th className="py-3 px-4 text-right">Security Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60 text-xs">
-                  {visibleUsers.map((u) => {
-                    const level =
-                      u.securityLevel ||
-                      (u.role === 'Super Admin' ? 100 : u.role === 'Store Manager' ? 80 : 40);
-                    const isProtectedSuperAdmin = u.role === 'Super Admin';
-                    const fullUserRecord = usersList.find((usr) => usr.id === u.id);
-                    const allowedStores = u.allowedStores || [u.storeScope];
-
-                    return (
-                      <tr key={`usr-row-${u.id}`} className="table-row">
-                        <td className="py-3 px-4 font-medium text-foreground sticky left-0 z-10 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
-                          <div className="flex items-center gap-2.5">
-                            {u.avatarUrl ? (
-                              <img
-                                src={u.avatarUrl}
-                                alt={u.name}
-                                className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">
-                                {u.name.substring(0, 2).toUpperCase()}
-                              </div>
-                            )}
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <p className="font-semibold text-foreground">{u.name}</p>
-                                {isProtectedSuperAdmin && (
-                                  <span className="text-3xs bg-danger/10 text-danger border border-danger/20 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5">
-                                    <Icon name="LockClosedIcon" size={10} /> Level 100
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-3xs text-muted-foreground">{u.email}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`badge ${level === 100 ? 'badge-danger' : level === 80 ? 'badge-warning' : 'badge-info'} text-3xs`}
-                          >
-                            Level {level} · {u.role}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {allowedStores.map((st) => (
-                              <span
-                                key={`st-badge-${st}`}
-                                className="badge-secondary text-3xs font-mono font-bold"
-                              >
-                                {st}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <select
-                            value={u.status}
-                            disabled={isProtectedSuperAdmin && currentUser.role !== 'Super Admin'}
-                            onChange={(e) => toggleUserStatus(u.id, e.target.value as any)}
-                            className={`text-3xs font-bold px-2 py-1 rounded-lg border ${
-                              u.status === 'Active'
-                                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
-                                : u.status === 'Suspended'
-                                  ? 'bg-rose-500/10 text-rose-600 border-rose-500/30'
-                                  : 'bg-muted text-muted-foreground border-border'
-                            }`}
-                          >
-                            <option value="Active">ACTIVE</option>
-                            <option value="Inactive">INACTIVE</option>
-                            <option value="Suspended">SUSPENDED</option>
-                          </select>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {fullUserRecord && (
-                              <button
-                                onClick={() => setPerformanceModalUser(fullUserRecord)}
-                                className="btn-secondary h-7 text-3xs py-1 px-2.5 gap-1"
-                                title="Employee Performance Metrics"
-                              >
-                                <Icon name="ChartBarIcon" size={12} />
-                                Metrics
-                              </button>
-                            )}
-
-                            {fullUserRecord &&
-                              (isProtectedSuperAdmin ? (
-                                <span
-                                  className="inline-flex items-center gap-1 text-3xs font-extrabold px-2 py-1 rounded-lg bg-danger/10 text-danger border border-danger/20"
-                                  title="Super Admin holds unrestricted root-level access to all modules, pages, stores, and actions."
-                                >
-                                  <Icon name="ShieldCheckIcon" size={12} />
-                                  Full Root Access
-                                </span>
-                              ) : (
-                                <button
-                                  onClick={() => handleOpenPermissions(fullUserRecord)}
-                                  className="btn-primary h-7 text-3xs py-1 px-2.5 gap-1"
-                                  title="Config Granular Permissions"
-                                >
-                                  <Icon name="KeyIcon" size={12} />
-                                  Access Matrix
-                                </button>
-                              ))}
-
-                            {(!isProtectedSuperAdmin || currentUser.role === 'Super Admin') &&
-                              fullUserRecord && (
-                                <>
-                                  <button
-                                    onClick={() => openEdit(fullUserRecord)}
-                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                                    title="Edit User"
-                                  >
-                                    <Icon name="PencilSquareIcon" size={14} />
-                                  </button>
-                                  {u.id !== currentUser.id && (
-                                    <button
-                                      onClick={() => handleDeleteClick(fullUserRecord)}
-                                      className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors"
-                                      title="Delete User"
-                                    >
-                                      <Icon name="TrashIcon" size={14} />
-                                    </button>
-                                  )}
-                                </>
-                              )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="flex justify-end pt-2 border-t border-border">
+              <button onClick={() => setPermissionsModalUser(null)} className="btn-primary text-xs">
+                Save Access Settings
+              </button>
             </div>
           </div>
-        </div>
+        </Modal>
+      )}
 
-        {/* Reusable Single-Source-of-Truth User Form Modal */}
-        <UserFormModal
-          open={inviteModal || !!editUserModal}
-          onClose={() => {
-            setInviteModal(false);
-            setEditUserModal(null);
-          }}
-          user={editUserModal}
-        />
+      {/* User Activity & Real Performance Drawer / Modal */}
+      {performanceModalUser && (
+        <Modal
+          open={!!performanceModalUser}
+          onClose={() => setPerformanceModalUser(null)}
+          title={`Real Performance Analytics — ${performanceModalUser.name}`}
+          subtitle={`${performanceModalUser.role} (Level ${performanceModalUser.securityLevel || 80}) · Store Scope: ${performanceModalUser.store}`}
+          size="lg"
+        >
+          {(() => {
+            const perf = getUserPerformance(performanceModalUser);
+            return (
+              <div className="space-y-5 py-2">
+                {/* Performance Metric Cards */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="card p-3.5 bg-muted/30 border border-border">
+                    <p className="text-2xs font-semibold text-muted-foreground uppercase">
+                      Sales Revenue
+                    </p>
+                    <p className="text-lg font-bold text-foreground font-tabular mt-1">
+                      ₹{perf.revenue.toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-3xs text-muted-foreground mt-0.5">
+                      {perf.salesCount} total transactions
+                    </p>
+                  </div>
 
-        {/* Non-Super-Admin User Access & Permissions Matrix Modal */}
-        {permissionsModalUser && permissionsModalUser.role !== 'Super Admin' && (
-          <Modal
-            open={!!permissionsModalUser}
-            onClose={() => setPermissionsModalUser(null)}
-            title={`User Access & Permissions — ${permissionsModalUser.name}`}
-            subtitle={`${permissionsModalUser.email} · Role: ${permissionsModalUser.role} (Level ${permissionsModalUser.securityLevel || 80})`}
-            size="lg"
-          >
-            <div className="space-y-5 py-2">
-              {/* Store Access ON/OFF Switches */}
-              <div className="card p-4 bg-muted/30 border border-border space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-foreground">
-                    AUTHORIZED STORE SCOPE ACCESS
-                  </span>
-                  <span className="text-2xs text-muted-foreground">
-                    Toggle store outlets accessible by this user
-                  </span>
+                  <div className="card p-3.5 bg-muted/30 border border-border">
+                    <p className="text-2xs font-semibold text-muted-foreground uppercase">
+                      Avg Order Value (AOV)
+                    </p>
+                    <p className="text-lg font-bold text-foreground font-tabular mt-1">
+                      ₹{Math.round(perf.aov).toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-3xs text-muted-foreground mt-0.5">Per order metric</p>
+                  </div>
+
+                  <div className="card p-3.5 bg-muted/30 border border-border">
+                    <p className="text-2xs font-semibold text-muted-foreground uppercase">
+                      Activity Log Count
+                    </p>
+                    <p className="text-lg font-bold text-foreground font-tabular mt-1">
+                      {perf.auditCount}
+                    </p>
+                    <p className="text-3xs text-muted-foreground mt-0.5">Verified server actions</p>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-4 flex-wrap pt-1">
-                  {storesList.map((stHub) => {
-                    const allowedStores = permissionsModalUser.allowedStores || [
-                      permissionsModalUser.store,
-                    ];
-                    const isStoreOn =
-                      permissionsModalUser.store === 'All Stores' ||
-                      allowedStores.includes(stHub.code);
-
-                    return (
-                      <div
-                        key={`st-toggle-${stHub.code}`}
-                        className="flex items-center justify-between gap-3 bg-card px-3.5 py-2 rounded-xl border border-border min-w-[150px]"
-                      >
-                        <div>
-                          <span className="text-xs font-bold text-foreground font-mono">
-                            {stHub.code}
-                          </span>
-                          <span className="text-3xs text-muted-foreground block">{stHub.city}</span>
-                        </div>
-
-                        {/* Prominent Store ON / OFF Toggle Switch */}
-                        <ToggleSwitch
-                          checked={isStoreOn}
-                          onChange={() =>
-                            toggleUserStoreAccess(permissionsModalUser.id, stHub.code)
-                          }
-                          size="sm"
-                          onText="ON"
-                          offText="OFF"
-                          title={`Toggle access for store ${stHub.code}`}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Quick Bulk Action Buttons */}
-              <div className="flex items-center justify-between gap-2 flex-wrap bg-primary/5 p-3 rounded-xl border border-primary/20">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                  <Icon name="AdjustmentsHorizontalIcon" size={16} className="text-primary" />
-                  <span>Quick Permission Toggles (Safe Actions Only)</span>
+                {/* Operations Summary */}
+                <div className="card p-4 border border-border space-y-3">
+                  <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                    Store Operations Handled
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="flex justify-between py-1.5 border-b border-border">
+                      <span className="text-muted-foreground">Purchase Orders (POs):</span>
+                      <span className="font-bold text-foreground">{perf.purchasesCount}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-border">
+                      <span className="text-muted-foreground">Operating Expenses:</span>
+                      <span className="font-bold text-foreground">{perf.expensesCount}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex justify-end pt-2 border-t border-border">
                   <button
-                    type="button"
-                    onClick={() => {
-                      PERMISSION_CATALOGUE.forEach((perm) => {
-                        if (!perm.isProtected) {
-                          setUserPermissionOverride(permissionsModalUser.id, perm.code, 'ALLOW');
-                        }
-                      });
-                      toast.success(
-                        `Enabled all non-protected permissions for ${permissionsModalUser.name}`
-                      );
-                    }}
-                    className="btn-secondary text-3xs font-bold text-success border-success/30 hover:bg-success/10 py-1"
+                    onClick={() => setPerformanceModalUser(null)}
+                    className="btn-primary text-xs"
                   >
-                    Enable All Allowed Permissions
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      PERMISSION_CATALOGUE.forEach((perm) => {
-                        if (!perm.isProtected) {
-                          setUserPermissionOverride(permissionsModalUser.id, perm.code, 'RESET');
-                        }
-                      });
-                      toast.info(
-                        `Reset custom permission overrides for ${permissionsModalUser.name}`
-                      );
-                    }}
-                    className="btn-secondary text-3xs font-bold text-muted-foreground py-1"
-                  >
-                    Disable All Optional Overrides
+                    Close Performance View
                   </button>
                 </div>
               </div>
+            );
+          })()}
+        </Modal>
+      )}
 
-              {/* Expandable Module Permission Groups */}
-              <div className="max-h-96 overflow-y-auto scrollbar-thin space-y-3">
-                {Object.entries(categoriesList).map(([category, perms]) => {
-                  const isCollapsed = collapsedCategories[category];
-
-                  // Page View Permission Code
-                  const pageViewPerm = perms.find((p) => p.code.endsWith('.view'));
-                  const pageViewState = pageViewPerm
-                    ? RBACEngine.getPermissionState(
-                        {
-                          id: permissionsModalUser.id,
-                          name: permissionsModalUser.name,
-                          email: permissionsModalUser.email,
-                          role: permissionsModalUser.role,
-                          securityLevel:
-                            (permissionsModalUser.securityLevel as any) ||
-                            (permissionsModalUser.role === 'Super Admin' ? 100 : 80),
-                          storeScope: permissionsModalUser.store,
-                          status: permissionsModalUser.status,
-                          permissions: permissionsModalUser.permissions || [],
-                          overrides: permissionsModalUser.overrides || [],
-                        },
-                        pageViewPerm.code
-                      )
-                    : 'Denied';
-
-                  const isPageOn = pageViewState === 'Allowed' || pageViewState === 'Custom Allow';
-
-                  return (
-                    <div
-                      key={`cat-sec-${category}`}
-                      className="border border-border rounded-xl overflow-hidden bg-card"
-                    >
-                      {/* Module Header with Page ON/OFF Switch */}
-                      <div
-                        className="p-3 bg-muted/40 flex items-center justify-between gap-3 cursor-pointer select-none"
-                        onClick={() => toggleCategoryCollapse(category)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="text-muted-foreground hover:text-foreground"
-                          >
-                            <Icon
-                              name={isCollapsed ? 'ChevronRightIcon' : 'ChevronDownIcon'}
-                              size={16}
-                            />
-                          </button>
-                          <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
-                            {category} MODULE
-                          </h4>
-                          <span className="text-3xs text-muted-foreground">
-                            ({perms.length} actions)
-                          </span>
-                        </div>
-
-                        <div
-                          className="flex items-center gap-2.5"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <span className="text-2xs font-semibold text-muted-foreground hidden sm:inline">
-                            {category} Access:
-                          </span>
-                          {pageViewPerm && !pageViewPerm.isProtected ? (
-                            <ToggleSwitch
-                              checked={isPageOn}
-                              onChange={() =>
-                                setUserPermissionOverride(
-                                  permissionsModalUser.id,
-                                  pageViewPerm.code,
-                                  isPageOn ? 'DENY' : 'ALLOW'
-                                )
-                              }
-                              size="sm"
-                              onText="ON"
-                              offText="OFF"
-                              title={`Toggle entire ${category} module access`}
-                            />
-                          ) : (
-                            <span
-                              className={`text-3xs font-bold px-2 py-0.5 rounded-full ${isPageOn ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}
-                            >
-                              {isPageOn ? 'ON' : 'OFF'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Action Toggles Inside Category */}
-                      {!isCollapsed && (
-                        <div className="p-3 divide-y divide-border space-y-2">
-                          {perms.map((perm) => {
-                            const permState = RBACEngine.getPermissionState(
-                              {
-                                id: permissionsModalUser.id,
-                                name: permissionsModalUser.name,
-                                email: permissionsModalUser.email,
-                                role: permissionsModalUser.role,
-                                securityLevel:
-                                  (permissionsModalUser.securityLevel as any) ||
-                                  (permissionsModalUser.role === 'Super Admin' ? 100 : 80),
-                                storeScope: permissionsModalUser.store,
-                                status: permissionsModalUser.status,
-                                permissions: permissionsModalUser.permissions || [],
-                                overrides: permissionsModalUser.overrides || [],
-                              },
-                              perm.code
-                            );
-
-                            const isActionOn =
-                              permState === 'Allowed' || permState === 'Custom Allow';
-
-                            return (
-                              <div
-                                key={`perm-item-${perm.code}`}
-                                className="pt-2 flex items-center justify-between gap-4"
-                              >
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-semibold text-foreground">
-                                      {perm.name}
-                                    </span>
-                                    <span className="text-3xs font-mono text-muted-foreground">
-                                      ({perm.code})
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  {perm.isProtected &&
-                                  (permissionsModalUser.securityLevel || 80) < 100 ? (
-                                    <span className="badge-danger text-3xs flex items-center gap-1 font-bold">
-                                      <Icon name="LockClosedIcon" size={11} /> 🔒 Super Admin Only
-                                    </span>
-                                  ) : (
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className={`text-3xs font-bold px-1.5 py-0.5 rounded ${
-                                          permState === 'Custom Allow'
-                                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
-                                            : permState === 'Custom Deny'
-                                              ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
-                                              : 'text-muted-foreground'
-                                        }`}
-                                      >
-                                        {permState}
-                                      </span>
-                                      {/* Prominent ON / OFF Clickable Toggle Switch */}
-                                      <ToggleSwitch
-                                        checked={isActionOn}
-                                        onChange={() =>
-                                          setUserPermissionOverride(
-                                            permissionsModalUser.id,
-                                            perm.code,
-                                            isActionOn ? 'DENY' : 'ALLOW'
-                                          )
-                                        }
-                                        size="sm"
-                                        onText="ON"
-                                        offText="OFF"
-                                        title={`Toggle ${perm.name} (${perm.code})`}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex justify-end pt-2 border-t border-border">
-                <button
-                  onClick={() => setPermissionsModalUser(null)}
-                  className="btn-primary text-xs"
-                >
-                  Save Access Settings
-                </button>
-              </div>
+      {/* Delete User Confirmation Modal */}
+      {deleteConfirmModal && (
+        <Modal
+          open={!!deleteConfirmModal}
+          onClose={() => setDeleteConfirmModal(null)}
+          title="Delete User Account"
+          subtitle={`Are you sure you want to remove ${deleteConfirmModal.name}?`}
+          size="sm"
+        >
+          <div className="space-y-4 py-2">
+            <p className="text-xs text-muted-foreground">
+              If this account has historical sales, inventory adjustments, or audit log entries
+              associated with it, consider setting status to{' '}
+              <span className="font-bold text-danger">SUSPENDED</span> instead of deleting.
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <button onClick={() => setDeleteConfirmModal(null)} className="btn-secondary text-xs">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteUserAccount(deleteConfirmModal.id);
+                  setDeleteConfirmModal(null);
+                }}
+                className="btn-danger text-xs"
+              >
+                Delete Account
+              </button>
             </div>
-          </Modal>
-        )}
-
-        {/* User Activity & Real Performance Drawer / Modal */}
-        {performanceModalUser && (
-          <Modal
-            open={!!performanceModalUser}
-            onClose={() => setPerformanceModalUser(null)}
-            title={`Real Performance Analytics — ${performanceModalUser.name}`}
-            subtitle={`${performanceModalUser.role} (Level ${performanceModalUser.securityLevel || 80}) · Store Scope: ${performanceModalUser.store}`}
-            size="lg"
-          >
-            {(() => {
-              const perf = getUserPerformance(performanceModalUser);
-              return (
-                <div className="space-y-5 py-2">
-                  {/* Performance Metric Cards */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="card p-3.5 bg-muted/30 border border-border">
-                      <p className="text-2xs font-semibold text-muted-foreground uppercase">
-                        Sales Revenue
-                      </p>
-                      <p className="text-lg font-bold text-foreground font-tabular mt-1">
-                        ₹{perf.revenue.toLocaleString('en-IN')}
-                      </p>
-                      <p className="text-3xs text-muted-foreground mt-0.5">
-                        {perf.salesCount} total transactions
-                      </p>
-                    </div>
-
-                    <div className="card p-3.5 bg-muted/30 border border-border">
-                      <p className="text-2xs font-semibold text-muted-foreground uppercase">
-                        Avg Order Value (AOV)
-                      </p>
-                      <p className="text-lg font-bold text-foreground font-tabular mt-1">
-                        ₹{Math.round(perf.aov).toLocaleString('en-IN')}
-                      </p>
-                      <p className="text-3xs text-muted-foreground mt-0.5">Per order metric</p>
-                    </div>
-
-                    <div className="card p-3.5 bg-muted/30 border border-border">
-                      <p className="text-2xs font-semibold text-muted-foreground uppercase">
-                        Activity Log Count
-                      </p>
-                      <p className="text-lg font-bold text-foreground font-tabular mt-1">
-                        {perf.auditCount}
-                      </p>
-                      <p className="text-3xs text-muted-foreground mt-0.5">
-                        Verified server actions
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Operations Summary */}
-                  <div className="card p-4 border border-border space-y-3">
-                    <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
-                      Store Operations Handled
-                    </h4>
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div className="flex justify-between py-1.5 border-b border-border">
-                        <span className="text-muted-foreground">Purchase Orders (POs):</span>
-                        <span className="font-bold text-foreground">{perf.purchasesCount}</span>
-                      </div>
-                      <div className="flex justify-between py-1.5 border-b border-border">
-                        <span className="text-muted-foreground">Operating Expenses:</span>
-                        <span className="font-bold text-foreground">{perf.expensesCount}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-2 border-t border-border">
-                    <button
-                      onClick={() => setPerformanceModalUser(null)}
-                      className="btn-primary text-xs"
-                    >
-                      Close Performance View
-                    </button>
-                  </div>
-                </div>
-              );
-            })()}
-          </Modal>
-        )}
-
-        {/* Delete User Confirmation Modal */}
-        {deleteConfirmModal && (
-          <Modal
-            open={!!deleteConfirmModal}
-            onClose={() => setDeleteConfirmModal(null)}
-            title="Delete User Account"
-            subtitle={`Are you sure you want to remove ${deleteConfirmModal.name}?`}
-            size="sm"
-          >
-            <div className="space-y-4 py-2">
-              <p className="text-xs text-muted-foreground">
-                If this account has historical sales, inventory adjustments, or audit log entries
-                associated with it, consider setting status to{' '}
-                <span className="font-bold text-danger">SUSPENDED</span> instead of deleting.
-              </p>
-              <div className="flex justify-end gap-2 pt-2 border-t border-border">
-                <button
-                  onClick={() => setDeleteConfirmModal(null)}
-                  className="btn-secondary text-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    deleteUserAccount(deleteConfirmModal.id);
-                    setDeleteConfirmModal(null);
-                  }}
-                  className="btn-danger text-xs"
-                >
-                  Delete Account
-                </button>
-              </div>
-            </div>
-          </Modal>
-        )}
-      </AppLayout>
-    </SuperAdminGuard>
+          </div>
+        </Modal>
+      )}
+    </AppLayout>
   );
 }

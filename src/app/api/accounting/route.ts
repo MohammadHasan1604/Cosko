@@ -20,17 +20,31 @@ export async function GET(req: NextRequest) {
     }
     const user = auth.user;
 
+    // Strict RBAC: Sales Manager has no access to financial accounting records
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient security level for financial accounting.' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
-    const requestedStore = searchParams.get('store') || 'All Stores';
+    const rawStore = searchParams.get('store');
     const period = searchParams.get('period') || 'This Month';
     const startDateParam = searchParams.get('startDate');
     const endDateParam = searchParams.get('endDate');
-    const view = searchParams.get('view') || 'all';
+    const rawView = searchParams.get('view');
 
     // Store isolation check: Super Admin Only for cross-store or consolidated accounting
-    let effectiveStore: string = requestedStore;
-    if (user.role !== 'Super Admin') {
-      if (requestedStore && requestedStore !== 'All Stores' && requestedStore !== user.store) {
+    let effectiveStore: string;
+    let effectiveView: string;
+
+    if (user.role === 'Super Admin') {
+      effectiveStore = rawStore || 'All Stores';
+      effectiveView = rawView || 'all';
+    } else {
+      // Non-Super-Admin (Store Manager)
+      if (rawStore && rawStore !== 'All Stores' && rawStore !== user.store) {
         return NextResponse.json(
           {
             error:
@@ -39,7 +53,7 @@ export async function GET(req: NextRequest) {
           { status: 403 }
         );
       }
-      if (requestedStore === 'All Stores' || view === 'consolidated' || view === 'central') {
+      if (rawStore === 'All Stores' || rawView === 'consolidated' || rawView === 'central') {
         return NextResponse.json(
           {
             error:
@@ -49,6 +63,7 @@ export async function GET(req: NextRequest) {
         );
       }
       effectiveStore = user.store;
+      effectiveView = 'store';
     }
 
     // Determine date boundary
@@ -78,11 +93,11 @@ export async function GET(req: NextRequest) {
     // Parallel fetch required statements (non-Super Admin never gets consolidated or central statements)
     const isSuperAdmin = user.role === 'Super Admin';
     const [consolidated, storePnL, centralPnL] = await Promise.all([
-      isSuperAdmin && (view === 'all' || view === 'consolidated')
+      isSuperAdmin && (effectiveView === 'all' || effectiveView === 'consolidated')
         ? getConsolidatedPnL(filter)
         : null,
-      view === 'all' || view === 'store' ? getStoreOperationalPnL(filter) : null,
-      isSuperAdmin && (view === 'all' || view === 'central')
+      effectiveView === 'all' || effectiveView === 'store' ? getStoreOperationalPnL(filter) : null,
+      isSuperAdmin && (effectiveView === 'all' || effectiveView === 'central')
         ? getCentralTransferPnL({ startDate, endDate })
         : null,
     ]);

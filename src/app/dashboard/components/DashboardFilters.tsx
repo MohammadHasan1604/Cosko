@@ -150,107 +150,93 @@ export default function DashboardFilters() {
 
       {/* ─── Desktop: Inline filter controls ─── */}
       <div className="hidden md:flex items-center gap-2">
-        {/* Store selector */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              setStoreOpen((v) => !v);
-              setRangeOpen(false);
-            }}
-            className="h-8 inline-flex items-center gap-1.5 px-2.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground hover:border-slate-300 transition-all shadow-2xs"
-          >
-            <Icon name="MapPinIcon" size={13} className="text-primary flex-shrink-0" />
-            <span className="max-w-[160px] truncate">
-              {selectedStore === 'All Stores' ? 'All Stores' : selectedStore}
-            </span>
-            <Icon
-              name="ChevronDownIcon"
-              size={12}
-              className="text-muted-foreground flex-shrink-0"
-            />
-          </button>
-          {storeOpen && (
-            <div className="absolute right-0 top-full mt-1 w-64 bg-card border border-border rounded-xl shadow-dropdown z-30 py-1.5 fade-in">
-              <div className="px-2.5 pb-1 pt-0.5">
-                <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                  Reporting Scope
-                </span>
-                <button
-                  onClick={() => handleSelectStore('All Stores')}
-                  disabled={currentUser.role !== 'Super Admin'}
-                  className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center justify-between ${
-                    currentUser.role !== 'Super Admin'
-                      ? 'text-muted-foreground/50 opacity-60 cursor-not-allowed'
-                      : selectedStore === 'All Stores'
+        {/* Store selector — Super Admin only gets multi-store switcher */}
+        {currentUser.role === 'Super Admin' ? (
+          <div className="relative">
+            <button
+              onClick={() => {
+                setStoreOpen((v) => !v);
+                setRangeOpen(false);
+              }}
+              className="h-8 inline-flex items-center gap-1.5 px-2.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground hover:border-slate-300 transition-all shadow-2xs"
+            >
+              <Icon name="MapPinIcon" size={13} className="text-primary flex-shrink-0" />
+              <span className="max-w-[160px] truncate">
+                {selectedStore === 'All Stores' ? 'All Stores' : selectedStore}
+              </span>
+              <Icon
+                name="ChevronDownIcon"
+                size={12}
+                className="text-muted-foreground flex-shrink-0"
+              />
+            </button>
+            {storeOpen && (
+              <div className="absolute right-0 top-full mt-1 w-64 bg-card border border-border rounded-xl shadow-dropdown z-30 py-1.5 fade-in">
+                <div className="px-2.5 pb-1 pt-0.5">
+                  <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                    Reporting Scope
+                  </span>
+                  <button
+                    onClick={() => handleSelectStore('All Stores')}
+                    className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center justify-between ${
+                      selectedStore === 'All Stores'
                         ? 'bg-primary/8 text-primary font-bold'
                         : 'text-foreground hover:bg-muted font-medium'
-                  }`}
-                >
-                  <div>
-                    <span className="block font-semibold">All Stores (Consolidated)</span>
-                    <span className="text-3xs text-muted-foreground">Aggregated reporting</span>
-                  </div>
-                  {currentUser.role !== 'Super Admin' ? (
-                    <Icon
-                      name="LockClosedIcon"
-                      size={12}
-                      className="text-muted-foreground flex-shrink-0"
-                    />
-                  ) : selectedStore === 'All Stores' ? (
-                    <Icon name="CheckIcon" size={13} className="text-primary flex-shrink-0" />
-                  ) : null}
-                </button>
-              </div>
+                    }`}
+                  >
+                    <div>
+                      <span className="block font-semibold">All Stores (Consolidated)</span>
+                      <span className="text-3xs text-muted-foreground">Aggregated reporting</span>
+                    </div>
+                    {selectedStore === 'All Stores' ? (
+                      <Icon name="CheckIcon" size={13} className="text-primary flex-shrink-0" />
+                    ) : null}
+                  </button>
+                </div>
 
-              <div className="my-1 border-t border-border/60" />
+                <div className="my-1 border-t border-border/60" />
 
-              <div className="px-2.5 pt-0.5">
-                <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                  Store Locations
-                </span>
-                <div className="space-y-0.5 max-h-48 overflow-y-auto scrollbar-thin">
-                  {sortedStores.map((st) => {
-                    const assignedStore =
-                      currentUser.store && currentUser.store !== 'All Stores'
-                        ? currentUser.store
-                        : 'CENTRAL';
-                    const isLocked =
-                      currentUser.role !== 'Super Admin' && st.code !== assignedStore;
-                    const isSelected = selectedStore === st.code;
-
-                    return (
-                      <button
-                        key={`store-${st.code}`}
-                        onClick={() => handleSelectStore(st.code)}
-                        disabled={isLocked}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${
-                          isLocked
-                            ? 'text-muted-foreground/50 opacity-60 cursor-not-allowed'
-                            : isSelected
+                <div className="px-2.5 pt-0.5">
+                  <span className="text-3xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                    Store Locations
+                  </span>
+                  <div className="space-y-0.5 max-h-48 overflow-y-auto scrollbar-thin">
+                    {sortedStores.map((st) => {
+                      const isSelected = selectedStore === st.code;
+                      return (
+                        <button
+                          key={`store-${st.code}`}
+                          onClick={() => handleSelectStore(st.code)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${
+                            isSelected
                               ? 'bg-primary/8 text-primary font-bold'
                               : 'text-foreground hover:bg-muted font-medium'
-                        }`}
-                      >
-                        <span className="truncate">
-                          {st.code} — {st.name}
-                        </span>
-                        {isLocked ? (
-                          <Icon
-                            name="LockClosedIcon"
-                            size={12}
-                            className="text-muted-foreground flex-shrink-0"
-                          />
-                        ) : isSelected ? (
-                          <Icon name="CheckIcon" size={13} className="text-primary flex-shrink-0" />
-                        ) : null}
-                      </button>
-                    );
-                  })}
+                          }`}
+                        >
+                          <span className="truncate">
+                            {st.code} — {st.name}
+                          </span>
+                          {isSelected ? (
+                            <Icon
+                              name="CheckIcon"
+                              size={13}
+                              className="text-primary flex-shrink-0"
+                            />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        ) : (
+          <div className="h-8 inline-flex items-center gap-1.5 px-2.5 rounded-lg border border-border bg-card text-xs font-semibold text-foreground">
+            <Icon name="MapPinIcon" size={13} className="text-primary flex-shrink-0" />
+            <span>{currentUser.store || 'BLR'}</span>
+          </div>
+        )}
 
         {/* Date range selector */}
         <div className="relative">
@@ -315,60 +301,48 @@ export default function DashboardFilters() {
         }
       >
         <div className="space-y-5">
-          {/* Store scope */}
-          <div>
-            <label className="label-text">Store Scope</label>
-            <div className="space-y-1">
-              <button
-                onClick={() => {
-                  handleSelectStore('All Stores');
-                }}
-                disabled={currentUser.role !== 'Super Admin'}
-                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between border ${
-                  currentUser.role !== 'Super Admin'
-                    ? 'text-muted-foreground opacity-50 cursor-not-allowed border-border/40'
-                    : selectedStore === 'All Stores'
+          {/* Store scope — Super Admin only */}
+          {currentUser.role === 'Super Admin' && (
+            <div>
+              <label className="label-text">Store Scope</label>
+              <div className="space-y-1">
+                <button
+                  onClick={() => {
+                    handleSelectStore('All Stores');
+                  }}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between border ${
+                    selectedStore === 'All Stores'
                       ? 'bg-primary/8 text-primary font-semibold border-primary/20'
                       : 'text-foreground border-border/60 active:bg-muted'
-                }`}
-              >
-                <span>All Stores (Consolidated)</span>
-                {selectedStore === 'All Stores' && (
-                  <Icon name="CheckIcon" size={16} className="text-primary" />
-                )}
-              </button>
-              {sortedStores.map((st) => {
-                const assignedStore =
-                  currentUser.store && currentUser.store !== 'All Stores'
-                    ? currentUser.store
-                    : 'CENTRAL';
-                const isLocked = currentUser.role !== 'Super Admin' && st.code !== assignedStore;
-                const isSelected = selectedStore === st.code;
-                return (
-                  <button
-                    key={`mstore-${st.code}`}
-                    onClick={() => handleSelectStore(st.code)}
-                    disabled={isLocked}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between border ${
-                      isLocked
-                        ? 'text-muted-foreground opacity-50 cursor-not-allowed border-border/40'
-                        : isSelected
+                  }`}
+                >
+                  <span>All Stores (Consolidated)</span>
+                  {selectedStore === 'All Stores' && (
+                    <Icon name="CheckIcon" size={16} className="text-primary" />
+                  )}
+                </button>
+                {sortedStores.map((st) => {
+                  const isSelected = selectedStore === st.code;
+                  return (
+                    <button
+                      key={`mstore-${st.code}`}
+                      onClick={() => handleSelectStore(st.code)}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between border ${
+                        isSelected
                           ? 'bg-primary/8 text-primary font-semibold border-primary/20'
                           : 'text-foreground border-border/60 active:bg-muted'
-                    }`}
-                  >
-                    <span>
-                      {st.code} — {st.name}
-                    </span>
-                    {isSelected && <Icon name="CheckIcon" size={16} className="text-primary" />}
-                    {isLocked && (
-                      <Icon name="LockClosedIcon" size={14} className="text-muted-foreground" />
-                    )}
-                  </button>
-                );
-              })}
+                      }`}
+                    >
+                      <span>
+                        {st.code} — {st.name}
+                      </span>
+                      {isSelected && <Icon name="CheckIcon" size={16} className="text-primary" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Date range */}
           <div>

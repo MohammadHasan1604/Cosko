@@ -17,41 +17,12 @@ import CoskoLogo from '@/components/ui/CoskoLogo';
 import GlobalConfirmationModal from '@/components/ui/GlobalConfirmationModal';
 import ActivityTracker from './ActivityTracker';
 import { useApp } from '@/context/AppContext';
+import { isRouteAllowed } from '@/lib/rbacEngine';
 
 interface AppLayoutProps {
   children: React.ReactNode;
   activeRoute?: string;
 }
-
-const superAdminOnly = ['Super Admin'];
-const managerRoles = ['Super Admin', 'Store Manager'];
-const allRoles = ['Super Admin', 'Store Manager', 'Sales Manager'];
-
-const routePermissions: Record<string, string[]> = {
-  '/dashboard': managerRoles,
-  '/sales': allRoles,
-  '/inventory-management': allRoles,
-  '/categories': managerRoles,
-  '/purchases': managerRoles,
-  '/customers': allRoles,
-  '/customers/existing': allRoles,
-  '/customers/360': allRoles,
-  '/vendors': managerRoles,
-  '/expenses': managerRoles,
-  '/accounting': managerRoles,
-  '/central-profit': superAdminOnly,
-  '/reports': managerRoles,
-  '/employees': managerRoles,
-  '/stores': superAdminOnly,
-  '/users': superAdminOnly,
-  '/work-activity': managerRoles,
-  '/audit-logs': superAdminOnly,
-  '/settings': superAdminOnly,
-  '/settings/data-connections': superAdminOnly,
-  '/stock-transfers': superAdminOnly,
-  '/delete-requests': superAdminOnly,
-  '/attendance': allRoles,
-};
 
 export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
   const router = useRouter();
@@ -122,12 +93,8 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
     );
   }
 
-  // Route Permission Check
-  const allowedRoles = activeRoute ? routePermissions[activeRoute] : undefined;
-  const isAuthorized =
-    currentUser.role === 'Super Admin' ||
-    !allowedRoles ||
-    (currentUser.role && allowedRoles.includes(currentUser.role));
+  // Route Permission Check — Canonical RBAC Engine is authoritative
+  const isAuthorized = activeRoute ? isRouteAllowed(activeRoute, currentUser.role) : true;
 
   return (
     <div className="flex h-[100dvh] bg-background overflow-hidden">

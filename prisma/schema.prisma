@@ -396,7 +396,7 @@ model Vendor {
   paymentTerms  String   @default("Net 30") @map("payment_terms") @db.VarChar(32)
   leadTimeDays  Int?     @map("lead_time_days")
   rating        Decimal? @db.Decimal(3, 1)
-  storeCode     String?  @map("store_code") @db.VarChar(16)
+  storeCode     String   @map("store_code") @db.VarChar(16)
   status        String   @default("Active") @db.VarChar(16)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")

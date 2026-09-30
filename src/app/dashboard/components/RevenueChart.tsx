@@ -54,7 +54,8 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 };
 
 export default function RevenueChart() {
-  const { sales, selectedStore, datePeriod, customDateRange } = useApp();
+  const { sales, selectedStore, datePeriod, customDateRange, currentUser } = useApp();
+  const isSalesManager = currentUser.role === 'Sales Manager';
 
   const matchStore = (storeCode?: string) =>
     selectedStore === 'All Stores' || storeCode === selectedStore;
@@ -138,16 +139,18 @@ export default function RevenueChart() {
           dot={{ r: 3, fill: 'var(--primary)' }}
           activeDot={{ r: 5, strokeWidth: 0 }}
         />
-        <Area
-          type="monotone"
-          dataKey="profit"
-          name="Gross Profit"
-          stroke="var(--positive)"
-          strokeWidth={2}
-          fill="url(#gradProfit)"
-          dot={{ r: 3, fill: 'var(--positive)' }}
-          activeDot={{ r: 5, strokeWidth: 0 }}
-        />
+        {!isSalesManager && (
+          <Area
+            type="monotone"
+            dataKey="profit"
+            name="Gross Profit"
+            stroke="var(--positive)"
+            strokeWidth={2}
+            fill="url(#gradProfit)"
+            dot={{ r: 3, fill: 'var(--positive)' }}
+            activeDot={{ r: 5, strokeWidth: 0 }}
+          />
+        )}
       </AreaChart>
     </ResponsiveContainer>
   );

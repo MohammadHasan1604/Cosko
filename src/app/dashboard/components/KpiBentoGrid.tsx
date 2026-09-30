@@ -19,7 +19,11 @@ export default function KpiBentoGrid() {
     selectedStore,
     datePeriod,
     customDateRange,
+    currentUser,
   } = useApp();
+
+  const isSuperAdmin = currentUser.role === 'Super Admin';
+  const isSalesManager = currentUser.role === 'Sales Manager';
 
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
 
@@ -299,27 +303,52 @@ export default function KpiBentoGrid() {
     },
   ];
 
+  const visibleKpiCards = useMemo(() => {
+    return kpiCards.filter((card) => {
+      if (card.id === 'kpi-stores') return isSuperAdmin;
+      if (
+        isSalesManager &&
+        (card.id === 'kpi-gross-profit' ||
+          card.id === 'kpi-net-profit' ||
+          card.id === 'kpi-expenses' ||
+          card.id === 'kpi-payables')
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [kpiCards, isSuperAdmin, isSalesManager]);
+
   return (
     <>
       {/* Hero KPI - full width on mobile */}
-      <div className="mb-3 md:mb-4">
-        <KpiCard {...kpiCards[0]} />
-      </div>
+      {visibleKpiCards.length > 0 && (
+        <div className="mb-3 md:mb-4">
+          <KpiCard {...visibleKpiCards[0]} />
+        </div>
+      )}
 
-      {/* Secondary KPIs - 2-col mobile, 4-col desktop */}
+      {/* Secondary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-        {kpiCards.slice(1).map((kpi) => (
-          <KpiCard key={kpi.id} {...kpi} />
-        ))}
+        {visibleKpiCards
+          .slice(1)
+          .filter((kpi) => kpi.id !== 'kpi-stores')
+          .map((kpi) => (
+            <KpiCard key={kpi.id} {...kpi} />
+          ))}
       </div>
 
-      {/* Stores KPI (8th card) */}
-      <div className="mt-3 md:mt-4">
-        <KpiCard {...kpiCards[kpiCards.length - 1]} />
-      </div>
+      {/* Stores KPI (Super Admin only) */}
+      {isSuperAdmin && (
+        <div className="mt-3 md:mt-4">
+          <KpiCard {...kpiCards[kpiCards.length - 1]} />
+        </div>
+      )}
 
-      {/* Vendor Payables Drill-Down Modal */}
-      <PendingVendorBillsModal open={vendorModalOpen} onClose={() => setVendorModalOpen(false)} />
+      {/* Vendor Payables Drill-Down Modal (Only accessible if not Sales Manager) */}
+      {!isSalesManager && (
+        <PendingVendorBillsModal open={vendorModalOpen} onClose={() => setVendorModalOpen(false)} />
+      )}
     </>
   );
 }

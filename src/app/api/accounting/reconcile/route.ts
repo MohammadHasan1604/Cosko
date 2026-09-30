@@ -14,6 +14,14 @@ export async function GET(req: NextRequest) {
     }
     const user = auth.user;
 
+    // Root financial reconciliation across all transactions is SUPER ADMIN ONLY
+    if (user.role !== 'Super Admin' || user.securityLevel < 100) {
+      return NextResponse.json(
+        { error: 'Forbidden: Root reconciliation is restricted to Super Admin only.' },
+        { status: 403 }
+      );
+    }
+
     const audit = await runRootFinancialReconciliation();
     return NextResponse.json(
       {

@@ -41,6 +41,14 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Strict RBAC: Sales Manager has no access to user management
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
+      return NextResponse.json(
+        { error: 'Forbidden: Sales Managers do not have permission to view or manage users' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const includeInactive = searchParams.get('includeInactive') === 'true';
 
@@ -49,13 +57,10 @@ export async function GET(req: NextRequest) {
       whereClause.status = { notIn: ['Inactive', 'Suspended'] };
     }
 
-    if (user.role !== 'Super Admin') {
-      const userAllowed = user.allowedStores.length > 0 ? user.allowedStores : [user.store];
-      whereClause.OR = [
-        { storeScope: { in: userAllowed } },
-        { storeAssignments: { some: { storeCode: { in: userAllowed } } } },
-      ];
-      whereClause.role = { not: 'Super Admin' };
+    if (user.role === 'Store Manager') {
+      // Store Manager can ONLY view Sales Manager accounts belonging to their own store
+      whereClause.role = 'Sales Manager';
+      whereClause.storeScope = user.store;
     }
 
     const users = await prisma.userAccount.findMany({
@@ -68,25 +73,30 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const safeUsers = users.map((u: any) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      securityLevel: u.securityLevel,
-      store:
-        u.storeScope ||
-        u.storeAssignments?.[0]?.storeCode ||
-        (u.role === 'Super Admin' ? 'All Stores' : 'CENTRAL'),
-      status: u.status,
-      assignedStores: u.storeAssignments?.map((a: any) => a.storeCode) || [],
-      allowedStores: u.storeAssignments?.map((a: any) => a.storeCode) || [
-        u.storeScope || 'CENTRAL',
-      ],
-      avatarUrl: u.avatarUrl,
-      createdAt: u.createdAt,
-      lastLoginAt: u.lastLogin,
-    }));
+    const safeUsers = users.map((u: any) => {
+      const singleStore = u.storeScope || u.storeAssignments?.[0]?.storeCode || 'BLR';
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        securityLevel: u.securityLevel,
+        store: u.role === 'Super Admin' ? 'All Stores' : singleStore,
+        storeScope: u.role === 'Super Admin' ? 'All Stores' : singleStore,
+        status: u.status,
+        assignedStores:
+          u.role === 'Super Admin'
+            ? u.storeAssignments?.map((a: any) => a.storeCode) || []
+            : [singleStore],
+        allowedStores:
+          u.role === 'Super Admin'
+            ? u.storeAssignments?.map((a: any) => a.storeCode) || ['CENTRAL']
+            : [singleStore],
+        avatarUrl: u.avatarUrl,
+        createdAt: u.createdAt,
+        lastLoginAt: u.lastLogin,
+      };
+    });
 
     return NextResponse.json(
       { success: true, users: safeUsers },
@@ -242,14 +252,17 @@ export async function POST(req: NextRequest) {
 
       const validHubs = await prisma.storeHub.findMany({ select: { code: true } });
       const validCodes = new Set(validHubs.map((s) => s.code));
-      targetAssignedStores = rawStores.filter((c: string) => validCodes.has(c));
+      const filtered = rawStores.filter((c: string) => validCodes.has(c));
 
-      if (targetAssignedStores.length === 0) {
+      if (filtered.length === 0) {
         return NextResponse.json(
           { success: false, error: 'User must be assigned to at least one valid store' },
           { status: 400 }
         );
       }
+
+      // Non-Super-Admin accounts must have EXACTLY ONE operational store assignment
+      targetAssignedStores = [filtered[0]];
     }
 
     // 🔒 Check protected permission overrides
@@ -443,6 +456,28 @@ export async function PUT(req: NextRequest) {
           { status: 403 }
         );
       }
+      // Store Manager can ONLY manage Sales Manager accounts belonging to their own store
+      if (authUser.role === 'Store Manager') {
+        if (targetUser.role !== 'Sales Manager' || targetUser.storeScope !== authUser.store) {
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                'Forbidden: Store Manager can only manage Sales Manager accounts belonging to their own store.',
+            },
+            { status: 403 }
+          );
+        }
+        if (requestedRole && requestedRole !== 'Sales Manager') {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Forbidden: Store Manager cannot promote or change roles.',
+            },
+            { status: 403 }
+          );
+        }
+      }
       // Store scope check
       const callerAllowed =
         authUser.allowedStores.length > 0 ? authUser.allowedStores : [authUser.store];
@@ -567,8 +602,12 @@ export async function PUT(req: NextRequest) {
     if (rawStoresToSync && !isSuperAdmin) {
       const validHubs = await prisma.storeHub.findMany({ select: { code: true } });
       const validCodes = new Set(validHubs.map((s) => s.code));
-      targetStores = rawStoresToSync.filter((c: string) => validCodes.has(c));
-      if (targetStores.length > 0) {
+      const filtered = rawStoresToSync.filter((c: string) => validCodes.has(c));
+      targetStores = filtered.length > 0 ? [filtered[0]] : null;
+      if (authUser.role === 'Store Manager') {
+        targetStores = [authUser.store];
+      }
+      if (targetStores && targetStores.length > 0) {
         updateData.storeScope = targetStores[0];
       }
     }
@@ -653,9 +692,12 @@ export async function DELETE(req: NextRequest) {
     }
     const session = auth.user;
 
-    if (session.role !== 'Super Admin') {
+    if (session.role === 'Sales Manager' || session.securityLevel < 80) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized: Only Super Admin can deactivate or delete users' },
+        {
+          success: false,
+          error: 'Forbidden: Insufficient permissions to deactivate or delete users',
+        },
         { status: 403 }
       );
     }
@@ -708,6 +750,20 @@ export async function DELETE(req: NextRequest) {
         { success: false, error: 'You cannot delete or deactivate your own logged-in account' },
         { status: 400 }
       );
+    }
+
+    // Store Manager can ONLY manage Sales Manager accounts belonging to their own store
+    if (session.role === 'Store Manager') {
+      if (target.role !== 'Sales Manager' || target.storeScope !== session.store) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'Forbidden: Store Manager can only manage Sales Manager accounts belonging to their own store.',
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Check if user has audit logs or sales orders

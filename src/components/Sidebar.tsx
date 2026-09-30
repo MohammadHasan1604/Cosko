@@ -4,6 +4,7 @@ import Link from 'next/link';
 import CoskoLogo from '@/components/ui/CoskoLogo';
 import Icon from '@/components/ui/AppIcon';
 import { useApp } from '@/context/AppContext';
+import { getAllowedRoutes } from '@/lib/rbacEngine';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -54,48 +55,8 @@ export default function Sidebar({
     (p) => p.status === 'Sent' || p.status === 'Draft'
   ).length;
 
-  // Strict RBAC Navigation — Exactly 3 roles
-  const roleAllowedHrefs: Record<string, string[]> = {
-    'Super Admin': [
-      '/dashboard',
-      '/sales',
-      '/inventory-management',
-      '/stock-transfers',
-      '/categories',
-      '/purchases',
-      '/customers',
-      '/vendors',
-      '/expenses',
-      '/accounting',
-      '/central-profit',
-      '/reports',
-      '/employees',
-      '/stores',
-      '/users',
-      '/work-activity',
-      '/audit-logs',
-      '/settings',
-      '/attendance',
-    ],
-    'Store Manager': [
-      '/dashboard',
-      '/sales',
-      '/inventory-management',
-      '/categories',
-      '/purchases',
-      '/customers',
-      '/vendors',
-      '/expenses',
-      '/accounting',
-      '/reports',
-      '/employees',
-      '/work-activity',
-      '/attendance',
-    ],
-    'Sales Manager': ['/sales', '/inventory-management', '/customers', '/attendance'],
-  };
-
-  const allowedHrefs = roleAllowedHrefs[currentUser.role] || ['/sales'];
+  // Strict Canonical RBAC Navigation — Single Source of Truth
+  const allowedHrefs = getAllowedRoutes(currentUser.role);
 
   const rawNavGroups: NavGroup[] = [
     {
@@ -267,7 +228,7 @@ export default function Sidebar({
               : currentUser.store && currentUser.store !== 'All Stores'
                 ? [currentUser.store]
                 : ['BLR'];
-          const canSwitch = isSuperAdmin || userAllowed.length > 1;
+          const canSwitch = isSuperAdmin;
 
           if (canSwitch) {
             return (

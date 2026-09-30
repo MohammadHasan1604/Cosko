@@ -16,6 +16,14 @@ export async function GET(req: NextRequest) {
     }
     const user = auth.user;
 
+    // Strict RBAC: Sales Manager has no expense administration access
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
+      return NextResponse.json(
+        { error: 'Forbidden: Sales Managers do not have access to expenses.' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const store = searchParams.get('store');
 
@@ -325,6 +333,16 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Expense record not found' }, { status: 404 });
     }
 
+    if (user.role !== 'Super Admin' && target.storeCode !== user.store) {
+      return NextResponse.json(
+        {
+          error:
+            'Forbidden: You do not have permission to modify an expense belonging to another store.',
+        },
+        { status: 403 }
+      );
+    }
+
     const updateData: any = {};
     if (body.category) updateData.category = body.category;
     if (body.amount !== undefined && body.amount !== null && body.amount !== '') {
@@ -455,6 +473,16 @@ export async function DELETE(req: NextRequest) {
 
     if (!target) {
       return NextResponse.json({ success: true, message: 'Expense already removed' });
+    }
+
+    if (user.role !== 'Super Admin' && target.storeCode !== user.store) {
+      return NextResponse.json(
+        {
+          error:
+            'Forbidden: You do not have permission to delete an expense belonging to another store.',
+        },
+        { status: 403 }
+      );
     }
 
     // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────

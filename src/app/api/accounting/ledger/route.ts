@@ -15,6 +15,14 @@ export async function GET(req: NextRequest) {
     }
     const user = auth.user;
 
+    // Strict RBAC: Sales Manager has no access to financial ledger
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
+      return NextResponse.json(
+        { error: 'Forbidden: Insufficient security level for financial ledger.' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const requestedStore = searchParams.get('store') || 'All Stores';
     const period = searchParams.get('period');

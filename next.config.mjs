@@ -12,11 +12,11 @@ const nextConfig = {
 
   // Allow production build on Netlify without failing on ESLint warnings or CI typecheck quirks
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
 
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
 
   images: {

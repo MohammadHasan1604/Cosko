@@ -93,9 +93,71 @@ export const SUPER_ADMIN_ONLY_MODULES = [
   'Central Profit',
   'Audit Logs',
   'Stores',
-  'Users & Roles',
   'Settings',
+  'Work Activity',
+  'Attendance Management',
+  'Delete Approvals',
 ] as const;
+
+/**
+ * CANONICAL ROUTE ACCESS MATRIX — Single authoritative source of truth for all routes.
+ * Exactly THREE roles: Super Admin (100), Store Manager (80), Sales Manager (40).
+ */
+export const CANONICAL_ROUTE_ACCESS: Record<string, UserRole[]> = {
+  '/dashboard': ['Super Admin', 'Store Manager', 'Sales Manager'],
+  '/sales': ['Super Admin', 'Store Manager', 'Sales Manager'],
+  '/inventory-management': ['Super Admin', 'Store Manager', 'Sales Manager'],
+  '/categories': ['Super Admin', 'Store Manager', 'Sales Manager'],
+  '/customers': ['Super Admin', 'Store Manager', 'Sales Manager'],
+  '/customers/existing': ['Super Admin', 'Store Manager', 'Sales Manager'],
+  '/customers/360': ['Super Admin', 'Store Manager', 'Sales Manager'],
+  '/vendors': ['Super Admin', 'Store Manager'],
+  '/purchases': ['Super Admin', 'Store Manager'],
+  '/expenses': ['Super Admin', 'Store Manager'],
+  '/accounting': ['Super Admin', 'Store Manager'],
+  '/reports': ['Super Admin', 'Store Manager'],
+  '/employees': ['Super Admin', 'Store Manager'],
+  '/users': ['Super Admin', 'Store Manager'],
+  '/central-profit': ['Super Admin'],
+  '/stock-transfers': ['Super Admin'],
+  '/stores': ['Super Admin'],
+  '/delete-requests': ['Super Admin'],
+  '/audit-logs': ['Super Admin'],
+  '/settings': ['Super Admin'],
+  '/settings/data-connections': ['Super Admin'],
+  '/attendance': ['Super Admin'],
+  '/work-activity': ['Super Admin'],
+};
+
+/**
+ * Check whether a given route is authorized for a specific role under the canonical access matrix.
+ */
+export function isRouteAllowed(route: string, role: UserRole | string): boolean {
+  if (role === 'Super Admin') return true;
+  const allowedRoles = CANONICAL_ROUTE_ACCESS[route];
+  if (!allowedRoles) {
+    const matchedPrefix = Object.keys(CANONICAL_ROUTE_ACCESS).find(
+      (r) => route.startsWith(r) && r !== '/'
+    );
+    if (matchedPrefix) {
+      return (CANONICAL_ROUTE_ACCESS[matchedPrefix] as string[]).includes(role);
+    }
+    return false;
+  }
+  return (allowedRoles as string[]).includes(role);
+}
+
+/**
+ * Get all routes authorized for a given role under the canonical access matrix.
+ */
+export function getAllowedRoutes(role: UserRole | string): string[] {
+  if (role === 'Super Admin') {
+    return Object.keys(CANONICAL_ROUTE_ACCESS);
+  }
+  return Object.entries(CANONICAL_ROUTE_ACCESS)
+    .filter(([_, roles]) => (roles as string[]).includes(role))
+    .map(([route]) => route);
+}
 
 /**
  * Check if caller can manage a target role.
@@ -816,13 +878,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'employees.add',
     'employees.edit',
     'attendance.view_own',
-    'attendance.view_store',
     'attendance.start_shift',
     'attendance.end_shift',
     'users.view',
     'users.create',
     'users.edit',
-    'users.assign_role',
     'users.reset_password',
     'delete_requests.view',
     'delete_requests.create',

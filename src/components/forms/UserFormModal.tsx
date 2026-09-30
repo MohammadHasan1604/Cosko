@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '@/components/ui/Modal';
 import Icon from '@/components/ui/AppIcon';
-import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import { useApp, UserAccount } from '@/context/AppContext';
 import { toast } from 'sonner';
 
@@ -41,7 +40,6 @@ export default function UserFormModal({
   const [role, setRole] = useState<'Store Manager' | 'Sales Manager'>('Store Manager');
   // Single source of truth for store access: assignedStores
   const [assignedStores, setAssignedStores] = useState<string[]>(['BLR']);
-  const [storeSearch, setStoreSearch] = useState('');
   const [status, setStatus] = useState<'Active' | 'Inactive' | 'Suspended'>('Active');
 
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -83,18 +81,6 @@ export default function UserFormModal({
       });
   }, [storesList, callerAccessibleStores]);
 
-  // Filtered stores based on search
-  const filteredStoreHubs = useMemo(() => {
-    const q = storeSearch.trim().toLowerCase();
-    if (!q) return availableStoreHubs;
-    return availableStoreHubs.filter(
-      (s) =>
-        s.code.toLowerCase().includes(q) ||
-        s.name.toLowerCase().includes(q) ||
-        s.city.toLowerCase().includes(q)
-    );
-  }, [availableStoreHubs, storeSearch]);
-
   // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
   // Initialize ONLY on closed -> open transition or when target user?.id intentionally changes.
   // Never re-initialize due to background sync, storesList refetch, or parent rerenders.
@@ -109,7 +95,6 @@ export default function UserFormModal({
       prevOpenRef.current = open;
       editUserIdRef.current = user?.id || null;
       setSubmitError(null);
-      setStoreSearch('');
 
       if (user) {
         setName(user.name || '');
@@ -186,34 +171,9 @@ export default function UserFormModal({
   // Rule 11: Sales Manager must not access user creation
   if (!open || currentUser.role === 'Sales Manager') return null;
 
-  // Toggle store assignment ON/OFF
-  const toggleStoreAssignment = (code: string) => {
-    if (isProtectedSuperAdmin) {
-      toast.info('Super Admin holds unconditional access across all enterprise stores.');
-      return;
-    }
-    setAssignedStores((prev) => {
-      if (prev.includes(code)) {
-        if (prev.length === 1) {
-          toast.error('A team member must be assigned to at least one store.');
-          return prev;
-        }
-        return prev.filter((c) => c !== code);
-      }
-      return [...prev, code];
-    });
-  };
-
-  const handleSelectAllStores = () => {
-    if (!isCallerSuperAdmin) return;
-    setAssignedStores(availableStoreHubs.map((s) => s.code));
-    toast.success(`Assigned all ${availableStoreHubs.length} store locations.`);
-  };
-
-  const handleClearStores = () => {
-    const fallback = callerAccessibleStores[0] || 'BLR';
-    setAssignedStores([fallback]);
-    toast.info(`Reset to single default store: ${fallback}`);
+  // Enforce exactly one operational store for Store Manager / Sales Manager
+  const selectSingleStore = (code: string) => {
+    setAssignedStores([code]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -494,117 +454,33 @@ export default function UserFormModal({
           </p>
         </div>
 
-        {/* 4. Assigned Store(s) — Rule 11: Super Admin may see Assigned Store. Store Manager creating Sales Manager: control MUST NOT render, optionally read-only */}
+        {/* 4. Assigned Store — Exactly ONE operational store for Store Manager / Sales Manager */}
         {isCallerSuperAdmin ? (
           <div className="space-y-2 p-3.5 rounded-xl border border-border bg-card">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <Icon name="BuildingStorefrontIcon" size={15} className="text-primary" />
-                  <label className="text-xs font-bold text-foreground">
-                    Assigned Store(s) <span className="text-danger">*</span>
-                  </label>
-                </div>
-                <p className="text-3xs text-muted-foreground mt-0.5">
-                  Single source of truth: User will strictly only access stores assigned here.
-                </p>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <Icon name="BuildingStorefrontIcon" size={15} className="text-primary" />
+                <label className="text-xs font-bold text-foreground">
+                  Assigned Operational Store <span className="text-danger">*</span>
+                </label>
               </div>
-
-              <div className="flex items-center gap-2">
-                <span className="badge-primary text-3xs font-bold">
-                  {assignedStores.length} Store{assignedStores.length !== 1 ? 's' : ''} Assigned
-                </span>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={handleSelectAllStores}
-                    className="text-3xs text-primary hover:underline font-semibold"
-                  >
-                    Select All
-                  </button>
-                  <span className="text-muted-foreground text-3xs">·</span>
-                  <button
-                    type="button"
-                    onClick={handleClearStores}
-                    className="text-3xs text-muted-foreground hover:text-foreground font-semibold"
-                  >
-                    Reset
-                  </button>
-                </div>
-              </div>
+              <p className="text-3xs text-muted-foreground mt-0.5">
+                Every Store Manager and Sales Manager account is strictly assigned to exactly ONE
+                operational store.
+              </p>
             </div>
 
-            {/* Search Box for Store Selector */}
-            <div className="relative">
-              <Icon
-                name="MagnifyingGlassIcon"
-                size={13}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <input
-                type="text"
-                placeholder="Search store code, branch name, or city..."
-                value={storeSearch}
-                onChange={(e) => setStoreSearch(e.target.value)}
-                className="input-field text-xs pl-8 py-1.5 bg-muted/40"
-              />
-            </div>
-
-            {/* Store List with Clear ON / OFF Access Toggles */}
-            <div className="max-h-48 overflow-y-auto scrollbar-thin divide-y divide-border/60 border border-border/80 rounded-lg bg-muted/10">
-              {filteredStoreHubs.length === 0 ? (
-                <div className="p-3 text-center text-xs text-muted-foreground">
-                  No store branches match "{storeSearch}"
-                </div>
-              ) : (
-                filteredStoreHubs.map((st) => {
-                  const isAssigned = isProtectedSuperAdmin || assignedStores.includes(st.code);
-
-                  return (
-                    <div
-                      key={`assign-store-${st.code}`}
-                      className="p-2.5 flex items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-foreground font-mono">
-                            {st.code}
-                          </span>
-                          <span className="text-xs font-medium text-foreground truncate">
-                            {st.name}
-                          </span>
-                          {st.code === 'CENTRAL' && (
-                            <span className="badge-warning text-3xs px-1.5 py-0">Central Hub</span>
-                          )}
-                        </div>
-                        <p className="text-3xs text-muted-foreground truncate">{st.city}</p>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span
-                          className={`text-3xs font-extrabold px-1.5 py-0.5 rounded ${
-                            isAssigned
-                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-muted text-muted-foreground'
-                          }`}
-                        >
-                          {isAssigned ? 'ASSIGNED' : 'OFF'}
-                        </span>
-                        <ToggleSwitch
-                          checked={isAssigned}
-                          disabled={isProtectedSuperAdmin}
-                          onChange={() => toggleStoreAssignment(st.code)}
-                          size="sm"
-                          onText="ON"
-                          offText="OFF"
-                          title={`Toggle access for ${st.name} (${st.code})`}
-                        />
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            <select
+              value={assignedStores[0] || 'BLR'}
+              onChange={(e) => setAssignedStores([e.target.value])}
+              className="input-field text-xs font-semibold"
+            >
+              {availableStoreHubs.map((st) => (
+                <option key={st.code} value={st.code}>
+                  {st.code} — {st.name} ({st.city})
+                </option>
+              ))}
+            </select>
           </div>
         ) : (
           /* Store Manager creating staff: Control MUST NOT render; store is displayed as read-only contextual info */

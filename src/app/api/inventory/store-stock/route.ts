@@ -16,6 +16,14 @@ export async function GET(req: NextRequest) {
     }
     const user = auth.user;
 
+    // Strict Cross-Store Isolation: Cross-store inventory breakdown is SUPER ADMIN ONLY
+    if (user.role !== 'Super Admin' || user.securityLevel < 100) {
+      return NextResponse.json(
+        { error: 'Forbidden: Cross-store inventory breakdown is restricted to Super Admin only.' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const sku = searchParams.get('sku')?.trim();
     const productId = searchParams.get('productId')?.trim() || searchParams.get('id')?.trim();

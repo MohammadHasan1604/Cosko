@@ -9,7 +9,9 @@ const SalesByStoreChart = dynamic(() => import('./SalesByStoreChart'), { ssr: fa
 const StoreSalesRanking = dynamic(() => import('./StoreSalesRanking'), { ssr: false });
 
 export default function DashboardCharts() {
-  const { selectedStore, datePeriod, customDateRange } = useApp();
+  const { selectedStore, datePeriod, customDateRange, currentUser } = useApp();
+  const isSuperAdmin = currentUser.role === 'Super Admin';
+  const isSalesManager = currentUser.role === 'Sales Manager';
 
   const periodLabel =
     datePeriod === 'Custom Range' && customDateRange?.start && customDateRange?.end
@@ -17,12 +19,16 @@ export default function DashboardCharts() {
       : datePeriod;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-6">
-      {/* Revenue & Profit trend — spans 3 cols */}
-      <div className="lg:col-span-3 card p-5">
+    <div
+      className={`grid grid-cols-1 ${isSuperAdmin ? 'lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5' : ''} gap-6`}
+    >
+      {/* Revenue & Profit trend — spans full width for Store/Sales Manager, 3 cols for Super Admin */}
+      <div className={`${isSuperAdmin ? 'lg:col-span-3' : 'w-full'} card p-5`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div>
-            <h2 className="section-header text-base sm:text-lg">Revenue & Gross Profit</h2>
+            <h2 className="section-header text-base sm:text-lg">
+              {isSalesManager ? 'Revenue Timeline' : 'Revenue & Gross Profit'}
+            </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               {periodLabel} timeline · Scope:{' '}
               <span className="font-semibold text-foreground">{selectedStore}</span>
@@ -36,32 +42,36 @@ export default function DashboardCharts() {
               />
               Revenue
             </span>
-            <span className="flex items-center gap-1.5 text-muted-foreground">
-              <span
-                className="w-3 h-0.5 rounded-full inline-block"
-                style={{ backgroundColor: 'var(--positive)' }}
-              />
-              Gross Profit
-            </span>
+            {!isSalesManager && (
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span
+                  className="w-3 h-0.5 rounded-full inline-block"
+                  style={{ backgroundColor: 'var(--positive)' }}
+                />
+                Gross Profit
+              </span>
+            )}
           </div>
         </div>
         <RevenueChart />
       </div>
 
-      {/* Right column: sales by store + Store Sales Ranking */}
-      <div className="lg:col-span-2 space-y-6">
-        <div className="card p-5">
-          <div className="mb-4">
-            <h2 className="section-header">Sales by Store</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Distribution across store outlets · {periodLabel}
-            </p>
+      {/* Right column: sales by store + Store Sales Ranking — Super Admin only */}
+      {isSuperAdmin && (
+        <div className="lg:col-span-2 space-y-6">
+          <div className="card p-5">
+            <div className="mb-4">
+              <h2 className="section-header">Sales by Store</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Distribution across store outlets · {periodLabel}
+              </p>
+            </div>
+            <SalesByStoreChart />
           </div>
-          <SalesByStoreChart />
-        </div>
 
-        <StoreSalesRanking />
-      </div>
+          <StoreSalesRanking />
+        </div>
+      )}
     </div>
   );
 }

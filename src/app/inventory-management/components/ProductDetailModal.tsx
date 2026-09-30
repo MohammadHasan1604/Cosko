@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { InventoryItem } from '@/context/AppContext';
+import { useApp, InventoryItem } from '@/context/AppContext';
 import Modal from '@/components/ui/Modal';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Icon from '@/components/ui/AppIcon';
@@ -12,6 +12,9 @@ interface ProductDetailModalProps {
 }
 
 export default function ProductDetailModal({ item, onClose }: ProductDetailModalProps) {
+  const { currentUser } = useApp();
+  const isSuperAdmin = currentUser.role === 'Super Admin';
+  const isSalesManager = currentUser.role === 'Sales Manager';
   const [storeStockOpen, setStoreStockOpen] = useState(false);
   if (!item) return null;
 
@@ -77,14 +80,16 @@ export default function ProductDetailModal({ item, onClose }: ProductDetailModal
                 </p>
                 <p className="text-sm font-bold text-primary mt-0.5">{item.store}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setStoreStockOpen(true)}
-                className="mt-2 inline-flex items-center gap-1 text-3xs font-semibold text-primary hover:underline"
-              >
-                <Icon name="BuildingStorefrontIcon" size={11} />
-                View All Stores
-              </button>
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setStoreStockOpen(true)}
+                  className="mt-2 inline-flex items-center gap-1 text-3xs font-semibold text-primary hover:underline"
+                >
+                  <Icon name="BuildingStorefrontIcon" size={11} />
+                  View All Stores
+                </button>
+              )}
             </div>
 
             <div className="p-3 rounded-lg border border-border bg-card">
@@ -105,12 +110,14 @@ export default function ProductDetailModal({ item, onClose }: ProductDetailModal
               </p>
             </div>
 
-            <div className="p-3 rounded-lg border border-border bg-card">
-              <p className="text-2xs text-muted-foreground uppercase font-semibold">Cost Price</p>
-              <p className="text-sm font-bold text-foreground mt-0.5 font-tabular">
-                ₹{item.costPrice.toLocaleString('en-IN')}
-              </p>
-            </div>
+            {!isSalesManager && (
+              <div className="p-3 rounded-lg border border-border bg-card">
+                <p className="text-2xs text-muted-foreground uppercase font-semibold">Cost Price</p>
+                <p className="text-sm font-bold text-foreground mt-0.5 font-tabular">
+                  ₹{item.costPrice.toLocaleString('en-IN')}
+                </p>
+              </div>
+            )}
 
             <div className="p-3 rounded-lg border border-border bg-card">
               <p className="text-2xs text-muted-foreground uppercase font-semibold">
@@ -161,12 +168,14 @@ export default function ProductDetailModal({ item, onClose }: ProductDetailModal
         </div>
       </Modal>
 
-      <StoreStockModal
-        open={storeStockOpen}
-        onClose={() => setStoreStockOpen(false)}
-        item={item}
-        selectedStoreFilter={item.store}
-      />
+      {isSuperAdmin && (
+        <StoreStockModal
+          open={storeStockOpen}
+          onClose={() => setStoreStockOpen(false)}
+          item={item}
+          selectedStoreFilter={item.store}
+        />
+      )}
     </>
   );
 }

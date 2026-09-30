@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
+import { authenticateRequest, createAuditLog } from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { broadcastRealtimeEvent } from '@/lib/realtime';
 import { validateAndNormalizeGstin } from '@/lib/gstUtils';
 import { executeWithIdempotency } from '@/lib/idempotency';
 
 /**
- * GET /api/vendors - Retrieve all vendors with authoritative, reconciled financial payables
+ * GET /api/vendors - Retrieve vendors with authoritative store scoping & reconciled financial payables
+ * Super Admin: all or filtered by store
+ * Store Manager: strictly own-store vendors
+ * Sales Manager: 403 Forbidden (no vendor administration)
  */
 export async function GET(req: NextRequest) {
   try {
@@ -16,15 +19,39 @@ export async function GET(req: NextRequest) {
     }
     const user = auth.user;
 
+    // Strict RBAC: Sales Manager has no vendor administration access
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
+      return NextResponse.json(
+        { error: 'Forbidden: Sales Managers do not have vendor administration access.' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const includeArchived = searchParams.get('includeArchived') === 'true';
     const vendorId = searchParams.get('id');
+    const storeParam = searchParams.get('store') || searchParams.get('storeCode');
 
     const whereClause: any = {};
     if (vendorId) {
       whereClause.id = vendorId;
     } else if (!includeArchived) {
       whereClause.status = { not: 'Archived' };
+    }
+
+    // Authoritative Store Isolation
+    if (user.role !== 'Super Admin') {
+      if (storeParam && storeParam !== 'All Stores' && storeParam !== user.store) {
+        return NextResponse.json(
+          { error: 'Forbidden: Cross-store vendor access is denied.' },
+          { status: 403 }
+        );
+      }
+      whereClause.storeCode = user.store;
+    } else {
+      if (storeParam && storeParam !== 'All Stores') {
+        whereClause.storeCode = storeParam;
+      }
     }
 
     const vendors = await (prisma as any).vendor.findMany({
@@ -34,9 +61,11 @@ export async function GET(req: NextRequest) {
         purchases: {
           where: {
             status: { notIn: ['Cancelled', 'Archived'] },
+            ...(user.role !== 'Super Admin' ? { storeCode: user.store } : {}),
           },
           select: {
             id: true,
+            storeCode: true,
             totalCost: true,
             paidAmount: true,
             creditAmount: true,
@@ -52,10 +81,20 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // If searching by ID, verify Store Manager owns this vendor
+    if (vendorId && vendors.length > 0 && user.role !== 'Super Admin') {
+      if (vendors[0].storeCode !== user.store) {
+        return NextResponse.json(
+          { error: 'Forbidden: You do not have permission to access this vendor.' },
+          { status: 403 }
+        );
+      }
+    }
+
     const now = new Date();
     const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-    // Reconcile financial figures exactly: Total Bill - Valid Payments - Credits = Outstanding Balance
+    // Reconcile financial figures scoped to vendor's store
     const vendorsWithPayable = vendors.map((v: any) => {
       let totalBilledAmount = 0;
       let totalPaidAmount = 0;
@@ -119,6 +158,9 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/vendors - Create a new vendor
+ * Super Admin: can explicitly select authorized store
+ * Store Manager: server FORCE own store
+ * Sales Manager: 403 Forbidden
  */
 export async function POST(req: NextRequest) {
   try {
@@ -128,9 +170,10 @@ export async function POST(req: NextRequest) {
     }
     const user = auth.user;
 
-    if (user.securityLevel < 60) {
+    // Strict RBAC check
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
       return NextResponse.json(
-        { error: 'Forbidden: Insufficient security level to create vendor' },
+        { error: 'Forbidden: Sales Managers cannot create vendors.' },
         { status: 403 }
       );
     }
@@ -139,6 +182,15 @@ export async function POST(req: NextRequest) {
 
     if (!body.name || !body.name.trim()) {
       return NextResponse.json({ error: 'Vendor name is required' }, { status: 400 });
+    }
+
+    // Authoritative store assignment
+    let targetStoreCode: string;
+    if (user.role === 'Super Admin') {
+      targetStoreCode = body.storeCode?.trim() || body.store?.trim() || 'CENTRAL';
+    } else {
+      // Store Manager: server FORCE own store. Client cannot override.
+      targetStoreCode = user.store;
     }
 
     const gstinValidation = validateAndNormalizeGstin(body.gstin);
@@ -155,7 +207,7 @@ export async function POST(req: NextRequest) {
     const customKey =
       body.idempotencyKey ||
       req.headers.get('x-idempotency-key') ||
-      `vnd_${body.name.trim()}_${cleanGstin || 'nogst'}_${Date.now()}`;
+      `vnd_${body.name.trim()}_${targetStoreCode}_${cleanGstin || 'nogst'}_${Date.now()}`;
 
     return await executeWithIdempotency(
       req,
@@ -188,7 +240,7 @@ export async function POST(req: NextRequest) {
             contactPerson: body.contactPerson?.trim() || 'Account Manager',
             email: body.email?.trim() || '',
             phone: body.phone?.trim() || '',
-            city: body.city?.trim() || 'Central',
+            city: body.city?.trim() || targetStoreCode,
             address: body.address?.trim() || null,
             categories: body.categories?.trim() || body.category?.trim() || 'General',
             gstin: cleanGstin,
@@ -200,6 +252,7 @@ export async function POST(req: NextRequest) {
                 : null,
             rating: body.rating ? Number(body.rating) : 5.0,
             paymentTerms: body.paymentTerms?.trim() || 'Net 30',
+            storeCode: targetStoreCode,
             status: body.status || 'Active',
           },
           update: {
@@ -223,19 +276,21 @@ export async function POST(req: NextRequest) {
               : {}),
             ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
             ...(body.paymentTerms ? { paymentTerms: body.paymentTerms.trim() } : {}),
+            ...(user.role === 'Super Admin' && body.storeCode ? { storeCode: body.storeCode } : {}),
             ...(body.status ? { status: body.status } : {}),
           },
         });
 
-        // Write audit log
+        // Write audit log with REAL affected storeCode
         await (prisma as any).auditLog.create({
           data: {
             module: 'Vendors',
             action: 'Onboard Vendor',
-            details: `Onboarded vendor "${vendor.name}" (${vendor.code}). GSTIN: ${cleanGstin || 'None'}, Terms: ${vendor.paymentTerms}`,
+            details: `Onboarded vendor "${vendor.name}" (${vendor.code}) for store ${targetStoreCode}. GSTIN: ${cleanGstin || 'None'}, Terms: ${vendor.paymentTerms}`,
+            userId: user.id,
             userEmail: user.email || user.name,
             userRole: user.role,
-            storeCode: 'CENTRAL',
+            storeCode: targetStoreCode,
           },
         });
 
@@ -257,6 +312,9 @@ export async function POST(req: NextRequest) {
 
 /**
  * PUT /api/vendors - Update existing vendor
+ * First loads from DB and verifies store ownership.
+ * Store Manager cannot modify another store's vendor.
+ * Sales Manager: 403 Forbidden.
  */
 export async function PUT(req: NextRequest) {
   try {
@@ -266,7 +324,8 @@ export async function PUT(req: NextRequest) {
     }
     const user = auth.user;
 
-    if (user.securityLevel < 60) {
+    // Strict RBAC check
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
       return NextResponse.json(
         { error: 'Forbidden: Insufficient security level to update vendor' },
         { status: 403 }
@@ -276,6 +335,26 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
     if (!body.id) {
       return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 });
+    }
+
+    // Authoritative check: First load vendor from DB
+    const existing = await (prisma as any).vendor.findUnique({
+      where: { id: body.id },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
+    }
+
+    // Verify caller store ownership
+    if (user.role !== 'Super Admin' && existing.storeCode !== user.store) {
+      return NextResponse.json(
+        {
+          error:
+            'Forbidden: You do not have permission to modify a vendor belonging to another store.',
+        },
+        { status: 403 }
+      );
     }
 
     if (body.gstin !== undefined && body.gstin !== null) {
@@ -291,35 +370,43 @@ export async function PUT(req: NextRequest) {
       body.gstin = gstinValidation.normalized;
     }
 
+    const updateData: any = {
+      ...(body.name ? { name: body.name.trim() } : {}),
+      ...(body.contactPerson ? { contactPerson: body.contactPerson.trim() } : {}),
+      ...(body.email ? { email: body.email.trim() } : {}),
+      ...(body.phone ? { phone: body.phone.trim() } : {}),
+      ...(body.city ? { city: body.city.trim() } : {}),
+      ...(body.address !== undefined ? { address: body.address?.trim() || null } : {}),
+      ...(body.categories || body.category
+        ? { categories: (body.categories || body.category).trim() }
+        : {}),
+      ...(body.gstin !== undefined ? { gstin: body.gstin } : {}),
+      ...(body.leadTimeDays !== undefined ? { leadTimeDays: Number(body.leadTimeDays) } : {}),
+      ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
+      ...(body.paymentTerms ? { paymentTerms: body.paymentTerms.trim() } : {}),
+      ...(body.status ? { status: body.status } : {}),
+    };
+
+    // Only Super Admin can transfer vendor to another store
+    if (user.role === 'Super Admin' && body.storeCode) {
+      updateData.storeCode = body.storeCode.trim();
+    }
+
     const vendor = await (prisma as any).vendor.update({
       where: { id: body.id },
-      data: {
-        ...(body.name ? { name: body.name.trim() } : {}),
-        ...(body.contactPerson ? { contactPerson: body.contactPerson.trim() } : {}),
-        ...(body.email ? { email: body.email.trim() } : {}),
-        ...(body.phone ? { phone: body.phone.trim() } : {}),
-        ...(body.city ? { city: body.city.trim() } : {}),
-        ...(body.address !== undefined ? { address: body.address?.trim() || null } : {}),
-        ...(body.categories || body.category
-          ? { categories: (body.categories || body.category).trim() }
-          : {}),
-        ...(body.gstin !== undefined ? { gstin: body.gstin } : {}),
-        ...(body.leadTimeDays !== undefined ? { leadTimeDays: Number(body.leadTimeDays) } : {}),
-        ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
-        ...(body.paymentTerms ? { paymentTerms: body.paymentTerms.trim() } : {}),
-        ...(body.status ? { status: body.status } : {}),
-      },
+      data: updateData,
     });
 
-    // Write audit log
+    // Write audit log with REAL affected storeCode
     await (prisma as any).auditLog.create({
       data: {
         module: 'Vendors',
         action: 'Update Vendor',
-        details: `Updated vendor details for "${vendor.name}" (${vendor.code}).`,
+        details: `Updated vendor details for "${vendor.name}" (${vendor.code}). Store: ${vendor.storeCode}`,
+        userId: user.id,
         userEmail: user.email || user.name,
         userRole: user.role,
-        storeCode: 'CENTRAL',
+        storeCode: vendor.storeCode,
       },
     });
 
@@ -341,8 +428,10 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE /api/vendors - Delete Approval Workflow
- * Super Admin: direct archive/delete. Store Manager: creates pending delete request.
+ * DELETE /api/vendors - Delete Approval Workflow / Deletion
+ * First loads from DB and verifies store ownership.
+ * Store Manager cannot delete another store's vendor.
+ * Sales Manager: 403 Forbidden.
  */
 export async function DELETE(req: NextRequest) {
   try {
@@ -352,7 +441,8 @@ export async function DELETE(req: NextRequest) {
     }
     const user = auth.user;
 
-    if (user.securityLevel < 80) {
+    // Strict RBAC check
+    if (user.role === 'Sales Manager' || user.securityLevel < 80) {
       return NextResponse.json(
         { error: 'Forbidden: Insufficient security level to archive/delete vendor' },
         { status: 403 }
@@ -378,6 +468,17 @@ export async function DELETE(req: NextRequest) {
         success: true,
         message: 'Vendor already deleted or non-existent',
       });
+    }
+
+    // Verify store ownership: Store Manager cannot delete another store's vendor
+    if (user.role !== 'Super Admin' && target.storeCode !== user.store) {
+      return NextResponse.json(
+        {
+          error:
+            'Forbidden: You do not have permission to delete a vendor belonging to another store.',
+        },
+        { status: 403 }
+      );
     }
 
     // ─── NON-SUPER-ADMIN: Route through delete approval workflow ────────────
@@ -418,10 +519,11 @@ export async function DELETE(req: NextRequest) {
         data: {
           module: 'Vendors',
           action: `ARCHIVED: Vendor "${target.name}" (${target.code})`,
-          details: JSON.stringify({ vendorId: target.id, poCount }),
+          details: JSON.stringify({ vendorId: target.id, poCount, storeCode: target.storeCode }),
+          userId: user.id,
           userEmail: user.email || user.name,
           userRole: user.role,
-          storeCode: 'CENTRAL',
+          storeCode: target.storeCode,
         },
       });
 
@@ -452,9 +554,10 @@ export async function DELETE(req: NextRequest) {
           module: 'Vendors',
           action: `HARD_DELETED: Vendor "${target.name}" (${target.code})`,
           details: JSON.stringify({ vendorId: target.id, beforeState: target }),
+          userId: user.id,
           userEmail: user.email || user.name,
           userRole: user.role,
-          storeCode: 'CENTRAL',
+          storeCode: target.storeCode,
         },
       });
     });

@@ -198,10 +198,8 @@ export async function authenticateRequest(req: NextRequest | Request): Promise<A
       dbRole === 'Super Admin'
         ? allowedStores.length > 0
           ? allowedStores
-          : ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM']
-        : allowedStores.length > 0
-          ? allowedStores
-          : [effectiveStore],
+          : ['CENTRAL', 'BLR', 'HYD', 'DEL', 'MUM', 'CHE']
+        : [effectiveStore], // CRITICAL: Non-Super-Admin strictly bounded to ONE assigned store
     status: dbUser.status,
     avatarUrl: dbUser.avatarUrl || undefined,
     mustChangePassword: dbUser.mustChangePassword || false,
@@ -276,7 +274,14 @@ export async function createAuditLog(
   ipAddress?: string
 ): Promise<void> {
   try {
-    await prisma.auditLog.create({
+    const effectiveStore =
+      storeCode && storeCode !== 'All Stores'
+        ? storeCode
+        : user.store && user.store !== 'All Stores'
+          ? user.store
+          : 'CENTRAL';
+
+    await (prisma as any).auditLog.create({
       data: {
         module,
         action,
@@ -284,7 +289,7 @@ export async function createAuditLog(
         userId: user.id,
         userEmail: user.email,
         userRole: user.role,
-        storeCode: storeCode || user.store || 'CENTRAL',
+        storeCode: effectiveStore,
         ipAddress: ipAddress || null,
       },
     });

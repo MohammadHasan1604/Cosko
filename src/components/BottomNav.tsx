@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import Icon from '@/components/ui/AppIcon';
 import BottomSheet from '@/components/ui/BottomSheet';
 import { useApp } from '@/context/AppContext';
+import { getAllowedRoutes } from '@/lib/rbacEngine';
 
 interface NavDestination {
   id: string;
@@ -13,46 +14,6 @@ interface NavDestination {
   icon: string;
   href: string;
 }
-
-const roleAllowedHrefs: Record<string, string[]> = {
-  'Super Admin': [
-    '/dashboard',
-    '/sales',
-    '/inventory-management',
-    '/stock-transfers',
-    '/categories',
-    '/purchases',
-    '/customers',
-    '/vendors',
-    '/expenses',
-    '/accounting',
-    '/central-profit',
-    '/reports',
-    '/employees',
-    '/stores',
-    '/users',
-    '/work-activity',
-    '/audit-logs',
-    '/settings',
-    '/delete-requests',
-    '/attendance',
-  ],
-  'Store Manager': [
-    '/dashboard',
-    '/sales',
-    '/inventory-management',
-    '/categories',
-    '/purchases',
-    '/customers',
-    '/vendors',
-    '/expenses',
-    '/accounting',
-    '/reports',
-    '/employees',
-    '/attendance',
-  ],
-  'Sales Manager': ['/sales', '/inventory-management', '/categories', '/customers', '/attendance'],
-};
 
 // All secondary nav items with icons for the "More" bottom sheet
 const allSecondaryNav: NavDestination[] = [
@@ -107,27 +68,15 @@ export default function BottomNav() {
   const { currentUser } = useApp();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const allowedHrefs = roleAllowedHrefs[currentUser.role] || ['/sales'];
+  const allowedHrefs = getAllowedRoutes(currentUser.role);
 
   // 5-Position Nav Layout: Sales is ALWAYS the exact center (Position 3)
   const leftSlots: NavDestination[] = useMemo(() => {
-    if (currentUser.role === 'Sales Manager') {
-      return [
-        {
-          id: 'bnav-inventory',
-          label: 'Inventory',
-          icon: 'CubeIcon',
-          href: '/inventory-management',
-        },
-        { id: 'bnav-catalog', label: 'Catalog', icon: 'TagIcon', href: '/categories' },
-      ];
-    }
-    // Super Admin & Store Manager:
     return [
       { id: 'bnav-dashboard', label: 'Home', icon: 'HomeIcon', href: '/dashboard' },
       { id: 'bnav-inventory', label: 'Inventory', icon: 'CubeIcon', href: '/inventory-management' },
     ];
-  }, [currentUser.role]);
+  }, []);
 
   const salesSlot: NavDestination = {
     id: 'bnav-sales',

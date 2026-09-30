@@ -68,6 +68,8 @@ export default function InventoryTable({
     confirmAction,
   } = useApp();
 
+  const isSuperAdmin = currentUser.role === 'Super Admin';
+
   const [search, setSearch] = useState('');
   const [localCategoryFilter, setLocalCategoryFilter] = useState('All Categories');
   const categoryFilter =
@@ -515,18 +517,20 @@ export default function InventoryTable({
                           ) : (
                             <span className="badge-info text-3xs font-mono">{item.store}</span>
                           )}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setStoreStockItem(item);
-                            }}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-bold text-primary hover:text-primary-focus bg-primary/10 border border-primary/20 transition-all ml-auto cursor-pointer"
-                            title="View store-wise stock allocation"
-                          >
-                            <Icon name="BuildingStorefrontIcon" size={11} />
-                            View Stores
-                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setStoreStockItem(item);
+                              }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-bold text-primary hover:text-primary-focus bg-primary/10 border border-primary/20 transition-all ml-auto cursor-pointer"
+                              title="View store-wise stock allocation"
+                            >
+                              <Icon name="BuildingStorefrontIcon" size={11} />
+                              View Stores
+                            </button>
+                          )}
                         </div>
                         <h4 className="text-xs font-bold text-foreground truncate mt-0.5">
                           {item.name}
@@ -792,36 +796,40 @@ export default function InventoryTable({
                                       {item.qtyOnHand} {item.qtyOnHand === 1 ? 'unit' : 'units'}
                                     </span>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setStoreStockItem(item);
-                                    }}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-semibold text-primary hover:text-primary-focus bg-primary/10 hover:bg-primary/20 border border-primary/25 transition-all duration-150 active:scale-95 cursor-pointer"
-                                    title={`View real-time stock across all stores for ${item.name}`}
-                                  >
-                                    <Icon name="BuildingStorefrontIcon" size={12} />
-                                    View All Stores
-                                  </button>
+                                  {isSuperAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setStoreStockItem(item);
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-semibold text-primary hover:text-primary-focus bg-primary/10 hover:bg-primary/20 border border-primary/25 transition-all duration-150 active:scale-95 cursor-pointer"
+                                      title={`View real-time stock across all stores for ${item.name}`}
+                                    >
+                                      <Icon name="BuildingStorefrontIcon" size={12} />
+                                      View All Stores
+                                    </button>
+                                  )}
                                 </div>
                               ) : (
                                 <div className="flex flex-col items-start gap-1 py-0.5">
                                   <span className="badge-info text-2xs font-semibold">
                                     {item.store}
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setStoreStockItem(item);
-                                    }}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-semibold text-muted-foreground hover:text-primary bg-muted/60 hover:bg-muted border border-border transition-all duration-150 active:scale-95 cursor-pointer"
-                                    title={`Check stock at other stores for ${item.name}`}
-                                  >
-                                    <Icon name="BuildingStorefrontIcon" size={11} />
-                                    View All Stores
-                                  </button>
+                                  {isSuperAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setStoreStockItem(item);
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-semibold text-muted-foreground hover:text-primary bg-muted/60 hover:bg-muted border border-border transition-all duration-150 active:scale-95 cursor-pointer"
+                                      title={`Check stock at other stores for ${item.name}`}
+                                    >
+                                      <Icon name="BuildingStorefrontIcon" size={11} />
+                                      View All Stores
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </td>
@@ -874,13 +882,15 @@ export default function InventoryTable({
                       {/* Actions */}
                       <td className="table-cell text-right pr-4">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                          <button
-                            onClick={() => setStoreStockItem(item)}
-                            className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all duration-150"
-                            title={`View all stores stock for ${item.name}`}
-                          >
-                            <Icon name="BuildingStorefrontIcon" size={15} />
-                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => setStoreStockItem(item)}
+                              className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all duration-150"
+                              title={`View all stores stock for ${item.name}`}
+                            >
+                              <Icon name="BuildingStorefrontIcon" size={15} />
+                            </button>
+                          )}
                           <button
                             onClick={() => setAdjustItem(item)}
                             className="p-1.5 rounded-lg hover:bg-warning/10 text-muted-foreground hover:text-warning transition-all duration-150"
@@ -1013,12 +1023,14 @@ export default function InventoryTable({
       <ProductDetailModal item={viewItem} onClose={() => setViewItem(null)} />
 
       {/* View All Stores Stock Modal */}
-      <StoreStockModal
-        open={!!storeStockItem}
-        item={storeStockItem}
-        onClose={() => setStoreStockItem(null)}
-        selectedStoreFilter={selectedStore}
-      />
+      {isSuperAdmin && (
+        <StoreStockModal
+          open={!!storeStockItem}
+          item={storeStockItem}
+          onClose={() => setStoreStockItem(null)}
+          selectedStoreFilter={selectedStore}
+        />
+      )}
 
       {/* Safe Delete / Archive Confirm Modal */}
       {deleteItemModal && (
@@ -1182,18 +1194,20 @@ export default function InventoryTable({
               <Icon name="EyeIcon" size={18} className="text-info" />
               <span>View Product Details</span>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                const item = mobileActionItem;
-                setMobileActionItem(null);
-                setStoreStockItem(item);
-              }}
-              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted text-sm font-semibold text-foreground min-h-[44px] cursor-pointer"
-            >
-              <Icon name="BuildingStorefrontIcon" size={18} className="text-primary" />
-              <span>Store Stock Allocation</span>
-            </button>
+            {isSuperAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  const item = mobileActionItem;
+                  setMobileActionItem(null);
+                  setStoreStockItem(item);
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted text-sm font-semibold text-foreground min-h-[44px] cursor-pointer"
+              >
+                <Icon name="BuildingStorefrontIcon" size={18} className="text-primary" />
+                <span>Store Stock Allocation</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
