@@ -28,34 +28,27 @@ export async function GET(req: NextRequest) {
     const filterStore = searchParams.get('storeCode');
     const filterUserId = searchParams.get('userId');
 
-    // 🔒 Store Isolation & Visibility Policy:
-    // Super Admin: sees all attendance records across all stores.
-    // Store Manager: sees attendance records strictly for own assigned store.
-    // Sales Manager: sees own attendance records strictly.
-    const where: any = {};
+    // 🔒 Attendance Management is SUPER ADMIN ONLY (Requirement G)
+    if (user.role !== 'Super Admin' || user.securityLevel < 100) {
+      return NextResponse.json(
+        { error: 'Forbidden: Attendance management records are restricted to Super Admin only.' },
+        { status: 403 }
+      );
+    }
 
-    if (user.role === 'Super Admin') {
-      if (filterStore && filterStore !== 'All Stores') {
-        where.storeCode = filterStore;
-      }
-      if (filterUserId) {
-        where.userId = filterUserId;
-      }
-    } else if (user.role === 'Store Manager') {
-      where.storeCode = user.store;
-      if (filterUserId) {
-        where.userId = filterUserId;
-      }
-    } else {
-      // Sales Manager — strictly own records
-      where.userId = user.id;
+    const where: any = {};
+    if (filterStore && filterStore !== 'All Stores') {
+      where.storeCode = filterStore;
+    }
+    if (filterUserId) {
+      where.userId = filterUserId;
     }
 
     if (filterDate) {
       where.localDate = filterDate;
     }
 
-    const records = await prisma.attendanceDay.findMany({
+    const records = await (prisma as any).attendanceDay.findMany({
       where,
       include: {
         user: {
@@ -75,7 +68,7 @@ export async function GET(req: NextRequest) {
 
     const now = new Date();
 
-    const formattedRecords = records.map((r) => {
+    const formattedRecords = records.map((r: any) => {
       let activeSeconds = r.totalSeconds;
       if (r.status === 'ACTIVE') {
         activeSeconds = Math.max(

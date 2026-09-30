@@ -339,7 +339,7 @@ export async function POST(req: NextRequest) {
       mustChangePassword: true,
     };
 
-    broadcastRealtimeEvent('users', 'USER_CREATED', {
+    await broadcastRealtimeEvent('users', 'USER_CREATED', {
       userId: newUser.id,
       email: newUser.email,
       storeCode: newUser.storeScope,
@@ -348,7 +348,7 @@ export async function POST(req: NextRequest) {
 
     for (const st of targetAssignedStores) {
       if (st && st !== 'All Stores') {
-        broadcastRealtimeEvent(getStoreChannel(st), 'USER_CREATED', {
+        await broadcastRealtimeEvent(getStoreChannel(st), 'USER_CREATED', {
           userId: newUser.id,
           email: newUser.email,
           storeCode: st,
@@ -653,7 +653,7 @@ export async function PUT(req: NextRequest) {
       `Updated user "${targetUser.name}" (${targetUser.email}): ${changes.join(', ')}`
     );
 
-    broadcastRealtimeEvent('users', 'USER_UPDATED', {
+    await broadcastRealtimeEvent('users', 'USER_UPDATED', {
       userId: updatedUser.id,
       email: updatedUser.email,
       action: 'updated',
@@ -790,7 +790,7 @@ export async function DELETE(req: NextRequest) {
         `Deactivated user "${target.name}" (${target.email}). History: ${auditCount} audit logs, ${salesCount} sales`
       );
 
-      broadcastRealtimeEvent('users', 'USER_UPDATED', {
+      await broadcastRealtimeEvent('users', 'USER_UPDATED', {
         userId: target.id,
         email: target.email,
         action: 'deactivated',
@@ -820,7 +820,7 @@ export async function DELETE(req: NextRequest) {
       `Permanently deleted user "${target.name}" (${target.email})`
     );
 
-    broadcastRealtimeEvent('users', 'USER_UPDATED', {
+    await broadcastRealtimeEvent('users', 'USER_UPDATED', {
       userId: target.id,
       email: target.email,
       action: 'deleted',

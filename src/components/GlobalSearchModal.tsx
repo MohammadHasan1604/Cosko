@@ -5,7 +5,8 @@ import Icon from '@/components/ui/AppIcon';
 import Link from 'next/link';
 
 export default function GlobalSearchModal() {
-  const { searchOpen, setSearchOpen, inventory, customers, sales, branding } = useApp();
+  const { searchOpen, setSearchOpen, inventory, customers, sales, branding, currentUser } =
+    useApp();
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -24,14 +25,21 @@ export default function GlobalSearchModal() {
 
   if (!searchOpen) return null;
 
+  const isSuperAdmin = currentUser.role === 'Super Admin';
+  const assignedStore = currentUser.store || 'BLR';
+
   const matchedItems = query
     ? inventory
-        .filter(
-          (i) =>
+        .filter((i) => {
+          if (!isSuperAdmin && i.store && i.store.toUpperCase() !== assignedStore.toUpperCase()) {
+            return false;
+          }
+          return (
             i.name.toLowerCase().includes(query.toLowerCase()) ||
             i.sku.toLowerCase().includes(query.toLowerCase()) ||
             (i.barcode && i.barcode.includes(query))
-        )
+          );
+        })
         .slice(0, 4)
     : [];
 
@@ -48,11 +56,15 @@ export default function GlobalSearchModal() {
 
   const matchedSales = query
     ? sales
-        .filter(
-          (s) =>
+        .filter((s) => {
+          if (!isSuperAdmin && s.store && s.store.toUpperCase() !== assignedStore.toUpperCase()) {
+            return false;
+          }
+          return (
             s.orderNo.toLowerCase().includes(query.toLowerCase()) ||
             s.customerName.toLowerCase().includes(query.toLowerCase())
-        )
+          );
+        })
         .slice(0, 3)
     : [];
 

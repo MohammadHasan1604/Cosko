@@ -487,13 +487,12 @@ export async function POST(req: NextRequest) {
         );
 
         // Broadcast realtime event for multi-tab sync
-        broadcastRealtimeEvent('purchases', 'PAYMENT_RECORDED', {
+        await broadcastRealtimeEvent('purchases', 'PAYMENT_RECORDED', {
           purchaseId: body.purchaseId,
           paymentStatus: result.newPaymentStatus,
           vendorId: result.vendor?.id,
-          amount: paymentAmount,
         });
-        broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
+        await broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
           id: result.vendor?.id,
           code: result.vendor?.code,
           action: 'payment_recorded',

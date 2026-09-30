@@ -353,9 +353,9 @@ export async function POST(req: NextRequest) {
           productId: savedProduct?.id,
           sku: savedProduct?.sku,
         };
-        broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
         if (storeCode) {
-          broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload);
+          await broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload);
         }
 
         return {
@@ -557,9 +557,9 @@ export async function PUT(req: NextRequest) {
       sku: product.sku,
       storeCode: invStore,
     };
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+    await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
     if (invStore) {
-      broadcastRealtimeEvent(getStoreChannel(invStore), 'STOCK_UPDATED', stockPayload);
+      await broadcastRealtimeEvent(getStoreChannel(invStore), 'STOCK_UPDATED', stockPayload);
     }
 
     return NextResponse.json({ success: true, product: updatedProduct });
@@ -695,9 +695,9 @@ export async function DELETE(req: NextRequest) {
         action: 'archived',
         storeCode: user.store || 'CENTRAL',
       };
-      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', archiveStockPayload);
+      await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', archiveStockPayload);
       if (user.store && user.store !== 'All Stores') {
-        broadcastRealtimeEvent(getStoreChannel(user.store), 'STOCK_UPDATED', archiveStockPayload);
+        await broadcastRealtimeEvent(getStoreChannel(user.store), 'STOCK_UPDATED', archiveStockPayload);
       }
 
       return NextResponse.json({
@@ -736,9 +736,9 @@ export async function DELETE(req: NextRequest) {
       action: 'deleted',
       storeCode: user.store || 'CENTRAL',
     };
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', deleteStockPayload);
+    await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', deleteStockPayload);
     if (user.store && user.store !== 'All Stores') {
-      broadcastRealtimeEvent(getStoreChannel(user.store), 'STOCK_UPDATED', deleteStockPayload);
+      await broadcastRealtimeEvent(getStoreChannel(user.store), 'STOCK_UPDATED', deleteStockPayload);
     }
 
     return NextResponse.json({

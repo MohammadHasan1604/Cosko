@@ -12,15 +12,21 @@
  * 8. Work Activity (Live Presence / ONLINE-IDLE-OFFLINE / Heartbeat / RBAC)
  */
 
+import { NextRequest } from 'next/server';
 import { prisma } from '../src/lib/db';
 import {
   getRealtimeStatus,
   getStoreChannel,
   getGlobalChannel,
+  getUserChannel,
+  getWorkActivityChannel,
+  getAttendanceChannel,
   sanitizeChannelName,
   persistOutboxEvent,
   broadcastRealtimeEvent,
 } from '../src/lib/realtime';
+import { signSessionToken, hashToken } from '../src/lib/auth';
+import { POST as realtimeAuthHandler } from '../src/app/api/realtime/auth/route';
 import {
   formatHHMMSS,
   getLocalDateString,
@@ -116,13 +122,16 @@ async function runTests() {
       }
     });
 
-    await it('Channel naming helpers sanitize and format correctly', () => {
+    await it('Channel naming helpers sanitize and format correctly for authenticated private channels', () => {
       expect(sanitizeChannelName('store:BLR')).toBe('store_BLR');
       expect(sanitizeChannelName('store/MUM')).toBe('store_MUM');
-      expect(getStoreChannel('BLR')).toBe('store-BLR');
-      expect(getStoreChannel('All Stores')).toBe('store-global');
-      expect(getStoreChannel(null)).toBe('store-global');
-      expect(getGlobalChannel()).toBe('store-global');
+      expect(getStoreChannel('BLR')).toBe('private-store-BLR');
+      expect(getStoreChannel('All Stores')).toBe('private-enterprise');
+      expect(getStoreChannel(null)).toBe('private-enterprise');
+      expect(getGlobalChannel()).toBe('private-enterprise');
+      expect(getUserChannel('u-123')).toBe('private-user-u-123');
+      expect(getWorkActivityChannel()).toBe('private-work-activity');
+      expect(getAttendanceChannel()).toBe('private-attendance');
     });
   });
 
@@ -137,14 +146,14 @@ async function runTests() {
         timestamp: new Date().toISOString(),
       };
 
-      const outboxId = await persistOutboxEvent(`store-${testStore}`, eventType, testPayload);
+      const outboxId = await persistOutboxEvent(`private-store-${testStore}`, eventType, testPayload);
       expect(outboxId).toBeTruthy();
 
-      const record = await prisma.realtimeOutbox.findUnique({
+      const record = await (prisma as any).realtimeOutbox.findUnique({
         where: { id: outboxId! },
       });
       expect(record).toBeTruthy();
-      expect(record?.channel).toBe(`store-${testStore}`);
+      expect(record?.channel).toBe(`private-store-${testStore}`);
       expect(record?.event).toBe(eventType);
       expect(record?.storeCode).toBe(testStore);
 
@@ -152,7 +161,7 @@ async function runTests() {
       expect(parsed.entityId).toBe('prod-test-001');
 
       // Clean up test record
-      await prisma.realtimeOutbox.delete({ where: { id: outboxId! } });
+      await (prisma as any).realtimeOutbox.delete({ where: { id: outboxId! } });
     });
 
     await it('broadcastRealtimeEvent strips sensitive passwords and credentials', async () => {
@@ -168,7 +177,7 @@ async function runTests() {
       const res = await broadcastRealtimeEvent('users', 'USER_CREATED', testPayload);
       expect(res.outboxId).toBeTruthy();
 
-      const record = await prisma.realtimeOutbox.findUnique({
+      const record = await (prisma as any).realtimeOutbox.findUnique({
         where: { id: res.outboxId! },
       });
       expect(record).toBeTruthy();
@@ -179,20 +188,20 @@ async function runTests() {
       expect(parsed.userId).toBe('user-sec-001');
 
       // Clean up
-      await prisma.realtimeOutbox.delete({ where: { id: res.outboxId! } });
+      await (prisma as any).realtimeOutbox.delete({ where: { id: res.outboxId! } });
     });
   });
 
   await describe('3. Store-Scoped Channels & Store Isolation Verification', async () => {
     await it('Events for store MUM cannot match queries for store BLR in outbox sync', async () => {
-      const blrId = await persistOutboxEvent('store-BLR', 'STOCK_UPDATED', {
+      const blrId = await persistOutboxEvent('private-store-BLR', 'STOCK_UPDATED', {
         eventType: 'STOCK_UPDATED',
         storeCode: 'BLR',
         productId: 'item-blr-1',
         timestamp: new Date().toISOString(),
       });
 
-      const mumId = await persistOutboxEvent('store-MUM', 'STOCK_UPDATED', {
+      const mumId = await persistOutboxEvent('private-store-MUM', 'STOCK_UPDATED', {
         eventType: 'STOCK_UPDATED',
         storeCode: 'MUM',
         productId: 'item-mum-1',
@@ -200,14 +209,14 @@ async function runTests() {
       });
 
       // Simulate a non-admin BLR user querying the outbox
-      const blrEvents = await prisma.realtimeOutbox.findMany({
+      const blrEvents = await (prisma as any).realtimeOutbox.findMany({
         where: {
           id: { in: [blrId!, mumId!] },
           AND: [
             {
               OR: [
                 { storeCode: 'BLR' },
-                { channel: 'store-BLR' },
+                { channel: 'private-store-BLR' },
               ],
             },
             {
@@ -225,9 +234,183 @@ async function runTests() {
       expect(blrEvents[0].storeCode).toBe('BLR');
 
       // Clean up
-      await prisma.realtimeOutbox.deleteMany({
+      await (prisma as any).realtimeOutbox.deleteMany({
         where: { id: { in: [blrId!, mumId!] } },
       });
+    });
+  });
+
+  await describe('3.1 POST /api/realtime/auth Authorization & Store Isolation Defense', async () => {
+    // Helper to create valid session token for a given user
+    async function createTestSession(user: any) {
+      const sid = 'auth-test-' + Math.random().toString(36).substring(2);
+      const token = signSessionToken({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        securityLevel: user.securityLevel,
+        store: user.storeScope || 'BLR',
+        avatar: '',
+        sessionId: sid,
+      }, sid);
+
+      const tokenHash = hashToken(token);
+      await (prisma as any).userSession.create({
+        data: {
+          id: sid,
+          userId: user.id,
+          tokenHash,
+          expiresAt: new Date(Date.now() + 3600000),
+        },
+      });
+
+      return { sid, token };
+    }
+
+    const superAdmin = await prisma.userAccount.findFirst({
+      where: { role: 'Super Admin', status: 'Active' },
+    });
+    const storeManager = await prisma.userAccount.findFirst({
+      where: { role: 'Store Manager', status: 'Active' },
+    });
+    const salesManager = await prisma.userAccount.findFirst({
+      where: { role: 'Sales Manager', status: 'Active' },
+    });
+
+    await it('Rejects unauthenticated subscription requests with 401', async () => {
+      const req = new NextRequest('http://localhost:3000/api/realtime/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ socket_id: '1234.5678', channel_name: 'private-store-BLR' }),
+      });
+      const res = await realtimeAuthHandler(req);
+      expect(res.status).toBe(401);
+    });
+
+    await it('Rejects request missing socket_id or channel_name with 400', async () => {
+      if (!superAdmin) return;
+      const { sid, token } = await createTestSession(superAdmin);
+      try {
+        const req = new NextRequest('http://localhost:3000/api/realtime/auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ socket_id: '1234.5678' }), // missing channel_name
+        });
+        const res = await realtimeAuthHandler(req);
+        expect(res.status).toBe(400);
+      } finally {
+        await (prisma as any).userSession.delete({ where: { id: sid } });
+      }
+    });
+
+    await it('Super Admin can authorize enterprise, work-activity, attendance, and all stores', async () => {
+      if (!superAdmin) return;
+      const { sid, token } = await createTestSession(superAdmin);
+      try {
+        for (const ch of ['private-enterprise', 'private-work-activity', 'private-attendance', 'private-store-BLR', 'private-store-MUM']) {
+          const req = new NextRequest('http://localhost:3000/api/realtime/auth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ socket_id: '1234.5678', channel_name: ch }),
+          });
+          const res = await realtimeAuthHandler(req);
+          expect(res.status).toBe(200);
+        }
+      } finally {
+        await (prisma as any).userSession.delete({ where: { id: sid } });
+      }
+    });
+
+    await it('Store Manager is strictly locked to own store and rejected for cross-store attempts (403)', async () => {
+      if (!storeManager) return;
+      const { sid, token } = await createTestSession(storeManager);
+      const ownStore = (storeManager.storeScope || 'BLR').toUpperCase();
+      const otherStore = ownStore === 'BLR' ? 'MUM' : 'BLR';
+
+      try {
+        // Own store authorized
+        const ownReq = new NextRequest('http://localhost:3000/api/realtime/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ socket_id: '1234.5678', channel_name: `private-store-${ownStore}` }),
+        });
+        const ownRes = await realtimeAuthHandler(ownReq);
+        expect(ownRes.status).toBe(200);
+
+        // Cross-store strictly rejected (403)
+        const crossReq = new NextRequest('http://localhost:3000/api/realtime/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ socket_id: '1234.5678', channel_name: `private-store-${otherStore}` }),
+        });
+        const crossRes = await realtimeAuthHandler(crossReq);
+        expect(crossRes.status).toBe(403);
+
+        // Enterprise channel rejected (403)
+        const entReq = new NextRequest('http://localhost:3000/api/realtime/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ socket_id: '1234.5678', channel_name: 'private-enterprise' }),
+        });
+        const entRes = await realtimeAuthHandler(entReq);
+        expect(entRes.status).toBe(403);
+
+        // Work activity channel rejected (403)
+        const waReq = new NextRequest('http://localhost:3000/api/realtime/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ socket_id: '1234.5678', channel_name: 'private-work-activity' }),
+        });
+        const waRes = await realtimeAuthHandler(waReq);
+        expect(waRes.status).toBe(403);
+
+        // Attendance channel rejected (403)
+        const attReq = new NextRequest('http://localhost:3000/api/realtime/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ socket_id: '1234.5678', channel_name: 'private-attendance' }),
+        });
+        const attRes = await realtimeAuthHandler(attReq);
+        expect(attRes.status).toBe(403);
+      } finally {
+        await (prisma as any).userSession.delete({ where: { id: sid } });
+      }
+    });
+
+    await it('Sales Manager is strictly locked to own store and rejected for cross-store attempts (403)', async () => {
+      if (!salesManager) return;
+      const { sid, token } = await createTestSession(salesManager);
+      const ownStore = (salesManager.storeScope || 'BLR').toUpperCase();
+      const otherStore = ownStore === 'BLR' ? 'CHE' : 'BLR';
+
+      try {
+        // Own store authorized
+        const ownReq = new NextRequest('http://localhost:3000/api/realtime/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ socket_id: '1234.5678', channel_name: `private-store-${ownStore}` }),
+        });
+        const ownRes = await realtimeAuthHandler(ownReq);
+        expect(ownRes.status).toBe(200);
+
+        // Cross-store strictly rejected (403)
+        const crossReq = new NextRequest('http://localhost:3000/api/realtime/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ socket_id: '1234.5678', channel_name: `private-store-${otherStore}` }),
+        });
+        const crossRes = await realtimeAuthHandler(crossReq);
+        expect(crossRes.status).toBe(403);
+      } finally {
+        await (prisma as any).userSession.delete({ where: { id: sid } });
+      }
     });
   });
 
@@ -284,7 +467,7 @@ async function runTests() {
       }
 
       const now = new Date();
-      const presence = await prisma.userPresence.upsert({
+      const presence = await (prisma as any).userPresence.upsert({
         where: { userId: testUser.id },
         create: {
           userId: testUser.id,
@@ -306,14 +489,14 @@ async function runTests() {
       expect(presence.lastHeartbeat).toBeDefined();
 
       // Test transitioning to IDLE
-      const idlePresence = await prisma.userPresence.update({
+      const idlePresence = await (prisma as any).userPresence.update({
         where: { userId: testUser.id },
         data: { status: 'IDLE' },
       });
       expect(idlePresence.status).toBe('IDLE');
 
       // Test transitioning to OFFLINE
-      const offlinePresence = await prisma.userPresence.update({
+      const offlinePresence = await (prisma as any).userPresence.update({
         where: { userId: testUser.id },
         data: { status: 'OFFLINE' },
       });

@@ -81,72 +81,23 @@ export async function GET(req: NextRequest) {
     const reqStore = searchParams.get('storeCode') || undefined;
     const timezone = searchParams.get('timezone') || 'Asia/Kolkata';
 
+    // Strict RBAC: Work Activity stats is SUPER ADMIN ONLY (Requirement I)
     const isSuperAdmin = caller.role === 'Super Admin' || caller.securityLevel >= 100;
-    const isStoreManager = caller.role === 'Store Manager';
-    const isSalesManager = !isSuperAdmin && !isStoreManager;
-    const callerStore = caller.store && caller.store !== 'All Stores' ? caller.store : 'BLR';
-
-    // RBAC: Store Isolation & Scope enforcement
     if (!isSuperAdmin) {
-      if (reqStore === 'All Stores') {
-        return NextResponse.json(
-          {
-            error:
-              'Forbidden: Consolidated view across all stores is restricted to Super Admin only',
-          },
-          { status: 403 }
-        );
-      }
-      if (reqStore && reqStore !== callerStore) {
-        return NextResponse.json(
-          {
-            error:
-              'Forbidden: You do not have permission to view activity records for another store',
-          },
-          { status: 403 }
-        );
-      }
-      if (isSalesManager && reqUserId && reqUserId !== caller.id) {
-        return NextResponse.json(
-          { error: 'Forbidden: You do not have permission to view other staff activity records' },
-          { status: 403 }
-        );
-      }
-      if (isStoreManager && reqUserId && reqUserId !== caller.id) {
-        const targetUser = await prisma.userAccount.findUnique({
-          where: { id: reqUserId },
-          select: { storeScope: true },
-        });
-        if (!targetUser || targetUser.storeScope !== callerStore) {
-          return NextResponse.json(
-            {
-              error:
-                'Forbidden: You do not have permission to view activity records for staff outside your store',
-            },
-            { status: 403 }
-          );
-        }
-      }
+      return NextResponse.json(
+        { error: 'Forbidden: Work Activity data is restricted to Super Admin only.' },
+        { status: 403 }
+      );
     }
 
     const { startDate, endDate } = computeDateRange(range, customStart, customEnd, timezone);
 
     // Fetch relevant users based on caller role
     const userWhere: any = {};
-    if (isSuperAdmin) {
-      if (reqUserId && reqUserId !== 'all') {
-        userWhere.id = reqUserId;
-      } else if (reqStore && reqStore !== 'All Stores' && reqStore !== 'all') {
-        userWhere.storeScope = reqStore;
-      }
-    } else if (isStoreManager) {
-      userWhere.storeScope = callerStore;
-      if (reqUserId && reqUserId !== 'all') {
-        userWhere.id = reqUserId;
-      }
-    } else {
-      // Sales Manager — strictly own activity
-      userWhere.id = caller.id;
+    if (reqUserId && reqUserId !== 'all') {
+      userWhere.id = reqUserId;
+    } else if (reqStore && reqStore !== 'All Stores' && reqStore !== 'all') {
+      userWhere.storeScope = reqStore;
     }
 
     const users = await prisma.userAccount.findMany({

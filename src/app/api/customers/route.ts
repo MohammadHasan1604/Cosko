@@ -226,16 +226,14 @@ export async function POST(req: NextRequest) {
 
         const customerStore = (user.store || 'HQ').toUpperCase();
         const customerPayload = {
-          id: customer.id,
-          name: customer.name,
-          phone: customer.phone,
+          entityId: customer.id,
           storeCode: customerStore,
           action: 'saved',
         };
 
-        broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
+        await broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
         if (customerStore) {
-          broadcastRealtimeEvent(
+          await broadcastRealtimeEvent(
             getStoreChannel(customerStore),
             'CUSTOMER_UPDATED',
             customerPayload
@@ -308,16 +306,14 @@ export async function PUT(req: NextRequest) {
 
     const customerStore = user.store || 'BLR';
     const customerPayload = {
-      id: customer.id,
-      name: customer.name,
-      phone: customer.phone,
+      entityId: customer.id,
       storeCode: customerStore,
       action: 'updated',
     };
 
-    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
+    await broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
     if (customerStore) {
-      broadcastRealtimeEvent(getStoreChannel(customerStore), 'CUSTOMER_UPDATED', customerPayload);
+      await broadcastRealtimeEvent(getStoreChannel(customerStore), 'CUSTOMER_UPDATED', customerPayload);
     }
 
     return NextResponse.json({ success: true, customer });
@@ -425,9 +421,8 @@ export async function DELETE(req: NextRequest) {
         },
       });
 
-      broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', {
-        id: target.id,
-        name: target.name,
+      await broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', {
+        entityId: target.id,
         action: 'archived',
       });
 
@@ -463,15 +458,14 @@ export async function DELETE(req: NextRequest) {
 
     const customerStore = user.store || 'BLR';
     const customerPayload = {
-      id: target.id,
-      name: target.name,
+      entityId: target.id,
       storeCode: customerStore,
       action: 'deleted',
     };
 
-    broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
+    await broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
     if (customerStore) {
-      broadcastRealtimeEvent(getStoreChannel(customerStore), 'CUSTOMER_UPDATED', customerPayload);
+      await broadcastRealtimeEvent(getStoreChannel(customerStore), 'CUSTOMER_UPDATED', customerPayload);
     }
 
     return NextResponse.json({

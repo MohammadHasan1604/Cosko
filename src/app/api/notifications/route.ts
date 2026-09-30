@@ -77,7 +77,7 @@ export async function PUT(req: NextRequest) {
         where: { userId: user.id, isRead: false },
         data: { isRead: true },
       });
-      broadcastRealtimeEvent(`user-${user.id}`, 'NOTIFICATION_UPDATED', {
+      await broadcastRealtimeEvent(`user-${user.id}`, 'NOTIFICATION_UPDATED', {
         userId: user.id,
         action: 'all_read',
       });
@@ -89,7 +89,7 @@ export async function PUT(req: NextRequest) {
         where: { id: body.notificationId, userId: user.id },
         data: { isRead: true },
       });
-      broadcastRealtimeEvent(`user-${user.id}`, 'NOTIFICATION_UPDATED', {
+      await broadcastRealtimeEvent(`user-${user.id}`, 'NOTIFICATION_UPDATED', {
         userId: user.id,
         notificationId: body.notificationId,
         action: 'read',

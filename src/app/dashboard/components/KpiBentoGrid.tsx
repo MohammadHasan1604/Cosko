@@ -253,14 +253,29 @@ export default function KpiBentoGrid() {
     },
     {
       id: 'kpi-inventory',
-      label: 'Inventory Asset Value',
-      value: `₹${invValue.toLocaleString('en-IN')}`,
+      label: isSalesManager ? 'Stock Status' : 'Inventory Asset Value',
+      value: isSalesManager
+        ? `${filteredInv.reduce((acc: number, i: any) => acc + (i.qtyOnHand || 0), 0)} Units`
+        : `₹${invValue.toLocaleString('en-IN')}`,
       change: `${filteredInv.length} SKUs`,
       trend: 'neutral' as const,
-      subtext: `${filteredInv.reduce((acc: number, i: any) => acc + (i.qtyOnHand || 0), 0)} units on hand`,
+      subtext: isSalesManager
+        ? `${filteredInv.length} active inventory products`
+        : `${filteredInv.reduce((acc: number, i: any) => acc + (i.qtyOnHand || 0), 0)} units on hand`,
       icon: 'CubeIcon',
       variant: 'normal' as const,
       color: 'info' as const,
+    },
+    {
+      id: 'kpi-transactions',
+      label: 'Store Transactions',
+      value: `${filteredSales.length} Orders`,
+      change: `${customers.length} Customers`,
+      trend: 'neutral' as const,
+      subtext: `Operational transactions in ${datePeriod}`,
+      icon: 'ShoppingCartIcon',
+      variant: 'normal' as const,
+      color: 'positive' as const,
     },
     {
       id: 'kpi-receivables',
@@ -306,12 +321,14 @@ export default function KpiBentoGrid() {
   const visibleKpiCards = useMemo(() => {
     return kpiCards.filter((card) => {
       if (card.id === 'kpi-stores') return isSuperAdmin;
+      if (card.id === 'kpi-transactions') return isSalesManager;
       if (
         isSalesManager &&
         (card.id === 'kpi-gross-profit' ||
           card.id === 'kpi-net-profit' ||
           card.id === 'kpi-expenses' ||
-          card.id === 'kpi-payables')
+          card.id === 'kpi-payables' ||
+          card.id === 'kpi-receivables')
       ) {
         return false;
       }

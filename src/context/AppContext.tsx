@@ -1947,7 +1947,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           } else if (c === 'stores') {
             await fetchStoresData(opts);
           } else {
-            await refreshAllData();
+            // Unrecognized domain: do NOT reload whole app to avoid resetting open forms
           }
         } catch (err) {
           console.warn(`[COSKO] Domain refresh error (${c}):`, err);
@@ -2015,34 +2015,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     realtimeClient.initialize();
 
     const unsubscribe = realtimeClient.subscribe((msg) => {
-      const channel = msg.channel || '';
       const event = (msg.event || '').toLowerCase();
-      const payload = msg.payload || {};
 
-      // Map event or channel to targeted domain
-      let domain = channel.replace(/^store-/, '');
-      if (event.includes('user')) domain = 'users';
-      else if (event.includes('stock') || event.includes('inventory')) domain = 'inventory';
-      else if (event.includes('sale')) domain = 'sales';
-      else if (event.includes('customer')) domain = 'customers';
-      else if (event.includes('purchase')) domain = 'purchases';
-      else if (event.includes('vendor')) domain = 'vendors';
-      else if (event.includes('expense')) domain = 'expenses';
-      else if (event.includes('transfer')) domain = 'transfers';
-      else if (event.includes('category')) domain = 'categories';
-      else if (event.includes('brand')) domain = 'brands';
-      else if (event.includes('unit')) domain = 'units';
-      else if (event.includes('store')) domain = 'stores';
-      else if (event.includes('attendance') || event.includes('shift')) domain = 'attendance';
-      else if (event.includes('work') || event.includes('activity')) domain = 'work-activity';
-
-      // Targeted domain invalidation — avoids reloading all 15 endpoints
-      refreshDomainData(domain);
-
-      if (event.includes('sale') && payload?.grandTotal) {
-        toast.info(
-          `⚡ Live POS Sale Recorded on ${payload?.storeCode || 'Store'}: ₹${payload?.grandTotal}`
-        );
+      // Targeted domain invalidation — avoids whole-app reload and preserves open form drafts (Requirements R & T)
+      if (event.includes('sale')) {
+        refreshDomainData('sales');
+        refreshDomainData('inventory');
+      } else if (event.includes('stock') || event.includes('inventory')) {
+        refreshDomainData('inventory');
+      } else if (event.includes('transfer')) {
+        refreshDomainData('transfers');
+        refreshDomainData('inventory');
+      } else if (event.includes('user')) {
+        refreshDomainData('users');
+      } else if (event.includes('customer')) {
+        refreshDomainData('customers');
+      } else if (event.includes('vendor')) {
+        refreshDomainData('vendors');
+      } else if (event.includes('purchase')) {
+        refreshDomainData('purchases');
+        refreshDomainData('inventory');
+      } else if (event.includes('expense')) {
+        refreshDomainData('expenses');
+      } else if (event.includes('category')) {
+        refreshDomainData('categories');
+      } else if (event.includes('brand')) {
+        refreshDomainData('brands');
+      } else if (event.includes('unit')) {
+        refreshDomainData('units');
+      } else if (event.includes('store')) {
+        refreshDomainData('stores');
       }
     });
 

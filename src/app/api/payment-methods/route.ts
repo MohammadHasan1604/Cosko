@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
     });
 
     invalidateCache();
-    broadcastRealtimeEvent('payment-methods', 'PAYMENT_METHOD_CREATED', created);
+    await broadcastRealtimeEvent('payment-methods', 'PAYMENT_METHOD_CREATED', created);
 
     return NextResponse.json(
       { success: true, paymentMethod: created, message: 'Payment method created successfully' },
@@ -203,7 +203,7 @@ export async function PUT(req: NextRequest) {
     });
 
     invalidateCache();
-    broadcastRealtimeEvent('payment-methods', 'PAYMENT_METHOD_UPDATED', updated);
+    await broadcastRealtimeEvent('payment-methods', 'PAYMENT_METHOD_UPDATED', updated);
 
     return NextResponse.json({
       success: true,
@@ -304,7 +304,7 @@ export async function DELETE(req: NextRequest) {
     });
 
     invalidateCache();
-    broadcastRealtimeEvent('payment-methods', 'PAYMENT_METHOD_DELETED', { id });
+    await broadcastRealtimeEvent('payment-methods', 'PAYMENT_METHOD_DELETED', { id });
 
     return NextResponse.json({
       success: true,

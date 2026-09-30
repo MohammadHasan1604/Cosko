@@ -109,6 +109,11 @@ class RealtimeClientManager {
       this.pusherInstance = new Pusher(key, {
         cluster,
         forceTLS: true,
+        channelAuthorization: {
+          endpoint: '/api/realtime/auth',
+          transport: 'ajax',
+        },
+        authEndpoint: '/api/realtime/auth',
       });
 
       this.currentMode = `Distributed WebSocket (Pusher Cluster: ${cluster})`;

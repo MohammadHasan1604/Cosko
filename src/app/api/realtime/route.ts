@@ -21,23 +21,23 @@ export async function GET(req: NextRequest) {
     const isSuperAdmin = user.role === 'Super Admin' || user.securityLevel >= 100;
 
     // Server-Authoritative Subscription Channels:
-    // Super Admin: May subscribe to global and all stores
-    // Store Manager / Sales Manager: Restricted strictly to own assigned store
+    // Super Admin: May subscribe to enterprise and all authorized stores
+    // Store Manager / Sales Manager: Restricted strictly to own assigned store + own user channel
     const authorizedChannels: string[] = [];
 
     if (isSuperAdmin) {
-      authorizedChannels.push(getGlobalChannel());
-      authorizedChannels.push('work-activity');
-      authorizedChannels.push('attendance');
-      authorizedChannels.push('users');
-      // Also allow individual store channels if needed
+      authorizedChannels.push(getGlobalChannel()); // private-enterprise
+      authorizedChannels.push('private-work-activity');
+      authorizedChannels.push('private-attendance');
+      authorizedChannels.push(`private-user-${user.id}`);
+      // Also allow individual store channels
       user.allowedStores.forEach((st) => {
         authorizedChannels.push(getStoreChannel(st));
       });
     } else {
       const userStore = user.store && user.store !== 'All Stores' ? user.store : 'BLR';
-      authorizedChannels.push(getStoreChannel(userStore));
-      authorizedChannels.push(`user-${user.id}`);
+      authorizedChannels.push(getStoreChannel(userStore)); // private-store-<store>
+      authorizedChannels.push(`private-user-${user.id}`);
     }
 
     const config = getRealtimeStatus();

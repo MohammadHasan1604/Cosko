@@ -11,6 +11,13 @@
 
 import fs from 'fs';
 import path from 'path';
+import {
+  NAVIGATION_REGISTRY,
+  CANONICAL_ROUTE_ACCESS,
+  isRouteAllowed,
+  getAuthoritativeNavGroups,
+  getMobileMoreNav,
+} from '../src/lib/rbacEngine';
 
 let p2Passed = 0;
 let p2Failed = 0;
@@ -560,11 +567,198 @@ describe('Phase 2 — API Integration Tests', () => {
       expect(content).toContain('repairsEnquiries');
     });
   });
+
+  describe('Phase 2 — Root Hardening: Canonical Feature Matrix & Device Parity (Req A & B)', () => {
+    it('NAVIGATION_REGISTRY contains authoritative list of navigation items', () => {
+      expect(NAVIGATION_REGISTRY.length).toBeGreaterThan(15);
+      const hrefs = NAVIGATION_REGISTRY.map((item) => item.href);
+      expect(hrefs).toContain('/dashboard');
+      expect(hrefs).toContain('/sales');
+      expect(hrefs).toContain('/inventory-management');
+      expect(hrefs).toContain('/categories');
+      expect(hrefs).toContain('/customers');
+      expect(hrefs).toContain('/attendance');
+      expect(hrefs).toContain('/work-activity');
+      expect(hrefs).toContain('/audit-logs');
+      expect(hrefs).toContain('/settings');
+    });
+
+    it('CANONICAL_ROUTE_ACCESS defines exact role permissions for every route', () => {
+      // Sales Manager allowed
+      expect(CANONICAL_ROUTE_ACCESS['/dashboard']).toContain('Sales Manager');
+      expect(CANONICAL_ROUTE_ACCESS['/categories']).toContain('Sales Manager');
+      expect(CANONICAL_ROUTE_ACCESS['/customers']).toContain('Sales Manager');
+      expect(CANONICAL_ROUTE_ACCESS['/sales']).toContain('Sales Manager');
+      expect(CANONICAL_ROUTE_ACCESS['/inventory-management']).toContain('Sales Manager');
+
+      // Attendance and Work Activity: Super Admin ONLY
+      expect(CANONICAL_ROUTE_ACCESS['/attendance']).toEqual(['Super Admin']);
+      expect(CANONICAL_ROUTE_ACCESS['/work-activity']).toEqual(['Super Admin']);
+      expect(CANONICAL_ROUTE_ACCESS['/audit-logs']).toEqual(['Super Admin']);
+      expect(CANONICAL_ROUTE_ACCESS['/settings']).toEqual(['Super Admin']);
+    });
+
+    it('isRouteAllowed enforces canonical matrix consistently across roles', () => {
+      // Super Admin has universal access
+      expect(isRouteAllowed('/dashboard', 'Super Admin')).toBe(true);
+      expect(isRouteAllowed('/attendance', 'Super Admin')).toBe(true);
+      expect(isRouteAllowed('/work-activity', 'Super Admin')).toBe(true);
+      expect(isRouteAllowed('/audit-logs', 'Super Admin')).toBe(true);
+      expect(isRouteAllowed('/settings', 'Super Admin')).toBe(true);
+      expect(isRouteAllowed('/purchases', 'Super Admin')).toBe(true);
+
+      // Store Manager
+      expect(isRouteAllowed('/dashboard', 'Store Manager')).toBe(true);
+      expect(isRouteAllowed('/sales', 'Store Manager')).toBe(true);
+      expect(isRouteAllowed('/inventory-management', 'Store Manager')).toBe(true);
+      expect(isRouteAllowed('/categories', 'Store Manager')).toBe(true);
+      expect(isRouteAllowed('/customers', 'Store Manager')).toBe(true);
+      expect(isRouteAllowed('/purchases', 'Store Manager')).toBe(true);
+      expect(isRouteAllowed('/vendors', 'Store Manager')).toBe(true);
+      expect(isRouteAllowed('/expenses', 'Store Manager')).toBe(true);
+      expect(isRouteAllowed('/attendance', 'Store Manager')).toBe(false);
+      expect(isRouteAllowed('/work-activity', 'Store Manager')).toBe(false);
+      expect(isRouteAllowed('/audit-logs', 'Store Manager')).toBe(false);
+      expect(isRouteAllowed('/settings', 'Store Manager')).toBe(false);
+
+      // Sales Manager
+      expect(isRouteAllowed('/dashboard', 'Sales Manager')).toBe(true);
+      expect(isRouteAllowed('/sales', 'Sales Manager')).toBe(true);
+      expect(isRouteAllowed('/inventory-management', 'Sales Manager')).toBe(true);
+      expect(isRouteAllowed('/categories', 'Sales Manager')).toBe(true);
+      expect(isRouteAllowed('/customers', 'Sales Manager')).toBe(true);
+      expect(isRouteAllowed('/attendance', 'Sales Manager')).toBe(false);
+      expect(isRouteAllowed('/work-activity', 'Sales Manager')).toBe(false);
+      expect(isRouteAllowed('/audit-logs', 'Sales Manager')).toBe(false);
+      expect(isRouteAllowed('/settings', 'Sales Manager')).toBe(false);
+      expect(isRouteAllowed('/purchases', 'Sales Manager')).toBe(false);
+      expect(isRouteAllowed('/accounting', 'Sales Manager')).toBe(false);
+      expect(isRouteAllowed('/reports', 'Sales Manager')).toBe(false);
+    });
+
+    it('Desktop Sidebar and Mobile Navigation exhibit 100% parity with zero drift', () => {
+      const roles: ('Super Admin' | 'Store Manager' | 'Sales Manager')[] = [
+        'Super Admin',
+        'Store Manager',
+        'Sales Manager',
+      ];
+
+      for (const role of roles) {
+        const desktopGroups = getAuthoritativeNavGroups(role);
+        const mobileMore = getMobileMoreNav(role);
+
+        // Every item visible on desktop must be allowed by route guard
+        for (const grp of desktopGroups) {
+          for (const item of grp.items) {
+            expect(isRouteAllowed(item.href, role)).toBe(true);
+          }
+        }
+
+        // Every item visible in mobile more menu must be allowed by route guard
+        for (const item of mobileMore) {
+          expect(isRouteAllowed(item.href, role)).toBe(true);
+        }
+
+        // Attendance & Work Activity must NEVER be present in desktop or mobile for lower roles
+        if (role !== 'Super Admin') {
+          const allDesktopHrefs = desktopGroups.flatMap((g) => g.items.map((i) => i.href));
+          const allMobileHrefs = mobileMore.map((i) => i.href);
+
+          expect(allDesktopHrefs.includes('/attendance')).toBeFalsy();
+          expect(allDesktopHrefs.includes('/work-activity')).toBeFalsy();
+          expect(allDesktopHrefs.includes('/audit-logs')).toBeFalsy();
+
+          expect(allMobileHrefs.includes('/attendance')).toBeFalsy();
+          expect(allMobileHrefs.includes('/work-activity')).toBeFalsy();
+          expect(allMobileHrefs.includes('/audit-logs')).toBeFalsy();
+        }
+      }
+    });
+  });
+
+  describe('Phase 2 — Attendance & Work Activity Super Admin Only API Defense (Req G & I)', () => {
+    it('/api/attendance strictly blocks non-Super-Admin with 403', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/api/attendance/route.ts'),
+        'utf8'
+      );
+      expect(content).toContain("user.role !== 'Super Admin' || user.securityLevel < 100");
+      expect(content).toContain('status: 403');
+    });
+
+    it('/api/activity/stats strictly blocks non-Super-Admin with 403', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/api/activity/stats/route.ts'),
+        'utf8'
+      );
+      expect(content).toContain("caller.role === 'Super Admin' || caller.securityLevel >= 100");
+      expect(content).toContain('if (!isSuperAdmin)');
+      expect(content).toContain('status: 403');
+    });
+
+    it('/api/activity/export strictly blocks non-Super-Admin with 403', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/api/activity/export/route.ts'),
+        'utf8'
+      );
+      expect(content).toContain("caller.role === 'Super Admin' || caller.securityLevel >= 100");
+      expect(content).toContain('if (!isSuperAdmin)');
+      expect(content).toContain('status: 403');
+    });
+  });
+
+  describe('Phase 2 — Dashboard Scope & Financial Data Leak Prevention (Req C, D, E, F)', () => {
+    it('KpiBentoGrid protects Sales Manager from financial metrics (P&L, margins, payables)', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/dashboard/components/KpiBentoGrid.tsx'),
+        'utf8'
+      );
+      expect(content).toContain("currentUser.role === 'Sales Manager'");
+      expect(content).toContain('Stock Status');
+      expect(content).toContain('Store Transactions');
+    });
+
+    it('RecentActivityFeed restricts audit logs and audit links to Super Admin only', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/dashboard/components/RecentActivityFeed.tsx'),
+        'utf8'
+      );
+      expect(content).toContain('isSuperAdmin');
+      expect(content).toContain('View full audit log');
+      expect(content).toContain('View all recent sales');
+    });
+
+    it('Inventory Table and Stock Modal restrict cross-store viewing to Super Admin', () => {
+      const invTableContent = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/inventory-management/components/InventoryTable.tsx'),
+        'utf8'
+      );
+      expect(invTableContent).toContain("currentUser.role === 'Super Admin'");
+
+      const stockModalContent = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/inventory-management/components/StoreStockModal.tsx'),
+        'utf8'
+      );
+      expect(stockModalContent).toContain("currentUser.role === 'Super Admin'");
+    });
+
+    it('GlobalSearchModal enforces store scoping for non-Super-Admin search results', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/GlobalSearchModal.tsx'),
+        'utf8'
+      );
+      expect(content).toContain('!isSuperAdmin');
+      expect(content).toContain('assignedStore');
+    });
+  });
 });
 
 setTimeout(() => {
   console.log('\n══════════════════════════════════════════════════');
   console.log(`📊 Phase 2 Test Results: ${p2Passed} passed, ${p2Failed} failed`);
+  if (p2Failed > 0) {
+    console.error('\nFAILED TESTS:\n' + p2Errors.join('\n'));
+    process.exit(1);
+  }
   console.log('══════════════════════════════════════════════════');
-  if (p2Failed > 0) process.exit(1);
 }, 500);

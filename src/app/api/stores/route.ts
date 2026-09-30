@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
         });
 
         invalidateStoresCache();
-        broadcastRealtimeEvent('stores', 'STORE_UPDATED', {
+        await broadcastRealtimeEvent('stores', 'STORE_UPDATED', {
           code: store.code,
           name: store.name,
           action: 'saved',
@@ -252,7 +252,7 @@ export async function DELETE(req: NextRequest) {
       });
 
       invalidateStoresCache();
-      broadcastRealtimeEvent('stores', 'STORE_UPDATED', {
+      await broadcastRealtimeEvent('stores', 'STORE_UPDATED', {
         code: target.code,
         name: target.name,
         action: 'deactivated',
@@ -274,7 +274,7 @@ export async function DELETE(req: NextRequest) {
     await prisma.storeHub.delete({ where: { id: target.id } });
 
     invalidateStoresCache();
-    broadcastRealtimeEvent('stores', 'STORE_UPDATED', {
+    await broadcastRealtimeEvent('stores', 'STORE_UPDATED', {
       code: target.code,
       name: target.name,
       action: 'deleted',

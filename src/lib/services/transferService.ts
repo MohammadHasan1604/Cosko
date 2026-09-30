@@ -310,13 +310,13 @@ export async function executeStockTransfer(input: CreateTransferInput) {
 
   // 7. Fire realtime broadcasts AFTER transaction commit
   try {
-    broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', {
+    await broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', {
       transferNo,
       sourceStore,
       destStore,
     });
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: sourceStore });
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: destStore });
+    await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: sourceStore });
+    await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: destStore });
   } catch (socketErr) {
     console.warn('Realtime broadcast notification failed (non-critical):', socketErr);
   }

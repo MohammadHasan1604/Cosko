@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    broadcastRealtimeEvent('brands', 'BRAND_CREATED', created);
+    await broadcastRealtimeEvent('brands', 'BRAND_CREATED', created);
 
     return NextResponse.json(
       { success: true, brand: created, message: 'Brand created successfully' },
@@ -167,7 +167,7 @@ export async function PUT(req: NextRequest) {
       },
     });
 
-    broadcastRealtimeEvent('brands', 'BRAND_UPDATED', updated);
+    await broadcastRealtimeEvent('brands', 'BRAND_UPDATED', updated);
 
     return NextResponse.json({
       success: true,
@@ -252,7 +252,7 @@ export async function DELETE(req: NextRequest) {
       });
     });
 
-    broadcastRealtimeEvent('brands', 'BRAND_DELETED', { id });
+    await broadcastRealtimeEvent('brands', 'BRAND_DELETED', { id });
 
     return NextResponse.json({ success: true, message: 'Brand deleted successfully' });
   } catch (error: any) {

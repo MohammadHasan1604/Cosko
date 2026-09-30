@@ -344,14 +344,13 @@ export async function executePOSCheckout(input: CreateSaleInput) {
     }
   );
 
-  // Broadcast Realtime SSE Events outside interactive transaction
+  // Broadcast Realtime Events outside interactive transaction
   try {
-    broadcastRealtimeEvent('sales', 'SALE_COMPLETED', {
+    await broadcastRealtimeEvent('sales', 'SALE_COMPLETED', {
       orderNo: result.orderNo,
-      grandTotal: result.grandTotal,
       storeCode: result.storeCode,
     });
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: result.storeCode });
+    await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: result.storeCode });
   } catch (broadcastErr) {
     console.warn('[salesService] Realtime broadcast error (non-fatal):', broadcastErr);
   }

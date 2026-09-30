@@ -63,15 +63,21 @@ export async function GET(req: NextRequest) {
     const reqStore = searchParams.get('storeCode') || undefined;
     const timezone = searchParams.get('timezone') || 'Asia/Kolkata';
 
+    // Strict RBAC: Work Activity export is SUPER ADMIN ONLY (Requirement I)
     const isSuperAdmin = caller.role === 'Super Admin' || caller.securityLevel >= 100;
-    const targetUserId = isSuperAdmin ? reqUserId : caller.id;
+    if (!isSuperAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden: Work Activity data export is restricted to Super Admin only.' },
+        { status: 403 }
+      );
+    }
 
     const { startDate, endDate } = computeDateRange(range, customStart, customEnd, timezone);
 
     const userWhere: any = {};
-    if (targetUserId) {
-      userWhere.id = targetUserId;
-    } else if (reqStore && reqStore !== 'All Stores') {
+    if (reqUserId && reqUserId !== 'all') {
+      userWhere.id = reqUserId;
+    } else if (reqStore && reqStore !== 'All Stores' && reqStore !== 'all') {
       userWhere.storeScope = reqStore;
     }
 
@@ -91,7 +97,7 @@ export async function GET(req: NextRequest) {
 
     const userIds = users.map((u) => u.id);
 
-    const dailyRecords = await prisma.attendanceDay.findMany({
+    const dailyRecords: any[] = await (prisma as any).attendanceDay.findMany({
       where: {
         userId: { in: userIds },
         localDate: { gte: startDate, lte: endDate },
@@ -136,8 +142,8 @@ export async function GET(req: NextRequest) {
 
     const now = new Date();
     for (const u of users) {
-      const userDays = dailyRecords.filter((d) => d.userId === u.id);
-      const totalActiveSeconds = userDays.reduce((acc, curr) => {
+      const userDays = dailyRecords.filter((d: any) => d.userId === u.id);
+      const totalActiveSeconds = userDays.reduce((acc: number, curr: any) => {
         let dur = curr.totalSeconds;
         if (curr.status === 'ACTIVE') {
           dur = Math.max(

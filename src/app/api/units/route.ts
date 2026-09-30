@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    broadcastRealtimeEvent('units', 'UNIT_CREATED', created);
+    await broadcastRealtimeEvent('units', 'UNIT_CREATED', created);
 
     return NextResponse.json(
       { success: true, unit: created, message: 'Unit created successfully' },
@@ -169,7 +169,7 @@ export async function PUT(req: NextRequest) {
       },
     });
 
-    broadcastRealtimeEvent('units', 'UNIT_UPDATED', updated);
+    await broadcastRealtimeEvent('units', 'UNIT_UPDATED', updated);
 
     return NextResponse.json({
       success: true,
@@ -252,7 +252,7 @@ export async function DELETE(req: NextRequest) {
       });
     });
 
-    broadcastRealtimeEvent('units', 'UNIT_DELETED', { id });
+    await broadcastRealtimeEvent('units', 'UNIT_DELETED', { id });
     return NextResponse.json({ success: true, message: 'Unit deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting unit:', error);

@@ -41,7 +41,7 @@ export interface IRealtimeProvider {
   publish(channel: string, event: string, payload: RealtimePayload): Promise<boolean>;
 }
 
-// ─── Channel Naming Helpers (Pusher & Store-Scoped Compliant) ────────────────
+// ─── Channel Naming Helpers (Private Authenticated Pusher Channels) ──────────
 
 export function sanitizeChannelName(name: string): string {
   // Pusher channels allow [-a-zA-Z0-9_=@,.;]+
@@ -50,14 +50,33 @@ export function sanitizeChannelName(name: string): string {
 
 export function getStoreChannel(storeCode?: string | null): string {
   if (!storeCode || storeCode === 'All Stores' || storeCode === 'all') {
-    return 'store-global';
+    return 'private-enterprise';
   }
-  return `store-${sanitizeChannelName(storeCode)}`;
+  return `private-store-${sanitizeChannelName(storeCode)}`;
 }
 
 export function getGlobalChannel(): string {
-  return 'store-global';
+  return 'private-enterprise';
 }
+
+export function getUserChannel(userId: string): string {
+  return `private-user-${sanitizeChannelName(userId)}`;
+}
+
+export function getWorkActivityChannel(): string {
+  return 'private-work-activity';
+}
+
+export function getAttendanceChannel(): string {
+  return 'private-attendance';
+}
+
+// Named aliases for explicit private channel ergonomics
+export const getPrivateStoreChannel = getStoreChannel;
+export const getPrivateGlobalChannel = getGlobalChannel;
+export const getPrivateUserChannel = getUserChannel;
+export const getPrivateWorkActivityChannel = getWorkActivityChannel;
+export const getPrivateAttendanceChannel = getAttendanceChannel;
 
 // ─── Distributed Pusher Provider ─────────────────────────────────────────────
 
@@ -159,9 +178,11 @@ export async function persistOutboxEvent(
     const db = tx || prisma;
     const storeCode =
       payload.storeCode ||
-      (channel.startsWith('store-') && channel !== 'store-global'
-        ? channel.replace('store-', '')
-        : null);
+      (channel.startsWith('private-store-')
+        ? channel.replace('private-store-', '')
+        : channel.startsWith('store-') && channel !== 'store-global'
+          ? channel.replace('store-', '')
+          : null);
 
     const record = await db.realtimeOutbox.create({
       data: {
@@ -200,37 +221,64 @@ export async function broadcastRealtimeEvent(
 ): Promise<{ outboxId: string | null; broadcastSuccess: boolean }> {
   const now = new Date().toISOString();
 
-  // Normalize minimal payload — DO NOT broadcast sensitive credentials or huge financial logs
+  // Normalize channel: map legacy channels to private authenticated channels
+  let targetChannel = channel;
+  if (channel === 'store-global' || channel === 'global') {
+    targetChannel = 'private-enterprise';
+  } else if (channel === 'work-activity') {
+    targetChannel = 'private-work-activity';
+  } else if (channel === 'attendance') {
+    targetChannel = 'private-attendance';
+  } else if (channel.startsWith('store-') && !channel.startsWith('private-store-')) {
+    targetChannel = `private-${channel}`;
+  } else if (channel.startsWith('user-') && !channel.startsWith('private-user-')) {
+    targetChannel = `private-${channel}`;
+  }
+
+  // Determine storeCode
+  const storeCode =
+    payload?.storeCode ||
+    options?.storeCode ||
+    (targetChannel.startsWith('private-store-')
+      ? targetChannel.replace('private-store-', '')
+      : targetChannel.startsWith('store-') && targetChannel !== 'store-global'
+        ? targetChannel.replace('store-', '')
+        : undefined);
+
+  // Normalize minimal payload — DO NOT broadcast sensitive credentials, tokens, or private accounting (Requirement O)
   const normalizedPayload: RealtimePayload = {
     eventType: payload?.eventType || event,
     entityId: payload?.entityId || payload?.id,
-    storeCode:
-      payload?.storeCode ||
-      options?.storeCode ||
-      (channel.startsWith('store-') && channel !== 'store-global'
-        ? channel.replace('store-', '')
-        : undefined),
+    storeCode,
     timestamp: payload?.timestamp || now,
     version: payload?.version || Date.now(),
     ...(typeof payload === 'object' ? payload : {}),
   };
 
-  // Remove sensitive keys
+  // Strip sensitive and restricted keys
   delete (normalizedPayload as any).password;
   delete (normalizedPayload as any).passwordHash;
   delete (normalizedPayload as any).tokenHash;
+  delete (normalizedPayload as any).token;
+  delete (normalizedPayload as any).secret;
+  delete (normalizedPayload as any).costPrice;
+  delete (normalizedPayload as any).grossProfit;
+  delete (normalizedPayload as any).netProfit;
+  delete (normalizedPayload as any).margin;
 
   let outboxId: string | null = null;
   if (!options?.skipOutbox) {
-    outboxId = await persistOutboxEvent(channel, event, normalizedPayload, options?.tx);
+    outboxId = await persistOutboxEvent(targetChannel, event, normalizedPayload, options?.tx);
   }
 
   let broadcastSuccess = false;
   if (realtimeProvider.isConfigured) {
-    broadcastSuccess = await realtimeProvider.publish(channel, event, normalizedPayload);
-    // Also broadcast to global channel if this is a store-specific event so Super Admin can observe
-    if (channel !== 'store-global' && channel.startsWith('store-')) {
-      await realtimeProvider.publish('store-global', event, normalizedPayload).catch(() => {});
+    broadcastSuccess = await realtimeProvider.publish(targetChannel, event, normalizedPayload);
+    // Also broadcast to enterprise channel if this is a store-specific event so Super Admin can observe
+    if (targetChannel.startsWith('private-store-') && targetChannel !== 'private-enterprise') {
+      await realtimeProvider
+        .publish('private-enterprise', event, normalizedPayload)
+        .catch(() => {});
     }
   }
 

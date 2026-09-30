@@ -171,26 +171,26 @@ export async function POST(req: NextRequest) {
           action: 'created',
         };
 
-        broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', transferPayload);
+        await broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', transferPayload);
         if (body.sourceStore) {
-          broadcastRealtimeEvent(
+          await broadcastRealtimeEvent(
             getStoreChannel(body.sourceStore),
             'TRANSFER_COMPLETED',
             transferPayload
           );
-          broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: body.sourceStore });
-          broadcastRealtimeEvent(getStoreChannel(body.sourceStore), 'STOCK_UPDATED', {
+          await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: body.sourceStore });
+          await broadcastRealtimeEvent(getStoreChannel(body.sourceStore), 'STOCK_UPDATED', {
             storeCode: body.sourceStore,
           });
         }
         if (body.destStore) {
-          broadcastRealtimeEvent(
+          await broadcastRealtimeEvent(
             getStoreChannel(body.destStore),
             'TRANSFER_COMPLETED',
             transferPayload
           );
-          broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: body.destStore });
-          broadcastRealtimeEvent(getStoreChannel(body.destStore), 'STOCK_UPDATED', {
+          await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: body.destStore });
+          await broadcastRealtimeEvent(getStoreChannel(body.destStore), 'STOCK_UPDATED', {
             storeCode: body.destStore,
           });
         }
@@ -374,28 +374,28 @@ export async function PUT(req: NextRequest) {
       sourceStore: existing.sourceStore,
       destStore: existing.destStore,
     };
-    broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', transferPayload);
+    await broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', transferPayload);
     if (existing.sourceStore) {
-      broadcastRealtimeEvent(
+      await broadcastRealtimeEvent(
         getStoreChannel(existing.sourceStore),
         'TRANSFER_COMPLETED',
         transferPayload
       );
     }
     if (existing.destStore) {
-      broadcastRealtimeEvent(
+      await broadcastRealtimeEvent(
         getStoreChannel(existing.destStore),
         'TRANSFER_COMPLETED',
         transferPayload
       );
     }
     if (isCancelling) {
-      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.sourceStore });
-      broadcastRealtimeEvent(getStoreChannel(existing.sourceStore), 'STOCK_UPDATED', {
+      await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.sourceStore });
+      await broadcastRealtimeEvent(getStoreChannel(existing.sourceStore), 'STOCK_UPDATED', {
         storeCode: existing.sourceStore,
       });
-      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.destStore });
-      broadcastRealtimeEvent(getStoreChannel(existing.destStore), 'STOCK_UPDATED', {
+      await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.destStore });
+      await broadcastRealtimeEvent(getStoreChannel(existing.destStore), 'STOCK_UPDATED', {
         storeCode: existing.destStore,
       });
     }
@@ -573,26 +573,26 @@ export async function DELETE(req: NextRequest) {
       sourceStore: existing.sourceStore,
       destStore: existing.destStore,
     };
-    broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', delTransferPayload);
+    await broadcastRealtimeEvent('transfers', 'TRANSFER_COMPLETED', delTransferPayload);
     if (existing.sourceStore) {
-      broadcastRealtimeEvent(
+      await broadcastRealtimeEvent(
         getStoreChannel(existing.sourceStore),
         'TRANSFER_COMPLETED',
         delTransferPayload
       );
-      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.sourceStore });
-      broadcastRealtimeEvent(getStoreChannel(existing.sourceStore), 'STOCK_UPDATED', {
+      await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.sourceStore });
+      await broadcastRealtimeEvent(getStoreChannel(existing.sourceStore), 'STOCK_UPDATED', {
         storeCode: existing.sourceStore,
       });
     }
     if (existing.destStore) {
-      broadcastRealtimeEvent(
+      await broadcastRealtimeEvent(
         getStoreChannel(existing.destStore),
         'TRANSFER_COMPLETED',
         delTransferPayload
       );
-      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.destStore });
-      broadcastRealtimeEvent(getStoreChannel(existing.destStore), 'STOCK_UPDATED', {
+      await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.destStore });
+      await broadcastRealtimeEvent(getStoreChannel(existing.destStore), 'STOCK_UPDATED', {
         storeCode: existing.destStore,
       });
     }

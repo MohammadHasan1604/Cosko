@@ -4,7 +4,7 @@ import Link from 'next/link';
 import CoskoLogo from '@/components/ui/CoskoLogo';
 import Icon from '@/components/ui/AppIcon';
 import { useApp } from '@/context/AppContext';
-import { getAllowedRoutes } from '@/lib/rbacEngine';
+import { getAuthoritativeNavGroups } from '@/lib/rbacEngine';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -55,102 +55,10 @@ export default function Sidebar({
     (p) => p.status === 'Sent' || p.status === 'Draft'
   ).length;
 
-  // Strict Canonical RBAC Navigation — Single Source of Truth
-  const allowedHrefs = getAllowedRoutes(currentUser.role);
-
-  const rawNavGroups: NavGroup[] = [
-    {
-      id: 'group-overview',
-      label: 'Overview',
-      items: [{ id: 'nav-dashboard', label: 'Dashboard', icon: 'HomeIcon', href: '/dashboard' }],
-    },
-    {
-      id: 'group-commerce',
-      label: 'Commerce',
-      items: [
-        { id: 'nav-sales', label: 'Sales & POS', icon: 'ShoppingCartIcon', href: '/sales' },
-        {
-          id: 'nav-inventory',
-          label: 'Inventory',
-          icon: 'CubeIcon',
-          href: '/inventory-management',
-          badge: lowStockCount,
-          badgeVariant: 'warning',
-        },
-        {
-          id: 'nav-stock-transfers',
-          label: 'Stock Transfers',
-          icon: 'ArrowsRightLeftIcon',
-          href: '/stock-transfers',
-        },
-        { id: 'nav-categories', label: 'Categories', icon: 'TagIcon', href: '/categories' },
-        {
-          id: 'nav-purchases',
-          label: 'Purchases',
-          icon: 'TruckIcon',
-          href: '/purchases',
-          badge: pendingPOCount,
-          badgeVariant: 'info',
-        },
-        { id: 'nav-customers', label: 'Customers', icon: 'UsersIcon', href: '/customers' },
-        { id: 'nav-vendors', label: 'Vendors', icon: 'BuildingStorefrontIcon', href: '/vendors' },
-      ],
-    },
-    {
-      id: 'group-finance',
-      label: 'Finance',
-      items: [
-        { id: 'nav-expenses', label: 'Expenses', icon: 'BanknotesIcon', href: '/expenses' },
-        { id: 'nav-accounting', label: 'Accounting', icon: 'CalculatorIcon', href: '/accounting' },
-        {
-          id: 'nav-central-profit',
-          label: 'Central Profit',
-          icon: 'ArrowTrendingUpIcon',
-          href: '/central-profit',
-        },
-        { id: 'nav-reports', label: 'Reports', icon: 'ChartBarIcon', href: '/reports' },
-      ],
-    },
-    {
-      id: 'group-org',
-      label: 'Organization',
-      items: [
-        { id: 'nav-attendance', label: 'Attendance', icon: 'ClockIcon', href: '/attendance' },
-        { id: 'nav-employees', label: 'Staff Roster', icon: 'UserGroupIcon', href: '/employees' },
-        { id: 'nav-stores', label: 'Stores', icon: 'MapPinIcon', href: '/stores' },
-        { id: 'nav-users', label: 'Users & Roles', icon: 'ShieldCheckIcon', href: '/users' },
-        {
-          id: 'nav-work-activity',
-          label: 'Work Activity',
-          icon: 'ChartBarIcon',
-          href: '/work-activity',
-        },
-      ],
-    },
-    {
-      id: 'group-system',
-      label: 'System',
-      items: [
-        {
-          id: 'nav-audit',
-          label: 'Audit Logs',
-          icon: 'ClipboardDocumentListIcon',
-          href: '/audit-logs',
-        },
-        { id: 'nav-settings', label: 'Settings', icon: 'Cog6ToothIcon', href: '/settings' },
-      ],
-    },
-  ];
-
-  const navGroups = rawNavGroups
-    .map((g) => ({
-      ...g,
-      items:
-        currentUser.role === 'Super Admin'
-          ? g.items
-          : g.items.filter((item) => allowedHrefs.includes(item.href)),
-    }))
-    .filter((g) => g.items.length > 0);
+  const navGroups = getAuthoritativeNavGroups(currentUser.role, {
+    lowStock: lowStockCount,
+    pendingPO: pendingPOCount,
+  });
 
   const sidebarClasses = [
     'fixed top-0 left-0 h-full z-50 flex flex-col bg-card border-r border-border shadow-sidebar sidebar-transition overflow-hidden',

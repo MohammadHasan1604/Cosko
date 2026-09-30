@@ -237,7 +237,7 @@ export async function POST(req: NextRequest) {
     });
 
     invalidateCategoryTypesCache();
-    broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_CREATED', {
+    await broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_CREATED', {
       id: newType.id,
       name: newType.name,
     });
@@ -345,7 +345,7 @@ export async function PUT(req: NextRequest) {
     });
 
     invalidateCategoryTypesCache();
-    broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_UPDATED', {
+    await broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_UPDATED', {
       id: updated.id,
       name: updated.name,
     });
@@ -462,7 +462,7 @@ export async function DELETE(req: NextRequest) {
     });
 
     invalidateCategoryTypesCache();
-    broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_DELETED', {
+    await broadcastRealtimeEvent('category-types', 'CATEGORY_TYPE_DELETED', {
       id,
       name: targetType.name,
     });

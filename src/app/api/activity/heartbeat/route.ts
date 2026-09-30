@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       : 0;
 
     // 3. Broadcast presence change to work-activity channel (skips outbox to avoid DB bloat)
-    broadcastRealtimeEvent(
+    await broadcastRealtimeEvent(
       'work-activity',
       'WORK_ACTIVITY_UPDATED',
       {

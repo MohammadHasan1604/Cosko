@@ -81,8 +81,13 @@ export default function StoreStockModal({
         setError('Could not fetch real-time stock from database. Showing cached records.');
 
         // Fallback: Populate from existing storesList & item.locationStock if network fails
-        const fallbackStores: StoreStockItem[] = storesList
-          .filter((s) => s.status === 'Active')
+        const isSuperAdmin = currentUser.role === 'Super Admin';
+        const assignedStore = currentUser.store || 'BLR';
+        const authorizedStoresList = isSuperAdmin
+          ? storesList.filter((s) => s.status === 'Active')
+          : storesList.filter((s) => s.code.toUpperCase() === assignedStore.toUpperCase());
+
+        const fallbackStores: StoreStockItem[] = authorizedStoresList
           .sort((a, b) =>
             a.code === 'CENTRAL' ? -1 : b.code === 'CENTRAL' ? 1 : a.code.localeCompare(b.code)
           )

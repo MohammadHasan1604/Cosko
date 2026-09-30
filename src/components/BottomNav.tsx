@@ -6,102 +6,39 @@ import { usePathname } from 'next/navigation';
 import Icon from '@/components/ui/AppIcon';
 import BottomSheet from '@/components/ui/BottomSheet';
 import { useApp } from '@/context/AppContext';
-import { getAllowedRoutes } from '@/lib/rbacEngine';
-
-interface NavDestination {
-  id: string;
-  label: string;
-  icon: string;
-  href: string;
-}
-
-// All secondary nav items with icons for the "More" bottom sheet
-const allSecondaryNav: NavDestination[] = [
-  { id: 'more-dashboard', label: 'Dashboard', icon: 'HomeIcon', href: '/dashboard' },
-  { id: 'more-attendance', label: 'Shift Attendance', icon: 'ClockIcon', href: '/attendance' },
-  { id: 'more-inventory', label: 'Inventory', icon: 'CubeIcon', href: '/inventory-management' },
-  { id: 'more-categories', label: 'Categories', icon: 'TagIcon', href: '/categories' },
-  {
-    id: 'more-stock-transfers',
-    label: 'Stock Transfers',
-    icon: 'ArrowsRightLeftIcon',
-    href: '/stock-transfers',
-  },
-  { id: 'more-purchases', label: 'Purchases', icon: 'TruckIcon', href: '/purchases' },
-  { id: 'more-customers', label: 'Customers', icon: 'UsersIcon', href: '/customers' },
-  { id: 'more-vendors', label: 'Vendors', icon: 'BuildingStorefrontIcon', href: '/vendors' },
-  { id: 'more-expenses', label: 'Expenses', icon: 'BanknotesIcon', href: '/expenses' },
-  { id: 'more-accounting', label: 'Accounting', icon: 'CalculatorIcon', href: '/accounting' },
-  {
-    id: 'more-central-profit',
-    label: 'Central Profit',
-    icon: 'ArrowTrendingUpIcon',
-    href: '/central-profit',
-  },
-  { id: 'more-reports', label: 'Reports', icon: 'ChartBarIcon', href: '/reports' },
-  { id: 'more-employees', label: 'Staff Roster', icon: 'UserGroupIcon', href: '/employees' },
-  { id: 'more-stores', label: 'Stores', icon: 'MapPinIcon', href: '/stores' },
-  { id: 'more-users', label: 'Users & Roles', icon: 'ShieldCheckIcon', href: '/users' },
-  {
-    id: 'more-work-activity',
-    label: 'Work Activity',
-    icon: 'ChartBarIcon',
-    href: '/work-activity',
-  },
-  {
-    id: 'more-delete-requests',
-    label: 'Delete Requests',
-    icon: 'TrashIcon',
-    href: '/delete-requests',
-  },
-  {
-    id: 'more-audit-logs',
-    label: 'Audit Logs',
-    icon: 'ClipboardDocumentListIcon',
-    href: '/audit-logs',
-  },
-  { id: 'more-settings', label: 'Settings', icon: 'Cog6ToothIcon', href: '/settings' },
-];
+import { getMobileMoreNav } from '@/lib/rbacEngine';
 
 export default function BottomNav() {
   const pathname = usePathname();
   const { currentUser } = useApp();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const allowedHrefs = getAllowedRoutes(currentUser.role);
-
   // 5-Position Nav Layout: Sales is ALWAYS the exact center (Position 3)
-  const leftSlots: NavDestination[] = useMemo(() => {
+  const leftSlots = useMemo(() => {
     return [
       { id: 'bnav-dashboard', label: 'Home', icon: 'HomeIcon', href: '/dashboard' },
       { id: 'bnav-inventory', label: 'Inventory', icon: 'CubeIcon', href: '/inventory-management' },
     ];
   }, []);
 
-  const salesSlot: NavDestination = {
+  const salesSlot = {
     id: 'bnav-sales',
     label: 'SALES',
     icon: 'ShoppingCartIcon',
     href: '/sales',
   };
 
-  const rightSlotCustomer: NavDestination = {
+  const rightSlotCustomer = {
     id: 'bnav-customers',
     label: 'Customers',
     icon: 'UsersIcon',
     href: '/customers',
   };
 
-  const primaryHrefs = useMemo(() => {
-    return new Set([...leftSlots.map((s) => s.href), salesSlot.href, rightSlotCustomer.href]);
-  }, [leftSlots]);
-
-  // Secondary items for the More BottomSheet: authorized for role but not in the 4 primary slots
+  // Authoritative secondary items for More BottomSheet from single source of truth
   const secondaryNav = useMemo(() => {
-    return allSecondaryNav.filter(
-      (item) => allowedHrefs.includes(item.href) && !primaryHrefs.has(item.href)
-    );
-  }, [allowedHrefs, primaryHrefs]);
+    return getMobileMoreNav(currentUser.role);
+  }, [currentUser.role]);
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/' || pathname === '/dashboard';

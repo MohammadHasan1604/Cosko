@@ -7,10 +7,17 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { useApp } from '@/context/AppContext';
 
 export default function RecentActivityFeed() {
-  const { sales, purchases, stockTransfers, auditLogs, selectedStore } = useApp();
+  const { sales, purchases, stockTransfers, auditLogs, selectedStore, currentUser } = useApp();
+  const isSuperAdmin = currentUser.role === 'Super Admin';
+  const isStoreManager = currentUser.role === 'Store Manager';
+  const isSalesManager = currentUser.role === 'Sales Manager';
+
+  const assignedStore =
+    currentUser.store && currentUser.store !== 'All Stores' ? currentUser.store : 'BLR';
+  const activeScope = isSuperAdmin ? selectedStore : assignedStore;
 
   const saleActivities = sales
-    .filter((s) => selectedStore === 'All Stores' || s.store === selectedStore)
+    .filter((s) => activeScope === 'All Stores' || s.store === activeScope)
     .map((s) => ({
       id: `sale-${s.id}`,
       icon: 'ShoppingCartIcon' as const,
@@ -29,8 +36,8 @@ export default function RecentActivityFeed() {
       badge: { variant: 'active' as const, label: s.paymentMethod || 'Paid' },
     }));
 
-  const purchaseActivities = purchases
-    .filter((p) => selectedStore === 'All Stores' || p.store === selectedStore)
+  const purchaseActivities = (!isSalesManager ? purchases : [])
+    .filter((p) => activeScope === 'All Stores' || p.store === activeScope)
     .map((p) => ({
       id: `po-${p.id}`,
       icon: 'TruckIcon' as const,
@@ -47,36 +54,40 @@ export default function RecentActivityFeed() {
       },
     }));
 
-  const transferActivities = stockTransfers
-    .filter(
-      (t) =>
-        selectedStore === 'All Stores' ||
-        t.sourceStore === selectedStore ||
-        t.destStore === selectedStore
-    )
-    .map((t) => ({
-      id: `transfer-${t.id}`,
-      icon: 'ArrowsRightLeftIcon' as const,
-      color: 'text-accent',
-      bg: 'bg-accent/10',
-      title: `Stock transfer #${t.transferNo}`,
-      meta: `${t.sourceStore} → ${t.destStore} · ${t.productName} · ${t.qty} units`,
-      time: t.createdAt
-        ? new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-        : 'Recent',
-      badge: { variant: 'info' as const, label: t.status },
-    }));
+  const transferActivities = isSuperAdmin
+    ? stockTransfers
+        .filter(
+          (t) =>
+            activeScope === 'All Stores' ||
+            t.sourceStore === activeScope ||
+            t.destStore === activeScope
+        )
+        .map((t) => ({
+          id: `transfer-${t.id}`,
+          icon: 'ArrowsRightLeftIcon' as const,
+          color: 'text-accent',
+          bg: 'bg-accent/10',
+          title: `Stock transfer #${t.transferNo}`,
+          meta: `${t.sourceStore} → ${t.destStore} · ${t.productName} · ${t.qty} units`,
+          time: t.createdAt
+            ? new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+            : 'Recent',
+          badge: { variant: 'info' as const, label: t.status },
+        }))
+    : [];
 
-  const auditActivities = auditLogs.map((a) => ({
-    id: `audit-${a.id}`,
-    icon: 'ShieldCheckIcon' as const,
-    color: 'text-muted-foreground',
-    bg: 'bg-muted',
-    title: `${a.action}: ${a.module}`,
-    meta: `${a.details} · by ${a.userName}`,
-    time: a.timestamp || 'Recent',
-    badge: { variant: 'neutral' as const, label: a.module },
-  }));
+  const auditActivities = isSuperAdmin
+    ? auditLogs.map((a) => ({
+        id: `audit-${a.id}`,
+        icon: 'ShieldCheckIcon' as const,
+        color: 'text-muted-foreground',
+        bg: 'bg-muted',
+        title: `${a.action}: ${a.module}`,
+        meta: `${a.details} · by ${a.userName}`,
+        time: a.timestamp || 'Recent',
+        badge: { variant: 'neutral' as const, label: a.module },
+      }))
+    : [];
 
   const activities = [
     ...saleActivities,
@@ -91,7 +102,7 @@ export default function RecentActivityFeed() {
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <div>
           <h2 className="section-header">Recent Activity</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{selectedStore} · Live feed</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{activeScope} · Live feed</p>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-positive animate-pulse" />
@@ -108,8 +119,7 @@ export default function RecentActivityFeed() {
             </div>
             <p className="text-xs font-medium text-foreground">No recent activity</p>
             <p className="text-2xs text-muted-foreground mt-1 max-w-[220px]">
-              Live transactions, purchase orders, and stock movements will appear here
-              automatically.
+              Live transactions and operational movements will appear here automatically.
             </p>
           </div>
         ) : (
@@ -136,15 +146,25 @@ export default function RecentActivityFeed() {
         )}
       </div>
 
-      {/* Footer */}
+      {/* Footer — Audit logs restricted strictly to Super Admin per Requirement F */}
       <div className="px-5 py-3 border-t border-border">
-        <Link
-          href="/audit-logs"
-          className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:underline"
-        >
-          View full audit log
-          <Icon name="ArrowRightIcon" size={12} />
-        </Link>
+        {isSuperAdmin ? (
+          <Link
+            href="/audit-logs"
+            className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:underline"
+          >
+            View full audit log
+            <Icon name="ArrowRightIcon" size={12} />
+          </Link>
+        ) : (
+          <Link
+            href="/sales"
+            className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:underline"
+          >
+            View all recent sales
+            <Icon name="ArrowRightIcon" size={12} />
+          </Link>
+        )}
       </div>
     </div>
   );

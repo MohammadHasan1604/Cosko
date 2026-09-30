@@ -294,7 +294,7 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
+        await broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
           id: vendor.id,
           code: vendor.code,
           name: vendor.name,
@@ -410,7 +410,7 @@ export async function PUT(req: NextRequest) {
       },
     });
 
-    broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
+    await broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
       id: vendor.id,
       code: vendor.code,
       name: vendor.name,
@@ -527,7 +527,7 @@ export async function DELETE(req: NextRequest) {
         },
       });
 
-      broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
+      await broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
         id: target.id,
         code: target.code,
         name: target.name,
@@ -562,7 +562,7 @@ export async function DELETE(req: NextRequest) {
       });
     });
 
-    broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
+    await broadcastRealtimeEvent('vendors', 'VENDOR_UPDATED', {
       id: target.id,
       code: target.code,
       name: target.name,

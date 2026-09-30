@@ -336,38 +336,42 @@ export default function InventoryTable({
           </div>
 
           {/* Location filter */}
-          <select
-            value={selectedStore}
-            onChange={(e) => {
-              setSelectedStore(e.target.value);
-              setPage(1);
-            }}
-            disabled={currentUser.role !== 'Super Admin'}
-            className="input-field py-2 text-sm w-auto min-w-[200px]"
-          >
-            {currentUser.role === 'Super Admin' && (
+          {currentUser.role === 'Super Admin' ? (
+            <select
+              value={selectedStore}
+              onChange={(e) => {
+                setSelectedStore(e.target.value);
+                setPage(1);
+              }}
+              className="input-field py-2 text-sm w-auto min-w-[200px]"
+            >
               <optgroup label="Reporting Scope">
                 <option value="All Stores">All Locations (Consolidated View)</option>
               </optgroup>
-            )}
-            <optgroup label="Physical Warehouses & Stores">
-              {[...storesList]
-                .sort((a, b) =>
-                  a.code === 'CENTRAL'
-                    ? -1
-                    : b.code === 'CENTRAL'
-                      ? 1
-                      : a.code.localeCompare(b.code)
-                )
-                .map((s) => (
-                  <option key={`store-opt-${s.code}`} value={s.code}>
-                    {s.code === 'CENTRAL'
-                      ? 'COSKO Central Warehouse (CENTRAL)'
-                      : `${s.name} (${s.code})`}
-                  </option>
-                ))}
-            </optgroup>
-          </select>
+              <optgroup label="Physical Warehouses & Stores">
+                {[...storesList]
+                  .sort((a, b) =>
+                    a.code === 'CENTRAL'
+                      ? -1
+                      : b.code === 'CENTRAL'
+                        ? 1
+                        : a.code.localeCompare(b.code)
+                  )
+                  .map((s) => (
+                    <option key={`store-opt-${s.code}`} value={s.code}>
+                      {s.code === 'CENTRAL'
+                        ? 'COSKO Central Warehouse (CENTRAL)'
+                        : `${s.name} (${s.code})`}
+                    </option>
+                  ))}
+              </optgroup>
+            </select>
+          ) : (
+            <div className="h-9 inline-flex items-center gap-1.5 px-3 rounded-lg border border-border bg-card text-xs font-semibold text-foreground">
+              <Icon name="MapPinIcon" size={13} className="text-primary flex-shrink-0" />
+              <span>{currentUser.store || 'BLR'} Store</span>
+            </div>
+          )}
 
           {/* Dynamic Category filter */}
           <select

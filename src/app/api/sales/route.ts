@@ -208,9 +208,9 @@ export async function POST(req: NextRequest) {
         };
 
         // Broadcast sale event to global and store-scoped channels
-        broadcastRealtimeEvent('sales', 'SALE_CREATED', salePayload);
+        await broadcastRealtimeEvent('sales', 'SALE_CREATED', salePayload);
         if (storeCode) {
-          broadcastRealtimeEvent(getStoreChannel(storeCode), 'SALE_CREATED', salePayload);
+          await broadcastRealtimeEvent(getStoreChannel(storeCode), 'SALE_CREATED', salePayload);
         }
 
         // Broadcast stock update event so devices invalidate/refetch inventory
@@ -219,9 +219,9 @@ export async function POST(req: NextRequest) {
           reason: 'SALE_CHECKOUT',
           orderNo: (sale as any)?.orderNo,
         };
-        broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
         if (storeCode) {
-          broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload);
+          await broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload);
         }
 
         return { status: 201, data: { success: true, sale } };
@@ -500,15 +500,15 @@ export async function PUT(req: NextRequest) {
       status: updatedSale.status,
       storeCode: existing.storeCode,
     };
-    broadcastRealtimeEvent('sales', 'SALE_UPDATED', salePayload);
+    await broadcastRealtimeEvent('sales', 'SALE_UPDATED', salePayload);
     if (existing.storeCode) {
-      broadcastRealtimeEvent(getStoreChannel(existing.storeCode), 'SALE_UPDATED', salePayload);
+      await broadcastRealtimeEvent(getStoreChannel(existing.storeCode), 'SALE_UPDATED', salePayload);
     }
     if (isVoidingOrRefunding) {
       const stockPayload = { storeCode: existing.storeCode, reason: 'SALE_REFUND' };
-      broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
+      await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
       if (existing.storeCode) {
-        broadcastRealtimeEvent(getStoreChannel(existing.storeCode), 'STOCK_UPDATED', stockPayload);
+        await broadcastRealtimeEvent(getStoreChannel(existing.storeCode), 'STOCK_UPDATED', stockPayload);
       }
     }
 
@@ -669,18 +669,18 @@ export async function DELETE(req: NextRequest) {
       status: 'Cancelled',
       storeCode: existing.storeCode,
     };
-    broadcastRealtimeEvent('sales', 'SALE_UPDATED', cancelSalePayload);
+    await broadcastRealtimeEvent('sales', 'SALE_UPDATED', cancelSalePayload);
     if (existing.storeCode) {
-      broadcastRealtimeEvent(
+      await broadcastRealtimeEvent(
         getStoreChannel(existing.storeCode),
         'SALE_UPDATED',
         cancelSalePayload
       );
     }
     const cancelStockPayload = { storeCode: existing.storeCode, reason: 'SALE_VOID' };
-    broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', cancelStockPayload);
+    await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', cancelStockPayload);
     if (existing.storeCode) {
-      broadcastRealtimeEvent(
+      await broadcastRealtimeEvent(
         getStoreChannel(existing.storeCode),
         'STOCK_UPDATED',
         cancelStockPayload

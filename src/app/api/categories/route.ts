@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
     });
 
     invalidateCategoriesCache();
-    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
+    await broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
       id: newCategory.id,
       name: newCategory.name,
       action: 'created',
@@ -249,7 +249,7 @@ export async function PUT(req: NextRequest) {
     });
 
     invalidateCategoriesCache();
-    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
+    await broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
       id: updated.id,
       name: updated.name,
       action: 'updated',
@@ -362,7 +362,7 @@ export async function DELETE(req: NextRequest) {
       });
 
       invalidateCategoriesCache();
-      broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
+      await broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
         id: target.id,
         name: target.name,
         action: 'archived',
@@ -395,7 +395,7 @@ export async function DELETE(req: NextRequest) {
     });
 
     invalidateCategoriesCache();
-    broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
+    await broadcastRealtimeEvent('categories', 'CATEGORY_UPDATED', {
       id: target.id,
       name: target.name,
       action: 'deleted',

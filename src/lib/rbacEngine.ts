@@ -100,33 +100,219 @@ export const SUPER_ADMIN_ONLY_MODULES = [
 ] as const;
 
 /**
- * CANONICAL ROUTE ACCESS MATRIX — Single authoritative source of truth for all routes.
+ * CANONICAL NAVIGATION & FEATURE MATRIX — Single authoritative source of truth.
+ * Drives Desktop Sidebar, Mobile Sidebar, Mobile BottomNav, More Sheet, and AppLayout route guards.
  * Exactly THREE roles: Super Admin (100), Store Manager (80), Sales Manager (40).
  */
+export interface NavigationItem {
+  id: string;
+  label: string;
+  icon: string;
+  href: string;
+  category: 'Overview' | 'Commerce' | 'Finance' | 'Organization' | 'System';
+  allowedRoles: UserRole[];
+  badgeKey?: 'lowStock' | 'pendingPO';
+  badgeVariant?: 'warning' | 'info' | 'danger';
+}
+
+export const NAVIGATION_REGISTRY: NavigationItem[] = [
+  // Overview
+  {
+    id: 'nav-dashboard',
+    label: 'Dashboard',
+    icon: 'HomeIcon',
+    href: '/dashboard',
+    category: 'Overview',
+    allowedRoles: ['Super Admin', 'Store Manager', 'Sales Manager'],
+  },
+
+  // Commerce
+  {
+    id: 'nav-sales',
+    label: 'Sales & POS',
+    icon: 'ShoppingCartIcon',
+    href: '/sales',
+    category: 'Commerce',
+    allowedRoles: ['Super Admin', 'Store Manager', 'Sales Manager'],
+  },
+  {
+    id: 'nav-inventory',
+    label: 'Inventory',
+    icon: 'CubeIcon',
+    href: '/inventory-management',
+    category: 'Commerce',
+    allowedRoles: ['Super Admin', 'Store Manager', 'Sales Manager'],
+    badgeKey: 'lowStock',
+    badgeVariant: 'warning',
+  },
+  {
+    id: 'nav-stock-transfers',
+    label: 'Stock Transfers',
+    icon: 'ArrowsRightLeftIcon',
+    href: '/stock-transfers',
+    category: 'Commerce',
+    allowedRoles: ['Super Admin'],
+  },
+  {
+    id: 'nav-categories',
+    label: 'Categories',
+    icon: 'TagIcon',
+    href: '/categories',
+    category: 'Commerce',
+    allowedRoles: ['Super Admin', 'Store Manager', 'Sales Manager'],
+  },
+  {
+    id: 'nav-purchases',
+    label: 'Purchases',
+    icon: 'TruckIcon',
+    href: '/purchases',
+    category: 'Commerce',
+    allowedRoles: ['Super Admin', 'Store Manager'],
+    badgeKey: 'pendingPO',
+    badgeVariant: 'info',
+  },
+  {
+    id: 'nav-customers',
+    label: 'Customers',
+    icon: 'UsersIcon',
+    href: '/customers',
+    category: 'Commerce',
+    allowedRoles: ['Super Admin', 'Store Manager', 'Sales Manager'],
+  },
+  {
+    id: 'nav-vendors',
+    label: 'Vendors',
+    icon: 'BuildingStorefrontIcon',
+    href: '/vendors',
+    category: 'Commerce',
+    allowedRoles: ['Super Admin', 'Store Manager'],
+  },
+
+  // Finance
+  {
+    id: 'nav-expenses',
+    label: 'Expenses',
+    icon: 'BanknotesIcon',
+    href: '/expenses',
+    category: 'Finance',
+    allowedRoles: ['Super Admin', 'Store Manager'],
+  },
+  {
+    id: 'nav-accounting',
+    label: 'Accounting',
+    icon: 'CalculatorIcon',
+    href: '/accounting',
+    category: 'Finance',
+    allowedRoles: ['Super Admin', 'Store Manager'],
+  },
+  {
+    id: 'nav-central-profit',
+    label: 'Central Profit',
+    icon: 'ArrowTrendingUpIcon',
+    href: '/central-profit',
+    category: 'Finance',
+    allowedRoles: ['Super Admin'],
+  },
+  {
+    id: 'nav-reports',
+    label: 'Reports',
+    icon: 'ChartBarIcon',
+    href: '/reports',
+    category: 'Finance',
+    allowedRoles: ['Super Admin', 'Store Manager'],
+  },
+
+  // Organization
+  {
+    id: 'nav-attendance',
+    label: 'Attendance',
+    icon: 'ClockIcon',
+    href: '/attendance',
+    category: 'Organization',
+    allowedRoles: ['Super Admin'], // Super Admin ONLY per Requirement G
+  },
+  {
+    id: 'nav-employees',
+    label: 'Staff Roster',
+    icon: 'UserGroupIcon',
+    href: '/employees',
+    category: 'Organization',
+    allowedRoles: ['Super Admin', 'Store Manager'],
+  },
+  {
+    id: 'nav-stores',
+    label: 'Stores',
+    icon: 'MapPinIcon',
+    href: '/stores',
+    category: 'Organization',
+    allowedRoles: ['Super Admin'],
+  },
+  {
+    id: 'nav-users',
+    label: 'Users & Roles',
+    icon: 'ShieldCheckIcon',
+    href: '/users',
+    category: 'Organization',
+    allowedRoles: ['Super Admin', 'Store Manager'],
+  },
+  {
+    id: 'nav-work-activity',
+    label: 'Work Activity',
+    icon: 'ChartBarIcon',
+    href: '/work-activity',
+    category: 'Organization',
+    allowedRoles: ['Super Admin'], // Super Admin ONLY per Requirement I
+  },
+
+  // System
+  {
+    id: 'nav-delete-requests',
+    label: 'Delete Requests',
+    icon: 'TrashIcon',
+    href: '/delete-requests',
+    category: 'System',
+    allowedRoles: ['Super Admin'],
+  },
+  {
+    id: 'nav-audit',
+    label: 'Audit Logs',
+    icon: 'ClipboardDocumentListIcon',
+    href: '/audit-logs',
+    category: 'System',
+    allowedRoles: ['Super Admin'],
+  },
+  {
+    id: 'nav-settings',
+    label: 'Settings',
+    icon: 'Cog6ToothIcon',
+    href: '/settings',
+    category: 'System',
+    allowedRoles: ['Super Admin'],
+  },
+  {
+    id: 'nav-settings-connections',
+    label: 'Data Connections',
+    icon: 'CircleStackIcon',
+    href: '/settings/data-connections',
+    category: 'System',
+    allowedRoles: ['Super Admin'],
+  },
+];
+
+/**
+ * CANONICAL ROUTE ACCESS MATRIX — Single authoritative source of truth for all routes.
+ * Derived directly from NAVIGATION_REGISTRY plus sub-route exceptions.
+ */
 export const CANONICAL_ROUTE_ACCESS: Record<string, UserRole[]> = {
-  '/dashboard': ['Super Admin', 'Store Manager', 'Sales Manager'],
-  '/sales': ['Super Admin', 'Store Manager', 'Sales Manager'],
-  '/inventory-management': ['Super Admin', 'Store Manager', 'Sales Manager'],
-  '/categories': ['Super Admin', 'Store Manager', 'Sales Manager'],
-  '/customers': ['Super Admin', 'Store Manager', 'Sales Manager'],
+  ...NAVIGATION_REGISTRY.reduce(
+    (acc, item) => {
+      acc[item.href] = item.allowedRoles;
+      return acc;
+    },
+    {} as Record<string, UserRole[]>
+  ),
   '/customers/existing': ['Super Admin', 'Store Manager', 'Sales Manager'],
   '/customers/360': ['Super Admin', 'Store Manager', 'Sales Manager'],
-  '/vendors': ['Super Admin', 'Store Manager'],
-  '/purchases': ['Super Admin', 'Store Manager'],
-  '/expenses': ['Super Admin', 'Store Manager'],
-  '/accounting': ['Super Admin', 'Store Manager'],
-  '/reports': ['Super Admin', 'Store Manager'],
-  '/employees': ['Super Admin', 'Store Manager'],
-  '/users': ['Super Admin', 'Store Manager'],
-  '/central-profit': ['Super Admin'],
-  '/stock-transfers': ['Super Admin'],
-  '/stores': ['Super Admin'],
-  '/delete-requests': ['Super Admin'],
-  '/audit-logs': ['Super Admin'],
-  '/settings': ['Super Admin'],
-  '/settings/data-connections': ['Super Admin'],
-  '/attendance': ['Super Admin'],
-  '/work-activity': ['Super Admin'],
 };
 
 /**
@@ -157,6 +343,73 @@ export function getAllowedRoutes(role: UserRole | string): string[] {
   return Object.entries(CANONICAL_ROUTE_ACCESS)
     .filter(([_, roles]) => (roles as string[]).includes(role))
     .map(([route]) => route);
+}
+
+/**
+ * Get unified navigation groups for Sidebar (Desktop & Mobile) filtered by role.
+ */
+export function getAuthoritativeNavGroups(
+  role: UserRole | string,
+  badges?: { lowStock?: number; pendingPO?: number }
+) {
+  const categories: Array<'Overview' | 'Commerce' | 'Finance' | 'Organization' | 'System'> = [
+    'Overview',
+    'Commerce',
+    'Finance',
+    'Organization',
+    'System',
+  ];
+
+  return categories
+    .map((cat) => {
+      const items = NAVIGATION_REGISTRY.filter(
+        (nav) =>
+          nav.category === cat &&
+          nav.href !== '/settings/data-connections' && // sub-page of settings
+          (role === 'Super Admin' || (nav.allowedRoles as string[]).includes(role))
+      ).map((nav) => {
+        let badge: number | undefined = undefined;
+        if (nav.badgeKey === 'lowStock' && badges?.lowStock !== undefined) {
+          badge = badges.lowStock;
+        } else if (nav.badgeKey === 'pendingPO' && badges?.pendingPO !== undefined) {
+          badge = badges.pendingPO;
+        }
+        return {
+          id: nav.id,
+          label: nav.label,
+          icon: nav.icon,
+          href: nav.href,
+          badge,
+          badgeVariant: nav.badgeVariant,
+        };
+      });
+
+      return {
+        id: `group-${cat.toLowerCase()}`,
+        label: cat,
+        items,
+      };
+    })
+    .filter((group) => group.items.length > 0);
+}
+
+/**
+ * Get secondary navigation items for the Mobile BottomNav "More" bottom sheet.
+ * Excludes primary navigation bar slots (/dashboard, /inventory-management, /sales, /customers).
+ */
+export function getMobileMoreNav(role: UserRole | string) {
+  const primarySlots = new Set(['/dashboard', '/inventory-management', '/sales', '/customers']);
+  return NAVIGATION_REGISTRY.filter(
+    (nav) =>
+      !primarySlots.has(nav.href) &&
+      nav.href !== '/settings/data-connections' &&
+      (role === 'Super Admin' || (nav.allowedRoles as string[]).includes(role))
+  ).map((nav) => ({
+    id: `more-${nav.id.replace('nav-', '')}`,
+    label: nav.label,
+    icon: nav.icon,
+    href: nav.href,
+  }));
 }
 
 /**

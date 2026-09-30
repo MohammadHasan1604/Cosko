@@ -288,7 +288,7 @@ export async function POST(req: NextRequest) {
         `Updated branding: ${Object.keys(updateData).join(', ')}`,
         user as any
       );
-      broadcastRealtimeEvent('settings', 'BRANDING_UPDATED', {
+      await broadcastRealtimeEvent('settings', 'BRANDING_UPDATED', {
         appName: updated.appName,
         logoUrl: updated.logoUrl,
       });

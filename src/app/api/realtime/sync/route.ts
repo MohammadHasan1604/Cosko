@@ -45,12 +45,24 @@ export async function GET(req: NextRequest) {
         {
           OR: [
             { storeCode: userStore },
+            { channel: `private-store-${userStore}` },
             { channel: `store-${userStore}` },
+            { channel: `private-user-${user.id}` },
             { channel: `user-${user.id}` },
             {
               AND: [
                 { storeCode: null },
-                { channel: { in: ['store-global', 'settings', 'units', 'payment-methods'] } },
+                {
+                  channel: {
+                    in: [
+                      'private-enterprise',
+                      'store-global',
+                      'settings',
+                      'units',
+                      'payment-methods',
+                    ],
+                  },
+                },
               ],
             },
           ],
@@ -61,7 +73,7 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    const events = await prisma.realtimeOutbox.findMany({
+    const events: any[] = await (prisma as any).realtimeOutbox.findMany({
       where,
       orderBy: { createdAt: 'asc' },
       take: limit,
@@ -75,7 +87,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const parsedEvents = events.map((e) => {
+    const parsedEvents = events.map((e: any) => {
       let parsedPayload: any = {};
       try {
         parsedPayload = JSON.parse(e.payload);

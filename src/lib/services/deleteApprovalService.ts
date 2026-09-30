@@ -338,7 +338,7 @@ export async function createDeleteRequest(
       })),
     });
 
-    broadcastRealtimeEvent('notifications', 'DELETE_REQUEST_CREATED', {
+    await broadcastRealtimeEvent('notifications', 'DELETE_REQUEST_CREATED', {
       requestId: deleteRequest.id,
       entityType: input.entityType,
       entityName: entityData.name,
@@ -471,12 +471,12 @@ export async function approveDeleteRequest(
     return { mode: executionMode, ...deletionResult };
   });
 
-  broadcastRealtimeEvent('notifications', 'DELETE_REQUEST_APPROVED', {
+  await broadcastRealtimeEvent('notifications', 'DELETE_REQUEST_APPROVED', {
     requestId: request.id,
     entityType: request.entityType,
     entityName: request.entityName,
   });
-  broadcastRealtimeEvent(request.entityType.toLowerCase(), `${request.entityType}_DELETED`, {
+  await broadcastRealtimeEvent(request.entityType.toLowerCase(), `${request.entityType}_DELETED`, {
     id: request.entityId,
     mode: executionMode,
   });
@@ -550,7 +550,7 @@ export async function rejectDeleteRequest(
     });
   });
 
-  broadcastRealtimeEvent('notifications', 'DELETE_REQUEST_REJECTED', {
+  await broadcastRealtimeEvent('notifications', 'DELETE_REQUEST_REJECTED', {
     requestId: request.id,
     entityType: request.entityType,
     entityName: request.entityName,

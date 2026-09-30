@@ -266,12 +266,11 @@ export async function POST(req: NextRequest) {
         const expPayload = {
           expenseNo: result.expenseNo,
           category: body.category,
-          amount: expenseAmt,
           storeCode: expenseStore,
         };
-        broadcastRealtimeEvent('expenses', 'EXPENSE_CREATED', expPayload);
+        await broadcastRealtimeEvent('expenses', 'EXPENSE_CREATED', expPayload);
         if (expenseStore) {
-          broadcastRealtimeEvent(getStoreChannel(expenseStore), 'EXPENSE_CREATED', expPayload);
+          await broadcastRealtimeEvent(getStoreChannel(expenseStore), 'EXPENSE_CREATED', expPayload);
         }
 
         return {
@@ -415,9 +414,9 @@ export async function PUT(req: NextRequest) {
       storeCode: updated.storeCode,
       action: 'updated',
     };
-    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', updateExpPayload);
+    await broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', updateExpPayload);
     if (updated.storeCode) {
-      broadcastRealtimeEvent(
+      await broadcastRealtimeEvent(
         getStoreChannel(updated.storeCode),
         'EXPENSE_UPDATED',
         updateExpPayload
@@ -540,9 +539,9 @@ export async function DELETE(req: NextRequest) {
       storeCode: target.storeCode,
       action: 'deleted',
     };
-    broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', delExpPayload);
+    await broadcastRealtimeEvent('expenses', 'EXPENSE_UPDATED', delExpPayload);
     if (target.storeCode) {
-      broadcastRealtimeEvent(getStoreChannel(target.storeCode), 'EXPENSE_UPDATED', delExpPayload);
+      await broadcastRealtimeEvent(getStoreChannel(target.storeCode), 'EXPENSE_UPDATED', delExpPayload);
     }
 
     return NextResponse.json({ success: true, message: 'Expense record deleted' });
