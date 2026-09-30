@@ -46,6 +46,7 @@ async function runVendorGstAndDrilldownTests() {
     data: {
       code: testVendorCode1,
       name: 'Unregistered Local Supplier',
+      storeCode: 'BLR',
       contactPerson: 'Suresh Kumar',
       email: 'suresh@localsupplier.in',
       phone: '+91 98888 11111',
@@ -66,6 +67,7 @@ async function runVendorGstAndDrilldownTests() {
     data: {
       code: testVendorCode2,
       name: 'Exempt Services Co',
+      storeCode: 'BLR',
       contactPerson: 'Ramesh Rao',
       email: 'ramesh@exemptservices.in',
       phone: '+91 98888 22222',
@@ -87,6 +89,7 @@ async function runVendorGstAndDrilldownTests() {
     data: {
       code: testVendorCode3,
       name: 'Registered Corporate Tech Ltd',
+      storeCode: 'BLR',
       contactPerson: 'Kavita Menon',
       email: 'kavita@corptech.in',
       phone: '+91 98888 33333',

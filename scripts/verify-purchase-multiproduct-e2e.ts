@@ -10,6 +10,7 @@ async function main() {
       data: {
         code: 'VEN-TEST-001',
         name: 'Alpha Wholesale Electronics',
+        storeCode: 'BLR',
         contactPerson: 'Arun Kumar',
         email: 'arun@alphawholesale.com',
         phone: '+91 98888 77777',

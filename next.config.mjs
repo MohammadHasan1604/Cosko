@@ -10,7 +10,7 @@ const nextConfig = {
     optimizePackageImports: ['lucide-react', '@heroicons/react', 'recharts', 'date-fns', 'sonner'],
   },
 
-  // Allow production build on Netlify without failing on ESLint warnings or CI typecheck quirks
+  // Strict production verification: fail build on any TypeScript or ESLint errors
   typescript: {
     ignoreBuildErrors: false,
   },

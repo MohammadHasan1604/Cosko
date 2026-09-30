@@ -143,6 +143,38 @@ export async function middleware(request: NextRequest) {
     return addSecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
+  // ─── Super Admin Only Route Enforcement (Direct Page & Module Access) ───
+  const SUPER_ADMIN_ONLY_PAGES = [
+    '/attendance',
+    '/work-activity',
+    '/audit-logs',
+    '/stores',
+    '/stock-transfers',
+    '/central-profit',
+  ];
+  if (SUPER_ADMIN_ONLY_PAGES.some((r) => pathname === r || pathname.startsWith(r + '/'))) {
+    const token =
+      sessionCookie ||
+      (request.headers.get('authorization')?.startsWith('Bearer ')
+        ? request.headers.get('authorization')!.substring(7)
+        : '');
+    let userRole = '';
+    if (token && AUTH_SECRET) {
+      try {
+        const decoded = jwt.verify(token, AUTH_SECRET) as any;
+        userRole = decoded?.user?.role || '';
+      } catch {}
+    }
+    if (userRole !== 'Super Admin') {
+      return addSecurityHeaders(
+        new NextResponse('Forbidden: Super Admin access required', {
+          status: 403,
+          headers: { 'Content-Type': 'text/plain' },
+        })
+      );
+    }
+  }
+
   return addSecurityHeaders(NextResponse.next());
 }
 

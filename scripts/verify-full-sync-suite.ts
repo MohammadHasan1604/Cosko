@@ -220,6 +220,7 @@ async function runFullSyncVerification() {
       data: {
         code: `VND-T${Date.now().toString().slice(-4)}`,
         name: 'Apex Semiconductor Distributors',
+        storeCode: 'BLR',
         contactPerson: 'Mr. Kapoor',
         phone: '+91 80 4455 6677',
         email: 'sales@apexsemi.com',

@@ -529,11 +529,15 @@ async function runTests() {
 
   if (failed > 0) {
     console.error('Failed tests:\n' + errors.join('\n'));
+    await prisma.$disconnect();
     process.exit(1);
   }
+  await prisma.$disconnect();
+  process.exit(0);
 }
 
-runTests().catch((err) => {
+runTests().catch(async (err) => {
   console.error('Fatal test error:', err);
+  await prisma.$disconnect();
   process.exit(1);
 });

@@ -502,13 +502,21 @@ export async function PUT(req: NextRequest) {
     };
     await broadcastRealtimeEvent('sales', 'SALE_UPDATED', salePayload);
     if (existing.storeCode) {
-      await broadcastRealtimeEvent(getStoreChannel(existing.storeCode), 'SALE_UPDATED', salePayload);
+      await broadcastRealtimeEvent(
+        getStoreChannel(existing.storeCode),
+        'SALE_UPDATED',
+        salePayload
+      );
     }
     if (isVoidingOrRefunding) {
       const stockPayload = { storeCode: existing.storeCode, reason: 'SALE_REFUND' };
       await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
       if (existing.storeCode) {
-        await broadcastRealtimeEvent(getStoreChannel(existing.storeCode), 'STOCK_UPDATED', stockPayload);
+        await broadcastRealtimeEvent(
+          getStoreChannel(existing.storeCode),
+          'STOCK_UPDATED',
+          stockPayload
+        );
       }
     }
 

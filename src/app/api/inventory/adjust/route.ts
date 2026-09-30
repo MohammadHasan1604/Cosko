@@ -202,7 +202,11 @@ export async function POST(req: NextRequest) {
         };
         await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload);
         if (body.storeCode) {
-          await broadcastRealtimeEvent(getStoreChannel(body.storeCode), 'STOCK_UPDATED', stockPayload);
+          await broadcastRealtimeEvent(
+            getStoreChannel(body.storeCode),
+            'STOCK_UPDATED',
+            stockPayload
+          );
         }
 
         return {

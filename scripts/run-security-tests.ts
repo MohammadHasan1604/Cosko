@@ -33,6 +33,7 @@ async function main() {
     process.exit(1);
   } else {
     console.log('🏆 SECURITY AUDIT SUCCESSFUL: All 15 security & performance test cases passed!');
+    process.exit(0);
   }
 }
 

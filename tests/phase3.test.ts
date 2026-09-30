@@ -296,6 +296,7 @@ async function runPhase3Tests() {
       data: {
         code: `VEN_${testId.slice(-6)}`,
         name: `Vendor ${testId}`,
+        storeCode: 'BLR',
         contactPerson: 'Manager Rao',
         phone: `88${Date.now().toString().slice(-8)}`,
         email: `vendor_${testId}@test.com`,

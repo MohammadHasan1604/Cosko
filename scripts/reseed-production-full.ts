@@ -359,6 +359,7 @@ async function reseedProductionFull() {
       {
         code: 'VND-APPL-01',
         name: 'Apple Distribution India Pvt Ltd',
+        storeCode: 'BLR',
         contactPerson: 'Arun Iyer',
         email: 'supply@apple-dist.in',
         phone: '9845012345',
@@ -372,6 +373,7 @@ async function reseedProductionFull() {
       {
         code: 'VND-SMSG-01',
         name: 'Samsung Electronics India Ltd',
+        storeCode: 'DEL',
         contactPerson: 'Sunil Nair',
         email: 'dist@samsung-supply.in',
         phone: '9845023456',
@@ -385,6 +387,7 @@ async function reseedProductionFull() {
       {
         code: 'VND-ANKR-01',
         name: 'Anker Innovations & Accessories Ltd',
+        storeCode: 'HYD',
         contactPerson: 'Rohit Shenoy',
         email: 'b2b@anker-accessories.in',
         phone: '9845034567',

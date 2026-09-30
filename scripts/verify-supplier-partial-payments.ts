@@ -33,6 +33,7 @@ async function runTests() {
         data: {
           code: 'VEN-PPTEST',
           name: 'Partial Pay Test Vendor',
+          storeCode: 'BLR',
           contactPerson: 'Payment Auditor',
           email: 'testpay@vendor.com',
           phone: '+91 99887 76655',
@@ -100,7 +101,7 @@ async function runTests() {
     // ------------------------------------------------------------------------
     // TEST 2: Record 1st Partial Payment (₹30,000)
     // ------------------------------------------------------------------------
-    console.log('\n--- Test 2: Record 1st Partial Payment (₹30,000 via Bank Transfer) ---');
+    console.log('\n--- Test 2: Record 1st Partial Payment (₹30,000 via UPI) ---');
     const voucherNo1 = `PV-TEST-001-${Date.now().toString().slice(-4)}`;
     const pay1 = await prisma.purchasePayment.create({
       data: {
@@ -108,8 +109,8 @@ async function runTests() {
         voucherNo: voucherNo1,
         amount: 30000,
         paymentDate: new Date(),
-        paymentMethod: 'Bank Transfer',
-        referenceNo: 'UTR-TEST-0001',
+        paymentMethod: 'UPI',
+        referenceNo: 'UPI-TEST-0001',
         notes: 'Advance 30% payment tranche',
         recordedBy: 'Accounts Manager',
       },
@@ -141,7 +142,7 @@ async function runTests() {
         entryDate: new Date(),
         storeCode: po1.storeCode,
         accountCategory: 'ASSET',
-        accountName: 'Cash / Bank (Bank Transfer)',
+        accountName: 'Cash / Bank (UPI)',
         debit: 0,
         credit: 30000,
         amount: -30000,
@@ -279,7 +280,7 @@ async function runTests() {
     // ------------------------------------------------------------------------
     // TEST 5: Final Settlement Payment (₹30,000)
     // ------------------------------------------------------------------------
-    console.log('\n--- Test 5: Final Settlement Payment (₹30,000 via Cheque) ---');
+    console.log('\n--- Test 5: Final Settlement Payment (₹30,000 via Other) ---');
     const voucherNo3 = `PV-TEST-003-${Date.now().toString().slice(-4)}`;
     const pay3 = await prisma.purchasePayment.create({
       data: {
@@ -287,8 +288,8 @@ async function runTests() {
         voucherNo: voucherNo3,
         amount: 30000,
         paymentDate: new Date(),
-        paymentMethod: 'Cheque',
-        referenceNo: 'CHQ-991122',
+        paymentMethod: 'Other',
+        referenceNo: 'OTH-TEST-991122',
         notes: 'Final balance settlement',
         recordedBy: 'Accounts Manager',
       },
@@ -319,7 +320,7 @@ async function runTests() {
         entryDate: new Date(),
         storeCode: po1.storeCode,
         accountCategory: 'ASSET',
-        accountName: 'Cash / Bank (Cheque)',
+        accountName: 'Cash / Bank (Other)',
         debit: 0,
         credit: 30000,
         amount: -30000,
@@ -394,8 +395,8 @@ async function runTests() {
         voucherNo: vNoUpfront,
         amount: initialPaid,
         paymentDate: new Date(),
-        paymentMethod: 'Bank Transfer',
-        referenceNo: 'UTR-UPFRONT-99',
+        paymentMethod: 'UPI',
+        referenceNo: 'UPI-UPFRONT-99',
         notes: 'Upfront advance tranche at PO creation',
         recordedBy: 'Test Runner',
       },
@@ -426,7 +427,7 @@ async function runTests() {
         entryDate: new Date(),
         storeCode: po2.storeCode,
         accountCategory: 'ASSET',
-        accountName: 'Cash / Bank (Bank Transfer)',
+        accountName: 'Cash / Bank (UPI)',
         debit: 0,
         credit: initialPaid,
         amount: -initialPaid,

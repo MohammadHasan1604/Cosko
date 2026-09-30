@@ -49,13 +49,15 @@
     "serve": "next start -p 4028",
     "type-check": "tsc --noEmit",
     "seed": "npx tsx scripts/seed-mysql.ts",
+    "test": "npm run test:all",
     "test:security": "npx tsx --env-file=.env scripts/run-security-tests.ts",
     "test:phase1": "npx tsx tests/phase1-security.test.ts",
+    "test:matrix": "npx tsx tests/phase1-security-matrix.ts",
     "test:phase2": "npx tsx tests/phase2.test.ts",
     "test:phase2-realtime": "npx tsx tests/phase2-realtime.test.ts",
     "test:phase3": "npx tsx tests/phase3.test.ts",
     "test:deep": "npx tsx tests/phase3-deep-verification.test.ts",
-    "test:all": "npx tsx tests/phase1-security.test.ts && npx tsx tests/phase2.test.ts && npx tsx tests/phase2-realtime.test.ts && npx tsx tests/phase3.test.ts && npx tsx tests/phase3-deep-verification.test.ts"
+    "test:all": "npx tsx tests/phase1-security.test.ts && npx tsx tests/phase1-security-matrix.ts && npx tsx tests/phase2.test.ts && npx tsx tests/phase2-realtime.test.ts && npx tsx tests/phase3.test.ts && npx tsx tests/phase3-deep-verification.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1121.0",

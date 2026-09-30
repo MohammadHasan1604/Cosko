@@ -178,7 +178,9 @@ export async function POST(req: NextRequest) {
             'TRANSFER_COMPLETED',
             transferPayload
           );
-          await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: body.sourceStore });
+          await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+            storeCode: body.sourceStore,
+          });
           await broadcastRealtimeEvent(getStoreChannel(body.sourceStore), 'STOCK_UPDATED', {
             storeCode: body.sourceStore,
           });
@@ -390,7 +392,9 @@ export async function PUT(req: NextRequest) {
       );
     }
     if (isCancelling) {
-      await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.sourceStore });
+      await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+        storeCode: existing.sourceStore,
+      });
       await broadcastRealtimeEvent(getStoreChannel(existing.sourceStore), 'STOCK_UPDATED', {
         storeCode: existing.sourceStore,
       });
@@ -580,7 +584,9 @@ export async function DELETE(req: NextRequest) {
         'TRANSFER_COMPLETED',
         delTransferPayload
       );
-      await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', { storeCode: existing.sourceStore });
+      await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', {
+        storeCode: existing.sourceStore,
+      });
       await broadcastRealtimeEvent(getStoreChannel(existing.sourceStore), 'STOCK_UPDATED', {
         storeCode: existing.sourceStore,
       });

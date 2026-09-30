@@ -313,7 +313,11 @@ export async function PUT(req: NextRequest) {
 
     await broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
     if (customerStore) {
-      await broadcastRealtimeEvent(getStoreChannel(customerStore), 'CUSTOMER_UPDATED', customerPayload);
+      await broadcastRealtimeEvent(
+        getStoreChannel(customerStore),
+        'CUSTOMER_UPDATED',
+        customerPayload
+      );
     }
 
     return NextResponse.json({ success: true, customer });
@@ -465,7 +469,11 @@ export async function DELETE(req: NextRequest) {
 
     await broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
     if (customerStore) {
-      await broadcastRealtimeEvent(getStoreChannel(customerStore), 'CUSTOMER_UPDATED', customerPayload);
+      await broadcastRealtimeEvent(
+        getStoreChannel(customerStore),
+        'CUSTOMER_UPDATED',
+        customerPayload
+      );
     }
 
     return NextResponse.json({

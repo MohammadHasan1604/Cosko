@@ -629,7 +629,11 @@ export async function POST(req: NextRequest) {
         };
         await broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', poPayload);
         if (body.storeCode) {
-          await broadcastRealtimeEvent(getStoreChannel(body.storeCode), 'PURCHASE_COMPLETED', poPayload);
+          await broadcastRealtimeEvent(
+            getStoreChannel(body.storeCode),
+            'PURCHASE_COMPLETED',
+            poPayload
+          );
         }
         if (body.status === 'Received') {
           const sc = body.storeCode || 'CENTRAL';
@@ -985,7 +989,11 @@ export async function PUT(req: NextRequest) {
     };
     await broadcastRealtimeEvent('purchases', 'PURCHASE_COMPLETED', updatePoPayload);
     if (targetStore) {
-      await broadcastRealtimeEvent(getStoreChannel(targetStore), 'PURCHASE_COMPLETED', updatePoPayload);
+      await broadcastRealtimeEvent(
+        getStoreChannel(targetStore),
+        'PURCHASE_COMPLETED',
+        updatePoPayload
+      );
     }
     if (isTransitioningToReceived) {
       const stockPayload = { storeCode: targetStore };

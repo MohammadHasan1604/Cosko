@@ -30,7 +30,7 @@ async function runVerification() {
       console.log(`  - ${m.name} (${m.code}) [${m.type}] : Status = ${m.status}, IsSystem = ${m.isSystem}`);
     });
 
-    const canonicalMethods = ['Cash', 'UPI', 'Card', 'Bank Transfer', 'Corporate Card', 'Direct Debit', 'Cheque', 'Credit'];
+    const canonicalMethods = ['Cash', 'UPI', 'Other'];
     for (const name of canonicalMethods) {
       const found = methods.find((m) => m.name.toLowerCase() === name.toLowerCase());
       assert(!!found, `Canonical Payment Method "${name}" exists in master table`);
@@ -39,7 +39,7 @@ async function runVerification() {
     // 2. Active status validation
     console.log('\n2. Verifying Active / Inactive States & Constraints...');
     const activeMethods = methods.filter((m) => m.status === 'Active');
-    assert(activeMethods.length >= 6, `At least 6 payment methods are active (Found: ${activeMethods.length})`);
+    assert(activeMethods.length >= 3, `All 3 operational payment methods are active (Found: ${activeMethods.length})`);
 
     // 3. Dynamic Creation & Single Source of Truth
     console.log('\n3. Testing Dynamic Master CRUD (Create, Update Status, Cleanup)...');

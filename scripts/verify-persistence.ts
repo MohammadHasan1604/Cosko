@@ -94,6 +94,7 @@ async function main() {
       data: {
         name: 'Test Silicon Vendor',
         code,
+        storeCode: 'BLR',
         categories: 'Electricals',
         contactPerson: 'Suresh Menon',
         email: 'suresh@vendor.com',
@@ -163,6 +164,7 @@ async function main() {
       data: {
         name: 'PO Test Vendor',
         code: `VND-PO-${Date.now()}`,
+        storeCode: 'BLR',
         contactPerson: 'Vendor Rep',
         categories: 'Electronics',
         email: 'po@vendor.com',

@@ -82,8 +82,8 @@ export async function GET(req: NextRequest) {
     });
 
     // If searching by ID, verify Store Manager owns this vendor
-    if (vendorId && vendors.length > 0 && user.role !== 'Super Admin') {
-      if (vendors[0].storeCode !== user.store) {
+    if (vendorId && user.role !== 'Super Admin') {
+      if (vendors.length === 0 || vendors[0].storeCode !== user.store) {
         return NextResponse.json(
           { error: 'Forbidden: You do not have permission to access this vendor.' },
           { status: 403 }

@@ -37,8 +37,6 @@
     ".next/next-build/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "tests",
-    "scripts"
+    "node_modules"
   ]
 }

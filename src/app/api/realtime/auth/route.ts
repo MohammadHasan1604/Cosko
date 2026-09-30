@@ -74,7 +74,9 @@ export async function POST(req: NextRequest) {
     }
 
     const isSuperAdmin = user.role === 'Super Admin' || user.securityLevel >= 100;
-    const userStore = (user.store && user.store !== 'All Stores' ? user.store : 'BLR').toUpperCase();
+    const userStore = (
+      user.store && user.store !== 'All Stores' ? user.store : 'BLR'
+    ).toUpperCase();
 
     // 🔒 Channel Authorization Matrix
     let isAuthorized = false;
@@ -106,10 +108,7 @@ export async function POST(req: NextRequest) {
       } else {
         denialMessage = 'Forbidden: Attendance management channel is restricted to Super Admin.';
       }
-    } else if (
-      channelName.startsWith('private-store-') ||
-      channelName.startsWith('store-')
-    ) {
+    } else if (channelName.startsWith('private-store-') || channelName.startsWith('store-')) {
       const requestedStore = channelName
         .replace(/^private-store-/, '')
         .replace(/^store-/, '')
@@ -126,13 +125,8 @@ export async function POST(req: NextRequest) {
           denialMessage = `Forbidden: Cross-store subscription not permitted. You are assigned to ${userStore}, cannot subscribe to ${requestedStore}.`;
         }
       }
-    } else if (
-      channelName.startsWith('private-user-') ||
-      channelName.startsWith('user-')
-    ) {
-      const requestedUserId = channelName
-        .replace(/^private-user-/, '')
-        .replace(/^user-/, '');
+    } else if (channelName.startsWith('private-user-') || channelName.startsWith('user-')) {
+      const requestedUserId = channelName.replace(/^private-user-/, '').replace(/^user-/, '');
 
       if (isSuperAdmin || requestedUserId === user.id) {
         isAuthorized = true;

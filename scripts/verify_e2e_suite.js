@@ -339,8 +339,8 @@ async function runEndToEndVerification() {
           purchaseId: po.id,
           voucherNo: `PV-AUDIT-1`,
           amount: 50000.00,
-          paymentMethod: 'Bank Transfer',
-          referenceNo: 'UTR-TEST-12345',
+          paymentMethod: 'UPI',
+          referenceNo: 'UPI-TEST-12345',
           recordedBy: 'AuditSuite',
         },
       });
@@ -363,8 +363,8 @@ async function runEndToEndVerification() {
           purchaseId: po.id,
           voucherNo: `PV-AUDIT-2`,
           amount: 45000.00,
-          paymentMethod: 'Bank Transfer',
-          referenceNo: 'UTR-TEST-67890',
+          paymentMethod: 'Other',
+          referenceNo: 'OTH-TEST-67890',
           recordedBy: 'AuditSuite',
         },
       });

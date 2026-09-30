@@ -100,10 +100,10 @@ async function main() {
   console.log('Cleaned up Test 1 sale.');
 
   // -------------------------------------------------------------------------
-  // TEST 2: All Payment Methods (UPI, Cash, Card, Credit)
+  // TEST 2: All Payment Methods (Cash, UPI, Other)
   // -------------------------------------------------------------------------
-  console.log('\n--- Test 2: Verification of Payment Methods (UPI, Cash, Card, Credit) ---');
-  for (const pm of ['Cash', 'Card', 'Credit'] as const) {
+  console.log('\n--- Test 2: Verification of Payment Methods (Cash, UPI, Other) ---');
+  for (const pm of ['Cash', 'UPI', 'Other'] as const) {
     const salePM = await executePOSCheckout({
       storeCode: 'CENTRAL',
       customerName: `PM Test Customer (${pm})`,
@@ -128,13 +128,8 @@ async function main() {
       where: { refNo: salePM.orderNo },
     });
 
-    if (pm === 'Credit') {
-      const arEntry = finPM.find((e) => e.accountName === 'Customer Accounts Receivable');
-      await assert(!!arEntry, `Credit payment routed to "Customer Accounts Receivable"`);
-    } else {
-      const bankEntry = finPM.find((e) => e.accountName === `Cash / Bank (${pm})`);
-      await assert(!!bankEntry, `${pm} payment routed to "Cash / Bank (${pm})"`);
-    }
+    const bankEntry = finPM.find((e) => e.accountName === `Cash / Bank (${pm})`);
+    await assert(!!bankEntry, `${pm} payment routed to "Cash / Bank (${pm})"`);
 
     // Clean up
     await prisma.salesOrderItem.deleteMany({ where: { orderId: salePM.id } });

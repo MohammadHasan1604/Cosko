@@ -697,7 +697,11 @@ export async function DELETE(req: NextRequest) {
       };
       await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', archiveStockPayload);
       if (user.store && user.store !== 'All Stores') {
-        await broadcastRealtimeEvent(getStoreChannel(user.store), 'STOCK_UPDATED', archiveStockPayload);
+        await broadcastRealtimeEvent(
+          getStoreChannel(user.store),
+          'STOCK_UPDATED',
+          archiveStockPayload
+        );
       }
 
       return NextResponse.json({
@@ -738,7 +742,11 @@ export async function DELETE(req: NextRequest) {
     };
     await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', deleteStockPayload);
     if (user.store && user.store !== 'All Stores') {
-      await broadcastRealtimeEvent(getStoreChannel(user.store), 'STOCK_UPDATED', deleteStockPayload);
+      await broadcastRealtimeEvent(
+        getStoreChannel(user.store),
+        'STOCK_UPDATED',
+        deleteStockPayload
+      );
     }
 
     return NextResponse.json({

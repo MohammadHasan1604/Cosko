@@ -842,16 +842,15 @@ export async function runDeepVerification() {
 
   if (failed > 0) {
     console.error('Failed checks:', failures);
+    await prisma.$disconnect();
     process.exit(1);
   }
+  await prisma.$disconnect();
+  process.exit(0);
 }
 
-runDeepVerification()
-  .catch((err) => {
-    console.error('Test execution failed:', err);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-    process.exit(0);
-  });
+runDeepVerification().catch(async (err) => {
+  console.error('Test execution failed:', err);
+  await prisma.$disconnect();
+  process.exit(1);
+});
