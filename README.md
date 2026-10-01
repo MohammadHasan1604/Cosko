@@ -1,5 +1,10 @@
 # COSKO — Multi-Store Enterprise Retail & POS Platform
 
+> **Copyright © 2026 Mohammad Hasan — All Rights Reserved.**  
+> **Proprietary & Confidential Software.** Unauthorized copying, modification, distribution, sublicensing, reverse engineering, or commercial use without prior written consent from Mohammad Hasan is strictly prohibited.
+
+---
+
 COSKO is an enterprise-grade, multi-store retail management, point-of-sale (POS), inventory distribution, and double-entry accounting platform. Engineered on **Next.js 15 (App Router)**, **TypeScript**, **Tailwind CSS**, and **MySQL 8+** with **Prisma ORM**, COSKO delivers complete store isolation, strict 3-role role-based access control (RBAC), atomic multi-product procurement, Cloudflare R2 object storage for financial payment proofs, and distributed Pusher realtime synchronization.
 
 ---
@@ -36,6 +41,7 @@ COSKO is an enterprise-grade, multi-store retail management, point-of-sale (POS)
 17. [Critical Production Warnings](#critical-production-warnings)
 18. [Project Folder Structure](#project-folder-structure)
 19. [Troubleshooting & FAQ](#troubleshooting--faq)
+20. [Proprietary License & Intellectual Property](#proprietary-license--intellectual-property)
 
 ---
 
@@ -730,6 +736,32 @@ COSKO is configured for zero-configuration Netlify deployments via `@netlify/plu
 
 ---
 
-## License
+## Proprietary License & Intellectual Property
 
-Proprietary enterprise retail software developed for COSKO Retail Networks. All rights reserved. Unauthorized reproduction, distribution, or decompilation is strictly prohibited.
+**Copyright © 2026 Mohammad Hasan — All Rights Reserved.**
+
+This repository, source code, system architecture, database design, user interface components, and all accompanying documentation (collectively, the "Software") are the exclusive intellectual property and proprietary assets of **Mohammad Hasan** ("Author", "Licensor", "Owner").
+
+### Proprietary Terms & Restrictions
+
+1. **Exclusive Ownership & IP Retention**:
+   Sole legal and equitable ownership, title, copyright, patent rights, trade secrets, and all other intellectual property rights in and to the Software remain perpetually and exclusively with **Mohammad Hasan**. No ownership or intellectual property rights are transferred to any party by granting access to this repository.
+
+2. **Prohibited Actions**:
+   Without express, prior written authorization executed by Mohammad Hasan, you are strictly prohibited from:
+   - **Copying & Reproduction**: Copying, duplicating, cloning, mirroring, or reproducing the source code or any portion of the platform.
+   - **Modification & Derivative Works**: Modifying, altering, adapting, translating, or creating derivative works of this codebase or its database structures.
+   - **Redistribution & Sublicensing**: Distributing, publishing, transferring, broadcasting, sublicensing, leasing, renting, assigning, or making the Software available to third parties.
+   - **Reselling & Commercial Exploitation**: Reselling, charging fees for, white-labeling, or hosting the Software as a service (SaaS) or managed service.
+   - **Reverse Engineering**: Decompiling, reverse engineering, disassembling, decrypting, or attempting to reconstruct the source algorithms or architecture.
+
+3. **Client & Enterprise Usage**:
+   Client deployment, institutional utilization, or operational installation of the Software is permitted **strictly and exclusively** through a separate, executed written commercial license agreement with Mohammad Hasan. Any installation, staging, deployment, or runtime execution outside an active written commercial agreement constitutes willful intellectual property infringement.
+
+4. **No Implied Rights**:
+   No license, immunity, or right is granted, whether by implication, estoppel, or otherwise, except as expressly stated in a valid written contract executed by Mohammad Hasan.
+
+For commercial licensing, enterprise deployment inquiries, or authorization requests, please contact:  
+**Mohammad Hasan** — [mohammadhasan@gmail.com](mailto:mohammadhasan@gmail.com)
+
+*Refer to the root [`LICENSE`](file:///c:/Users/admin/Downloads/storecommand/LICENSE) file for the full legal terms and conditions.*
