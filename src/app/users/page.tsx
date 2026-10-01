@@ -10,7 +10,6 @@ import {
   RBACEngine,
   RBACUser,
   PERMISSION_CATALOGUE,
-  SUPER_ADMIN_PROTECTED_PERMISSIONS,
   PermissionDefinition,
   ROLE_SECURITY_LEVELS,
 } from '@/lib/rbacEngine';
@@ -20,18 +19,13 @@ export default function UsersPage() {
   const {
     usersList,
     currentUser,
-    addUserAccount,
-    updateUserAccount,
     toggleUserStatus,
     setUserPermissionOverride,
-    toggleUserStoreAccess,
     deleteUserAccount,
     sales,
     purchases,
-    inventory,
     expenses,
     auditLogs,
-    storesList,
   } = useApp();
 
   const [inviteModal, setInviteModal] = useState(false);
