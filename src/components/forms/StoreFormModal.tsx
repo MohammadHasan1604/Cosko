@@ -201,9 +201,39 @@ export default function StoreFormModal({
           ? `Code: ${store?.code}`
           : 'Multi-store retail network & regional warehouse configuration'
       }
-      size="md"
+      size="standard"
+      footer={
+        <div className="flex items-center justify-end gap-2 w-full">
+          <button
+            type="button"
+            onClick={handleSafeClose}
+            className="btn-secondary text-xs flex-1 sm:flex-initial"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="store-form"
+            className="btn-primary text-xs gap-1.5 flex-1 sm:flex-initial font-bold"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Icon name="CheckIcon" size={14} />
+                {isEdit ? 'Update Store' : 'Create Store Hub'}
+              </>
+            )}
+          </button>
+        </div>
+      }
     >
-      <form onSubmit={handleSubmit} className="space-y-4 py-2">
+      <form id="store-form" onSubmit={handleSubmit} className="space-y-4 py-2">
         {/* Code & Name */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
@@ -311,31 +341,6 @@ export default function StoreFormModal({
             offText="OFF"
             title="Toggle store operational status"
           />
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
-          <button
-            type="button"
-            onClick={handleSafeClose}
-            className="btn-secondary text-xs"
-            disabled={isSubmitting}
-          >
-            Cancel
-          </button>
-          <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Icon name="CheckIcon" size={14} />
-                {isEdit ? 'Update Store' : 'Create Store Hub'}
-              </>
-            )}
-          </button>
         </div>
       </form>
     </Modal>

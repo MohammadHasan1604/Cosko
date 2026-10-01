@@ -35,8 +35,48 @@ export const VoidRefundModal: React.FC<VoidRefundModalProps> = ({
       }}
       title={`Void / Refund Invoice #${sale.orderNo}`}
       subtitle="Record return payout instrument and automatically restore inventory"
-      size="md"
+      size="standard"
       zIndex={1150}
+      footer={
+        <div className="flex items-center justify-end gap-2 w-full">
+          <button
+            type="button"
+            disabled={isRefunding}
+            onClick={onClose}
+            className="btn-secondary text-xs flex-1 sm:flex-initial"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={isRefunding}
+            onClick={async () => {
+              setIsRefunding(true);
+              try {
+                const success = await onConfirmRefund(sale.id, refundMethod);
+                if (success) {
+                  onClose();
+                }
+              } finally {
+                setIsRefunding(false);
+              }
+            }}
+            className="btn-danger text-xs font-bold gap-1.5 px-4 flex-1 sm:flex-initial"
+          >
+            {isRefunding ? (
+              <>
+                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Processing Refund...</span>
+              </>
+            ) : (
+              <>
+                <Icon name="ArrowPathIcon" size={14} />
+                <span>Confirm Void & Refund</span>
+              </>
+            )}
+          </button>
+        </div>
+      }
     >
       <div className="space-y-4 py-2">
         <div className="p-3 rounded-xl bg-card border border-border/80 space-y-1.5 text-xs">
@@ -82,45 +122,6 @@ export const VoidRefundModal: React.FC<VoidRefundModalProps> = ({
             Confirming will mark order {sale.orderNo} as Refunded, automatically restock all items
             into {sale.store}, and log a refund payout via {refundMethod} in the general ledger.
           </p>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2 border-t border-border">
-          <button
-            type="button"
-            disabled={isRefunding}
-            onClick={onClose}
-            className="btn-secondary text-xs"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={isRefunding}
-            onClick={async () => {
-              setIsRefunding(true);
-              try {
-                const success = await onConfirmRefund(sale.id, refundMethod);
-                if (success) {
-                  onClose();
-                }
-              } finally {
-                setIsRefunding(false);
-              }
-            }}
-            className="btn-danger text-xs font-bold gap-1.5 px-4"
-          >
-            {isRefunding ? (
-              <>
-                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Processing Refund...</span>
-              </>
-            ) : (
-              <>
-                <Icon name="ArrowPathIcon" size={14} />
-                <span>Confirm Void & Refund</span>
-              </>
-            )}
-          </button>
         </div>
       </div>
     </Modal>

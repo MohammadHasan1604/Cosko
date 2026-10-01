@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '@/context/AppContext';
 import Icon from '@/components/ui/AppIcon';
 import Link from 'next/link';
@@ -8,6 +9,11 @@ export default function GlobalSearchModal() {
   const { searchOpen, setSearchOpen, inventory, customers, sales, branding, currentUser } =
     useApp();
   const [query, setQuery] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -23,7 +29,7 @@ export default function GlobalSearchModal() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchOpen, setSearchOpen]);
 
-  if (!searchOpen) return null;
+  if (!searchOpen || !mounted) return null;
 
   const isSuperAdmin = currentUser.role === 'Super Admin';
   const assignedStore = currentUser.store || 'BLR';
@@ -68,14 +74,14 @@ export default function GlobalSearchModal() {
         .slice(0, 3)
     : [];
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-start md:items-start md:justify-center md:pt-16 bg-foreground/30 backdrop-blur-sm fade-in"
+      className="fixed inset-0 z-[150] flex items-start md:items-start md:justify-center md:pt-16 bg-black/60 backdrop-blur-sm fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) setSearchOpen(false);
       }}
     >
-      <div className="bg-card w-full h-full md:h-auto md:border md:border-border md:max-w-2xl md:rounded-2xl md:shadow-2xl overflow-hidden flex flex-col md:max-h-[80vh] md:mx-4">
+      <div className="bg-card w-full h-[100dvh] md:h-auto md:border md:border-border md:max-w-2xl md:rounded-2xl md:shadow-2xl overflow-hidden flex flex-col md:max-h-[85dvh] md:mx-4">
         {/* Search Header */}
         <div className="flex items-center gap-3 px-4 md:px-5 py-3 md:py-4 border-b border-border bg-muted/30">
           <Icon name="MagnifyingGlassIcon" size={18} className="text-primary flex-shrink-0" />
@@ -239,6 +245,7 @@ export default function GlobalSearchModal() {
           <span>Press ESC to close</span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

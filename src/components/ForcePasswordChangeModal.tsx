@@ -1,5 +1,6 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '@/context/AppContext';
 import Icon from '@/components/ui/AppIcon';
 import { toast } from 'sonner';
@@ -13,9 +14,14 @@ export default function ForcePasswordChangeModal() {
   const [showNew, setShowNew] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // If user does not need to change password or is unauthenticated, do not render
-  if (!currentUser || !currentUser.id || !currentUser.mustChangePassword) {
+  if (!currentUser || !currentUser.id || !currentUser.mustChangePassword || !mounted) {
     return null;
   }
 
@@ -63,9 +69,9 @@ export default function ForcePasswordChangeModal() {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="bg-card border border-border/80 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      <div className="bg-card border border-border/80 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200 max-h-[min(90dvh,calc(var(--vv-height,100dvh)-2rem))] overflow-y-auto">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-1">
             <Icon name="KeyIcon" size={24} />
@@ -165,6 +171,7 @@ export default function ForcePasswordChangeModal() {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

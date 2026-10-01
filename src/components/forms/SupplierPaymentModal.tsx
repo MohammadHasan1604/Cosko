@@ -194,10 +194,40 @@ export default function SupplierPaymentModal({
       onClose={handleSafeClose}
       title="Record Supplier / Bill Payment"
       subtitle={`Bill: ${purchase.invoiceNo || purchase.poNo} · Vendor: ${purchase.vendorName || purchase.vendor}`}
-      size="md"
+      size="standard"
       zIndex={zIndex}
+      footer={
+        <div className="flex items-center justify-end gap-2 w-full">
+          <button
+            type="button"
+            onClick={handleSafeClose}
+            className="btn-secondary text-xs flex-1 sm:flex-initial"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="supplier-payment-form"
+            className="btn-primary text-xs font-bold gap-1.5 px-4 flex-1 sm:flex-initial disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isSubmitting || !payProof || !payAmount || Number(payAmount) <= 0}
+          >
+            {isSubmitting ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Processing Payment...
+              </>
+            ) : (
+              <>
+                <Icon name="CheckCircleIcon" size={14} />
+                Confirm & Record Payment
+              </>
+            )}
+          </button>
+        </div>
+      }
     >
-      <form onSubmit={handleSubmit} className="space-y-4 py-2 text-xs">
+      <form id="supplier-payment-form" onSubmit={handleSubmit} className="space-y-4 py-2 text-xs">
         {/* Authoritative Financial Breakdown Banner */}
         <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/5 space-y-2 font-tabular">
           <div className="flex justify-between text-muted-foreground">
@@ -275,18 +305,34 @@ export default function SupplierPaymentModal({
           </div>
         </div>
 
-        {/* Date */}
-        <div>
-          <label className="text-xs font-bold text-foreground block mb-1">
-            Payment Date <span className="text-danger">*</span>
-          </label>
-          <input
-            type="date"
-            required
-            value={payDate}
-            onChange={(e) => setPayDate(e.target.value)}
-            className="input-field text-xs font-mono h-9"
-          />
+        {/* Date & Reference */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Payment Date <span className="text-danger">*</span>
+            </label>
+            <input
+              type="date"
+              required
+              value={payDate}
+              onChange={(e) => setPayDate(e.target.value)}
+              className="input-field text-xs font-mono h-9"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Reference / UTR No.{' '}
+              <span className="text-muted-foreground font-normal">(Optional)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. UTR / IMPS / Cheque No"
+              value={payRef}
+              onChange={(e) => setPayRef(e.target.value)}
+              className="input-field text-xs font-mono h-9"
+            />
+          </div>
         </div>
 
         {/* Mandatory Payment Proof Attachment */}
@@ -323,37 +369,6 @@ export default function SupplierPaymentModal({
             </span>
           </div>
         )}
-
-        {/* Actions */}
-        <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
-          <button
-            type="button"
-            onClick={handleSafeClose}
-            className="btn-secondary text-xs"
-            disabled={isSubmitting}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="btn-primary text-xs font-bold gap-1.5 px-4 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={
-              isSubmitting || !payProof || !payRef.trim() || !payAmount || Number(payAmount) <= 0
-            }
-          >
-            {isSubmitting ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Processing Payment...
-              </>
-            ) : (
-              <>
-                <Icon name="CheckCircleIcon" size={14} />
-                Confirm & Record Payment
-              </>
-            )}
-          </button>
-        </div>
       </form>
     </Modal>
   );

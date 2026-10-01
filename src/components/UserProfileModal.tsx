@@ -142,7 +142,26 @@ export default function UserProfileModal() {
       onClose={() => setUserProfileOpen(false)}
       title="User Account & Security Profile"
       subtitle={`${branding.appName} · Enterprise RBAC & Profile Management`}
-      size="md"
+      size="standard"
+      footer={
+        <div className="flex items-center justify-between gap-3 w-full">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-danger/10 text-danger hover:bg-danger hover:text-white transition-colors"
+          >
+            <Icon name="ArrowRightOnRectangleIcon" size={14} />
+            Sign Out
+          </button>
+          <button
+            type="button"
+            onClick={() => setUserProfileOpen(false)}
+            className="btn-secondary text-xs"
+          >
+            Close
+          </button>
+        </div>
+      }
     >
       <div className="space-y-4 py-2">
         {/* Navigation Tabs */}
@@ -419,25 +438,6 @@ export default function UserProfileModal() {
           </form>
         )}
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between gap-3 pt-2 border-t border-border">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-danger/10 text-danger hover:bg-danger hover:text-white transition-colors"
-          >
-            <Icon name="ArrowRightOnRectangleIcon" size={14} />
-            Sign Out
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setUserProfileOpen(false)}
-            className="btn-secondary text-xs"
-          >
-            Close
-          </button>
-        </div>
       </div>
     </Modal>
   );

@@ -721,10 +721,47 @@ export default function PurchaseOrderFormModal({
         onClose={handleSafeClose}
         title={isEdit ? `Edit Purchase Order: ${purchase?.poNo}` : 'Create Purchase Order (PO)'}
         subtitle="Procure multi-product stock replenishment with live taxes, discounts, and inventory receiving"
-        size="xl"
+        size="large-form"
         zIndex={zIndex}
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={handleSafeClose}
+              className="btn-secondary text-xs flex-1 sm:flex-initial"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="po-form"
+              className="btn-primary text-xs gap-1.5 font-bold px-4 flex-1 sm:flex-initial disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={
+                isSubmitting ||
+                (!isEdit &&
+                  (paymentStatus === 'Partial' ||
+                    paymentStatus === 'Paid' ||
+                    financials.paidAmount > 0) &&
+                  (!paymentProof || !paymentRef.trim()))
+              }
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Saving Purchase Order...</span>
+                </>
+              ) : (
+                <>
+                  <Icon name="CheckIcon" size={14} />
+                  <span>{isEdit ? 'Update Purchase Order' : 'Create Purchase Order'}</span>
+                </>
+              )}
+            </button>
+          </div>
+        }
       >
-        <form onSubmit={handleSubmit} className="space-y-4 py-1">
+        <form id="po-form" onSubmit={handleSubmit} className="space-y-4 py-1">
           {/* Header Row: Vendor & Store Selection */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 p-3.5 rounded-xl border border-border bg-card">
             <div>
@@ -769,7 +806,7 @@ export default function PurchaseOrderFormModal({
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label className="text-2xs font-bold text-foreground block mb-1">
                   Invoice / Ref No (Optional)
@@ -793,7 +830,7 @@ export default function PurchaseOrderFormModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label className="text-2xs font-bold text-foreground block mb-1">
                   Expected Delivery Date
@@ -1403,41 +1440,6 @@ export default function PurchaseOrderFormModal({
               </div>
             )}
 
-          {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
-            <button
-              type="button"
-              onClick={handleSafeClose}
-              className="btn-secondary text-xs"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn-primary text-xs gap-1.5 font-bold px-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={
-                isSubmitting ||
-                (!isEdit &&
-                  (paymentStatus === 'Partial' ||
-                    paymentStatus === 'Paid' ||
-                    financials.paidAmount > 0) &&
-                  (!paymentProof || !paymentRef.trim()))
-              }
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Saving Purchase Order...
-                </>
-              ) : (
-                <>
-                  <Icon name="CheckIcon" size={14} />
-                  {isEdit ? 'Update Purchase Order' : 'Create Purchase Order'}
-                </>
-              )}
-            </button>
-          </div>
         </form>
       </Modal>
 

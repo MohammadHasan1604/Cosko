@@ -317,10 +317,40 @@ export default function UserFormModal({
           ? `Manage operational profile and store assignments for ${user?.email}`
           : 'Provision new staff account, operational role, and assigned store access'
       }
-      size="md"
+      size="standard"
       zIndex={zIndex}
+      footer={
+        <div className="flex items-center justify-end gap-2 w-full">
+          <button
+            type="button"
+            onClick={handleSafeClose}
+            className="btn-secondary text-xs flex-1 sm:flex-initial"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="user-form"
+            className="btn-primary text-xs gap-1.5 font-bold flex-1 sm:flex-initial"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Icon name="CheckIcon" size={14} />
+                {isEdit ? 'Update Team Member' : 'Register Team Member'}
+              </>
+            )}
+          </button>
+        </div>
+      }
     >
-      <form onSubmit={handleSubmit} className="space-y-4 py-2">
+      <form id="user-form" onSubmit={handleSubmit} className="space-y-4 py-2">
         {/* Error Alert Banner with Retry Guidance */}
         {submitError && (
           <div className="p-3 rounded-xl bg-danger/10 border border-danger/30 text-danger text-xs flex items-center justify-between gap-2">
@@ -514,35 +544,6 @@ export default function UserFormModal({
               <option value="Suspended">Suspended</option>
             </select>
           </div>
-        </div>
-
-        {/* Submit Actions */}
-        <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
-          <button
-            type="button"
-            onClick={handleSafeClose}
-            className="btn-secondary text-xs"
-            disabled={isSubmitting}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="btn-primary text-xs gap-1.5 font-bold"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Icon name="CheckIcon" size={14} />
-                {isEdit ? 'Update Team Member' : 'Register Team Member'}
-              </>
-            )}
-          </button>
         </div>
       </form>
     </Modal>

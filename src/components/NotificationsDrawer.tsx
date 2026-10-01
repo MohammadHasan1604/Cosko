@@ -1,5 +1,6 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '@/context/AppContext';
 import Icon from '@/components/ui/AppIcon';
 
@@ -12,19 +13,24 @@ export default function NotificationsDrawer() {
     markAllNotificationsRead,
     branding,
   } = useApp();
+  const [mounted, setMounted] = useState(false);
 
-  if (!notificationsOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!notificationsOpen || !mounted) return null;
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-foreground/20 backdrop-blur-sm fade-in"
+      className="fixed inset-0 z-[120] flex justify-end bg-black/50 backdrop-blur-sm fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) setNotificationsOpen(false);
       }}
     >
-      <div className="w-full md:max-w-md bg-card border-l border-border h-full flex flex-col shadow-2xl">
+      <div className="w-full md:max-w-md bg-card border-l border-border h-[100dvh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-5 py-3 md:py-4 border-b border-border">
           <div className="flex items-center gap-2">
@@ -108,6 +114,7 @@ export default function NotificationsDrawer() {
           </p>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

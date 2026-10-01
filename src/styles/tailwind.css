@@ -722,6 +722,15 @@
     @apply text-3xs font-semibold leading-none;
   }
 
+  /* Body modal open scroll lock and navigation suppression */
+  body.modal-open {
+    overflow: hidden !important;
+    overscroll-behavior: contain;
+  }
+  body.modal-open nav[aria-label="Mobile navigation"] {
+    pointer-events: none !important;
+  }
+
   /* ─── Bottom Sheet ─── */
   .sheet-overlay {
     @apply fixed inset-0 bg-slate-950/40;
@@ -732,7 +741,7 @@
   .sheet-content {
     @apply fixed bottom-0 left-0 right-0 bg-card rounded-t-2xl shadow-sheet;
     z-index: 151;
-    max-height: 85vh;
+    max-height: min(88dvh, var(--vv-sheet-max-h, 88dvh), 88vh);
     padding-bottom: env(safe-area-inset-bottom);
     animation: slideUpSheet var(--duration-sheet) var(--ease-sheet) forwards;
   }

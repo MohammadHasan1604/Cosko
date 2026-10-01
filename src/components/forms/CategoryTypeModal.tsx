@@ -58,6 +58,17 @@ export default function CategoryTypeModal({
   const [color, setColor] = useState('primary');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 🔒 STABLE FORM INITIALIZATION & DRAFT PROTECTION
+  const prevOpenRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!prevOpenRef.current && open) {
+      setName('');
+      setDescription('');
+      setColor('primary');
+    }
+    prevOpenRef.current = open;
+  }, [open]);
+
   if (!open) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,10 +108,40 @@ export default function CategoryTypeModal({
       onClose={onClose}
       title="Create New Category Type"
       subtitle="Save a new dynamic classification type to root database"
-      size="sm"
+      size="compact"
       zIndex={zIndex}
+      footer={
+        <div className="flex items-center justify-end gap-2 w-full">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-secondary text-xs flex-1 sm:flex-initial"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="category-type-form"
+            className="btn-primary text-xs gap-1.5 flex-1 sm:flex-initial font-bold"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Icon name="PlusIcon" size={14} />
+                Save & Select Type
+              </>
+            )}
+          </button>
+        </div>
+      }
     >
-      <form onSubmit={handleSubmit} className="space-y-4 py-2">
+      <form id="category-type-form" onSubmit={handleSubmit} className="space-y-4 py-2">
         <div>
           <label className="text-xs font-bold text-foreground block mb-1">
             Category Type Name <span className="text-danger">*</span>
@@ -153,30 +194,6 @@ export default function CategoryTypeModal({
             onChange={(e) => setDescription(e.target.value)}
             className="input-field text-xs resize-none"
           />
-        </div>
-
-        <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-secondary text-xs"
-            disabled={isSubmitting}
-          >
-            Cancel
-          </button>
-          <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Icon name="PlusIcon" size={14} />
-                Save & Select Type
-              </>
-            )}
-          </button>
         </div>
       </form>
     </Modal>

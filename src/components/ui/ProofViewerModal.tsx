@@ -64,7 +64,29 @@ export default function ProofViewerModal({ open, onClose, data, proof }: ProofVi
           ? `Transaction Ref: ${activeData.billNo}`
           : 'Verified Financial Transaction'
       }
-      size="lg"
+      size="standard"
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-2 w-full">
+          <span className="text-3xs text-muted-foreground font-mono truncate max-w-[200px] hidden sm:inline">
+            File: {filename}
+          </span>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <a
+              href={url}
+              download={filename}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary text-xs py-1.5 px-3 gap-1.5 font-bold flex-1 sm:flex-initial text-center justify-center inline-flex items-center"
+            >
+              <Icon name="ArrowDownTrayIcon" size={14} />
+              Download Proof
+            </a>
+            <button type="button" onClick={onClose} className="btn-secondary text-xs py-1.5 px-3 flex-1 sm:flex-initial">
+              Close
+            </button>
+          </div>
+        </div>
+      }
     >
       <div className="space-y-4 py-1 text-xs">
         {/* Metadata summary header card */}
@@ -144,9 +166,9 @@ export default function ProofViewerModal({ open, onClose, data, proof }: ProofVi
         )}
 
         {/* Proof Document Viewer */}
-        <div className="border border-border rounded-xl overflow-hidden bg-muted/20 flex flex-col items-center justify-center min-h-[320px] max-h-[500px]">
+        <div className="border border-border rounded-xl overflow-hidden bg-muted/20 flex flex-col items-center justify-center min-h-[260px] max-h-[460px]">
           {isPdf ? (
-            <div className="w-full h-[450px] flex flex-col items-center justify-center p-4 bg-muted/10">
+            <div className="w-full h-[400px] flex flex-col items-center justify-center p-4 bg-muted/10">
               <iframe
                 src={`${url}#toolbar=1`}
                 className="w-full h-full rounded-lg border border-border"
@@ -154,37 +176,15 @@ export default function ProofViewerModal({ open, onClose, data, proof }: ProofVi
               />
             </div>
           ) : (
-            <div className="p-3 w-full h-full flex items-center justify-center overflow-auto max-h-[460px]">
+            <div className="p-3 w-full h-full flex items-center justify-center overflow-auto max-h-[420px]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={url}
                 alt="Payment Proof Document"
-                className="max-w-full max-h-[440px] object-contain rounded-lg shadow-xs"
+                className="max-w-full max-h-[400px] object-contain rounded-lg shadow-xs"
               />
             </div>
           )}
-        </div>
-
-        {/* Action Footer */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border">
-          <span className="text-3xs text-muted-foreground font-mono truncate max-w-[260px]">
-            File: {filename}
-          </span>
-          <div className="flex items-center gap-2">
-            <a
-              href={url}
-              download={filename}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-primary text-xs py-1.5 px-3 gap-1.5 font-bold"
-            >
-              <Icon name="ArrowDownTrayIcon" size={14} />
-              Download Proof
-            </a>
-            <button type="button" onClick={onClose} className="btn-secondary text-xs py-1.5 px-3">
-              Close
-            </button>
-          </div>
         </div>
       </div>
     </Modal>

@@ -73,7 +73,40 @@ export const DeleteVendorModal: React.FC<DeleteVendorModalProps> = ({
         isSuperAdmin ? `Archive / Delete "${vendor.name}"` : `Request Deletion for "${vendor.name}"`
       }
       subtitle="Relational validation against purchase orders and financial history"
-      size="md"
+      size="standard"
+      footer={
+        <div className="flex flex-wrap items-center justify-end gap-2 w-full">
+          <button
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="btn-secondary text-xs cursor-pointer flex-1 sm:flex-initial"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={isSubmitting || (!isSuperAdmin && reason.trim().length < 3)}
+            onClick={handleArchive}
+            className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 cursor-pointer disabled:opacity-50 flex-1 sm:flex-initial"
+          >
+            {isSubmitting
+              ? 'Processing...'
+              : isSuperAdmin
+                ? 'Safe Archive'
+                : 'Submit Deletion Request'}
+          </button>
+          {poCount === 0 && isSuperAdmin && (
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handlePermanentDelete}
+              className="btn-danger text-xs font-bold px-4 cursor-pointer disabled:opacity-50 flex-1 sm:flex-initial"
+            >
+              {isSubmitting ? 'Deleting...' : 'Permanent Delete'}
+            </button>
+          )}
+        </div>
+      }
     >
       <div className="space-y-4 py-2 text-xs">
         <div
@@ -127,38 +160,6 @@ export const DeleteVendorModal: React.FC<DeleteVendorModalProps> = ({
             />
           </div>
         )}
-
-        <div className="flex justify-end gap-2 pt-3 border-t border-border">
-          <button
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="btn-secondary text-xs cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={isSubmitting || (!isSuperAdmin && reason.trim().length < 3)}
-            onClick={handleArchive}
-            className="btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 cursor-pointer disabled:opacity-50"
-          >
-            {isSubmitting
-              ? 'Processing...'
-              : isSuperAdmin
-                ? 'Safe Archive'
-                : 'Submit Deletion Request'}
-          </button>
-          {poCount === 0 && isSuperAdmin && (
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={handlePermanentDelete}
-              className="btn-danger text-xs font-bold px-4 cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? 'Deleting...' : 'Permanent Delete'}
-            </button>
-          )}
-        </div>
       </div>
     </Modal>
   );

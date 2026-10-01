@@ -30,7 +30,36 @@ export const DigitalInvoiceModal: React.FC<DigitalInvoiceModalProps> = ({
       onClose={onClose}
       title="COSKO Digital Tax Invoice"
       subtitle={`${receiptModal.orderNo} · ${receiptModal.createdAt || 'Today'}`}
-      size="md"
+      size="standard"
+      footer={
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2 w-full">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="btn-secondary text-xs flex-1 sm:flex-initial flex items-center justify-center gap-1.5"
+          >
+            <Icon name="PrinterIcon" size={14} />
+            <span>Print / PDF</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onSendWhatsApp(receiptModal)}
+            className="btn-primary bg-emerald-600 hover:bg-emerald-700 text-white text-xs flex-1 sm:flex-initial flex items-center justify-center gap-1.5 font-bold"
+            title="Send WhatsApp Invoice"
+            aria-label="Send WhatsApp Invoice"
+          >
+            <Icon name="WhatsApp" size={14} />
+            <span>Send WhatsApp</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-secondary text-xs flex-1 sm:flex-initial"
+          >
+            Close
+          </button>
+        </div>
+      }
     >
       <div className="relative space-y-4 py-2 text-xs overflow-hidden">
         {/* Canva / Custom Template Background if configured */}
@@ -216,31 +245,6 @@ export const DigitalInvoiceModal: React.FC<DigitalInvoiceModalProps> = ({
               {systemSettings?.invoiceFooter ||
                 'Thank you for shopping with us! Goods once sold cannot be returned without original receipt.'}
             </p>
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-wrap justify-end gap-2 pt-3 border-t border-border">
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="btn-secondary text-xs flex items-center gap-1"
-            >
-              <Icon name="PrinterIcon" size={14} />
-              Print / PDF
-            </button>
-            <button
-              type="button"
-              onClick={() => onSendWhatsApp(receiptModal)}
-              className="btn-primary bg-emerald-600 hover:bg-emerald-700 text-white text-xs flex items-center gap-1 font-bold"
-              title="Send WhatsApp Invoice"
-              aria-label="Send WhatsApp Invoice"
-            >
-              <Icon name="WhatsApp" size={14} />
-              Send WhatsApp Invoice
-            </button>
-            <button type="button" onClick={onClose} className="btn-secondary text-xs">
-              Close
-            </button>
           </div>
         </div>
       </div>

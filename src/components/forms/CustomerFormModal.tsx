@@ -254,9 +254,45 @@ export default function CustomerFormModal({
           ? `Account: ${customer?.phone}`
           : 'Unified customer profile across POS, Orders, and Billing'
       }
-      size={quickMode ? 'sm' : 'md'}
+      size={quickMode ? 'compact' : 'standard'}
+      footer={
+        <div className="flex items-center justify-end gap-2 w-full">
+          <button
+            type="button"
+            onClick={handleSafeClose}
+            className="btn-secondary text-xs flex-1 sm:flex-initial"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="customer-form"
+            className="btn-primary text-xs gap-1.5 flex-1 sm:flex-initial"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Icon name="CheckIcon" size={14} />
+                <span>
+                  {isEdit
+                    ? 'Update Customer'
+                    : quickMode
+                      ? 'Save & Auto-Select'
+                      : 'Register Customer'}
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+      }
     >
-      <form onSubmit={handleSubmit} className="space-y-4 py-2">
+      <form id="customer-form" onSubmit={handleSubmit} className="space-y-4 py-1">
         {/* Full Name */}
         <div>
           <label className="text-xs font-bold text-foreground block mb-1">
@@ -384,34 +420,6 @@ export default function CustomerFormModal({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
-          <button
-            type="button"
-            onClick={handleSafeClose}
-            className="btn-secondary text-xs"
-            disabled={isSubmitting}
-          >
-            Cancel
-          </button>
-          <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Icon name="CheckIcon" size={14} />
-                {isEdit
-                  ? 'Update Customer'
-                  : quickMode
-                    ? 'Save & Auto-Select'
-                    : 'Register Customer'}
-              </>
-            )}
-          </button>
-        </div>
       </form>
     </Modal>
   );

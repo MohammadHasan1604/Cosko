@@ -495,10 +495,40 @@ export default function ProductFormModal({
             ? `SKU: ${editItem.sku}`
             : 'Master product catalog and store inventory definition'
         }
-        size="lg"
+        size="large-form"
         zIndex={zIndex}
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={handleSafeClose}
+              className="btn-secondary text-xs flex-1 sm:flex-initial"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="product-form"
+              className="btn-primary text-xs gap-1.5 flex-1 sm:flex-initial"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Icon name="CheckIcon" size={14} />
+                  <span>{editItem ? 'Update Product' : 'Add to Inventory'}</span>
+                </>
+              )}
+            </button>
+          </div>
+        }
       >
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+        <form id="product-form" onSubmit={handleSubmit} className="space-y-4 py-1">
           {/* General Information */}
           <div className="space-y-3">
             <h4 className="text-2xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border pb-1">
@@ -639,7 +669,7 @@ export default function ProductFormModal({
               Pricing & GST Tax Architecture
             </h4>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {isSalesManager ? (
                 <div>
                   <label className="text-xs font-bold text-foreground block mb-1">
@@ -781,7 +811,7 @@ export default function ProductFormModal({
               Stock & Inventory Control
             </h4>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <CustomSelect
                   label="Stock Location"
@@ -896,30 +926,6 @@ export default function ProductFormModal({
             />
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
-            <button
-              type="button"
-              onClick={handleSafeClose}
-              className="btn-secondary text-xs"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Icon name="CheckIcon" size={14} />
-                  {editItem ? 'Update Product' : 'Add to Inventory'}
-                </>
-              )}
-            </button>
-          </div>
         </form>
       </Modal>
 

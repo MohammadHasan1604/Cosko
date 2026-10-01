@@ -38,7 +38,14 @@ export const VendorBillsBreakdownModal: React.FC<VendorBillsBreakdownModalProps>
       onClose={onClose}
       title={`Outstanding Payables & Bills — ${vendor.name}`}
       subtitle={`Supplier Code: ${vendor.code} · Terms: ${vendor.paymentTerms || 'Net 30'}`}
-      size="lg"
+      size="large-form"
+      footer={
+        <div className="flex justify-end w-full">
+          <button onClick={onClose} className="btn-secondary text-xs cursor-pointer flex-1 sm:flex-initial">
+            Close Payables
+          </button>
+        </div>
+      }
     >
       <div className="space-y-4 py-1 text-xs">
         {/* Financial Reconciled Banner */}
@@ -350,12 +357,6 @@ export const VendorBillsBreakdownModal: React.FC<VendorBillsBreakdownModalProps>
             })}
           </div>
         )}
-
-        <div className="flex justify-end pt-3 border-t border-border">
-          <button onClick={onClose} className="btn-secondary text-xs cursor-pointer">
-            Close Payables Drawer
-          </button>
-        </div>
       </div>
     </Modal>
   );

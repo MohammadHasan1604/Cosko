@@ -52,6 +52,7 @@ export default function CustomSelect({
   const [search, setSearch] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isMobile, setIsMobile] = useState(false);
+  const [flipAbove, setFlipAbove] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -64,6 +65,16 @@ export default function CustomSelect({
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Check collision with bottom of viewport on desktop
+  useEffect(() => {
+    if (open && !isMobile && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      setFlipAbove(spaceBelow < 280 && spaceAbove > 280);
+    }
+  }, [open, isMobile]);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -269,7 +280,9 @@ export default function CustomSelect({
       {/* Desktop Dropdown Menu */}
       {open && !isMobile && (
         <div
-          className="absolute left-0 right-0 z-[70] mt-1 bg-card rounded-xl border border-border shadow-dropdown p-1 fade-in max-h-72 overflow-hidden flex flex-col min-w-[200px]"
+          className={`absolute left-0 right-0 z-[70] bg-card rounded-xl border border-border shadow-dropdown p-1 fade-in max-h-72 overflow-hidden flex flex-col min-w-[200px] ${
+            flipAbove ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
           role="presentation"
         >
           {/* Search Header */}
@@ -477,7 +490,7 @@ export default function CustomSelect({
                   )}
                 </div>
               ) : (
-                filteredOptions.map((option, index) => {
+                filteredOptions.map((option) => {
                   const isSelected = option.value === value;
                   return (
                     <button

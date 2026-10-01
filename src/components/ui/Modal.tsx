@@ -1,5 +1,7 @@
 'use client';
-import React, { useEffect, useRef, useId } from 'react';
+
+import React, { useEffect, useRef, useState, useId } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '@/components/ui/AppIcon';
 
 export type ModalSize =
@@ -31,15 +33,15 @@ export interface ModalProps {
 }
 
 const desktopWidthClasses: Record<string, string> = {
-  sm: 'md:max-w-md',
-  compact: 'md:max-w-md',
-  md: 'md:max-w-xl',
-  standard: 'md:max-w-xl',
-  lg: 'md:max-w-3xl',
-  'large-form': 'md:max-w-3xl',
-  xl: 'md:max-w-5xl',
-  'full-workflow': 'md:max-w-5xl',
-  full: 'md:max-w-7xl md:w-[96vw]',
+  sm: 'w-full md:max-w-md',
+  compact: 'w-full md:max-w-md',
+  md: 'w-full md:max-w-xl',
+  standard: 'w-full md:max-w-xl',
+  lg: 'w-full md:max-w-3xl',
+  'large-form': 'w-full md:max-w-3xl',
+  xl: 'w-full md:max-w-5xl',
+  'full-workflow': 'w-full md:max-w-5xl',
+  full: 'w-full md:max-w-7xl md:w-[96vw]',
 };
 
 export default function Modal({
@@ -57,10 +59,16 @@ export default function Modal({
   closeOnEscape = true,
   initialFocusRef,
 }: ModalProps) {
+  const [mounted, setMounted] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const subtitleId = useId();
+
+  // Client-side hydration mount check for React Portal
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Stable reference to onClose callback to avoid breaking effect dependencies
   const onCloseRef = useRef(onClose);
@@ -79,7 +87,45 @@ export default function Modal({
   const isWorkflow =
     resolvedSize === 'xl' || resolvedSize === 'full-workflow' || resolvedSize === 'full';
 
-  // 1. OPEN / CLOSE LIFECYCLE & ACCESSIBLE FOCUS TRAP INITIALIZATION
+  // 1. DYNAMIC VISUAL VIEWPORT TRACKING (ANDROID KEYBOARD & DYNAMIC BROWSER CHROMES)
+  // When keyboard opens on Android Chrome or iOS Safari, visualViewport.height shrinks.
+  // We keep the modal overlay and dialog tightly inside the visible window.
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return;
+
+    const updateViewportMetrics = () => {
+      if (!overlayRef.current) return;
+      const vv = window.visualViewport;
+      if (vv) {
+        const height = Math.round(vv.height);
+        const top = Math.round(vv.offsetTop);
+        overlayRef.current.style.setProperty('--vv-height', `${height}px`);
+        overlayRef.current.style.setProperty('--vv-top', `${top}px`);
+      } else {
+        overlayRef.current.style.setProperty('--vv-height', '100dvh');
+        overlayRef.current.style.setProperty('--vv-top', '0px');
+      }
+    };
+
+    updateViewportMetrics();
+
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener('resize', updateViewportMetrics, { passive: true });
+      vv.addEventListener('scroll', updateViewportMetrics, { passive: true });
+    }
+    window.addEventListener('resize', updateViewportMetrics, { passive: true });
+
+    return () => {
+      if (vv) {
+        vv.removeEventListener('resize', updateViewportMetrics);
+        vv.removeEventListener('scroll', updateViewportMetrics);
+      }
+      window.removeEventListener('resize', updateViewportMetrics);
+    };
+  }, [open]);
+
+  // 2. OPEN / CLOSE LIFECYCLE, ACCESSIBLE FOCUS TRAP INITIALIZATION & BODY SCROLL LOCK
   // Runs ONLY when `open` actually transitions false -> true or true -> false.
   // NEVER runs on form keystrokes, parent re-renders, or realtime events.
   useEffect(() => {
@@ -91,8 +137,9 @@ export default function Modal({
       previouslyFocusedElementRef.current =
         typeof document !== 'undefined' ? (document.activeElement as HTMLElement) : null;
 
-      // Lock body scroll while open
+      // Lock body scroll and mark document body as modal-open
       if (typeof document !== 'undefined') {
+        document.body.classList.add('modal-open');
         document.body.style.overflow = 'hidden';
       }
 
@@ -131,6 +178,7 @@ export default function Modal({
     } else if (wasOpen && !open) {
       // Modal closed: unlock body scroll & restore previous focus
       if (typeof document !== 'undefined') {
+        document.body.classList.remove('modal-open');
         document.body.style.overflow = '';
       }
       if (
@@ -150,12 +198,13 @@ export default function Modal({
   useEffect(() => {
     return () => {
       if (typeof document !== 'undefined') {
+        document.body.classList.remove('modal-open');
         document.body.style.overflow = '';
       }
     };
   }, []);
 
-  // 2. KEYBOARD LISTENERS: ESCAPE KEY & TAB FOCUS TRAP
+  // 3. KEYBOARD LISTENERS: ESCAPE KEY & TAB FOCUS TRAP
   // Stable listener: NEVER re-focuses the dialog container during typing
   useEffect(() => {
     if (!open) return;
@@ -210,30 +259,53 @@ export default function Modal({
     };
   }, [open, closeOnEscape]);
 
-  if (!open) return null;
+  // 4. SMOOTH SCROLL FOR INPUT FOCUS (KEYBOARD AWARE)
+  // Ensures that whenever an input is tapped, it smoothly stays visible inside the scroll area
+  const handleFocusCapture = (e: React.FocusEvent) => {
+    if (
+      e.target instanceof HTMLInputElement ||
+      e.target instanceof HTMLTextAreaElement ||
+      e.target instanceof HTMLSelectElement
+    ) {
+      setTimeout(() => {
+        try {
+          e.target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+        } catch {
+          // Ignore unsupported scroll options
+        }
+      }, 80);
+    }
+  };
+
+  if (!mounted || !open) return null;
 
   // Responsive mobile container styling:
-  // - Compact: Content-sized bottom card (max 85dvh), no empty wasted screen space
-  // - Standard: Adaptive height bottom sheet (up to 92dvh)
-  // - Large: Near full viewport sheet (up to 95dvh)
+  // - Compact: Content-sized bottom card (up to 85dvh / vv-height), no empty wasted screen space
+  // - Standard: Adaptive height bottom sheet (up to 92dvh / vv-height)
+  // - Large: Near full viewport sheet (up to 95dvh / vv-height)
   // - Workflow: Near-full / full-screen workflow
-  let mobileClasses = 'rounded-t-2xl md:rounded-2xl max-h-[85dvh]';
+  let mobileClasses = 'rounded-t-2xl md:rounded-2xl max-h-[min(85dvh,calc(var(--vv-height,100dvh)-24px))]';
   if (isStandard) {
-    mobileClasses = 'rounded-t-2xl md:rounded-2xl max-h-[92dvh]';
+    mobileClasses = 'rounded-t-2xl md:rounded-2xl max-h-[min(92dvh,calc(var(--vv-height,100dvh)-16px))]';
   } else if (isLarge) {
-    mobileClasses = 'rounded-t-2xl md:rounded-2xl max-h-[calc(100dvh-12px)]';
+    mobileClasses =
+      'rounded-t-2xl md:rounded-2xl max-h-[min(calc(100dvh-12px),calc(var(--vv-height,100dvh)-12px))]';
   } else if (isWorkflow || mobileFullScreen === true) {
     mobileClasses =
-      'rounded-t-2xl md:rounded-2xl h-full md:h-auto max-h-[calc(100dvh-8px)] md:max-h-[92vh]';
+      'rounded-t-2xl md:rounded-2xl h-full md:h-auto max-h-[min(calc(100dvh-8px),calc(var(--vv-height,100dvh)-8px))] md:max-h-[92vh]';
   }
 
   const widthClass = desktopWidthClasses[resolvedSize] || 'md:max-w-xl';
 
-  return (
+  const modalContent = (
     <div
       ref={overlayRef}
-      style={{ zIndex }}
-      className="fixed inset-0 flex items-end md:items-center justify-center overflow-hidden p-0 md:p-4"
+      style={{
+        zIndex,
+        top: 'var(--vv-top, 0px)',
+        height: 'var(--vv-height, 100dvh)',
+      }}
+      className="fixed inset-x-0 bottom-0 flex items-end md:items-center justify-center overflow-hidden p-0 md:p-4 touch-none"
       onClick={(e) => {
         if (closeOnBackdrop && e.target === overlayRef.current) {
           onCloseRef.current?.();
@@ -241,7 +313,7 @@ export default function Modal({
       }}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px] animate-backdrop-in" />
+      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px] animate-backdrop-in pointer-events-auto" />
 
       {/* Dialog Container */}
       <div
@@ -251,16 +323,17 @@ export default function Modal({
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         aria-describedby={subtitle ? subtitleId : undefined}
-        className={`relative bg-card flex flex-col overflow-hidden focus:outline-none shadow-modal border-t md:border border-border/80 w-full ${widthClass} ${mobileClasses} md:my-auto md:max-h-[90vh] animate-slide-up md:animate-scale-in`}
+        onFocusCapture={handleFocusCapture}
+        className={`relative bg-card flex flex-col overflow-hidden focus:outline-none shadow-modal border-t md:border border-border/80 w-full ${widthClass} ${mobileClasses} md:my-auto md:max-h-[90vh] animate-slide-up md:animate-scale-in pointer-events-auto`}
         style={{
           // Dynamic visual viewport safe sizing
           maxHeight: isCompact
-            ? 'min(85dvh, 85vh)'
+            ? 'min(85dvh, calc(var(--vv-height, 100dvh) - 24px), 85vh)'
             : isStandard
-              ? 'min(92dvh, 88vh)'
+              ? 'min(92dvh, calc(var(--vv-height, 100dvh) - 16px), 88vh)'
               : isLarge
-                ? 'min(95dvh, 90vh)'
-                : 'min(calc(100dvh - 8px), 92vh)',
+                ? 'min(calc(100dvh - 12px), calc(var(--vv-height, 100dvh) - 12px), 92vh)'
+                : 'min(calc(100dvh - 8px), calc(var(--vv-height, 100dvh) - 8px), 94vh)',
         }}
       >
         {/* Header */}
@@ -294,7 +367,7 @@ export default function Modal({
         )}
 
         {/* Scrollable Body: Single internal scroll container */}
-        <div className="flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-4 py-4 md:px-5 md:py-5">
+        <div className="flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-4 py-4 md:px-5 md:py-5 min-h-0">
           {children}
         </div>
 
@@ -310,4 +383,6 @@ export default function Modal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

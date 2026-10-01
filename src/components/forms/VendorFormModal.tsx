@@ -243,10 +243,46 @@ export default function VendorFormModal({
             ? `Code: ${vendor?.code || vendor?.id}`
             : 'Unified vendor directory across Purchase Orders, Accounts, and Inventory'
         }
-        size={quickMode ? 'sm' : 'md'}
+        size={quickMode ? 'compact' : 'standard'}
         zIndex={zIndex}
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={handleSafeClose}
+              className="btn-secondary text-xs flex-1 sm:flex-initial"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="vendor-form"
+              className="btn-primary text-xs gap-1.5 flex-1 sm:flex-initial"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Icon name="CheckIcon" size={14} />
+                  <span>
+                    {isEdit
+                      ? 'Update Vendor'
+                      : quickMode
+                        ? 'Save & Select Supplier'
+                        : 'Onboard Supplier'}
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+        }
       >
-        <form onSubmit={handleSubmit} className="space-y-3.5 py-2">
+        <form id="vendor-form" onSubmit={handleSubmit} className="space-y-3.5 py-1">
           {/* Company Name */}
           <div>
             <label className="text-xs font-bold text-foreground block mb-1">
@@ -377,34 +413,6 @@ export default function VendorFormModal({
             </div>
           </div>
 
-          {/* Submit Actions */}
-          <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
-            <button
-              type="button"
-              onClick={handleSafeClose}
-              className="btn-secondary text-xs"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Icon name="CheckIcon" size={14} />
-                  {isEdit
-                    ? 'Update Vendor'
-                    : quickMode
-                      ? 'Save & Select Supplier'
-                      : 'Onboard Supplier'}
-                </>
-              )}
-            </button>
-          </div>
         </form>
       </Modal>
 

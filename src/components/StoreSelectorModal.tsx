@@ -92,7 +92,7 @@ export default function StoreSelectorModal() {
       onClose={() => setStoreSelectorOpen(false)}
       title="Select Active Store Scope"
       subtitle={`${branding.appName} Location & Hub Selection — Select an active store location scope`}
-      size="md"
+      size="standard"
     >
       <div className="space-y-4 py-2">
         {/* Business Branding & Add Store Button */}
@@ -336,18 +336,11 @@ export default function StoreSelectorModal() {
           open={!!deleteStoreModal}
           onClose={() => setDeleteStoreModal(null)}
           title="Delete Store Hub"
-          size="sm"
-        >
-          <div className="space-y-3 py-2">
-            <p className="text-xs text-muted-foreground">
-              Are you sure you want to delete store hub{' '}
-              <strong className="text-foreground">
-                {deleteStoreModal.name} ({deleteStoreModal.code})
-              </strong>
-              ?
-            </p>
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <button onClick={() => setDeleteStoreModal(null)} className="btn-secondary text-xs">
+          size="compact"
+          zIndex={130}
+          footer={
+            <div className="flex justify-end gap-2 w-full">
+              <button onClick={() => setDeleteStoreModal(null)} className="btn-secondary text-xs flex-1 sm:flex-initial">
                 Cancel
               </button>
               <button
@@ -367,11 +360,21 @@ export default function StoreSelectorModal() {
                   }
                   setDeleteStoreModal(null);
                 }}
-                className="btn-danger text-xs font-bold px-3 py-1.5"
+                className="btn-danger text-xs font-bold px-3 py-1.5 flex-1 sm:flex-initial"
               >
                 Delete Store Hub
               </button>
             </div>
+          }
+        >
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Are you sure you want to delete store hub{' '}
+              <strong className="text-foreground">
+                {deleteStoreModal.name} ({deleteStoreModal.code})
+              </strong>
+              ?
+            </p>
           </div>
         </Modal>
       )}

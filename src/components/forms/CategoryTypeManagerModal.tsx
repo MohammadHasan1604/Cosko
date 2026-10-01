@@ -79,8 +79,15 @@ export default function CategoryTypeManagerModal({
         onClose={onClose}
         title="Manage Category Types & Taxonomy"
         subtitle="View, edit, and safely manage root category classifications"
-        size="lg"
+        size="standard"
         zIndex={zIndex}
+        footer={
+          <div className="flex justify-end w-full">
+            <button type="button" onClick={onClose} className="btn-secondary text-xs flex-1 sm:flex-initial">
+              Close
+            </button>
+          </div>
+        }
       >
         <div className="space-y-4 py-1">
           <div className="flex items-center justify-between pb-3 border-b border-border">
@@ -178,7 +185,7 @@ export default function CategoryTypeManagerModal({
           )}
 
           {/* List of types */}
-          <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+          <div className="space-y-2 pr-1">
             {categoryTypes.map((t) => {
               const hasCategories = (t.categoryCount || 0) > 0;
               return (
@@ -247,12 +254,6 @@ export default function CategoryTypeManagerModal({
                 </div>
               );
             })}
-          </div>
-
-          <div className="flex justify-end pt-3 border-t border-border">
-            <button type="button" onClick={onClose} className="btn-secondary text-xs">
-              Close
-            </button>
           </div>
         </div>
       </Modal>

@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
+import Modal from '@/components/ui/Modal';
 import Icon from '@/components/ui/AppIcon';
 
 interface DrilldownModalProps {
@@ -72,14 +73,6 @@ export default function DrilldownModal({
     }
   }, [isOpen, fetchData]);
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (isOpen) window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
 
   const handlePageChange = (newPage: number) => {
@@ -93,31 +86,37 @@ export default function DrilldownModal({
     v?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
-      <div
-        className="relative bg-card rounded-2xl shadow-2xl border border-border w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30">
-          <div>
-            <h2 className="text-base font-bold text-foreground">{title}</h2>
-            <p className="text-2xs text-muted-foreground mt-0.5">
-              {totalRecords} record{totalRecords !== 1 ? 's' : ''} found · Page {page} of{' '}
-              {totalPages}
-            </p>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title={title}
+      subtitle={`${totalRecords} record${totalRecords !== 1 ? 's' : ''} found · Page ${page} of ${totalPages}`}
+      size="xl"
+      footer={
+        totalPages > 1 ? (
+          <div className="flex items-center justify-between w-full">
+            <button
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page <= 1}
+              className="btn-secondary text-xs gap-1 py-1.5 disabled:opacity-40"
+            >
+              <Icon name="ChevronLeftIcon" size={14} /> Previous
+            </button>
+            <span className="text-2xs text-muted-foreground">
+              Page {page} of {totalPages} · {totalRecords} total records
+            </span>
+            <button
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page >= totalPages}
+              className="btn-secondary text-xs gap-1 py-1.5 disabled:opacity-40"
+            >
+              Next <Icon name="ChevronRightIcon" size={14} />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
-          >
-            <Icon name="XMarkIcon" size={20} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-auto px-6 py-4">
+        ) : undefined
+      }
+    >
+      <div className="overflow-x-auto py-2">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
@@ -267,31 +266,7 @@ export default function DrilldownModal({
               </tbody>
             </table>
           )}
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-3 border-t border-border bg-muted/20">
-            <button
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page <= 1}
-              className="btn-secondary text-xs gap-1 py-1.5 disabled:opacity-40"
-            >
-              <Icon name="ChevronLeftIcon" size={14} /> Previous
-            </button>
-            <span className="text-2xs text-muted-foreground">
-              Page {page} of {totalPages} · {totalRecords} total records
-            </span>
-            <button
-              onClick={() => handlePageChange(page + 1)}
-              disabled={page >= totalPages}
-              className="btn-secondary text-xs gap-1 py-1.5 disabled:opacity-40"
-            >
-              Next <Icon name="ChevronRightIcon" size={14} />
-            </button>
-          </div>
-        )}
       </div>
-    </div>
+    </Modal>
   );
 }

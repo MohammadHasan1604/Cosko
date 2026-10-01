@@ -138,7 +138,57 @@ export default function GlobalConfirmationModal({
   };
 
   return (
-    <Modal open={open} onClose={handleBackdropClose} title="" size="md" zIndex={200}>
+    <Modal
+      open={open}
+      onClose={handleBackdropClose}
+      title=""
+      size="standard"
+      zIndex={200}
+      footer={
+        <div className="flex items-center gap-3 w-full">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isProcessing}
+            className="flex-1 px-4 py-2.5 rounded-xl border border-border/80 bg-card hover:bg-muted text-foreground text-xs font-semibold transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {config.cancelLabel || 'Review Details'}
+          </button>
+          <button
+            type="button"
+            onClick={onExecuteConfirm}
+            disabled={isProcessing}
+            className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-all duration-150 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer ${buttonStyleClass}`}
+          >
+            {isProcessing ? (
+              <>
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
+                  />
+                </svg>
+                <span>Processing...</span>
+              </>
+            ) : (
+              <>
+                <Icon name="CheckCircleIcon" size={16} />
+                <span>{config.confirmLabel || 'Confirm & Proceed'}</span>
+              </>
+            )}
+          </button>
+        </div>
+      }
+    >
       <div className="py-1 space-y-4">
         {/* Step Indicator & Action Header */}
         <div className="flex items-center justify-between border-b border-border/80 pb-3">
@@ -241,49 +291,6 @@ export default function GlobalConfirmationModal({
           </span>
         </div>
 
-        {/* Buttons */}
-        <div className="flex items-center gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isProcessing}
-            className="flex-1 px-4 py-2.5 rounded-xl border border-border/80 bg-card hover:bg-muted text-foreground text-xs font-semibold transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-          >
-            {config.cancelLabel || 'Review Details'}
-          </button>
-          <button
-            type="button"
-            onClick={onExecuteConfirm}
-            disabled={isProcessing}
-            className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-all duration-150 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer ${buttonStyleClass}`}
-          >
-            {isProcessing ? (
-              <>
-                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"
-                  />
-                </svg>
-                <span>Processing...</span>
-              </>
-            ) : (
-              <>
-                <Icon name="CheckCircleIcon" size={16} />
-                <span>{config.confirmLabel || 'Confirm & Proceed'}</span>
-              </>
-            )}
-          </button>
-        </div>
       </div>
     </Modal>
   );

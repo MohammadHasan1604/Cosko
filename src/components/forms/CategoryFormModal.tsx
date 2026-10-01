@@ -272,10 +272,40 @@ export default function CategoryFormModal({
               ? 'Unified store operational expenditure classification'
               : 'Unified taxonomy & catalog master categorization'
         }
-        size={quickMode ? 'sm' : 'md'}
+        size={quickMode ? 'compact' : 'standard'}
         zIndex={zIndex}
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={handleSafeClose}
+              className="btn-secondary text-xs flex-1 sm:flex-initial"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="category-form"
+              className="btn-primary text-xs gap-1.5 flex-1 sm:flex-initial font-bold"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Icon name="CheckIcon" size={14} />
+                  {isEdit ? 'Update Category' : 'Save & Select Category'}
+                </>
+              )}
+            </button>
+          </div>
+        }
       >
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+        <form id="category-form" onSubmit={handleSubmit} className="space-y-4 py-2">
           {/* Category Name */}
           <div>
             <label className="text-xs font-bold text-foreground block mb-1">
@@ -398,31 +428,6 @@ export default function CategoryFormModal({
               </p>
             </div>
             <ToggleSwitch checked={isActive} onChange={setIsActive} size="sm" />
-          </div>
-
-          {/* Submit Actions */}
-          <div className="flex justify-end items-center gap-2 pt-3 border-t border-border">
-            <button
-              type="button"
-              onClick={handleSafeClose}
-              className="btn-secondary text-xs"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button type="submit" className="btn-primary text-xs gap-1.5" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Icon name="CheckIcon" size={14} />
-                  {isEdit ? 'Update Category' : 'Save & Select Category'}
-                </>
-              )}
-            </button>
           </div>
         </form>
       </Modal>
