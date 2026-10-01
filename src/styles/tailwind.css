@@ -725,13 +725,13 @@
   /* ─── Bottom Sheet ─── */
   .sheet-overlay {
     @apply fixed inset-0 bg-slate-950/40;
-    z-index: 50;
+    z-index: 150;
     animation: backdropIn var(--duration-slow) var(--ease-default) forwards;
   }
 
   .sheet-content {
     @apply fixed bottom-0 left-0 right-0 bg-card rounded-t-2xl shadow-sheet;
-    z-index: 51;
+    z-index: 151;
     max-height: 85vh;
     padding-bottom: env(safe-area-inset-bottom);
     animation: slideUpSheet var(--duration-sheet) var(--ease-sheet) forwards;

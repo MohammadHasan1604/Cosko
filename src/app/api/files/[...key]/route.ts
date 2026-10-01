@@ -278,7 +278,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
         });
         if (productWithImg) {
           return NextResponse.json(
-            { error: 'Forbidden: Master catalog product images can only be deleted by Super Admin' },
+            {
+              error: 'Forbidden: Master catalog product images can only be deleted by Super Admin',
+            },
             { status: 403 }
           );
         }
@@ -309,7 +311,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
 
         if (!keyMatchesStore) {
           return NextResponse.json(
-            { error: 'Forbidden: Cannot verify file ownership for deletion. Store Manager may only delete verified own-store assets.' },
+            {
+              error:
+                'Forbidden: Cannot verify file ownership for deletion. Store Manager may only delete verified own-store assets.',
+            },
             { status: 403 }
           );
         }

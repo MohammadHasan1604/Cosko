@@ -62,6 +62,57 @@ export default function UsersPage() {
   // Permission UI Category Expand/Collapse State
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
+  // Active permission target user derived live from usersList
+  const activePermissionsUser = useMemo(() => {
+    if (!permissionsModalUser) return null;
+    return usersList.find((u) => u.id === permissionsModalUser.id) || permissionsModalUser;
+  }, [permissionsModalUser, usersList]);
+
+  // Loading state tracking per permission code for live saving feedback
+  const [savingPermissionCodes, setSavingPermissionCodes] = useState<Record<string, boolean>>({});
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
+
+  const handleTogglePermission = async (
+    targetUserId: string,
+    permissionCode: string,
+    overrideType: 'ALLOW' | 'DENY' | 'RESET'
+  ) => {
+    setSavingPermissionCodes((prev) => ({ ...prev, [permissionCode]: true }));
+    try {
+      await setUserPermissionOverride(targetUserId, permissionCode, overrideType);
+    } finally {
+      setSavingPermissionCodes((prev) => ({ ...prev, [permissionCode]: false }));
+    }
+  };
+
+  const handleBulkAllowAll = async (targetUserId: string) => {
+    setIsBulkSaving(true);
+    try {
+      for (const perm of PERMISSION_CATALOGUE) {
+        if (!perm.isProtected) {
+          await setUserPermissionOverride(targetUserId, perm.code, 'ALLOW');
+        }
+      }
+      toast.success(`Enabled all non-protected permissions`);
+    } finally {
+      setIsBulkSaving(false);
+    }
+  };
+
+  const handleBulkResetAll = async (targetUserId: string) => {
+    setIsBulkSaving(true);
+    try {
+      for (const perm of PERMISSION_CATALOGUE) {
+        if (!perm.isProtected) {
+          await setUserPermissionOverride(targetUserId, perm.code, 'RESET');
+        }
+      }
+      toast.info(`Reset custom permission overrides`);
+    } finally {
+      setIsBulkSaving(false);
+    }
+  };
+
   // Convert context users to RBACUser format for engine evaluation
   const rbacCurrentUser: RBACUser = {
     id: currentUser.id,
@@ -570,12 +621,12 @@ export default function UsersPage() {
       />
 
       {/* Non-Super-Admin User Access & Permissions Matrix Modal */}
-      {permissionsModalUser && permissionsModalUser.role !== 'Super Admin' && (
+      {activePermissionsUser && activePermissionsUser.role !== 'Super Admin' && (
         <Modal
           open={!!permissionsModalUser}
           onClose={() => setPermissionsModalUser(null)}
-          title={`User Access & Permissions — ${permissionsModalUser.name}`}
-          subtitle={`${permissionsModalUser.email} · Role: ${permissionsModalUser.role} (Level ${permissionsModalUser.securityLevel || 80})`}
+          title={`User Access & Permissions — ${activePermissionsUser.name}`}
+          subtitle={`${activePermissionsUser.email} · Role: ${activePermissionsUser.role} (Level ${activePermissionsUser.securityLevel || 80})`}
           size="lg"
         >
           <div className="space-y-5 py-2">
@@ -592,7 +643,7 @@ export default function UsersPage() {
 
               <div className="flex items-center gap-3 pt-1">
                 <span className="badge-primary font-mono text-xs font-bold px-3 py-1">
-                  {permissionsModalUser.store || 'BLR'}
+                  {activePermissionsUser.store || 'BLR'}
                 </span>
                 <span className="text-2xs text-muted-foreground">
                   Store Manager and Sales Manager roles are strictly locked to exactly one
@@ -611,36 +662,20 @@ export default function UsersPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    PERMISSION_CATALOGUE.forEach((perm) => {
-                      if (!perm.isProtected) {
-                        setUserPermissionOverride(permissionsModalUser.id, perm.code, 'ALLOW');
-                      }
-                    });
-                    toast.success(
-                      `Enabled all non-protected permissions for ${permissionsModalUser.name}`
-                    );
-                  }}
-                  className="btn-secondary text-3xs font-bold text-success border-success/30 hover:bg-success/10 py-1"
+                  disabled={isBulkSaving}
+                  onClick={() => handleBulkAllowAll(activePermissionsUser.id)}
+                  className="btn-secondary text-3xs font-bold text-success border-success/30 hover:bg-success/10 py-1 disabled:opacity-50"
                 >
-                  Enable All Allowed Permissions
+                  {isBulkSaving ? 'Saving...' : 'Enable All Allowed Permissions'}
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    PERMISSION_CATALOGUE.forEach((perm) => {
-                      if (!perm.isProtected) {
-                        setUserPermissionOverride(permissionsModalUser.id, perm.code, 'RESET');
-                      }
-                    });
-                    toast.info(
-                      `Reset custom permission overrides for ${permissionsModalUser.name}`
-                    );
-                  }}
-                  className="btn-secondary text-3xs font-bold text-muted-foreground py-1"
+                  disabled={isBulkSaving}
+                  onClick={() => handleBulkResetAll(activePermissionsUser.id)}
+                  className="btn-secondary text-3xs font-bold text-muted-foreground py-1 disabled:opacity-50"
                 >
-                  Disable All Optional Overrides
+                  {isBulkSaving ? 'Saving...' : 'Disable All Optional Overrides'}
                 </button>
               </div>
             </div>
@@ -655,17 +690,17 @@ export default function UsersPage() {
                 const pageViewState = pageViewPerm
                   ? RBACEngine.getPermissionState(
                       {
-                        id: permissionsModalUser.id,
-                        name: permissionsModalUser.name,
-                        email: permissionsModalUser.email,
-                        role: permissionsModalUser.role,
+                        id: activePermissionsUser.id,
+                        name: activePermissionsUser.name,
+                        email: activePermissionsUser.email,
+                        role: activePermissionsUser.role,
                         securityLevel:
-                          (permissionsModalUser.securityLevel as any) ||
-                          (permissionsModalUser.role === 'Super Admin' ? 100 : 80),
-                        storeScope: permissionsModalUser.store,
-                        status: permissionsModalUser.status,
-                        permissions: permissionsModalUser.permissions || [],
-                        overrides: permissionsModalUser.overrides || [],
+                          (activePermissionsUser.securityLevel as any) ||
+                          (activePermissionsUser.role === 'Super Admin' ? 100 : 80),
+                        storeScope: activePermissionsUser.store,
+                        status: activePermissionsUser.status,
+                        permissions: activePermissionsUser.permissions || [],
+                        overrides: activePermissionsUser.overrides || [],
                       },
                       pageViewPerm.code
                     )
@@ -711,9 +746,10 @@ export default function UsersPage() {
                         {pageViewPerm && !pageViewPerm.isProtected ? (
                           <ToggleSwitch
                             checked={isPageOn}
+                            loading={Boolean(savingPermissionCodes[pageViewPerm.code])}
                             onChange={() =>
-                              setUserPermissionOverride(
-                                permissionsModalUser.id,
+                              handleTogglePermission(
+                                activePermissionsUser.id,
                                 pageViewPerm.code,
                                 isPageOn ? 'DENY' : 'ALLOW'
                               )
@@ -739,17 +775,17 @@ export default function UsersPage() {
                         {perms.map((perm) => {
                           const permState = RBACEngine.getPermissionState(
                             {
-                              id: permissionsModalUser.id,
-                              name: permissionsModalUser.name,
-                              email: permissionsModalUser.email,
-                              role: permissionsModalUser.role,
+                              id: activePermissionsUser.id,
+                              name: activePermissionsUser.name,
+                              email: activePermissionsUser.email,
+                              role: activePermissionsUser.role,
                               securityLevel:
-                                (permissionsModalUser.securityLevel as any) ||
-                                (permissionsModalUser.role === 'Super Admin' ? 100 : 80),
-                              storeScope: permissionsModalUser.store,
-                              status: permissionsModalUser.status,
-                              permissions: permissionsModalUser.permissions || [],
-                              overrides: permissionsModalUser.overrides || [],
+                                (activePermissionsUser.securityLevel as any) ||
+                                (activePermissionsUser.role === 'Super Admin' ? 100 : 80),
+                              storeScope: activePermissionsUser.store,
+                              status: activePermissionsUser.status,
+                              permissions: activePermissionsUser.permissions || [],
+                              overrides: activePermissionsUser.overrides || [],
                             },
                             perm.code
                           );
@@ -775,7 +811,7 @@ export default function UsersPage() {
 
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 {perm.isProtected &&
-                                (permissionsModalUser.securityLevel || 80) < 100 ? (
+                                (activePermissionsUser.securityLevel || 80) < 100 ? (
                                   <span className="badge-danger text-3xs flex items-center gap-1 font-bold">
                                     <Icon name="LockClosedIcon" size={11} /> 🔒 Super Admin Only
                                   </span>
@@ -792,12 +828,13 @@ export default function UsersPage() {
                                     >
                                       {permState}
                                     </span>
-                                    {/* Prominent ON / OFF Clickable Toggle Switch */}
+                                    {/* Prominent ON / OFF Clickable Toggle Switch with Loading Indicator */}
                                     <ToggleSwitch
                                       checked={isActionOn}
+                                      loading={Boolean(savingPermissionCodes[perm.code])}
                                       onChange={() =>
-                                        setUserPermissionOverride(
-                                          permissionsModalUser.id,
+                                        handleTogglePermission(
+                                          activePermissionsUser.id,
                                           perm.code,
                                           isActionOn ? 'DENY' : 'ALLOW'
                                         )
@@ -822,7 +859,7 @@ export default function UsersPage() {
 
             <div className="flex justify-end pt-2 border-t border-border">
               <button onClick={() => setPermissionsModalUser(null)} className="btn-primary text-xs">
-                Save Access Settings
+                Close Access Settings
               </button>
             </div>
           </div>

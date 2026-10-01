@@ -149,7 +149,7 @@ async function main() {
   ];
 
   // 2. Ensure CENTRAL vendor Samsung exists
-  const centralVendor = await prisma.vendor.findFirst({ where: { storeCode: 'CENTRAL' } });
+  const centralVendor = await prisma.vendor.findFirst({ where: { storeCode: 'CENTRAL', status: 'Active' } });
   assert('CENTRAL vendor exists in database', !!centralVendor, centralVendor ? `ID: ${centralVendor.id} (${centralVendor.name})` : 'No CENTRAL vendor');
   const centralVendorId = centralVendor?.id || 'non_existent_central';
 

@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useId } from 'react';
 
 export interface ToggleSwitchProps {
   checked: boolean;
@@ -36,7 +36,8 @@ export default function ToggleSwitch({
   title,
   'aria-label': ariaLabel,
 }: ToggleSwitchProps) {
-  const switchId = id || `toggle-${Math.random().toString(36).substring(2, 9)}`;
+  const generatedId = useId();
+  const switchId = id || generatedId;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (disabled || loading) return;

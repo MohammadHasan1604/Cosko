@@ -747,9 +747,10 @@ export async function PUT(req: NextRequest) {
     }
 
     const isTransitioningToReceived = body.status === 'Received' && existing.status !== 'Received';
-    const targetStore = user.role !== 'Super Admin' && user.securityLevel < 100
-      ? user.store
-      : (body.storeCode || existing.storeCode || 'CENTRAL');
+    const targetStore =
+      user.role !== 'Super Admin' && user.securityLevel < 100
+        ? user.store
+        : body.storeCode || existing.storeCode || 'CENTRAL';
 
     // Pre-resolve any missing products outside transaction if items are updated
     let preparedUpdateItems: any[] | null = null;

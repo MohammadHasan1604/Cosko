@@ -730,7 +730,7 @@ interface AppContextType {
     userId: string,
     permissionCode: string,
     overrideType: 'ALLOW' | 'DENY' | 'RESET'
-  ) => void;
+  ) => Promise<{ success: boolean; error?: string }>;
   toggleUserStoreAccess: (userId: string, storeCode: string) => void;
   deleteUserAccount: (
     id: string,
@@ -2458,13 +2458,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     userId: string,
     permissionCode: string,
     overrideType: 'ALLOW' | 'DENY' | 'RESET'
-  ) => {
+  ): Promise<{ success: boolean; error?: string }> => {
     const targetUser = usersList.find((u) => u.id === userId);
     if (targetUser?.role === 'Super Admin') {
       toast.info(
         'Super Admin holds full root-level enterprise access. Permissions cannot be overridden.'
       );
-      return;
+      return { success: false, error: 'Cannot override Super Admin permissions' };
     }
     const currentOverrides = targetUser?.overrides || [];
     let updatedOverrides: UserPermissionOverride[];
@@ -2477,7 +2477,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ];
     }
 
-    // 1. Optimistic instant visual update
+    // 1. Optimistic visual update
     setUsersList((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, overrides: updatedOverrides } : u))
     );
@@ -2488,7 +2488,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         permissions: getEffectivePermissions({ role: prev.role, overrides: updatedOverrides }),
       }));
     }
-    toast.success(`Permission ${permissionCode} override updated`);
 
     // 2. Persist to MySQL database
     try {
@@ -2498,7 +2497,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         overrides: updatedOverrides,
       });
       if (!res?.success) {
-        toast.error(res?.error || 'Failed to persist permission override to database');
+        const errorMsg = res?.error || 'Failed to persist permission override to database';
+        toast.error(errorMsg);
         // Rollback on error
         setUsersList((prev) =>
           prev.map((u) => (u.id === userId ? { ...u, overrides: currentOverrides } : u))
@@ -2510,9 +2510,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             permissions: getEffectivePermissions({ role: prev.role, overrides: currentOverrides }),
           }));
         }
+        return { success: false, error: errorMsg };
       }
+
+      toast.success(`Permission ${permissionCode} override saved to database`);
+      return { success: true };
     } catch (err: any) {
-      toast.error('Network error saving permission override');
+      const errorMsg = err.message || 'Network error saving permission override';
+      toast.error(errorMsg);
       setUsersList((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, overrides: currentOverrides } : u))
       );
@@ -2523,6 +2528,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           permissions: getEffectivePermissions({ role: prev.role, overrides: currentOverrides }),
         }));
       }
+      return { success: false, error: errorMsg };
     }
   };
 

@@ -265,7 +265,9 @@ export async function POST(req: NextRequest) {
           category: body.category,
           storeCode: expenseStore,
         };
-        await broadcastRealtimeEvent('expenses', 'EXPENSE_CREATED', expPayload, { skipOutbox: true });
+        await broadcastRealtimeEvent('expenses', 'EXPENSE_CREATED', expPayload, {
+          skipOutbox: true,
+        });
         if (expenseStore) {
           await broadcastRealtimeEvent(
             getStoreChannel(expenseStore),

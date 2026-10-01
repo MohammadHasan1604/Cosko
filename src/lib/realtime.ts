@@ -244,7 +244,8 @@ export async function persistOutboxEvent(
 
     const safePayload = {
       eventType: payload.eventType || event,
-      entityId: payload.entityId || payload.id,
+      entityId: payload.entityId || payload.id || payload.userId,
+      userId: payload.userId || undefined,
       storeCode: storeCode || undefined,
       timestamp: payload.timestamp || new Date().toISOString(),
       version: payload.version || Date.now(),
@@ -344,7 +345,8 @@ export async function broadcastRealtimeEvent(
   // Client receives minimal invalidation event and refetches authoritative protected API.
   const normalizedPayload: RealtimePayload = {
     eventType: payload?.eventType || event,
-    entityId: payload?.entityId || payload?.id,
+    entityId: payload?.entityId || payload?.id || payload?.userId,
+    userId: payload?.userId || undefined,
     storeCode,
     timestamp: payload?.timestamp || now,
     version: payload?.version || Date.now(),

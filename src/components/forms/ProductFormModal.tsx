@@ -431,7 +431,10 @@ export default function ProductFormModal({
         ? [{ label: 'Operational Scope', value: 'Catalog info & local store stock' }]
         : [
             { label: 'Cost Price', value: `₹${(payload.costPrice || 0).toLocaleString('en-IN')}` },
-            { label: 'Selling Price', value: `₹${(payload.sellingPrice || 0).toLocaleString('en-IN')}` },
+            {
+              label: 'Selling Price',
+              value: `₹${(payload.sellingPrice || 0).toLocaleString('en-IN')}`,
+            },
           ]),
       { label: 'Stock On Hand', value: `${payload.qtyOnHand} units` },
     ];
@@ -640,11 +643,14 @@ export default function ProductFormModal({
               {isSalesManager ? (
                 <div>
                   <label className="text-xs font-bold text-foreground block mb-1">
-                    Cost Price (₹) <span className="text-muted-foreground text-2xs">(Protected)</span>
+                    Cost Price (₹){' '}
+                    <span className="text-muted-foreground text-2xs">(Protected)</span>
                   </label>
                   <div className="input-field text-xs bg-muted/30 text-muted-foreground flex items-center justify-between cursor-not-allowed py-2">
                     <span>••••••</span>
-                    <span className="text-2xs font-semibold uppercase text-warning">Restricted</span>
+                    <span className="text-2xs font-semibold uppercase text-warning">
+                      Restricted
+                    </span>
                   </div>
                 </div>
               ) : (
@@ -667,7 +673,12 @@ export default function ProductFormModal({
 
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">
-                  Selling Price (₹) {isSalesManager ? <span className="text-2xs text-muted-foreground">(Locked)</span> : <span className="text-danger">*</span>}
+                  Selling Price (₹){' '}
+                  {isSalesManager ? (
+                    <span className="text-2xs text-muted-foreground">(Locked)</span>
+                  ) : (
+                    <span className="text-danger">*</span>
+                  )}
                 </label>
                 <NumericInput
                   required={!isSalesManager}
@@ -684,7 +695,10 @@ export default function ProductFormModal({
 
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">
-                  MRP (₹) {isSalesManager && <span className="text-2xs text-muted-foreground">(Locked)</span>}
+                  MRP (₹){' '}
+                  {isSalesManager && (
+                    <span className="text-2xs text-muted-foreground">(Locked)</span>
+                  )}
                 </label>
                 <NumericInput
                   disabled={isSalesManager}
@@ -700,7 +714,10 @@ export default function ProductFormModal({
 
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1">
-                  GST Tax Rate (%) {isSalesManager && <span className="text-2xs text-muted-foreground">(Locked)</span>}
+                  GST Tax Rate (%){' '}
+                  {isSalesManager && (
+                    <span className="text-2xs text-muted-foreground">(Locked)</span>
+                  )}
                 </label>
                 <select
                   disabled={isSalesManager}
@@ -770,7 +787,7 @@ export default function ProductFormModal({
                   label="Stock Location"
                   disabled={!!editItem || isSalesManager}
                   placeholder="Select store location..."
-                  value={isSalesManager ? (currentUser?.store || formData.store) : formData.store}
+                  value={isSalesManager ? currentUser?.store || formData.store : formData.store}
                   onChange={(val) => setFormData((prev) => ({ ...prev, store: val }))}
                   options={storeOptions}
                   searchable={true}

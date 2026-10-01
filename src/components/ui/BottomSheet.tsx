@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import Icon from '@/components/ui/AppIcon';
 
 interface BottomSheetProps {
@@ -13,31 +13,33 @@ interface BottomSheetProps {
 
 export default function BottomSheet({ open, onClose, title, children, footer }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
-
-  const handleEscape = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    },
-    [onClose]
-  );
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
-    if (open) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
-    }
+    if (!open) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCloseRef.current?.();
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    document.body.style.overflow = 'hidden';
+
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = '';
     };
-  }, [open, handleEscape]);
+  }, [open]);
 
   if (!open) return null;
 
   return (
     <>
       {/* Backdrop */}
-      <div className="sheet-overlay" onClick={onClose} aria-hidden="true" />
+      <div className="sheet-overlay" onClick={() => onCloseRef.current?.()} aria-hidden="true" />
 
       {/* Sheet */}
       <div
@@ -55,7 +57,7 @@ export default function BottomSheet({ open, onClose, title, children, footer }: 
           <div className="sheet-header">
             <h3 className="text-sm font-bold text-foreground">{title}</h3>
             <button
-              onClick={onClose}
+              onClick={() => onCloseRef.current?.()}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               aria-label="Close"
             >

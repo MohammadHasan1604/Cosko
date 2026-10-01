@@ -47,7 +47,11 @@
     "lint:fix": "next lint --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md,json}\"",
     "serve": "next start -p 4028",
-    "type-check": "tsc --noEmit",
+    "type-check": "npm run type-check:all",
+    "type-check:app": "tsc --noEmit",
+    "type-check:tests": "tsc --noEmit --project tsconfig.tests.json",
+    "type-check:scripts": "tsc --noEmit --project tsconfig.scripts.json",
+    "type-check:all": "npm run type-check:app && npm run type-check:tests && npm run type-check:scripts",
     "seed": "npx tsx scripts/seed-mysql.ts",
     "test": "npm run test:all",
     "test:security": "npx tsx --env-file=.env scripts/run-security-tests.ts",
@@ -58,7 +62,8 @@
     "test:phase3": "npx tsx tests/phase3.test.ts",
     "test:deep": "npx tsx tests/phase3-deep-verification.test.ts",
     "test:phase4": "npx tsx tests/phase4-security-closure.test.ts",
-    "test:all": "npx tsx tests/phase1-security.test.ts && npx tsx tests/phase1-security-matrix.ts && npx tsx tests/phase2.test.ts && npx tsx tests/phase2-realtime.test.ts && npx tsx tests/phase3.test.ts && npx tsx tests/phase3-deep-verification.test.ts && npx tsx tests/phase4-security-closure.test.ts"
+    "test:final-phase2": "npx tsx tests/final-closure-phase2.test.ts",
+    "test:all": "npx tsx tests/phase1-security.test.ts && npx tsx tests/phase1-security-matrix.ts && npx tsx tests/phase2.test.ts && npx tsx tests/phase2-realtime.test.ts && npx tsx tests/phase3.test.ts && npx tsx tests/phase3-deep-verification.test.ts && npx tsx tests/phase4-security-closure.test.ts && npx tsx tests/final-closure-phase2.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1121.0",

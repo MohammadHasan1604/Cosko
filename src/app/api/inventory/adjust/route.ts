@@ -57,10 +57,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!body.productId) {
-      return NextResponse.json(
-        { error: 'productId is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'productId is required' }, { status: 400 });
     }
 
     // Support either qtyChange or explicit newQty

@@ -29,7 +29,9 @@ export const DeleteVendorModal: React.FC<DeleteVendorModalProps> = ({
 
   const handleArchive = async () => {
     if (!isSuperAdmin && reason.trim().length < 3) {
-      toast.error('Please enter a deletion reason (at least 3 characters) to submit approval request');
+      toast.error(
+        'Please enter a deletion reason (at least 3 characters) to submit approval request'
+      );
       return;
     }
     setIsSubmitting(true);
@@ -37,6 +39,8 @@ export const DeleteVendorModal: React.FC<DeleteVendorModalProps> = ({
       const res = await onDelete(vendor.id, false, reason.trim());
       if (res === true || res?.success) {
         onClose();
+      } else {
+        toast.error(res?.message || res?.error || 'Failed to archive vendor');
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to process request');
@@ -51,6 +55,8 @@ export const DeleteVendorModal: React.FC<DeleteVendorModalProps> = ({
       const res = await onDelete(vendor.id, true, reason.trim());
       if (res === true || res?.success) {
         onClose();
+      } else {
+        toast.error(res?.message || res?.error || 'Failed to permanently delete vendor');
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to permanently delete vendor');
@@ -63,7 +69,9 @@ export const DeleteVendorModal: React.FC<DeleteVendorModalProps> = ({
     <Modal
       open={!!vendor}
       onClose={isSubmitting ? () => {} : onClose}
-      title={isSuperAdmin ? `Archive / Delete "${vendor.name}"` : `Request Deletion for "${vendor.name}"`}
+      title={
+        isSuperAdmin ? `Archive / Delete "${vendor.name}"` : `Request Deletion for "${vendor.name}"`
+      }
       subtitle="Relational validation against purchase orders and financial history"
       size="md"
     >

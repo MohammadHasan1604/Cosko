@@ -29,8 +29,12 @@ export async function GET(req: NextRequest) {
 
     // ─── SINGLE PRODUCT FETCH (For Edit Product Form & Details) ─────────────
     if (id || sku) {
-      const isSalesManager = user.role === 'Sales Manager' || (user.securityLevel !== undefined && user.securityLevel <= 40);
-      const isSuperAdmin = user.role === 'Super Admin' || (user.securityLevel !== undefined && user.securityLevel >= 100);
+      const isSalesManager =
+        user.role === 'Sales Manager' ||
+        (user.securityLevel !== undefined && user.securityLevel <= 40);
+      const isSuperAdmin =
+        user.role === 'Super Admin' ||
+        (user.securityLevel !== undefined && user.securityLevel >= 100);
 
       const product = await prisma.product.findFirst({
         where: id ? { OR: [{ id }, { sku: id }] } : { sku: sku! },
@@ -121,7 +125,9 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const isSalesManager = user.role === 'Sales Manager' || (user.securityLevel !== undefined && user.securityLevel <= 40);
+    const isSalesManager =
+      user.role === 'Sales Manager' ||
+      (user.securityLevel !== undefined && user.securityLevel <= 40);
     const sanitizedProducts = products.map((p) => ({
       ...p,
       baseCostPrice: isSalesManager ? 0 : Number(p.baseCostPrice),
@@ -230,7 +236,11 @@ export async function POST(req: NextRequest) {
           };
         }
 
-        if (user.role !== 'Super Admin' && requestedStore && requestedStore.trim().toUpperCase() !== (user.store || '').trim().toUpperCase()) {
+        if (
+          user.role !== 'Super Admin' &&
+          requestedStore &&
+          requestedStore.trim().toUpperCase() !== (user.store || '').trim().toUpperCase()
+        ) {
           return {
             status: 403,
             data: {
@@ -398,9 +408,13 @@ export async function POST(req: NextRequest) {
           productId: savedProduct?.id,
           sku: savedProduct?.sku,
         };
-        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload, { skipOutbox: true });
+        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload, {
+          skipOutbox: true,
+        });
         if (storeCode) {
-          await broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload, { skipOutbox: true });
+          await broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload, {
+            skipOutbox: true,
+          });
         }
 
         let responseProduct: any = savedProduct;
@@ -547,13 +561,19 @@ export async function PUT(req: NextRequest) {
     if (user.role === 'Sales Manager') {
       const hasCostEdit =
         (body.costPrice !== undefined && body.costPrice !== null && body.costPrice !== '') ||
-        (body.baseCostPrice !== undefined && body.baseCostPrice !== null && body.baseCostPrice !== '');
+        (body.baseCostPrice !== undefined &&
+          body.baseCostPrice !== null &&
+          body.baseCostPrice !== '');
       const hasTaxEdit =
         (body.taxRate !== undefined && body.taxRate !== null && body.taxRate !== '') ||
         (body.gstRate !== undefined && body.gstRate !== null && body.gstRate !== '');
       const hasPriceEdit =
-        (body.sellingPrice !== undefined && body.sellingPrice !== null && body.sellingPrice !== '') ||
-        (body.baseSellingPrice !== undefined && body.baseSellingPrice !== null && body.baseSellingPrice !== '') ||
+        (body.sellingPrice !== undefined &&
+          body.sellingPrice !== null &&
+          body.sellingPrice !== '') ||
+        (body.baseSellingPrice !== undefined &&
+          body.baseSellingPrice !== null &&
+          body.baseSellingPrice !== '') ||
         (body.mrp !== undefined && body.mrp !== null && body.mrp !== '');
 
       if (hasCostEdit || hasTaxEdit || hasPriceEdit) {

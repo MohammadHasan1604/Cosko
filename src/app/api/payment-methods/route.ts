@@ -103,7 +103,10 @@ export async function POST(req: NextRequest) {
 
     if (authUser.role !== 'Super Admin' || authUser.securityLevel < 100) {
       return NextResponse.json(
-        { success: false, error: 'Forbidden: Managing payment methods is restricted to Super Admin only.' },
+        {
+          success: false,
+          error: 'Forbidden: Managing payment methods is restricted to Super Admin only.',
+        },
         { status: 403 }
       );
     }
@@ -190,7 +193,10 @@ export async function PUT(req: NextRequest) {
 
     if (authUser.role !== 'Super Admin' || authUser.securityLevel < 100) {
       return NextResponse.json(
-        { success: false, error: 'Forbidden: Managing payment methods is restricted to Super Admin only.' },
+        {
+          success: false,
+          error: 'Forbidden: Managing payment methods is restricted to Super Admin only.',
+        },
         { status: 403 }
       );
     }
@@ -252,7 +258,10 @@ export async function DELETE(req: NextRequest) {
 
     if (authUser.role !== 'Super Admin' || authUser.securityLevel < 100) {
       return NextResponse.json(
-        { success: false, error: 'Forbidden: Managing payment methods is restricted to Super Admin only.' },
+        {
+          success: false,
+          error: 'Forbidden: Managing payment methods is restricted to Super Admin only.',
+        },
         { status: 403 }
       );
     }

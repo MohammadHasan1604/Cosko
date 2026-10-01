@@ -740,7 +740,9 @@ export async function PUT(req: NextRequest) {
     if (password) changes.push('password=reset');
     if (targetStores) changes.push(`stores=[${targetStores.join(',')}]`);
     if (body.permissionOverride) {
-      changes.push(`permissionOverride=${body.permissionOverride.permissionCode}:${body.permissionOverride.overrideType}`);
+      changes.push(
+        `permissionOverride=${body.permissionOverride.permissionCode}:${body.permissionOverride.overrideType}`
+      );
     }
     await createAuditLog(
       authUser,
@@ -756,11 +758,9 @@ export async function PUT(req: NextRequest) {
     });
 
     if (body.permissionOverride || Array.isArray(overrides)) {
-      await broadcastRealtimeEvent(
-        `private-user-${updatedUser.id}`,
-        'USER_PERMISSIONS_UPDATED',
-        { userId: updatedUser.id }
-      );
+      await broadcastRealtimeEvent(`private-user-${updatedUser.id}`, 'USER_PERMISSIONS_UPDATED', {
+        userId: updatedUser.id,
+      });
     }
 
     return NextResponse.json({

@@ -221,7 +221,9 @@ export async function POST(req: NextRequest) {
           reason: 'SALE_CHECKOUT',
           orderNo: (sale as any)?.orderNo,
         };
-        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload, { skipOutbox: true });
+        await broadcastRealtimeEvent('inventory', 'STOCK_UPDATED', stockPayload, {
+          skipOutbox: true,
+        });
         if (storeCode) {
           await broadcastRealtimeEvent(getStoreChannel(storeCode), 'STOCK_UPDATED', stockPayload, {
             skipOutbox: true,

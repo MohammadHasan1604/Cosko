@@ -687,9 +687,8 @@ export default function VendorsPage() {
               const res = await deleteVendor(vendorId, permanent, reason);
               if (res?.success) {
                 setDeleteVendorModal(null);
-                return true;
               }
-              return false;
+              return res;
             }}
           />
         )}

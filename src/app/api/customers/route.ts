@@ -22,7 +22,9 @@ export async function GET(req: NextRequest) {
     const includeArchived = searchParams.get('includeArchived') === 'true';
 
     const isSuperAdmin = user.role === 'Super Admin' || user.securityLevel >= 100;
-    const callerStore = (user.store && user.store !== 'All Stores' ? user.store : 'BLR').toUpperCase();
+    const callerStore = (
+      user.store && user.store !== 'All Stores' ? user.store : 'BLR'
+    ).toUpperCase();
 
     const whereClause: any = {};
     if (!includeArchived) {
@@ -37,9 +39,7 @@ export async function GET(req: NextRequest) {
       let totalOrders = 0;
 
       if (!isSuperAdmin) {
-        const p = allProfiles.find(
-          (prof: any) => prof.storeCode.toUpperCase() === callerStore
-        );
+        const p = allProfiles.find((prof: any) => prof.storeCode.toUpperCase() === callerStore);
         if (p) {
           totalSpent = Number(p.totalSpent) || 0;
           creditBalance = Number(p.creditBalance) || 0;
@@ -230,8 +230,10 @@ export async function POST(req: NextRequest) {
               const updateData: any = { status: 'Active' };
               if (canModifyMaster) {
                 if (body.name) updateData.name = body.name.trim();
-                if (body.email !== undefined) updateData.email = body.email ? body.email.trim() : null;
-                if (body.address !== undefined) updateData.address = body.address ? body.address.trim() : null;
+                if (body.email !== undefined)
+                  updateData.email = body.email ? body.email.trim() : null;
+                if (body.address !== undefined)
+                  updateData.address = body.address ? body.address.trim() : null;
                 if (body.city !== undefined) updateData.city = body.city ? body.city.trim() : null;
               }
 
@@ -346,7 +348,9 @@ export async function PUT(req: NextRequest) {
     }
 
     if (user.securityLevel < 100) {
-      const callerStore = (user.store && user.store !== 'All Stores' ? user.store : 'BLR').toUpperCase();
+      const callerStore = (
+        user.store && user.store !== 'All Stores' ? user.store : 'BLR'
+      ).toUpperCase();
       const association = await (prisma as any).customer.findFirst({
         where: {
           id: body.id,
@@ -382,7 +386,9 @@ export async function PUT(req: NextRequest) {
     });
 
     if (body.creditBalance !== undefined) {
-      const storeCode = (user.store && user.store !== 'All Stores' ? user.store : 'BLR').toUpperCase();
+      const storeCode = (
+        user.store && user.store !== 'All Stores' ? user.store : 'BLR'
+      ).toUpperCase();
       await (prisma as any).customerStoreProfile.upsert({
         where: {
           customerId_storeCode: {
@@ -403,7 +409,9 @@ export async function PUT(req: NextRequest) {
       });
     }
 
-    const customerStore = (user.store && user.store !== 'All Stores' ? user.store : 'BLR').toUpperCase();
+    const customerStore = (
+      user.store && user.store !== 'All Stores' ? user.store : 'BLR'
+    ).toUpperCase();
     const customerPayload = {
       entityId: customer.id,
       storeCode: customerStore,

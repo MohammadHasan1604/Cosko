@@ -53,8 +53,7 @@ export default function PurchaseOrderFormModal({
     confirmAction,
   } = useApp();
 
-  const defaultStore =
-    currentUser.role === 'Super Admin' ? 'CENTRAL' : currentUser.store || 'BLR';
+  const defaultStore = currentUser.role === 'Super Admin' ? 'CENTRAL' : currentUser.store || 'BLR';
 
   // PO Header Details
   const [vendorName, setVendorName] = useState('');
