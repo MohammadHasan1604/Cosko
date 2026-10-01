@@ -762,6 +762,6 @@ This repository, source code, system architecture, database design, user interfa
    No license, immunity, or right is granted, whether by implication, estoppel, or otherwise, except as expressly stated in a valid written contract executed by Mohammad Hasan.
 
 For commercial licensing, enterprise deployment inquiries, or authorization requests, please contact:  
-**Mohammad Hasan** — [mohammadhasan@gmail.com](mailto:mohammadhasan@gmail.com)
+**Mohammad Hasan** — [mohammadhasan16114@gmail.com](mailto:mohammadhasan16114@gmail.com)
 
 *Refer to the root [`LICENSE`](file:///c:/Users/admin/Downloads/storecommand/LICENSE) file for the full legal terms and conditions.*
