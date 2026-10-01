@@ -40,7 +40,17 @@ export default function ProductFormModal({
     currentUser,
   } = useApp();
 
+  const isSuperAdmin = currentUser?.role === 'Super Admin';
+  const isStoreManager = currentUser?.role === 'Store Manager';
   const isSalesManager = currentUser?.role === 'Sales Manager';
+  const userStoreCode =
+    currentUser?.store && currentUser.store !== 'All Stores' && currentUser.store !== 'ALL'
+      ? currentUser.store
+      : 'BLR';
+  const assignedStoreObj = storesList.find(
+    (s) => s.code.toUpperCase() === userStoreCode.toUpperCase()
+  );
+  const assignedStoreLabel = `${userStoreCode} · ${assignedStoreObj?.name || 'Cosko Store'}`;
 
   const [images, setImages] = useState<string[]>([]);
   const [primaryImage, setPrimaryImage] = useState<string>('');
@@ -64,10 +74,27 @@ export default function ProductFormModal({
   }, [categoriesList]);
 
   const storeOptions: SelectOption[] = React.useMemo(() => {
+    if (!isSuperAdmin) {
+      return [
+        {
+          value: userStoreCode,
+          label: assignedStoreLabel,
+          sublabel: assignedStoreObj?.city || 'Assigned Store',
+          badge: 'Assigned Store',
+        },
+      ];
+    }
+
     return [
       { value: 'CENTRAL', label: 'CENTRAL Warehouse', sublabel: 'Central Distribution Hub' },
       ...storesList
-        .filter((s) => s.code !== 'CENTRAL')
+        .filter(
+          (s) =>
+            s.code !== 'CENTRAL' &&
+            s.code !== 'All Stores' &&
+            s.code !== 'ALL' &&
+            s.status === 'Active'
+        )
         .map((s) => ({
           value: s.code,
           label: `${s.code} · ${s.name}`,
@@ -75,7 +102,7 @@ export default function ProductFormModal({
           badge: s.status,
         })),
     ];
-  }, [storesList]);
+  }, [storesList, isSuperAdmin, userStoreCode, assignedStoreLabel, assignedStoreObj]);
 
   const vendorOptions: SelectOption[] = React.useMemo(() => {
     return vendors
@@ -108,7 +135,7 @@ export default function ProductFormModal({
     subcategory: '',
     vendor: '',
     description: '',
-    store: 'CENTRAL',
+    store: !isSuperAdmin ? userStoreCode : 'CENTRAL',
     qtyOnHand: '' as unknown as number,
     reorderPt: '' as unknown as number,
     minStock: '' as unknown as number,
@@ -145,7 +172,7 @@ export default function ProductFormModal({
           subcategory: editItem.subcategory || '',
           vendor: (editItem as any)?.vendor || '',
           description: editItem.description || '',
-          store: editItem.store || 'CENTRAL',
+          store: !isSuperAdmin ? userStoreCode : (editItem.store || 'CENTRAL'),
           qtyOnHand:
             editItem.qtyOnHand !== undefined && editItem.qtyOnHand !== null
               ? editItem.qtyOnHand
@@ -200,7 +227,7 @@ export default function ProductFormModal({
           subcategory: '',
           vendor: '',
           description: '',
-          store: 'CENTRAL',
+          store: !isSuperAdmin ? userStoreCode : 'CENTRAL',
           qtyOnHand: '' as unknown as number,
           reorderPt: '' as unknown as number,
           minStock: '' as unknown as number,
@@ -397,8 +424,14 @@ export default function ProductFormModal({
       imageUrl: primaryImage || images[0] || undefined,
     };
 
+    if (!isSuperAdmin) {
+      payload.store = userStoreCode;
+    } else {
+      payload.store = formData.store || 'CENTRAL';
+    }
+
     if (isSalesManager) {
-      payload.store = currentUser?.store || formData.store;
+      payload.store = userStoreCode;
       delete payload.costPrice;
       delete payload.transferPrice;
       delete payload.sellingPrice;
@@ -813,18 +846,30 @@ export default function ProductFormModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
-                <CustomSelect
-                  label="Stock Location"
-                  disabled={!!editItem || isSalesManager}
-                  placeholder="Select store location..."
-                  value={isSalesManager ? currentUser?.store || formData.store : formData.store}
-                  onChange={(val) => setFormData((prev) => ({ ...prev, store: val }))}
-                  options={storeOptions}
-                  searchable={true}
-                  addNewLabel="+ Add New Store"
-                  onAddNew={() => setStoreModalOpen(true)}
-                  size="sm"
-                />
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  Stock Location <span className="text-danger">*</span>
+                </label>
+                {!isSuperAdmin ? (
+                  <div className="input-field text-xs bg-muted/30 border border-border text-foreground flex items-center justify-between cursor-not-allowed py-2">
+                    <span className="font-semibold text-foreground truncate mr-2">
+                      {assignedStoreLabel}
+                    </span>
+                    <span className="text-3xs font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full shrink-0">
+                      Assigned Store
+                    </span>
+                  </div>
+                ) : (
+                  <CustomSelect
+                    label=""
+                    disabled={!!editItem}
+                    placeholder="Select store location..."
+                    value={formData.store}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, store: val }))}
+                    options={storeOptions}
+                    searchable={true}
+                    size="sm"
+                  />
+                )}
               </div>
 
               <div>

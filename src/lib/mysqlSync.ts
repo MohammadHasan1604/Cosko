@@ -302,6 +302,7 @@ export const MySQLDataService = {
       email: cust.email,
       city: cust.city,
       address: cust.address,
+      storeCode: cust.storeCode || cust.store,
       totalSpend: cust.totalSpend || 0,
       creditBalance: cust.creditBalance || 0,
     });
@@ -316,6 +317,7 @@ export const MySQLDataService = {
       city: cust.city,
       address: cust.address,
       status: cust.status,
+      storeCode: cust.storeCode || cust.store,
       creditBalance: cust.creditBalance,
     });
   },

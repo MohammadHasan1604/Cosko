@@ -29,14 +29,48 @@ interface ProofViewerModalProps {
   proof?: ProofViewerData | null;
 }
 
+export function normalizeProofUrl(inputUrl?: string): string {
+  if (!inputUrl) return '';
+  // If it's already an app file URL with %2F or mixed slashes, decode and re-encode safely
+  if (inputUrl.startsWith('/api/files/')) {
+    const rest = inputUrl.slice('/api/files/'.length);
+    const segments = decodeURIComponent(rest)
+      .split(/[/\\]+/)
+      .filter(Boolean);
+    return `/api/files/${segments.map(encodeURIComponent).join('/')}`;
+  }
+  // If it's a raw R2/S3/external URL pointing to payment-proofs or expense-receipts
+  const proofIndex = inputUrl.indexOf('payment-proofs/');
+  if (proofIndex !== -1) {
+    const key = inputUrl.slice(proofIndex).split('?')[0];
+    const segments = key.split(/[/\\]+/).filter(Boolean);
+    return `/api/files/${segments.map(encodeURIComponent).join('/')}`;
+  }
+  const receiptIndex = inputUrl.indexOf('expense-receipts/');
+  if (receiptIndex !== -1) {
+    const key = inputUrl.slice(receiptIndex).split('?')[0];
+    const segments = key.split(/[/\\]+/).filter(Boolean);
+    return `/api/files/${segments.map(encodeURIComponent).join('/')}`;
+  }
+  return inputUrl;
+}
+
 export default function ProofViewerModal({ open, onClose, data, proof }: ProofViewerModalProps) {
   const activeData = proof || data;
   const isModalOpen = open !== undefined ? open : Boolean(activeData);
+  const rawUrl = activeData?.proofUrl || activeData?.url;
 
-  if (!isModalOpen || !activeData) return null;
+  const [hasError, setHasError] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
 
-  const url = activeData.proofUrl || activeData.url;
-  if (!url) return null;
+  React.useEffect(() => {
+    setHasError(false);
+    setLoading(true);
+  }, [rawUrl]);
+
+  if (!isModalOpen || !activeData || !rawUrl) return null;
+
+  const url = normalizeProofUrl(rawUrl);
   const isPdf = url.toLowerCase().endsWith('.pdf') || url.includes('application/pdf');
   const filename = url.split('/').pop() || 'payment-proof';
 
@@ -71,17 +105,23 @@ export default function ProofViewerModal({ open, onClose, data, proof }: ProofVi
             File: {filename}
           </span>
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <a
-              href={url}
-              download={filename}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-primary text-xs py-1.5 px-3 gap-1.5 font-bold flex-1 sm:flex-initial text-center justify-center inline-flex items-center"
+            {!hasError && (
+              <a
+                href={url}
+                download={filename}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-primary text-xs py-1.5 px-3 gap-1.5 font-bold flex-1 sm:flex-initial text-center justify-center inline-flex items-center"
+              >
+                <Icon name="ArrowDownTrayIcon" size={14} />
+                Download Proof
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-secondary text-xs py-1.5 px-3 flex-1 sm:flex-initial"
             >
-              <Icon name="ArrowDownTrayIcon" size={14} />
-              Download Proof
-            </a>
-            <button type="button" onClick={onClose} className="btn-secondary text-xs py-1.5 px-3 flex-1 sm:flex-initial">
               Close
             </button>
           </div>
@@ -166,22 +206,56 @@ export default function ProofViewerModal({ open, onClose, data, proof }: ProofVi
         )}
 
         {/* Proof Document Viewer */}
-        <div className="border border-border rounded-xl overflow-hidden bg-muted/20 flex flex-col items-center justify-center min-h-[260px] max-h-[460px]">
-          {isPdf ? (
-            <div className="w-full h-[400px] flex flex-col items-center justify-center p-4 bg-muted/10">
+        <div className="border border-border rounded-xl overflow-hidden bg-muted/20 flex flex-col items-center justify-center min-h-[260px] max-h-[460px] relative">
+          {hasError ? (
+            <div className="p-6 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-danger/10 text-danger flex items-center justify-center mx-auto">
+                <Icon name="ExclamationTriangleIcon" size={24} />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-foreground">
+                  Payment proof file is missing from object storage
+                </p>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  The transaction voucher metadata exists in database, but the physical file could not be retrieved from object storage.
+                </p>
+              </div>
+            </div>
+          ) : isPdf ? (
+            <div className="w-full h-[400px] flex flex-col items-center justify-center p-4 bg-muted/10 relative">
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
+                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
               <iframe
                 src={`${url}#toolbar=1`}
                 className="w-full h-full rounded-lg border border-border"
                 title="PDF Payment Proof"
+                onLoad={() => setLoading(false)}
+                onError={() => {
+                  setHasError(true);
+                  setLoading(false);
+                }}
               />
             </div>
           ) : (
-            <div className="p-3 w-full h-full flex items-center justify-center overflow-auto max-h-[420px]">
+            <div className="p-3 w-full h-full flex items-center justify-center overflow-auto max-h-[420px] relative">
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
+                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={url}
                 alt="Payment Proof Document"
                 className="max-w-full max-h-[400px] object-contain rounded-lg shadow-xs"
+                onLoad={() => setLoading(false)}
+                onError={() => {
+                  setHasError(true);
+                  setLoading(false);
+                }}
               />
             </div>
           )}

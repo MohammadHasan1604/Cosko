@@ -593,10 +593,7 @@ export default function PurchaseOrderFormModal({
         lineTotal: Number(it.lineTotal),
       }));
 
-      // If creating new PO with initial payment, enforce mandatory proof
-      const effectivePaymentRef =
-        paymentRef.trim() || `PO-ADV-${Date.now().toString(36).toUpperCase()}`;
-
+      // Payment validation rules
       if (
         !isEdit &&
         (paymentStatus === 'Partial' || paymentStatus === 'Paid' || financials.paidAmount > 0)
@@ -608,7 +605,29 @@ export default function PurchaseOrderFormModal({
           setIsSubmitting(false);
           return;
         }
+
+        if (paymentStatus === 'Partial') {
+          if (financials.paidAmount <= 0 || financials.paidAmount >= financials.grandTotal) {
+            toast.error(
+              `Partial payment requires a paid amount between ₹0.01 and ₹${(financials.grandTotal - 0.01).toLocaleString('en-IN')}`
+            );
+            setIsSubmitting(false);
+            return;
+          }
+        } else if (paymentStatus === 'Paid') {
+          if (financials.paidAmount !== financials.grandTotal) {
+            toast.error(
+              `Full payment requires paid amount to equal grand total (₹${financials.grandTotal.toLocaleString('en-IN')})`
+            );
+            setIsSubmitting(false);
+            return;
+          }
+        }
       }
+
+      // If creating new PO with initial payment, generate internal fallback reference if not provided
+      const effectivePaymentRef =
+        paymentRef.trim() || `PO-ADV-${Date.now().toString(36).toUpperCase()}`;
 
       const payload = {
         vendorName: vendorName.trim(),
@@ -629,6 +648,7 @@ export default function PurchaseOrderFormModal({
         remainingAmount: financials.remainingAmount,
         paymentMethod: paymentMethod,
         referenceNo: effectivePaymentRef,
+        payRef: effectivePaymentRef,
         receiptUrl: paymentProof || undefined,
         paymentProofUrl: paymentProof || undefined,
         paymentNotes: paymentNotes.trim() || undefined,
@@ -686,7 +706,11 @@ export default function PurchaseOrderFormModal({
       }
 
       if (isEdit && purchase) {
-        await updatePurchase(purchase.id, payload as any);
+        const updateRes = await updatePurchase(purchase.id, payload as any);
+        if (updateRes && (updateRes as any).success === false) {
+          setIsSubmitting(false);
+          return;
+        }
         toast.success(`Purchase Order #${purchase.poNo} updated successfully!`);
         if (onSuccess) {
           onSuccess({
@@ -694,16 +718,22 @@ export default function PurchaseOrderFormModal({
             ...payload,
           } as any);
         }
+        await refreshAllData();
+        onClose();
       } else {
         const created = await addPurchase(payload as any);
-        toast.success(`Purchase Order created with ${formattedItems.length} items!`);
-        if (onSuccess && created) {
-          onSuccess(created);
+        if (!created || (created as any).success === false) {
+          setIsSubmitting(false);
+          return;
         }
+        const createdPO = (created as any).item || created;
+        toast.success(`Purchase Order created with ${formattedItems.length} items!`);
+        if (onSuccess && createdPO) {
+          onSuccess(createdPO);
+        }
+        await refreshAllData();
+        onClose();
       }
-
-      await refreshAllData();
-      onClose();
     } catch (err: any) {
       console.error('Error saving purchase order:', err);
       toast.error(err.message || 'Failed to save purchase order');
@@ -743,7 +773,12 @@ export default function PurchaseOrderFormModal({
                   (paymentStatus === 'Partial' ||
                     paymentStatus === 'Paid' ||
                     financials.paidAmount > 0) &&
-                  (!paymentProof || !paymentRef.trim()))
+                  (!paymentProof ||
+                    financials.paidAmount <= 0 ||
+                    (paymentStatus === 'Partial' &&
+                      financials.paidAmount >= financials.grandTotal) ||
+                    (paymentStatus === 'Paid' &&
+                      financials.paidAmount !== financials.grandTotal)))
               }
             >
               {isSubmitting ? (
@@ -1356,16 +1391,28 @@ export default function PurchaseOrderFormModal({
                 <div className="font-bold text-muted-foreground text-3xs uppercase tracking-wider">
                   Initial Payment Details
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
                     <label className="text-3xs font-semibold text-muted-foreground block mb-0.5">
-                      Method
+                      Method <span className="text-danger">*</span>
                     </label>
                     <PaymentMethodSelect
                       value={paymentMethod}
                       onChange={(val) => setPaymentMethod(val)}
                       size="sm"
                       modalZIndex={zIndex + 30}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-3xs font-semibold text-muted-foreground block mb-0.5">
+                      UTR / Transaction Reference
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. UPI Ref / UTR (auto if blank)"
+                      value={paymentRef}
+                      onChange={(e) => setPaymentRef(e.target.value)}
+                      className="input-field text-xs h-8 font-mono"
                     />
                   </div>
                   <div>
@@ -1426,7 +1473,7 @@ export default function PurchaseOrderFormModal({
             (paymentStatus === 'Partial' ||
               paymentStatus === 'Paid' ||
               financials.paidAmount > 0) &&
-            (!paymentProof || !paymentRef.trim()) && (
+            !paymentProof && (
               <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-3xs font-semibold">
                 <Icon
                   name="ExclamationTriangleIcon"
@@ -1434,8 +1481,7 @@ export default function PurchaseOrderFormModal({
                   className="shrink-0 text-amber-600"
                 />
                 <span>
-                  Advance Payment requires Payment Proof upload and Reference / UTR No before
-                  saving.
+                  Advance Payment requires Payment Proof upload (Receipt / Voucher / Screenshot) before saving.
                 </span>
               </div>
             )}

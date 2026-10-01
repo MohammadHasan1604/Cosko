@@ -505,6 +505,30 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Product record not found in database' }, { status: 404 });
     }
 
+    // Verify inventory ID ownership if body.inventoryId or an inventory ID was supplied
+    const possibleInvId =
+      body.inventoryId ||
+      (body.id && product && body.id !== product.id ? body.id : null);
+    if (possibleInvId) {
+      const invCheck = await prisma.inventory
+        .findUnique({ where: { id: possibleInvId } })
+        .catch(() => null);
+      if (invCheck) {
+        targetInventoryStoreCode = invCheck.storeCode;
+        if (
+          user.securityLevel < 100 &&
+          invCheck.storeCode.trim().toUpperCase() !== (user.store || '').trim().toUpperCase()
+        ) {
+          return NextResponse.json(
+            {
+              error: `Forbidden: As ${user.role}, you cannot modify an inventory record belonging to store "${invCheck.storeCode}". Your assigned store is "${user.store}".`,
+            },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     // ─── STORE SCOPE ENFORCEMENT ON PUT ─────────────────────────────────────
     const requestedStore = body.storeCode || body.store;
     if (requestedStore === 'All Stores' || requestedStore === 'ALL') {

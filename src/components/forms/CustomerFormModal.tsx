@@ -39,13 +39,55 @@ export default function CustomerFormModal({
   quickMode = false,
   zIndex = 100,
 }: CustomerFormModalProps) {
-  const { addCustomer, updateCustomer, confirmAction } = useApp();
+  const { addCustomer, updateCustomer, confirmAction, currentUser, selectedStore, storesList } = useApp();
+
+  const isSuperAdmin = currentUser?.role === 'Super Admin';
+  const userStoreCode = (
+    currentUser?.store && currentUser?.store !== 'All Stores' && currentUser?.store !== 'HQ'
+      ? currentUser.store
+      : 'BLR'
+  ).toUpperCase();
+
+  const activePhysicalStores = React.useMemo(() => {
+    return (storesList || []).filter(
+      (s: any) =>
+        s.status === 'Active' &&
+        s.code.toUpperCase() !== 'ALL' &&
+        s.code.toUpperCase() !== 'ALL STORES' &&
+        s.code.toUpperCase() !== 'HQ' &&
+        s.code.toUpperCase() !== 'CENTRAL'
+    );
+  }, [storesList]);
+
+  const assignedStoreObj = React.useMemo(() => {
+    return (storesList || []).find((s: any) => s.code.toUpperCase() === userStoreCode);
+  }, [storesList, userStoreCode]);
+
+  const assignedStoreLabel = assignedStoreObj
+    ? `${userStoreCode} · ${assignedStoreObj.name}`
+    : `${userStoreCode} · Cosko Indiranagar`;
+
+  const defaultSuperAdminStore = React.useMemo(() => {
+    if (
+      selectedStore &&
+      selectedStore !== 'All Stores' &&
+      selectedStore !== 'ALL' &&
+      selectedStore !== 'HQ' &&
+      selectedStore !== 'CENTRAL'
+    ) {
+      return selectedStore.toUpperCase();
+    }
+    return activePhysicalStores[0]?.code?.toUpperCase() || 'BLR';
+  }, [selectedStore, activePhysicalStores]);
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [city, setCity] = useState('Bengaluru');
+  const [city, setCity] = useState('');
   const [address, setAddress] = useState('');
+  const [serviceStore, setServiceStore] = useState<string>(
+    !isSuperAdmin ? userStoreCode : defaultSuperAdminStore
+  );
   const [gstin, setGstin] = useState('');
   const [tier, setTier] = useState<'VIP' | 'Regular' | 'New'>('Regular');
   const [creditBalance, setCreditBalance] = useState<number | ''>('');
@@ -70,7 +112,7 @@ export default function CustomerFormModal({
         setName(customer.name || '');
         setPhone(clean10DigitPhone(customer.phone || ''));
         setEmail(customer.email || '');
-        setCity(customer.city || 'Bengaluru');
+        setCity(customer.city || '');
         setAddress(customer.address || '');
         setGstin('');
         setTier(customer.tier || 'Regular');
@@ -79,15 +121,21 @@ export default function CustomerFormModal({
             ? customer.creditBalance
             : ''
         );
+        const custStore =
+          customer.storeCode ||
+          (customer.serviceStores && customer.serviceStores[0]) ||
+          (!isSuperAdmin ? userStoreCode : defaultSuperAdminStore);
+        setServiceStore(custStore);
       } else {
         setName(initialName || '');
         setPhone(clean10DigitPhone(initialPhone || ''));
         setEmail('');
-        setCity('Bengaluru');
+        setCity('');
         setAddress('');
         setGstin('');
         setTier('Regular');
         setCreditBalance('');
+        setServiceStore(!isSuperAdmin ? userStoreCode : defaultSuperAdminStore);
       }
     }
 
@@ -95,7 +143,7 @@ export default function CustomerFormModal({
       prevOpenRef.current = false;
       editCustomerIdRef.current = null;
     }
-  }, [open, customer?.id, initialPhone, initialName]);
+  }, [open, customer?.id, initialPhone, initialName, isSuperAdmin, userStoreCode, defaultSuperAdminStore]);
 
   const isDirty = React.useMemo(() => {
     if (isEdit) {
@@ -106,8 +154,8 @@ export default function CustomerFormModal({
         address !== (customer?.address || '')
       );
     }
-    return Boolean(name || phone || email || address || gstin);
-  }, [isEdit, customer, name, phone, email, address, gstin]);
+    return Boolean(name || phone || email || address || gstin || city);
+  }, [isEdit, customer, name, phone, email, address, gstin, city]);
 
   const handleSafeClose = () => {
     if (isDirty && !isSubmitting) {
@@ -145,6 +193,7 @@ export default function CustomerFormModal({
       }
     }
 
+    const effectiveStoreCode = !isSuperAdmin ? userStoreCode : (serviceStore || defaultSuperAdminStore);
     const formattedPhone = `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}`;
     const cleanGstin = gstin.trim().toUpperCase();
 
@@ -156,8 +205,13 @@ export default function CustomerFormModal({
       summaryItems: [
         { label: 'Customer Name', value: cleanName, highlighted: true },
         { label: 'Mobile Phone', value: formattedPhone },
+        {
+          label: 'Customer Store / Service Location',
+          value: !isSuperAdmin ? assignedStoreLabel : effectiveStoreCode,
+          highlighted: true,
+        },
         { label: 'Email Address', value: email.trim() || 'N/A' },
-        { label: 'City / Location', value: city.trim() || 'Bengaluru' },
+        { label: 'City / Region', value: city.trim() || 'Not specified' },
         { label: 'Customer Tier', value: tier },
         ...(creditBalance !== ''
           ? [
@@ -182,8 +236,9 @@ export default function CustomerFormModal({
           name: cleanName,
           phone: formattedPhone,
           email: email.trim() || undefined,
-          city: city.trim() || 'Bengaluru',
+          city: city.trim() || undefined,
           address: address.trim() || undefined,
+          storeCode: effectiveStoreCode,
           tier,
           creditBalance:
             creditBalance !== '' && creditBalance !== undefined && creditBalance !== null
@@ -196,8 +251,9 @@ export default function CustomerFormModal({
           name: cleanName,
           phone: formattedPhone,
           email: email.trim(),
-          city: city.trim() || 'Bengaluru',
+          city: city.trim(),
           address: address.trim(),
+          storeCode: effectiveStoreCode,
           tier,
           creditBalance:
             creditBalance !== '' && creditBalance !== undefined && creditBalance !== null
@@ -214,8 +270,9 @@ export default function CustomerFormModal({
           phone: formattedPhone,
           email:
             email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@customer.com`,
-          city: city.trim() || 'Bengaluru',
+          city: city.trim(),
           address: address.trim() || undefined,
+          storeCode: effectiveStoreCode,
           tier,
           creditBalance:
             creditBalance !== '' && creditBalance !== undefined && creditBalance !== null
@@ -293,6 +350,35 @@ export default function CustomerFormModal({
       }
     >
       <form id="customer-form" onSubmit={handleSubmit} className="space-y-4 py-1">
+        {/* Customer Store / Service Location */}
+        <div>
+          <label className="text-xs font-bold text-foreground block mb-1">
+            Customer Store / Service Location <span className="text-danger">*</span>
+          </label>
+          {!isSuperAdmin ? (
+            <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/40 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="font-semibold text-foreground">{assignedStoreLabel}</span>
+              </div>
+              <span className="badge-neutral text-3xs font-semibold px-2 py-0.5">Assigned Store</span>
+            </div>
+          ) : (
+            <select
+              value={serviceStore}
+              onChange={(e) => setServiceStore(e.target.value)}
+              className="input-field text-xs font-medium"
+              required
+            >
+              {activePhysicalStores.map((st: any) => (
+                <option key={st.code} value={st.code}>
+                  {st.code} · {st.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
         {/* Full Name */}
         <div>
           <label className="text-xs font-bold text-foreground block mb-1">
@@ -363,10 +449,12 @@ export default function CustomerFormModal({
           </div>
 
           <div>
-            <label className="text-xs font-bold text-foreground block mb-1">City / Region</label>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              City / Region <span className="text-muted-foreground font-normal">(Optional)</span>
+            </label>
             <input
               type="text"
-              placeholder="e.g. Bengaluru, Hyderabad"
+              placeholder="e.g. Bengaluru, Mangaluru, Hyderabad"
               value={city}
               onChange={(e) => setCity(e.target.value)}
               className="input-field text-xs"

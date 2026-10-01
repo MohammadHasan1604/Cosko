@@ -22,6 +22,8 @@ export default function CustomersPage() {
     currentUser,
   } = useApp();
 
+  const isSuperAdmin = currentUser?.role === 'Super Admin';
+
   const [registerModal, setRegisterModal] = useState(false);
   const [editCustomerModal, setEditCustomerModal] = useState<Customer | null>(null);
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<Customer | null>(null);
@@ -347,7 +349,17 @@ export default function CustomersPage() {
                           {cust.phone}
                         </td>
                         <td className="px-4 py-3 text-xs text-foreground font-medium">
-                          {cust.city}
+                          <div>{cust.city || '—'}</div>
+                          {isSuperAdmin && cust.serviceStores && cust.serviceStores.length > 0 && (
+                            <div className="flex items-center gap-1 mt-1 flex-wrap">
+                              <span className="text-3xs text-muted-foreground">Stores:</span>
+                              {cust.serviceStores.map((st: string) => (
+                                <span key={st} className="badge-neutral text-3xs px-1.5 py-0 font-mono font-bold">
+                                  {st}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -447,7 +459,12 @@ export default function CustomersPage() {
                     <div className="record-content">
                       <p className="record-title">{cust.name}</p>
                       <p className="record-subtitle">
-                        {cust.phone} · {cust.city}
+                        {cust.phone} · {cust.city || '—'}
+                        {isSuperAdmin && cust.serviceStores && cust.serviceStores.length > 0 && (
+                          <span className="ml-1 text-primary font-mono text-3xs font-semibold">
+                            [{cust.serviceStores.join(', ')}]
+                          </span>
+                        )}
                       </p>
                     </div>
                     <div className="record-meta">
@@ -516,6 +533,18 @@ export default function CustomersPage() {
                     LEGACY_MYSQL_DB (R/O)
                   </span>
                 </div>
+                {isSuperAdmin && crmViewCustomer.serviceStores && crmViewCustomer.serviceStores.length > 0 && (
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Service Stores</span>
+                    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                      {crmViewCustomer.serviceStores.map((st: string) => (
+                        <span key={st} className="badge-neutral text-3xs px-1.5 py-0 font-mono font-bold">
+                          {st}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Customer Analytics KPI Cards */}

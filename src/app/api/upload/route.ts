@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, createAuditLog } from '@/lib/authPipeline';
-import { uploadToStorage, validateFile, StorageBucket } from '@/lib/objectStorage';
+import {
+  uploadToStorage,
+  validateFile,
+  StorageBucket,
+  fileExistsInStorage,
+  isObjectStorageConfigured,
+} from '@/lib/objectStorage';
 import { prisma } from '@/lib/db';
 
 const CATEGORY_MAP: Record<string, StorageBucket> = {
@@ -57,8 +63,19 @@ export async function POST(req: NextRequest) {
       user.name
     );
 
-    if (!result.success) {
+    if (!result.success || !result.key) {
       return NextResponse.json({ error: result.error || 'Upload failed' }, { status: 500 });
+    }
+
+    // 🔒 Verify persistence before claiming success
+    if (isObjectStorageConfigured()) {
+      const persisted = await fileExistsInStorage(result.key);
+      if (!persisted) {
+        return NextResponse.json(
+          { error: 'Upload failed: Persistence verification failed in object storage' },
+          { status: 500 }
+        );
+      }
     }
 
     // Persist FileAsset record in MySQL
@@ -71,7 +88,7 @@ export async function POST(req: NextRequest) {
           byteSize: result.size,
           originalFilename: file.name || 'document',
           createdByUserId: user.id,
-          storeCode: user.store && user.store !== 'All Stores' ? user.store : 'CENTRAL',
+          storeCode: user.store && user.store !== 'All Stores' && user.store !== 'HQ' ? user.store : 'BLR',
           privacyLevel: result.isPrivate ? 'STORE_PRIVATE' : 'PUBLIC',
           relatedEntityType:
             categoryRaw === 'payment-proofs'

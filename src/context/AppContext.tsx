@@ -370,6 +370,9 @@ export interface Customer {
   gstin?: string;
   notes?: string;
   createdAt?: string;
+  storeCode?: string;
+  storeProfiles?: any[];
+  serviceStores?: string[];
 }
 
 export interface Vendor {
@@ -1495,6 +1498,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 ? new Date(c.updatedAt).toLocaleDateString('en-IN')
                 : 'Never',
               createdAt: c.createdAt,
+              storeCode: c.storeCode,
+              storeProfiles: c.storeProfiles || [],
+              serviceStores:
+                c.serviceStores || (c.storeProfiles || []).map((p: any) => p.storeCode),
             }))
         );
       }
@@ -3798,10 +3805,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         refreshDomainData('purchases');
         return newPO;
       } else {
-        toast.error(res?.error || 'Failed to create purchase order');
+        const errorMsg = res?.error || 'Failed to create purchase order';
+        toast.error(errorMsg);
+        return { success: false, error: errorMsg } as any;
       }
     } catch (err: any) {
       toast.error(err.message || 'Error creating purchase order');
+      return { success: false, error: err.message || 'Error creating purchase order' } as any;
     }
   };
 
@@ -3816,8 +3826,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        toast.error(data.error || 'Failed to update purchase order in database');
-        return;
+        const errorMsg = data.error || 'Failed to update purchase order in database';
+        toast.error(errorMsg);
+        return { success: false, error: errorMsg };
       }
 
       if (data.purchaseOrder) {
@@ -3864,8 +3875,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addAuditLog('Purchases', 'Edit Purchase Order', `Updated PO #${id}`);
       toast.success('Purchase Order updated in MySQL');
       await refreshDomainData('purchases');
+      return { success: true };
     } catch (err: any) {
       toast.error(err.message || 'Error updating purchase order');
+      return { success: false, error: err.message || 'Error updating purchase order' };
     }
   };
 
@@ -3975,6 +3988,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           creditBalance: Number(c.creditBalance) || 0,
           lastPurchase: 'Never',
           createdAt: c.createdAt,
+          storeCode: c.storeCode || custData.storeCode,
+          storeProfiles: c.storeProfiles || [],
+          serviceStores:
+            c.serviceStores || (c.storeProfiles || []).map((p: any) => p.storeCode),
         };
         setCustomers((prev) => [newCust, ...prev.filter((cust) => cust.id !== newCust.id)]);
         addAuditLog('Customers', 'Add Customer', `Registered customer "${newCust.name}"`);

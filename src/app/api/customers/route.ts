@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, hasPermission, createAuditLog } from '@/lib/authPipeline';
+import {
+  authenticateRequest,
+  hasPermission,
+  createAuditLog,
+  validatePhysicalStore,
+} from '@/lib/authPipeline';
 import { prisma } from '@/lib/db';
 import { normalizeMobileNumber } from '@/lib/phoneUtils';
 import { broadcastRealtimeEvent, getStoreChannel } from '@/lib/realtime';
@@ -51,6 +56,7 @@ export async function GET(req: NextRequest) {
           creditBalance,
           totalOrders,
           storeProfiles: p ? [p] : [],
+          serviceStores: p ? [p.storeCode] : [],
         };
       } else {
         const filterStore = searchParams.get('storeCode') || searchParams.get('store');
@@ -76,6 +82,7 @@ export async function GET(req: NextRequest) {
           creditBalance,
           totalOrders,
           storeProfiles: allProfiles,
+          serviceStores: allProfiles.map((prof: any) => prof.storeCode),
         };
       }
     };
@@ -190,6 +197,52 @@ export async function POST(req: NextRequest) {
 
     const normalizedPhone = normalizeMobileNumber(body.phone);
 
+    const isSuperAdmin = user.role === 'Super Admin' || user.securityLevel >= 100;
+    let effectiveStore: string;
+
+    if (!isSuperAdmin) {
+      // Non-Super-Admin: storeCode MUST be authenticated user.store.
+      // Ignore/reject forged storeCode.
+      const assignedStore = (user.store || '').toUpperCase().trim();
+      if (
+        !assignedStore ||
+        assignedStore === 'ALL' ||
+        assignedStore === 'ALL STORES' ||
+        assignedStore === 'HQ'
+      ) {
+        return NextResponse.json(
+          { error: 'Assigned physical store required to register customers' },
+          { status: 403 }
+        );
+      }
+      effectiveStore = assignedStore;
+    } else {
+      // Super Admin: accept selected physical store ONLY after validatePhysicalStore()
+      const requestedStore = (body.storeCode || body.store || '').trim();
+      if (
+        !requestedStore ||
+        requestedStore.toUpperCase() === 'ALL' ||
+        requestedStore.toUpperCase() === 'ALL STORES' ||
+        requestedStore.toUpperCase() === 'HQ'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Super Admin must select a valid active physical store for customer service location',
+          },
+          { status: 400 }
+        );
+      }
+      const val = await validatePhysicalStore(requestedStore);
+      if (!val.valid) {
+        return NextResponse.json(
+          { error: val.error || `Invalid or inactive physical store: "${requestedStore}"` },
+          { status: 400 }
+        );
+      }
+      effectiveStore = val.storeCode!;
+    }
+
     const customKey =
       body.idempotencyKey ||
       req.headers.get('x-idempotency-key') ||
@@ -210,7 +263,7 @@ export async function POST(req: NextRequest) {
               where: { normalizedPhone },
             });
 
-            const storeCode = (user.store || 'HQ').toUpperCase();
+            const storeCode = effectiveStore;
             const initialSpent = Number(body.totalSpend || body.totalSpent) || 0;
             const initialCredit = Number(body.creditBalance) || 0;
 
@@ -223,7 +276,7 @@ export async function POST(req: NextRequest) {
                 (p: any) => p.storeCode.toUpperCase() === storeCode
               );
               const canModifyMaster =
-                user.role === 'Super Admin' ||
+                isSuperAdmin ||
                 existingProfiles.length === 0 ||
                 (existingProfiles.length === 1 && Boolean(callerProfile));
 
@@ -242,7 +295,7 @@ export async function POST(req: NextRequest) {
                 data: updateData,
               });
 
-              // Always ensure caller's store profile is linked
+              // Always ensure effectiveStore's profile is upserted safely
               const profile = await tx.customerStoreProfile.upsert({
                 where: {
                   customerId_storeCode: {
@@ -262,28 +315,36 @@ export async function POST(req: NextRequest) {
                 },
               });
 
+              const allProfiles = await tx.customerStoreProfile.findMany({
+                where: { customerId: existingCustomer.id },
+              });
+
               return {
                 ...updated,
+                storeCode,
                 totalSpent: Number(profile.totalSpent) || initialSpent,
                 creditBalance: Number(profile.creditBalance) || initialCredit,
                 totalOrders: Number(profile.totalOrders) || 0,
-                storeProfiles: [profile],
+                storeProfiles: isSuperAdmin ? allProfiles : [profile],
+                serviceStores: isSuperAdmin
+                  ? allProfiles.map((p: any) => p.storeCode)
+                  : [profile.storeCode],
               };
             }
 
             const created = await tx.customer.create({
               data: {
-                name: body.name,
+                name: body.name.trim(),
                 phone: body.phone,
                 normalizedPhone,
-                email: body.email || null,
-                address: body.address || null,
-                city: body.city || user.store,
+                email: body.email ? body.email.trim() : null,
+                address: body.address ? body.address.trim() : null,
+                city: body.city ? body.city.trim() : '',
                 status: 'Active',
               },
             });
 
-            await tx.customerStoreProfile.create({
+            const newProfile = await tx.customerStoreProfile.create({
               data: {
                 customerId: created.id,
                 storeCode,
@@ -295,29 +356,29 @@ export async function POST(req: NextRequest) {
 
             return {
               ...created,
+              storeCode,
               totalSpent: initialSpent,
               creditBalance: initialCredit,
               totalOrders: 0,
+              storeProfiles: [newProfile],
+              serviceStores: [newProfile.storeCode],
             };
           },
           { maxWait: 15000, timeout: 45000 }
         );
 
-        const customerStore = (user.store || 'HQ').toUpperCase();
         const customerPayload = {
           entityId: customer.id,
-          storeCode: customerStore,
+          storeCode: effectiveStore,
           action: 'saved',
         };
 
         await broadcastRealtimeEvent('customers', 'CUSTOMER_UPDATED', customerPayload);
-        if (customerStore) {
-          await broadcastRealtimeEvent(
-            getStoreChannel(customerStore),
-            'CUSTOMER_UPDATED',
-            customerPayload
-          );
-        }
+        await broadcastRealtimeEvent(
+          getStoreChannel(effectiveStore),
+          'CUSTOMER_UPDATED',
+          customerPayload
+        );
 
         return { status: 201, data: { success: true, customer } };
       }
@@ -347,7 +408,10 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
     }
 
-    if (user.securityLevel < 100) {
+    const isSuperAdmin = user.role === 'Super Admin' || user.securityLevel >= 100;
+    let targetStoreCode: string | undefined;
+
+    if (!isSuperAdmin) {
       const callerStore = (
         user.store && user.store !== 'All Stores' ? user.store : 'BLR'
       ).toUpperCase();
@@ -369,36 +433,47 @@ export async function PUT(req: NextRequest) {
           { status: 403 }
         );
       }
+      targetStoreCode = callerStore;
+    } else {
+      if (body.storeCode || body.store) {
+        const val = await validatePhysicalStore(body.storeCode || body.store);
+        if (val.valid && val.storeCode) {
+          targetStoreCode = val.storeCode;
+        }
+      }
+      if (!targetStoreCode) {
+        targetStoreCode =
+          user.store && user.store !== 'All Stores' && user.store !== 'HQ'
+            ? user.store.toUpperCase()
+            : undefined;
+      }
     }
 
     const customer = await (prisma as any).customer.update({
       where: { id: body.id },
       data: {
-        ...(body.name ? { name: body.name } : {}),
+        ...(body.name ? { name: body.name.trim() } : {}),
         ...(body.phone
           ? { phone: body.phone, normalizedPhone: normalizeMobileNumber(body.phone) }
           : {}),
-        ...(body.email !== undefined ? { email: body.email || null } : {}),
-        ...(body.city ? { city: body.city } : {}),
-        ...(body.address !== undefined ? { address: body.address || null } : {}),
+        ...(body.email !== undefined ? { email: body.email ? body.email.trim() : null } : {}),
+        ...(body.city !== undefined ? { city: body.city ? body.city.trim() : null } : {}),
+        ...(body.address !== undefined ? { address: body.address ? body.address.trim() : null } : {}),
         ...(body.status ? { status: body.status } : {}),
       },
     });
 
-    if (body.creditBalance !== undefined) {
-      const storeCode = (
-        user.store && user.store !== 'All Stores' ? user.store : 'BLR'
-      ).toUpperCase();
+    if (body.creditBalance !== undefined && targetStoreCode) {
       await (prisma as any).customerStoreProfile.upsert({
         where: {
           customerId_storeCode: {
             customerId: body.id,
-            storeCode,
+            storeCode: targetStoreCode,
           },
         },
         create: {
           customerId: body.id,
-          storeCode,
+          storeCode: targetStoreCode,
           creditBalance: Number(body.creditBalance) || 0,
           totalSpent: 0,
           totalOrders: 0,
@@ -409,9 +484,7 @@ export async function PUT(req: NextRequest) {
       });
     }
 
-    const customerStore = (
-      user.store && user.store !== 'All Stores' ? user.store : 'BLR'
-    ).toUpperCase();
+    const customerStore = targetStoreCode || (user.store || 'BLR').toUpperCase();
     const customerPayload = {
       entityId: customer.id,
       storeCode: customerStore,

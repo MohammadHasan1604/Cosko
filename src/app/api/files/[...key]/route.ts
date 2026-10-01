@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/authPipeline';
-import { getSignedDownloadUrl, deleteFromStorage } from '@/lib/objectStorage';
+import {
+  getSignedDownloadUrl,
+  deleteFromStorage,
+  fileExistsInStorage,
+} from '@/lib/objectStorage';
 import { prisma } from '@/lib/db';
 import path from 'path';
 import fs from 'fs/promises';
@@ -34,13 +38,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
       return NextResponse.json({ error: 'File key is required' }, { status: 400 });
     }
 
+    // Safely reconstruct key segments, decoding any %2F or %20 without stripping slashes
+    const rawSegments = keyParts
+      .flatMap((p) => decodeURIComponent(p).split(/[/\\]+/))
+      .map((s) => s.trim())
+      .filter(Boolean);
+
     // Path traversal prevention
-    const sanitizedParts = keyParts.map((p) => p.replace(/(\.\.|\/|\\)/g, ''));
-    const fullKey = sanitizedParts.join('/');
+    if (rawSegments.some((p) => p === '..' || p.includes('..'))) {
+      return NextResponse.json({ error: 'Forbidden: Path traversal detected' }, { status: 400 });
+    }
+    const fullKey = rawSegments.join('/');
 
     // 🔒 Database Authorization Check (Requirement 13)
     // Super Admin has global enterprise access; all other roles require database authorization.
     if (auth.user.role !== 'Super Admin') {
+      const userStore = (auth.user.store || '').toUpperCase();
+      const allowedStores = (auth.user.allowedStores || []).map((s: string) => s.toUpperCase());
+
       const fileAsset = await (prisma as any).fileAsset.findUnique({
         where: { objectKey: fullKey },
       });
@@ -50,8 +65,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
           // Check store scope
           if (
             fileAsset.storeCode &&
-            fileAsset.storeCode !== auth.user.store &&
-            !auth.user.allowedStores.includes(fileAsset.storeCode)
+            fileAsset.storeCode.toUpperCase() !== userStore &&
+            !allowedStores.includes(fileAsset.storeCode.toUpperCase())
           ) {
             return NextResponse.json(
               { error: 'Forbidden: Cannot access private files of another store' },
@@ -89,12 +104,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
               );
             }
             const expense = await prisma.expense.findFirst({
-              where: { receiptUrl: { contains: fullKey } },
+              where: {
+                OR: [
+                  { receiptUrl: { contains: fullKey } },
+                  { receiptUrl: { contains: encodeURIComponent(fullKey) } },
+                ],
+              },
             });
             if (expense) {
               if (
-                expense.storeCode !== auth.user.store &&
-                !auth.user.allowedStores.includes(expense.storeCode)
+                expense.storeCode.toUpperCase() !== userStore &&
+                !allowedStores.includes(expense.storeCode.toUpperCase())
               ) {
                 return NextResponse.json(
                   { error: 'Forbidden: Cannot access expense receipts of another store' },
@@ -109,12 +129,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
             }
           } else if (fullKey.startsWith('payment-proofs/')) {
             const sale = await prisma.salesOrder.findFirst({
-              where: { paymentProofUrl: { contains: fullKey } },
+              where: {
+                OR: [
+                  { paymentProofUrl: { contains: fullKey } },
+                  { paymentProofUrl: { contains: encodeURIComponent(fullKey) } },
+                ],
+              },
             });
             if (sale) {
               if (
-                sale.storeCode !== auth.user.store &&
-                !auth.user.allowedStores.includes(sale.storeCode)
+                sale.storeCode.toUpperCase() !== userStore &&
+                !allowedStores.includes(sale.storeCode.toUpperCase())
               ) {
                 return NextResponse.json(
                   { error: 'Forbidden: Cannot access payment proofs of another store' },
@@ -123,13 +148,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
               }
             } else {
               const payment = await prisma.purchasePayment.findFirst({
-                where: { receiptUrl: { contains: fullKey } },
+                where: {
+                  OR: [
+                    { receiptUrl: { contains: fullKey } },
+                    { receiptUrl: { contains: encodeURIComponent(fullKey) } },
+                  ],
+                },
                 include: { purchase: true },
               });
               if (payment) {
                 if (
-                  payment.purchase.storeCode !== auth.user.store &&
-                  !auth.user.allowedStores.includes(payment.purchase.storeCode)
+                  payment.purchase.storeCode.toUpperCase() !== userStore &&
+                  !allowedStores.includes(payment.purchase.storeCode.toUpperCase())
                 ) {
                   return NextResponse.json(
                     { error: 'Forbidden: Cannot access payment proofs of another store' },
@@ -148,6 +178,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
       }
     }
 
+    // 🔒 Verify file existence in storage
+    const exists = await fileExistsInStorage(fullKey);
+    if (!exists) {
+      console.warn(`[Files API] Requested file does not exist in storage: ${fullKey}`);
+      return NextResponse.json(
+        { error: 'Payment proof file is missing from object storage', key: fullKey },
+        { status: 404 }
+      );
+    }
+
     // Check if signed S3 URL is available
     const signedUrl = await getSignedDownloadUrl(fullKey, 3600);
     if (signedUrl && signedUrl.startsWith('http')) {
@@ -157,7 +197,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
 
     // Local filesystem fallback
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    const filePath = path.join(uploadsDir, ...sanitizedParts);
+    const filePath = path.join(uploadsDir, ...rawSegments);
 
     // Security check: ensure path is within uploads directory
     if (!filePath.startsWith(uploadsDir)) {
@@ -216,8 +256,15 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
       return NextResponse.json({ error: 'File key is required' }, { status: 400 });
     }
 
-    const sanitizedParts = keyParts.map((p) => p.replace(/(\.\.|\/|\\)/g, ''));
-    const fullKey = sanitizedParts.join('/');
+    const rawSegments = keyParts
+      .flatMap((p) => decodeURIComponent(p).split(/[/\\]+/))
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (rawSegments.some((p) => p === '..' || p.includes('..'))) {
+      return NextResponse.json({ error: 'Forbidden: Path traversal detected' }, { status: 400 });
+    }
+    const fullKey = rawSegments.join('/');
 
     // Retention enforcement: NEVER delete financial proof
     if (
