@@ -193,7 +193,7 @@ export async function executePOSCheckout(input: CreateSaleInput) {
           grandTotal,
           totalCost,
           grossProfit,
-          paymentMethod: input.paymentMethod,
+          paymentMethod,
           referenceNo: effectiveRefNo,
           paymentProofUrl:
             input.paymentProofUrl ||
@@ -216,6 +216,30 @@ export async function executePOSCheckout(input: CreateSaleInput) {
 
       const effectiveProofUrl =
         input.paymentProofUrl || (input.photos && input.photos.length > 0 ? input.photos[0] : null);
+
+      // Link FileAsset with created SalesOrder and guarantee transaction storeCode
+      if (effectiveProofUrl) {
+        try {
+          const proofIndex = effectiveProofUrl.indexOf('payment-proofs/');
+          if (proofIndex !== -1) {
+            const rawKey = effectiveProofUrl.slice(proofIndex).split('?')[0];
+            const cleanKey = decodeURIComponent(rawKey)
+              .split(/[/\\]+/)
+              .filter(Boolean)
+              .join('/');
+            await tx.fileAsset.updateMany({
+              where: { objectKey: cleanKey },
+              data: {
+                relatedEntityType: 'Sale',
+                relatedEntityId: sale.id,
+                storeCode,
+              },
+            });
+          }
+        } catch (faErr) {
+          console.warn('[salesService] FileAsset linking notice:', faErr);
+        }
+      }
 
       // 6. Batch create double-entry financial ledger records
       const financialEntries: any[] = [

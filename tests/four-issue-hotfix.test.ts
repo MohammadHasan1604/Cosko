@@ -460,11 +460,16 @@ async function runTests() {
   if (failed > 0) {
     console.error('\nFailures:');
     errors.forEach(e => console.error(`  - ${e}`));
+    await prisma.$disconnect().catch(() => {});
     process.exit(1);
   }
+
+  await prisma.$disconnect().catch(() => {});
+  process.exit(0);
 }
 
-runTests().catch(err => {
+runTests().catch(async (err) => {
   console.error('Test execution error:', err);
+  await prisma.$disconnect().catch(() => {});
   process.exit(1);
 });

@@ -21,6 +21,7 @@ import PaymentProofUpload from '@/components/ui/PaymentProofUpload';
 import ProofViewerModal, { PaymentProofData } from '@/components/ui/ProofViewerModal';
 import { DigitalInvoiceModal } from './components/DigitalInvoiceModal';
 import { VoidRefundModal } from './components/VoidRefundModal';
+import { buildWhatsAppInvoiceUrl } from '@/lib/whatsappInvoice';
 import { toast } from 'sonner';
 
 interface CartItem {
@@ -596,20 +597,15 @@ export default function SalesPage() {
 
   // WhatsApp Digital Invoice Sender
   const handleSendWhatsAppInvoice = (receipt: any) => {
-    const rawPhone = receipt.customerPhone || customerPhone;
-    const cleanDigits = clean10DigitPhone(rawPhone);
-    if (cleanDigits.length < 10) {
-      toast.error('Customer has no valid 10-digit mobile number for WhatsApp dispatch.');
+    const targetPhone = receipt.customerPhone || customerPhone;
+    const res = buildWhatsAppInvoiceUrl(receipt, targetPhone);
+    if (!res.success || !res.url) {
+      toast.error(res.error || 'Customer phone number is required to send invoice on WhatsApp.');
       return;
     }
 
-    const custFirstName = (receipt.customerName || 'Valued Customer').split(' ')[0];
-    const invoiceUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/sales?invoice=${receipt.orderNo}`;
-    const message = `Hello ${custFirstName}, thank you for shopping with COSKO. Your invoice ${receipt.orderNo} for ₹${receipt.total.toLocaleString('en-IN')} is available here: ${invoiceUrl}`;
-
-    const waUrl = `https://wa.me/91${cleanDigits}?text=${encodeURIComponent(message)}`;
-    window.open(waUrl, '_blank');
-    toast.success(`Opened WhatsApp with invoice link for +91 ${cleanDigits}`);
+    window.open(res.url, '_blank');
+    toast.success(`Opened WhatsApp with invoice summary for +91 ${res.cleanPhone}`);
   };
 
   // Sales History Filtering
@@ -1248,6 +1244,8 @@ export default function SalesPage() {
                     required={true}
                     label="Payment Proof * (Receipt / Screenshot / Slip)"
                     helperText="Upload UPI screenshot, card slip, or cash voucher (JPG, PNG, WebP, PDF) — Required"
+                    storeCode={effectiveStore}
+                    relatedEntityType="Sale"
                   />
 
                   {!posPaymentProofUrl && cart.length > 0 && (

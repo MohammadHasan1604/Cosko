@@ -408,6 +408,9 @@ export default function ExpenseFormModal({
             required={true}
             label="Payment Proof * (Receipt / Bill / Voucher)"
             helperText="Upload official invoice, bank confirmation, or voucher (JPG, PNG, WebP, PDF) — Required"
+            storeCode={store}
+            relatedEntityType="Expense"
+            relatedEntityId={expense?.id}
           />
 
           {/* Validation Helper Notice */}

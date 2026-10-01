@@ -20,6 +20,9 @@ export interface PaymentProofUploadProps {
   helperText?: string;
   disabled?: boolean;
   error?: string;
+  storeCode?: string;
+  relatedEntityType?: 'Sale' | 'PurchasePayment' | 'Expense' | string;
+  relatedEntityId?: string;
   onUploadStart?: () => void;
   onUploadEnd?: () => void;
 }
@@ -32,6 +35,9 @@ export default function PaymentProofUpload({
   helperText = 'Receipt, UPI screenshot, Cheque/Bank voucher, or payment slip (JPG, PNG, WebP, PDF up to 10MB)',
   disabled = false,
   error,
+  storeCode,
+  relatedEntityType,
+  relatedEntityId,
   onUploadStart,
   onUploadEnd,
 }: PaymentProofUploadProps) {
@@ -76,7 +82,11 @@ export default function PaymentProofUpload({
     onUploadStart?.();
 
     try {
-      const res = await StorageService.uploadPaymentProof(file);
+      const res = await StorageService.uploadPaymentProof(file, {
+        storeCode,
+        relatedEntityType,
+        relatedEntityId,
+      });
       if (res.success && res.url) {
         const meta: PaymentProofMeta = {
           filename: res.filename || file.name,

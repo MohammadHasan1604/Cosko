@@ -149,7 +149,22 @@ async function main() {
   ];
 
   // 2. Ensure CENTRAL vendor Samsung exists
-  const centralVendor = await prisma.vendor.findFirst({ where: { storeCode: 'CENTRAL', status: 'Active' } });
+  let centralVendor = await prisma.vendor.findFirst({ where: { storeCode: 'CENTRAL', status: 'Active' } });
+  if (!centralVendor) {
+    centralVendor = await prisma.vendor.create({
+      data: {
+        code: `VND-CEN-${Date.now().toString().slice(-4)}`,
+        name: 'Samsung India Central',
+        contactPerson: 'Central Purchasing',
+        email: 'central@samsung.com',
+        phone: '9876543210',
+        city: 'Bengaluru',
+        categories: 'Electronics',
+        storeCode: 'CENTRAL',
+        status: 'Active',
+      },
+    });
+  }
   assert('CENTRAL vendor exists in database', !!centralVendor, centralVendor ? `ID: ${centralVendor.id} (${centralVendor.name})` : 'No CENTRAL vendor');
   const centralVendorId = centralVendor?.id || 'non_existent_central';
 

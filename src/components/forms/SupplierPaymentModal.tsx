@@ -342,6 +342,9 @@ export default function SupplierPaymentModal({
           required={true}
           label="Payment Proof * (Screenshot / Bank Receipt / Cheque Copy)"
           helperText="Upload official transaction receipt or voucher (JPG, PNG, WebP, PDF) — Required"
+          storeCode={purchase?.storeCode || purchase?.store}
+          relatedEntityType="PurchasePayment"
+          relatedEntityId={purchase?.id}
         />
 
         {/* Remarks / Notes */}

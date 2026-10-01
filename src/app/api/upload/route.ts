@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, createAuditLog } from '@/lib/authPipeline';
+import { authenticateRequest, createAuditLog, validatePhysicalStore } from '@/lib/authPipeline';
 import {
   uploadToStorage,
   validateFile,
@@ -39,9 +39,85 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File | null;
     const categoryRaw = (formData.get('category') as string) || 'payment-proofs';
     const bucket: StorageBucket = CATEGORY_MAP[categoryRaw] || 'payment-proofs';
+    const requestedStore = (formData.get('storeCode') as string)?.trim() || '';
+    const requestedEntityType = (formData.get('relatedEntityType') as string)?.trim() || '';
+    const requestedEntityId = (formData.get('relatedEntityId') as string)?.trim() || '';
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+
+    // 🔒 Authoritative Server Store Rule for Private Financial Evidence
+    const isFinancialEvidence =
+      categoryRaw === 'payment-proofs' || categoryRaw === 'expense-receipts';
+    let effectiveStoreCode: string | null = null;
+
+    if (isFinancialEvidence) {
+      if (user.role === 'Super Admin') {
+        if (!requestedStore) {
+          return NextResponse.json(
+            {
+              error:
+                'Physical store code is required when uploading private financial evidence as Super Admin.',
+            },
+            { status: 400 }
+          );
+        }
+        const storeVal = await validatePhysicalStore(requestedStore);
+        if (!storeVal.valid || !storeVal.storeCode) {
+          return NextResponse.json(
+            {
+              error:
+                storeVal.error ||
+                `Invalid store code "${requestedStore}". Financial evidence must target an active physical store.`,
+            },
+            { status: 400 }
+          );
+        }
+        effectiveStoreCode = storeVal.storeCode;
+      } else {
+        const assignedStore = user.store?.trim().toUpperCase();
+        if (
+          !assignedStore ||
+          assignedStore === 'ALL STORES' ||
+          assignedStore === 'ALL' ||
+          assignedStore === 'HQ'
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                'Forbidden: User does not have a valid assigned physical store for financial proof upload.',
+            },
+            { status: 403 }
+          );
+        }
+
+        if (requestedStore && requestedStore.toUpperCase() !== assignedStore) {
+          return NextResponse.json(
+            {
+              error: `Forbidden: Cannot upload financial proof for another store (${requestedStore}). Assigned store is ${assignedStore}.`,
+            },
+            { status: 403 }
+          );
+        }
+
+        effectiveStoreCode = assignedStore;
+      }
+    } else {
+      // Non-financial uploads
+      if (requestedStore) {
+        const storeVal = await validatePhysicalStore(requestedStore);
+        if (storeVal.valid && storeVal.storeCode) {
+          effectiveStoreCode = storeVal.storeCode;
+        } else {
+          effectiveStoreCode =
+            user.store && user.store !== 'All Stores' && user.store !== 'HQ' ? user.store : null;
+        }
+      } else if (user.store && user.store !== 'All Stores' && user.store !== 'HQ') {
+        effectiveStoreCode = user.store;
+      } else {
+        effectiveStoreCode = null;
+      }
     }
 
     const mimeType = file.type?.toLowerCase() || '';
@@ -78,24 +154,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const effectiveEntityType =
+      requestedEntityType ||
+      (categoryRaw === 'payment-proofs'
+        ? 'Sale'
+        : categoryRaw === 'expense-receipts'
+          ? 'Expense'
+          : 'Asset');
+
     // Persist FileAsset record in MySQL
     try {
       await (prisma as any).fileAsset.create({
         data: {
           objectKey: result.key,
-          storageProvider: process.env.STORAGE_ENDPOINT ? 's3' : 'local',
+          storageProvider:
+            process.env.STORAGE_ENDPOINT || process.env.R2_ENDPOINT || process.env.R2_ACCOUNT_ID
+              ? 's3'
+              : 'local',
           mimeType: result.mimeType,
           byteSize: result.size,
           originalFilename: file.name || 'document',
           createdByUserId: user.id,
-          storeCode: user.store && user.store !== 'All Stores' && user.store !== 'HQ' ? user.store : 'BLR',
+          storeCode: effectiveStoreCode,
           privacyLevel: result.isPrivate ? 'STORE_PRIVATE' : 'PUBLIC',
-          relatedEntityType:
-            categoryRaw === 'payment-proofs'
-              ? 'Sale'
-              : categoryRaw === 'expense-receipts'
-                ? 'Expense'
-                : 'Asset',
+          relatedEntityType: effectiveEntityType,
+          relatedEntityId: requestedEntityId || null,
         },
       });
     } catch (assetErr) {
@@ -119,6 +202,8 @@ export async function POST(req: NextRequest) {
       size: result.size,
       mimeType: result.mimeType,
       isPrivate: result.isPrivate,
+      storeCode: effectiveStoreCode,
+      relatedEntityType: effectiveEntityType,
       uploadedAt: new Date().toISOString(),
       uploadedBy: user.name,
     });

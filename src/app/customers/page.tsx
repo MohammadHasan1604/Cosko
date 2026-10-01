@@ -20,9 +20,18 @@ export default function CustomersPage() {
     updateCustomer,
     addAuditLog,
     currentUser,
+    selectedStore,
   } = useApp();
 
   const isSuperAdmin = currentUser?.role === 'Super Admin';
+  const effectiveCustomerStore =
+    currentUser?.role === 'Super Admin'
+      ? selectedStore && selectedStore !== 'All Stores'
+        ? selectedStore
+        : 'BLR'
+      : currentUser?.store && currentUser.store !== 'All Stores'
+        ? currentUser.store
+        : 'BLR';
 
   const [registerModal, setRegisterModal] = useState(false);
   const [editCustomerModal, setEditCustomerModal] = useState<Customer | null>(null);
@@ -925,6 +934,9 @@ export default function CustomersPage() {
                 onChange={setSettleProof}
                 required={false}
                 label="Payment Proof Receipt / Slip (Optional)"
+                storeCode={effectiveCustomerStore}
+                relatedEntityType="CustomerPayment"
+                relatedEntityId={settleCreditCustomer?.id}
               />
 
               {/* Notes */}

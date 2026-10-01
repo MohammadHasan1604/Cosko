@@ -1436,6 +1436,8 @@ export default function PurchaseOrderFormModal({
                   required={true}
                   label="Advance Payment Proof * (Receipt / Voucher / Screenshot)"
                   helperText="Upload receipt, UPI screenshot, Cheque/Bank voucher (JPG, PNG, WebP, PDF up to 10MB) — Required"
+                  storeCode={store}
+                  relatedEntityType="PurchasePayment"
                 />
               </div>
             )}

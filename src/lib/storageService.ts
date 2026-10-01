@@ -100,7 +100,14 @@ export class StorageService {
    * Upload payment proof handler: uploads file directly to backend /api/upload
    * Supporting JPG, PNG, WebP, PDF up to 10MB, returning permanent URL
    */
-  static async uploadPaymentProof(file: File): Promise<{
+  static async uploadPaymentProof(
+    file: File,
+    context?: {
+      storeCode?: string;
+      relatedEntityType?: 'Sale' | 'PurchasePayment' | 'Expense' | string;
+      relatedEntityId?: string;
+    }
+  ): Promise<{
     success: boolean;
     url?: string;
     key?: string;
@@ -113,6 +120,16 @@ export class StorageService {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('category', 'payment-proofs');
+
+      if (context?.storeCode) {
+        formData.append('storeCode', context.storeCode);
+      }
+      if (context?.relatedEntityType) {
+        formData.append('relatedEntityType', context.relatedEntityType);
+      }
+      if (context?.relatedEntityId) {
+        formData.append('relatedEntityId', context.relatedEntityId);
+      }
 
       const res = await fetch('/api/upload', {
         method: 'POST',
